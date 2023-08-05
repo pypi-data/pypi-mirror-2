@@ -1,0 +1,89 @@
+GoogleSystemStorage
+===================
+
+
+About GoogleSystemStorage
+-------------------------
+
+GoogleSystemStorage (GSS) is an extension of FileSystemStorage (FSS).
+
+GSS transparently to the user, saves the document types supported by the Google Docs service
+on the Google servers, while storing all the other files in the local filesystem.
+
+GSS permits Plone users to access their files from both the Plone application and their 
+Google Docs account. 
+
+In addition, GSS permits to overcome the problem of ZODB size growth, and the consequent 
+performance penalties, when many files with large size are used.
+
+
+Copyright and license
+---------------------
+
+Copyright (c) 2009 Federica D'Elia
+
+This software is subject to the provisions of the GNU General Public License,
+Version 2.0 (GPL).  A copy of the GPL should accompany this distribution.
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
+WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
+FOR A PARTICULAR PURPOSE
+
+See the `LICENSE` file that comes with this product.
+
+
+Requirements
+------------
+
+FileSystemStorage, GoogleAuthentication and gdata-1.3.0
+must be correctly installed.
+
+
+Installation
+------------
+
+With buildout
+-------------
+
+This example speaks of itself::
+
+  [buildout]
+  parts =
+      ...
+      fss
+  
+  ...
+  
+  eggs =
+    ...
+    collective.googlesystemstorage
+    collective.googleauthentication
+    iw.recipe.fss
+    iw.fss
+    ...
+  
+  ...
+  
+  zcml =
+      ...
+      collective.googlesystemstorage
+      collective.googleauthentication
+      iw.fss
+      iw.fss-meta
+  
+  ...
+  
+  [fss]
+  recipe = iw.recipe.fss
+  zope-instances =
+       ${instance:location}
+  
+  storages =
+      global / flat
+      portale /portale site1 ${buildout:directory}/var/portale_fss_storage ${buildout:directory}/var/portale_fss_backup
+
+
+Credits
+-------
+
+Main developer: D'Elia Federica <federica.delia@redturtle.it>
