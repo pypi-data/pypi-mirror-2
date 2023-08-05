@@ -1,0 +1,1 @@
+Please see ./collective/subscribemember/README.txt
