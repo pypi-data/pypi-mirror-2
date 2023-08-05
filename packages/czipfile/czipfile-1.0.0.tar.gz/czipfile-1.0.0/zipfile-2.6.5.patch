@@ -1,0 +1,202 @@
+This file is a patch versus Python's bundled zipfile.py, in case you
+wanted to see the actual differences easily.  Enjoy!
+
+--- Python-2.6.5/Lib/zipfile.py	2010-01-06 14:08:02.000000000 -0600
++++ czipfile.pyx	2010-07-27 13:45:06.000000000 -0500
+@@ -3,6 +3,7 @@
+ """
+ import struct, os, time, sys, shutil
+ import binascii, cStringIO, stat
++cimport python
+ 
+ try:
+     import zlib # We may need its compression method
+@@ -380,7 +381,7 @@
+             extra = extra[ln+4:]
+ 
+ 
+-class _ZipDecrypter:
++cdef class _ZipDecrypter:
+     """Class to handle decryption of files stored within a ZIP archive.
+ 
+     ZIP supports a password-based form of encryption. Even though known
+@@ -389,55 +390,81 @@
+ 
+     Usage:
+         zd = _ZipDecrypter(mypwd)
+-        plain_char = zd(cypher_char)
++        plain_text = zd(cypher_text)
++
++    The original usage of:
+         plain_text = map(zd, cypher_text)
++    is still supported, but will be slower (by a factor of 10 or so, by
++    my measurements) than simply calling it with the full cypher_text.
+     """
+ 
+-    def _GenerateCRCTable():
++    # I guess to make these C vars, we must declare them out here?
++    cdef unsigned long crctable[256]
++    cdef unsigned long key0
++    cdef unsigned long key1
++    cdef unsigned long key2
++
++    cdef void _GenerateCRCTable(self):
+         """Generate a CRC-32 table.
+ 
+         ZIP encryption uses the CRC32 one-byte primitive for scrambling some
+         internal keys. We noticed that a direct implementation is faster than
+         relying on binascii.crc32().
+         """
+-        poly = 0xedb88320
+-        table = [0] * 256
+-        for i in range(256):
++        cdef unsigned long poly = 0xedb88320
++        cdef unsigned long crc, i, j
++        for 0 <= i < 256:
+             crc = i
+-            for j in range(8):
++            for 0 <= j < 8:
+                 if crc & 1:
+                     crc = ((crc >> 1) & 0x7FFFFFFF) ^ poly
+                 else:
+                     crc = ((crc >> 1) & 0x7FFFFFFF)
+-            table[i] = crc
+-        return table
+-    crctable = _GenerateCRCTable()
++            self.crctable[i] = crc
+ 
+-    def _crc32(self, ch, crc):
++    cdef unsigned long _crc32(self, unsigned char ch, unsigned long crc):
+         """Compute the CRC32 primitive on one byte."""
+-        return ((crc >> 8) & 0xffffff) ^ self.crctable[(crc ^ ord(ch)) & 0xff]
++        return ((crc >> 8) & 0xffffff) ^ self.crctable[(crc ^ ch) & 0xff]
+ 
+     def __init__(self, pwd):
+         self.key0 = 305419896
+         self.key1 = 591751049
+         self.key2 = 878082192
++
++        # Generate the CRC table; previously done outside of any method
++        self._GenerateCRCTable()
++
++        # Update our keys, given the password
+         for p in pwd:
+-            self._UpdateKeys(p)
++            self._UpdateKeys(ord(p))
+ 
+-    def _UpdateKeys(self, c):
++    cdef void _UpdateKeys(self, unsigned char c):
+         self.key0 = self._crc32(c, self.key0)
+-        self.key1 = (self.key1 + (self.key0 & 255)) & 4294967295
+-        self.key1 = (self.key1 * 134775813 + 1) & 4294967295
+-        self.key2 = self._crc32(chr((self.key1 >> 24) & 255), self.key2)
+-
+-    def __call__(self, c):
+-        """Decrypt a single character."""
+-        c = ord(c)
+-        k = self.key2 | 2
+-        c = c ^ (((k * (k^1)) >> 8) & 255)
+-        c = chr(c)
+-        self._UpdateKeys(c)
+-        return c
++        self.key1 = (self.key1 + (self.key0 & 255)) & 4294967295UL
++        self.key1 = (self.key1 * 134775813 + 1) & 4294967295UL
++        self.key2 = self._crc32((self.key1 >> 24) & 255, self.key2)
++
++    def __call__(self, data):
++        cdef unsigned long k
++        cdef Py_ssize_t i, datalen
++        cdef char *data_s, *ret_s
++
++        python.PyString_AsStringAndSize(data, &data_s, &datalen)
++        ret = python.PyString_FromStringAndSize(NULL, datalen)
++        ret_s = python.PyString_AsString(ret)
++        for 0 <= i < datalen:
++            k = self.key2 | 2
++            ret_s[i] = data_s[i] ^ (((k * (k^1)) >> 8) & 255);
++            # The proper way to do this is to call _UpdateKeys here, like so:
++            #self._UpdateKeys(ret_s[i])
++            # ... but we can cut runtime by about a third if we unroll the
++            # function.  So, we're doing so.  Yes, it's duplication.  Ah well...
++            self.key0 = ((self.key0 >> 8) & 0xFFFFFF) ^ self.crctable[(self.key0 ^ ret_s[i]) & 0xFF]
++            self.key1 = (self.key1 + (self.key0 & 255)) & 4294967295UL
++            self.key1 = (self.key1 * 134775813 + 1) & 4294967295UL
++            self.key2 = ((self.key2 >> 8) & 0xFFFFFF) ^ self.crctable[(self.key2 ^ ((self.key1 >> 24) & 255)) & 0xFF]
++
++        return ret
+ 
+ class ZipExtFile:
+     """File-like object for reading an archive member.
+@@ -605,7 +632,7 @@
+ 
+                 # decrypt new data if we were given an object to handle that
+                 if newdata and self.decrypter is not None:
+-                    newdata = ''.join(map(self.decrypter, newdata))
++                    newdata = self.decrypter(newdata)
+ 
+                 # decompress newly read data if necessary
+                 if newdata and self.compress_type == ZIP_DEFLATED:
+@@ -632,7 +659,6 @@
+ 
+         return bytes
+ 
+-
+ class ZipFile:
+     """ Class with methods to open, read, write, close, list zip files.
+ 
+@@ -890,7 +916,7 @@
+             #  or the MSB of the file time depending on the header type
+             #  and is used to check the correctness of the password.
+             bytes = zef_file.read(12)
+-            h = map(zd, bytes[0:12])
++            h = zd(bytes[0:12])
+             if zinfo.flag_bits & 0x8:
+                 # compare against the file type from extended local headers
+                 check_byte = (zinfo._raw_time >> 8) & 0xff
+@@ -1177,14 +1203,14 @@
+                      0, zinfo.internal_attr, zinfo.external_attr,
+                      header_offset)
+                 except DeprecationWarning:
+-                    print >>sys.stderr, (structCentralDir,
++                    sys.stderr.write("%s\n" % str((structCentralDir,
+                      stringCentralDir, create_version,
+                      zinfo.create_system, extract_version, zinfo.reserved,
+                      zinfo.flag_bits, zinfo.compress_type, dostime, dosdate,
+                      zinfo.CRC, compress_size, file_size,
+                      len(zinfo.filename), len(extra_data), len(zinfo.comment),
+                      0, zinfo.internal_attr, zinfo.external_attr,
+-                     header_offset)
++                     header_offset)))
+                     raise
+                 self.fp.write(centdir)
+                 self.fp.write(filename)
+@@ -1390,20 +1416,20 @@
+             print USAGE
+             sys.exit(1)
+ 
+-        def addToZip(zf, path, zippath):
+-            if os.path.isfile(path):
+-                zf.write(path, zippath, ZIP_DEFLATED)
+-            elif os.path.isdir(path):
+-                for nm in os.listdir(path):
+-                    addToZip(zf,
+-                            os.path.join(path, nm), os.path.join(zippath, nm))
+-            # else: ignore
+-
+         zf = ZipFile(args[1], 'w', allowZip64=True)
+         for src in args[2:]:
+             addToZip(zf, src, os.path.basename(src))
+ 
+         zf.close()
+ 
++def addToZip(zf, path, zippath):
++    if os.path.isfile(path):
++        zf.write(path, zippath, ZIP_DEFLATED)
++    elif os.path.isdir(path):
++        for nm in os.listdir(path):
++            addToZip(zf,
++                    os.path.join(path, nm), os.path.join(zippath, nm))
++    # else: ignore
++
+ if __name__ == "__main__":
+     main()
