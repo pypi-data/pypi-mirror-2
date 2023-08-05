@@ -1,0 +1,329 @@
+Metadata-Version: 1.0
+Name: collective.portlet.localcumulus
+Version: 1.4
+Summary: Project collective.portlet.localcumulus cumulus product
+Home-page: http://pypi.python.org/pypi/collective.portlet.localcumulus
+Author: kiorky
+Author-email: kiorky@cryptelium.net
+License: GPL
+Description: .. contents::
+        
+        Introduction
+        ==============
+        
+        - based on `quintagroup.portlet.cumulus`_
+        
+        This package provides 2 new tagcloud based portlets
+        
+        With
+        
+        * cache (refresh)
+        * local path searches enhancements
+        
+        And for the 'custom portlet':
+        
+        * url customization for tag browsing
+        
+        Usage
+        
+        * Install "Local Tag cloud (cumulus) portlet" with QuickInstaller.
+        * Select Local Tag Cloud (cumulus) portlet from Add portlet drop-down menu.
+        * Provide your own values for portlet configuration if needed.
+        * Save changes.
+        
+        Supported Plone version
+        
+        * 3.x
+        
+        Repository:
+        
+        `svn`_
+        
+        .. _quintagroup.portlet.cumulus:  http://pypi.python.org/pypi/quintagroup.portlet.cumulus/
+        .. _svn: http://svn.plone.org/svn/collective/colllective.portlet.localcumulus/trunk
+        
+        
+        
+        
+        collective.portlet.cumulus Installation
+        =================================================================================
+        
+        To install collective.portlet.cumulus into the global Python environment (or a workingenv),
+        using a traditional Zope 2 instance, you can do this:
+        
+        * When you're reading this you have probably already run ::
+        
+        ``easy_install collective.portlet.cumulus``.
+        
+        Find out how to install setuptools (and EasyInstall) here:
+        http://peak.telecommunity.com/DevCenter/EasyInstall
+        
+        * If you are using Zope 2.9 (not 2.10), get `pythonproducts`_ and install it
+        via::
+        
+        python setup.py install --home /path/to/instance
+        
+        into your Zope instance.
+        
+        * Create a file called ``collective.portlet.cumulus-configure.zcml`` in the
+        ``/path/to/instance/etc/package-includes`` directory.  The file
+        should only contain this::
+        
+        <include package="collective.portlet.cumulus" />
+        
+        .. _pythonproducts: http://plone.org/products/pythonproducts
+        
+        
+        Alternatively, if you are using zc.buildout and the plone.recipe.zope2instance
+        recipe to manage your project, you can do this:
+        
+        * Add ``collective.portlet.cumulus`` to the list of eggs to install, e.g.::
+        
+        [buildout]
+        ...
+        eggs =
+        ...
+        collective.portlet.cumulus
+        
+        * Tell the plone.recipe.zope2instance recipe to install a ZCML slug::
+        
+        [instance]
+        recipe = plone.recipe.zope2instance
+        ...
+        zcml =
+        collective.portlet.cumulus
+        
+        * Re-run buildout, e.g. with::
+        
+        $ ./bin/buildout
+        
+        You can skip the ZCML slug if you are going to explicitly include the package
+        from another package's configure.zcml file.
+        
+        
+        Detailed documentation
+        ============================
+        
+        The local renderer and portlet objects
+        -------------------------------------------
+        
+        Adding some content for testing searches
+        ::
+        
+        >>> self.setRoles(('Manager', ))
+        >>> self.portal['front-page'].edit(subject=['global', 'tags'])
+        >>> if1 = self.folder.invokeFactory('Folder', id='f1')
+        >>> if2 = self.folder.invokeFactory('Folder', id='f2')
+        >>> f1 = self.folder[if1]
+        >>> f2 = self.folder[if2]
+        >>> d1 = f1.invokeFactory('Document', id='blog-entry1')
+        >>> d2 = f1.invokeFactory('Document', id='blog-entry2')
+        >>> d3 = f2.invokeFactory('Document', id='blog-entry3')
+        >>> d4 = f2.invokeFactory('Document', id='blog-entry4')
+        >>> f1[d1].edit(subject=['blog', 'tags'])
+        >>> f1[d2].edit(subject=['foo', 'bar'])
+        >>> f2[d3].edit(subject=['toto', 'titi'])
+        >>> f2[d4].edit(subject=['toto', 'tutu'])
+        
+        
+        
+        Looking for our adapter to be in place
+        ::
+        
+        >>> from collective.portlet.localcumulus.interfaces import ILocalTagsRetriever
+        >>> from collective.portlet.localcumulus import catalog
+        >>> data = catalog.DummyData()
+        >>> data.refreshInterval = 1
+        
+        
+        This adapter takes a context and an Assigment as 'data' attribute
+        ::
+        
+        >>> retriever = ILocalTagsRetriever(f1)
+        >>> retriever
+        <collective.portlet.localcumulus.catalog.LocalTags object at ...>
+        
+        Trying to get the local tags of the f1 folder
+        ::
+        
+        >>> data.path = '/'.join(f1.getPhysicalPath())
+        >>> retriever.data = data
+        >>> print '\n'.join(['%s %s %s'% i for i in retriever.getTags()])
+        blog 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=blog
+        foo 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=foo
+        bar 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=bar
+        tags 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=tags
+        
+        Trying to get the local tags of the f2 folder
+        ::
+        
+        >>> data.path = '/'.join(f2.getPhysicalPath())
+        >>> print '\n'.join(['%s %s %s'% i for i in retriever.getTags()])
+        tutu 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f2&Subject:list=tutu
+        titi 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f2&Subject:list=titi
+        toto 2 http://nohost/plone/search?path=/plone/Members/test_user_1_/f2&Subject:list=toto
+        
+        
+        
+        If we have a portlet without path, it goes system wide
+        ::
+        
+        >>> data.path = ''
+        >>> print '\n'.join(['%s %s %s'% i for i in retriever.getTags(data=data)])
+        bar 1 http://nohost/plone/search?Subject:list=bar
+        blog 1 http://nohost/plone/search?Subject:list=blog
+        foo 1 http://nohost/plone/search?Subject:list=foo
+        global 1 http://nohost/plone/search?Subject:list=global
+        tags 2 http://nohost/plone/search?Subject:list=tags
+        titi 1 http://nohost/plone/search?Subject:list=titi
+        toto 2 http://nohost/plone/search?Subject:list=toto
+        tutu 1 http://nohost/plone/search?Subject:list=tutu
+        
+        
+        Testing cache
+        ::
+        
+        >>> import time
+        >>> data.path = '/'.join(f2.getPhysicalPath())
+        >>> data.refreshInterval = 10
+        >>> [o[0] for o in retriever.getTags()]
+        [u'tutu', u'titi', u'toto']
+        >>> f2[d4].edit(subject=['toto', 'tutu', 'tata'])
+        >>> [o[0] for o in retriever.getTags()]
+        [u'tutu', u'titi', u'toto']
+        >>> time.sleep(2)
+        >>> [o[0] for o in retriever.getTags()]
+        [u'tutu', u'titi', u'toto']
+        
+        After 11 seconds, cache life is up
+        ::
+        
+        >>> time.sleep(9)
+        >>> [o[0] for o in retriever.getTags()]
+        [u'tutu', u'titi', u'toto', u'tata']
+        
+        .. vim: set ft=rst:
+        
+        
+        The local custom portlet
+        --------------------------
+        
+        The custom portlet enables the user to format the url used to browse a tag instead to use the plone ``search_form`` as a default.
+        
+        Tests
+        ~~~~~~~
+        Adding some content for testing searches
+        ::
+        
+        >>> self.setRoles(('Manager', ))
+        >>> self.portal['front-page'].edit(subject=['global', 'tags'])
+        >>> if1 = self.folder.invokeFactory('Folder', id='f1')
+        >>> if2 = self.folder.invokeFactory('Folder', id='f2')
+        >>> f1 = self.folder[if1]
+        >>> f2 = self.folder[if2]
+        >>> d1 = f1.invokeFactory('Document', id='blog-entry1')
+        >>> d2 = f1.invokeFactory('Document', id='blog-entry2')
+        >>> d3 = f2.invokeFactory('Document', id='blog-entry3')
+        >>> d4 = f2.invokeFactory('Document', id='blog-entry4')
+        >>> f1[d1].edit(subject=['blog', 'tags'])
+        >>> f1[d2].edit(subject=['foo', 'bar'])
+        >>> f2[d3].edit(subject=['toto', 'titi'])
+        >>> f2[d4].edit(subject=['toto', 'tutu'])
+        
+        Looking for our adapter to be in place
+        ::
+        
+        >>> from collective.portlet.localcumulus.interfaces import ICustomLocalTagsRetriever
+        >>> from collective.portlet.localcumulus import catalog
+        >>> data = catalog.DummyData()
+        >>> data.refreshInterval = 1
+        >>> data.path = '/'.join(f1.getPhysicalPath())
+        
+        This adapter takes a context and an Assigment as 'data' attribute
+        ::
+        
+        >>> retriever = ICustomLocalTagsRetriever(f1)
+        >>> retriever
+        <collective.portlet.localcumulus.catalog.CustomLocalTags object at ...>
+        
+        Trying to get the local tags of the f1 folder with no url, it will default to the localtag behaviour
+        ::
+        
+        >>> data.search_url = ''
+        >>> retriever.data = data
+        >>> print '\n'.join(['%s %s %s'% i for i in retriever.getTags()])
+        blog 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=blog
+        foo 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=foo
+        bar 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=bar
+        tags 1 http://nohost/plone/search?path=/plone/Members/test_user_1_/f1&Subject:list=tags
+        
+        
+        Customize url with variables
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        We can play with some variables in python dict-string formating style.
+        
+        If we have an url without any parameters inside, it just appends the tag at the end
+        ::
+        
+        >>> [bool(catalog.NOT_SIMPLE_URL_RE.match(a)) for a in ['azerty', '()', '%(azerty)s', '%()', '%()s']]
+        [False, False, True, False, False]
+        >>> data.search_url = 'http://foo'
+        >>> retriever.data = data
+        >>> print '\n'.join(['%s' % i for i in retriever.getTags()])
+        [u'blog', 1, u'http://foo/blog&path=/plone/Members/test_user_1_/f1']
+        [u'foo', 1, u'http://foo/foo&path=/plone/Members/test_user_1_/f1']
+        [u'bar', 1, u'http://foo/bar&path=/plone/Members/test_user_1_/f1']
+        [u'tags', 1, u'http://foo/tags&path=/plone/Members/test_user_1_/f1']
+        
+        Think that you'll surely have to add at least ``%(tag)s`` somewhere in your url to include the tag information ;).
+        
+        Variables avaiblable are:
+        
+        * *portal_path*: plone site path
+        * *portal_url*: plone site url
+        * *here_url*: context url
+        * *here_path*: context path inside the ZODB
+        * *tag*: the tag
+        * *tag_weight*: weight of the tag
+        
+        ::
+        
+        >>> data.search_url = '%(portal_url)s?path=%(portal_path)s&url=%(here_url)s&hpath=%(here_path)s&tag=%(tag)s&weight=%(tag_weight)s'
+        >>> retriever.data = data
+        >>> print '\n'.join(['%s' % i for i in retriever.getTags()])
+        [u'blog', 1, u'http://nohost/plone?path=/plone&url=http://nohost/plone/Members/test_user_1_/f1&hpath=/plone&tag=blog&weight=1']
+        [u'foo', 1, u'http://nohost/plone?path=/plone&url=http://nohost/plone/Members/test_user_1_/f1&hpath=/plone&tag=foo&weight=1']
+        [u'bar', 1, u'http://nohost/plone?path=/plone&url=http://nohost/plone/Members/test_user_1_/f1&hpath=/plone&tag=bar&weight=1']
+        [u'tags', 1, u'http://nohost/plone?path=/plone&url=http://nohost/plone/Members/test_user_1_/f1&hpath=/plone&tag=tags&weight=1']
+        
+        .. vim: set ft=rst:
+        
+        
+        Changelog
+        =========
+        
+        1.4 - 2010-03-16
+        ------------------
+        * grok fix (remove it, useless) [kiorky]
+        * Fix tests.
+        
+        
+        1.3 - Unreleased
+        -------------------
+        
+        * honour path in custom portlet [kiorky]
+        
+        1.2 - 2010-02-08
+        ------------------
+        
+        * Add customizable portlet with special url to browse when a tag is chosen [kiorky]
+        
+        1.0 - 2010-01-18
+        ------------------
+        
+        * Initial release [kiorky]
+        
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development
