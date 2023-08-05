@@ -1,0 +1,129 @@
+===================================
+Initial setup of portal and browser
+===================================
+
+    >>> from Products.Five.testbrowser import Browser
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> from Products.CMFCore.utils import getToolByName
+    >>> import re
+    >>> catalog = getToolByName(self.portal, 'portal_catalog')
+    >>> portal.error_log.setProperties(20, ignored_exceptions=())
+    >>> portal_url = self.portal.absolute_url()
+    >>> browser = Browser()
+
+Log in as administrator
+    >>> browser.open(portal_url + '/login')
+    >>> browser.getControl('Login Name').value = portal_owner
+    >>> browser.getControl('Password').value = default_password
+    >>> browser.getControl('Log in').click()
+    
+Go to collage compose page
+    >>> browser.open(self.collage.absolute_url())
+    >>> browser.getLink('Compose').click()
+    
+There are just three 'Tags' layout links:
+1. For image (alias-2)
+2. For with-image news item (alias-3)
+3. For no-image news item (alias-4)
+
+    >>> browser.getLink('Image tags', index=0).url
+    '...alias-2/set-content-layout?layout=tags'
+    >>> browser.getLink('Image tags', index=1).url
+    '...alias-3/set-content-layout?layout=tags'
+    >>> browser.getLink('Image tags', index=2).url
+    '...alias-4/set-content-layout?layout=tags'
+    >>> browser.getLink('Image tags', index=3)
+    Traceback (most recent call last):
+    ...
+    LinkNotFoundError
+    
+Set 'tags' layout for no-image news item (alias-4)
+set-content-layout can only be submitted by post method
+
+After submitting, we must go back and reload compose page due to 
+automatic redirection of Collage (not working in test)
+
+    >>> tags_link = browser.getLink('Image tags', index=2)
+    >>> url = tags_link.url.split('?')[0]
+    >>> data = tags_link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+
+    >>> browser.goBack()
+    >>> browser.reload()
+    
+We should get an error message
+    >>> '<strong>Selected object has no loaded image</strong>' in browser.contents
+    True
+    
+This error message, however, is not shown in View mode
+    >>> browser.getLink('View').click()
+    >>> '<strong>Selected object has no loaded image</strong>' in browser.contents
+    False
+    
+Get back to Compose page and set 'tags' layout again for remaining aliases
+    >>> browser.getLink('Compose').click()
+    >>> tags_link = browser.getLink('Image tags', index=0)
+    >>> url = tags_link.url.split('?')[0]
+    >>> data = tags_link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+    >>> browser.goBack()
+    >>> browser.reload()
+
+Now we are again in Compose page let's check the layout has been 
+correctly applied to the image.
+It should show:
+1. An image with a link pointing to image_view_fullscreen
+
+    >>> '<img src="http://nohost/plone/image/image"' in browser.contents
+    True
+
+    >>> browser.getLink(url='/image/image_view_fullscreen').text
+    '...[IMG]...'
+    
+2. A 'Tagged' legend with all tags (none for the time being)
+    >>> 'Tagged' in browser.contents
+    True
+    
+3. A 'Tag this picture' link pointing to tagging management page
+    >>> '/image/@@imagetags-manage' in browser.getLink('Tag this picture').url
+    True
+
+Let's set the 'tags' layout to with-image news item
+(the last 'Image tags' link, that's why we use index=0)
+
+    >>> tags_link = browser.getLink('Image tags', index=0)
+    >>> url = tags_link.url.split('?')[0]
+    >>> data = tags_link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+    >>> browser.goBack()
+    >>> browser.reload()
+        
+We have now three 'Settings' links to set prefernces of the 'tags' layout:
+1. For image (alias-2)
+2. For with-image news item (alias-3)
+3. For no-image news item (alias-4)
+    >>> settings_link = browser.getLink('Settings', index=0)
+    >>> 'alias-2/@@imagetags-settings' in settings_link.url
+    True
+    >>> settings_link = browser.getLink('Settings', index=1)
+    >>> 'alias-3/@@imagetags-settings' in settings_link.url
+    True
+    >>> settings_link = browser.getLink('Settings', index=2)
+    >>> 'alias-4/@@imagetags-settings' in settings_link.url
+    True
+    
+Set scale settings for the image (alias-2)
+    >>> browser.getLink('Settings', index=0).click()
+    >>> browser.getControl('Image scale').value = ('preview',)
+    >>> browser.getControl('Apply').click()
+    >>> '<img src="http://nohost/plone/image/image_preview"' in browser.contents
+    True
