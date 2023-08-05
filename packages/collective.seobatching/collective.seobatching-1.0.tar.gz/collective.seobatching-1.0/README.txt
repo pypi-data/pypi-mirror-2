@@ -1,0 +1,82 @@
+Introduction
+============
+
+.. contents:: Table of contents
+
+Some SEO validation services tell us that query parameters are bad for those
+pages which display different content based on those parameters. It usually
+means having the same page but with different content within it. Thus we end up
+with different pages with the same meta tags, title, etc...
+
+This packages deals only with one kind of query parameters inside Plone: pages
+with batched listings. It replaces those query parameters with traversal
+sub-paths to make up completely different urls for the next items inside batched
+listings.
+
+
+Overview
+========
+
+Plone batching mechanism uses ``b_start`` query parameter to tell where to start
+with displaying content items inside batched listing page. So url for
+``folder1`` containing batched listing might look like::
+
+    ...folder1?b_start:int=10&-C=
+
+Instead, after installing and setting up collective.seobatching package this
+url will have the next appearance::
+
+    ...folder1/batch-10
+
+This is a default look for batched page urls with ``batch-10`` sub-path telling
+that now we're displaying listing starting from the 10th item. ``batch-10`` look
+could be customized if needed. How to do this? Take a look at
+**Deeper Customization** section.
+
+
+Quick Start
+===========
+
+Install this python package as described in ``docs/INSTALL.txt`` file. Then go
+to portal_quickinstaller tool and install ``collective.seobatching``. After this
+``seo_batch_macros.pt`` template will be available for you to use in your
+customized page templates.
+
+For example if you need seo friendly batching in your folder_listing template,
+then customize it and replace this string::
+
+    <div metal:use-macro="here/batch_macros/macros/navigation" />
+
+with the next one::
+
+    <div metal:use-macro="here/seo_batch_macros/macros/navigation" />
+
+That's it.
+
+
+Deeper Customization
+====================
+
+If you're not happy with ``batch-10`` in your batch listing urls, you can easily
+adjust it to your needs inside ``portal_properties`` tool. There you have
+``seobatching_properties`` property sheet with ``batch_pattern`` inside telling
+how to represent batched sub-pages. Default pattern is ``batch-${num}`` which
+gives us the result we saw above.
+
+And, for instance, to have ``start_from_10`` component at the end of batch urls
+we simply have to set ``batch_pattern`` property to::
+
+    start_from_${num}
+
+string. As you guessed already, ``${num}`` is a placeholder for the number of
+items to start from for a given link.
+
+
+Drawbacks
+=========
+
+``collective.seobatching`` doesn't support any other query parameters apart from
+``b_start``. It also won't forward any 3rd party query parameters which may be
+required by your page. So in case you need some extra variables provided by
+``Plone Batch`` class or your own logic, this package won't help. But this may be
+implemented in the next versions of ``collective.seobatching`` package.
