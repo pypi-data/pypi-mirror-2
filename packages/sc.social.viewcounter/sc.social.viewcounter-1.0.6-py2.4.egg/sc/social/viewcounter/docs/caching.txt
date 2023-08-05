@@ -1,0 +1,75 @@
+Caching
+=======
+
+   >>> from sc.social.viewcounter.browser import portlet as vcPortlet
+   >>> from zope.component import getUtility, getMultiAdapter
+   >>> from plone.portlets.interfaces import IPortletType
+   >>> from plone.portlets.interfaces import IPortletManager
+   >>> from plone.portlets.interfaces import IPortletRenderer
+   >>> self.loginAsPortalOwner()
+   >>> portal = self.portal
+
+No results, no cache
+********************
+
+On a brand new instance, let try to see how many accesses we have:
+   
+   >>> allTime = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failUnless(len(allTime)==0)
+
+Populate the backend:
+
+   >>> self.populateViewCounter()
+
+Now, we will execute the same report and it should have something to show us:
+
+   >>> allTime = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failUnless(len(allTime)>0)
+
+Even if we manually add new page views, our results should be the same -- as we 
+are caching it:
+
+   >>> self.populateViewCounter(periods=['lastHour',],invalidate=False)
+   >>> allTime2 = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failUnless(allTime == allTime2)
+
+After invalidation, new resultset:
+
+   >>> self.invalidateReportCache()
+   >>> allTime3 = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failIf(allTime2 == allTime3)
+
+Caching tests
+*************
+
+First we clean any previosly cached report:
+
+   >>> self.invalidateReportCache()
+
+Then we will get the viewsAllTime report:
+
+   >>> allTime = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+
+Add a few page views and get another report:
+
+   >>> self.populateViewCounter(periods=['lastHour',],invalidate=False)
+   >>> allTime2 = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+
+allTime and allTime2 must be the same as we cached this method the first time 
+we invoked it:
+
+   >>> self.failUnless(allTime == allTime2)
+
+If we invalidate the cache, we get a newer resultset:
+
+   >>> self.invalidateReportCache()
+   >>> allTime3 = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failIf(allTime2 == allTime3)
+
+And, of course, even with cached results, each view must have its own resultset:
+
+   >>> self.invalidateReportCache()
+   >>> lastDay = portal.restrictedTraverse('@@vc_reports').viewsLastDay()
+   >>> allTime = portal.restrictedTraverse('@@vc_reports').viewsAllTime()
+   >>> self.failIf(lastDay == allTime)
+   
