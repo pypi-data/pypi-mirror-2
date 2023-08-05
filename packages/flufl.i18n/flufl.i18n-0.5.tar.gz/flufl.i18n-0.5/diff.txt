@@ -1,0 +1,466 @@
+=== modified file 'src/flufl/i18n/__init__.py'
+--- src/flufl/i18n/__init__.py	2010-03-05 04:06:53 +0000
++++ src/flufl/i18n/__init__.py	2010-04-16 03:26:42 +0000
+@@ -16,9 +16,20 @@
+ 
+ """Expose sub-module names in the package namespace."""
+ 
+-__version__ = '0.4'
++__version__ = '0.5'
+ 
+ from flufl.i18n._expand import expand
+ from flufl.i18n._registry import registry
+ # pylint: disable-msg=W0401
+ from flufl.i18n._strategy import *
++
++
++def initialize(domain):
++    """A convenience function for setting up translation.
++
++    :param domain: The application's name.
++    :type domain: string
++    """
++    strategy = SimpleStrategy(domain)
++    application = registry.register(strategy)
++    return application._
+
+=== modified file 'src/flufl/i18n/_application.py'
+--- src/flufl/i18n/_application.py	2010-03-05 04:05:19 +0000
++++ src/flufl/i18n/_application.py	2010-04-16 02:42:35 +0000
+@@ -169,6 +169,7 @@
+         # public API so that we share code.
+         self._default_language = None
+         self._default_translator = None
++        # This sets the _default_translator.
+         del self.default
+ 
+     @property
+@@ -207,7 +208,7 @@
+         """Reset the default language to the null translator."""
+         self._default_language = None
+         self._default_translator = Translator(
+-            gettext.NullTranslations(), self.dedent, self.depth)
++            self._strategy(), self.dedent, self.depth)
+ 
+     def get(self, language_code):
+         """Get the catalog associated with the language code.
+
+=== modified file 'src/flufl/i18n/_strategy.py'
+--- src/flufl/i18n/_strategy.py	2009-11-14 20:35:20 +0000
++++ src/flufl/i18n/_strategy.py	2010-04-16 03:00:07 +0000
+@@ -21,6 +21,7 @@
+ __metaclass__ = type
+ __all__ = [
+     'PackageStrategy',
++    'SimpleStrategy',
+     ]
+ 
+ 
+@@ -30,34 +31,67 @@
+ 
+ 
+ # pylint: disable-msg=R0903
+-class PackageStrategy:
+-    """A strategy that finds catalogs based on package paths."""
++class _BaseStrategy:
++    """Common code for strategies."""
+ 
+-    def __init__(self, name, package):
++    def __init__(self, name):
+         """Create a catalog lookup strategy.
+ 
+         :param name: The application's name.
+         :type name: string
+-        :param package: The package path to the message catalogs.  This
+-            strategy uses the __file__ of the package path as the directory
+-            containing `gettext` messages.
+-        :type package_name: module
+         """
+         self.name = name
+-        self._messages_dir = os.path.dirname(package.__file__)
++        self._messages_dir = None
+ 
+-    def __call__(self, language_code):
++    def __call__(self, language_code=None):
+         """Find the catalog for the language.
+ 
+-        :param language_code: The language code to find.
++        :param language_code: The language code to find.  If None, then the
++            default gettext language code lookup scheme is used.
+         :type language_code: string
+         :return: A `gettext` catalog.
+         :rtype: `gettext.NullTranslations` or subclass
+         """
+         # gettext.translation() requires None or a sequence.
++        languages = (None if language_code is None else [language_code])
+         try:
+             return gettext.translation(
+-                self.name, self._messages_dir, [language_code])
++                self.name, self._messages_dir, languages)
+         except IOError:
+             # Fall back to untranslated source language.
+             return gettext.NullTranslations()
++
++
++class PackageStrategy(_BaseStrategy):
++    """A strategy that finds catalogs based on package paths."""
++
++    def __init__(self, name, package):
++        """Create a catalog lookup strategy.
++
++        :param name: The application's name.
++        :type name: string
++        :param package: The package path to the message catalogs.  This
++            strategy uses the __file__ of the package path as the directory
++            containing `gettext` messages.
++        :type package_name: module
++        """
++        super(PackageStrategy, self).__init__(name)
++        self._messages_dir = os.path.dirname(package.__file__)
++
++
++
++class SimpleStrategy(_BaseStrategy):
++    """A simpler strategy for getting translations."""
++
++    def __init__(self, name):
++        """Create a catalog lookup strategy.
++
++        :param name: The application's name.
++        :type name: string
++        :param package: The package path to the message catalogs.  This
++            strategy uses the __file__ of the package path as the directory
++            containing `gettext` messages.
++        :type package_name: module
++        """
++        super(SimpleStrategy, self).__init__(name)
++        self._messages_dir = os.environ.get('LOCPATH')
+
+=== modified file 'src/flufl/i18n/docs/expand.txt'
+--- src/flufl/i18n/docs/expand.txt	2009-11-12 04:37:04 +0000
++++ src/flufl/i18n/docs/expand.txt	2010-04-16 04:06:43 +0000
+@@ -2,11 +2,11 @@
+ Expanding templates
+ ===================
+ 
+-PEP 292 defines a simplified string template, where substitution variables are
+-identified by a leading $-sign.  The substitution dictionary names the keys
+-and values that should be interpolated into the template.  string.Template
+-uses ** keyword arguments, but Python requires that ** dictionaries have str
+-keys.   Specifically, the keys may not be unicodes.
++`PEP 292`_ defines a simplified string template, where substitution variables
++are identified by a leading $-sign.  The substitution dictionary names the
++keys and values that should be interpolated into the template.
++string.Template uses ** keyword arguments, but Python requires that **
++dictionaries have str keys.  Specifically, the keys may not be unicodes.
+ 
+ For our purposes they keys should always be ascii, so this helper ensures that
+ the keys are of str type.
+@@ -30,3 +30,6 @@
+     ...         key_2: 'the second key',
+     ...         })
+     the second key is different than the first key
++
++
++.. _`PEP 292`: http://www.python.org/dev/peps/pep-0292/
+
+=== modified file 'src/flufl/i18n/docs/readme.txt'
+--- src/flufl/i18n/docs/readme.txt	2010-03-05 04:05:19 +0000
++++ src/flufl/i18n/docs/readme.txt	2010-04-20 21:06:10 +0000
+@@ -2,21 +2,71 @@
+ Using the flufl.i18n library
+ ============================
+ 
+-This is how to use the flufl.i18n library from your application.  The first
+-thing you should do is import the global registry.
++Set up
++======
++
++There are two basic ways that your application can set up translations using
++this library.  The simple initialization will work for most applications,
++where there is only one language context for the entire run of the
++application.  The more complex initialization works well for applications like
++servers that may want to use multiple language contexts during their
++execution.
++
++
++Single language contexts
++------------------------
++
++If your application only needs one language context for its entire execution,
++you can use the simple API to set things up.
++
++    >>> from flufl.i18n import initialize
++
++The library by default uses the $LANG and $LOCPATH environment variables to
++set things up.
++
++    # The testing 'xx' language rot13's the source string.
++    >>> import os
++    >>> import flufl.i18n.testing.messages
++
++    >>> os.environ['LANG'] = 'xx'
++    >>> os.environ['LOCPATH'] = os.path.dirname(
++    ...     flufl.i18n.testing.messages.__file__)
++
++Now you just need to call the `initialize()` function with the application's
++name and you'll get an object back that you can assign to the _() function for
++run-time translations.
++
++    >>> _ = initialize('flufl')
++    >>> print _('A test message')
++    N grfg zrffntr
++
++
++Multiple language contexts
++--------------------------
++
++Some applications, such as servers, are more complex; they need multiple
++language contexts during their execution.  The first thing you should do is
++import the global registry.
+ 
+     >>> from flufl.i18n import registry
+ 
++    # Unregister the application domain used earlier.  Also, clear the
++    # environment settings from above.
++    >>> registry._registry.clear()
++    >>> del os.environ['LANG']
++    >>> del os.environ['LOCPATH']
++
+ Next, decide on a strategy for finding your application's catalogs when given
+-a language code.  flufl.i18n comes with a fairly simple one that looks up
+-catalogs from the file system using GNU gettext's convention.  The base
+-directory for the catalogs is rooted in a submodule.
++a language code.  flufl.i18n comes with a couple of fairly simple ones.  One
++looks up catalogs from within the package directory using GNU gettext's
++convention.  The base directory for the catalogs is rooted in a subpackage.
+ 
+     >>> from flufl.i18n import PackageStrategy
+     >>> import flufl.i18n.testing.messages
+ 
+ The first argument is the application name, which must be unique among all
+-registered strategies.
++registered strategies.  The second argument is the package where the
++translations can be found.
+ 
+     >>> strategy = PackageStrategy('flufl', flufl.i18n.testing.messages)
+ 
+@@ -111,3 +161,67 @@
+ 
+     >>> print _('A test message')
+     N grfg zrffntr
++
++
++Usage
++=====
++
++As you can see from the example above, using the library is very simple.  You
++just put the string to translate inside the underscore function.  What if your
++source strings need placeholders for other runtime information?
++
++In that case, you use `PEP 292`_ style substitution strings as arguments to
++the underscore function.  As a useful convenience, substitutions are taken
++from the locals and globals of the function doing the translation.
++
++    >>> ordinal = 'first'
++    >>> def print_it(name):
++    ...     print _('The $ordinal test message $name')
++
++In this example, when `print_it()` is called, the $ordinal placeholder is
++taken from globals, while the $name placeholder is taken from the function
++locals (i.e. the arguments).  With no language context in place, the source
++string is printed unchanged, except that the substitutions are made.
++
++    >>> del _.default
++    >>> print _.code
++    None
++
++    >>> print_it('Anne')
++    The first test message Anne
++
++When a substitution is missing, rather than raise an exception, the $variable
++is used unchanged.
++
++    >>> del ordinal
++    >>> print_it('Bart')
++    The $ordinal test message Bart
++
++When there is a language context in effect, the substitutions happen after
++translation.
++
++    >>> ordinal = 'second'
++    >>> with _.using('xx'):
++    ...     print_it('Cris')
++    second si n grfg zrffntr Cris
++
++Some languages change the order of the substitution variables, but of course
++there is no problem with that.
++
++    >>> ordinal = 'third'
++    >>> with _.using('yy'):
++    ...     print_it('Dave')
++    Dave egassem tset third eht
++
++Locals always take precedence over globals.
++
++    >>> def print_it(name, ordinal):
++    ...     print _('The $ordinal test message $name')
++
++    >>> with _.using('yy'):
++    ...     print_it('Elle', 'fourth')
++    Elle egassem tset fourth eht
++
++
++.. _`PEP 292`: http://www.python.org/dev/peps/pep-0292/
++
+
+=== added file 'src/flufl/i18n/docs/strategies.txt'
+--- src/flufl/i18n/docs/strategies.txt	1970-01-01 00:00:00 +0000
++++ src/flufl/i18n/docs/strategies.txt	2010-04-19 03:01:44 +0000
+@@ -0,0 +1,85 @@
++==================
++Catalog strategies
++==================
++
++The way flufl.i18n finds its catalog for an application is extensible.  These
++are called 'strategies'.  flufl.i18n comes with a couple of fairly simple
++strategies.  The first locates catalog files from within a package's
++namespace.
++
++
++Python package strategies
++=========================
++
++For example, to use the catalog in flufl.i18n's testing package, you would use
++the `PackageStrategy`.
++
++    >>> from flufl.i18n import PackageStrategy
++    >>> import flufl.i18n.testing.messages
++
++By setting the $LANG environment variable, we can specify that the application
++translates into that language automatically.
++
++    # The testing 'xx' language rot13's the source string.
++    >>> import os
++    >>> os.environ['LANG'] = 'xx'
++
++The first argument is the application name, which must be unique among all
++registered strategies. The second argument is the package in which to search.
++
++    >>> strategy = PackageStrategy('flufl', flufl.i18n.testing.messages)
++
++Once you have the desired strategy, register this with the global registry.
++The registration process returns an application object which can be used to
++look up language codes.
++
++    >>> from flufl.i18n import registry
++    >>> application = registry.register(strategy)
++
++The application object keeps track of a current translation catalog, and
++exports a method which you can bind to the 'underscore' function in your
++module globals for convenient gettext usage.
++
++    >>> _ = application._
++
++By doing so, at run time, _() will always translate the string argument to the
++current catalog's language.
++
++    >>> print _('A test message')
++    N grfg zrffntr
++
++
++Simple strategy
++===============
++
++There is also a simpler strategy that uses both the $LANG environment
++variable, and the $LOCPATH environment variable to set things up.
++
++    >>> os.environ['LOCPATH'] = os.path.dirname(
++    ...     flufl.i18n.testing.messages.__file__)
++
++    # Hack to unregister the previous strategy.
++    >>> registry._registry.clear()
++
++    >>> from flufl.i18n import SimpleStrategy
++    >>> strategy = SimpleStrategy('flufl')
++    >>> application = registry.register(strategy)
++
++    >>> _ = application._
++    >>> print _('A test message')
++    N grfg zrffntr
++
++
++Calling with zero arguments
++===========================
++
++Strategies should be prepared to accept zero arguments when called, to produce
++a 'default' translation (usually the `gettext.NullTranslator`).
++
++    >>> print SimpleStrategy('example')().ugettext('A test message')
++    A test message
++
++    >>> print PackageStrategy(
++    ...     'example', flufl.i18n.testing.messages)().ugettext(
++    ...     'A test message')
++    A test message
+
+=== modified file 'src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.mo'
+Binary files src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.mo	2009-11-14 20:11:30 +0000 and src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.mo	2010-04-20 21:03:54 +0000 differ
+=== modified file 'src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.po'
+--- src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.po	2009-11-14 20:11:30 +0000
++++ src/flufl/i18n/testing/messages/xx/LC_MESSAGES/flufl.po	2010-04-20 21:03:11 +0000
+@@ -17,3 +17,7 @@
+ #: flufl/i18n/docs/readme.txt:39
+ msgid "A test message"
+ msgstr "N grfg zrffntr"
++
++#: flufl/i18n/docs/readme.txt:40
++msgid "The $ordinal test message $name"
++msgstr "$ordinal si n grfg zrffntr $name"
+
+=== modified file 'src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.mo'
+Binary files src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.mo	2009-11-14 20:11:30 +0000 and src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.mo	2010-04-20 21:01:11 +0000 differ
+=== modified file 'src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.po'
+--- src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.po	2009-11-14 20:11:30 +0000
++++ src/flufl/i18n/testing/messages/yy/LC_MESSAGES/flufl.po	2010-04-16 03:59:19 +0000
+@@ -17,3 +17,7 @@
+ #: flufl/i18n/docs/readme.txt:39
+ msgid "A test message"
+ msgstr "egassem tset A"
++
++#: flufl/i18n/docs/readme.txt:40
++msgid "The $ordinal test message $name"
++msgstr "$name egassem tset $ordinal eht"
+
+=== modified file 'src/flufl/i18n/tests/test_docs.py'
+--- src/flufl/i18n/tests/test_docs.py	2010-03-05 04:05:19 +0000
++++ src/flufl/i18n/tests/test_docs.py	2010-04-15 14:48:13 +0000
+@@ -25,13 +25,14 @@
+     ]
+ 
+ 
++import os
+ import atexit
+ import doctest
+-import os
++import unittest
++
+ # pylint: disable-msg=F0401
+ from pkg_resources import (
+     resource_filename, resource_exists, resource_listdir, cleanup_resources)
+-import unittest
+ 
+ 
+ DOCTEST_FLAGS = (
+@@ -45,6 +46,10 @@
+     # Make sure future statements in our doctests match the Python code.
+     testobj.globs['absolute_import'] = absolute_import
+     testobj.globs['unicode_literals'] = unicode_literals
++    # Ensure that environment variables affecting translation are neutralized.
++    for envar in ('LANGUAGE', 'LC_ALL', 'LC_MESSAGES', 'LANG'):
++        if envar in os.environ:
++            del os.environ[envar]
+ 
+ 
+ def additional_tests():
+
