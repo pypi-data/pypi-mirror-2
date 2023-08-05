@@ -1,0 +1,803 @@
+#include <string>
+#include <boost/python.hpp>
+#include <boost/python/return_value_policy.hpp>
+#include <tango.h>
+
+#include "defs.h"
+#include "pytgutils.h"
+#include "tango_extra.h"
+#include "attribute.h"
+
+using namespace boost::python;
+
+# ifdef WIN32
+#   define PYTG_TIME_FROM_DOUBLE(dbl, tv) \
+            if (true) { \
+                tv.time = (time_t)floor(dbl); \
+                tv.millitm = (unsigned short)((dbl - tv.time)*1.0e3); \
+            } else (void)0
+#   define PYTG_NEW_TIME_FROM_DOUBLE(dbl, tv) \
+            struct _timeb tv; PYTG_TIME_FROM_DOUBLE(dbl, tv)
+# else
+#   define PYTG_TIME_FROM_DOUBLE(dbl, tv) double2timeval(tv, dbl);
+#   define PYTG_NEW_TIME_FROM_DOUBLE(dbl, tv) \
+            struct timeval tv; PYTG_TIME_FROM_DOUBLE(dbl, tv)
+#endif
+
+inline void throw_wrong_python_data_type(const std::string &att_name,
+                                         const char *method)
+{
+    TangoSys_OMemStream o;
+    o << "Wrong Python type for attribute " << att_name << ends;
+    Tango::Except::throw_exception(
+            (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+            o.str(), method);
+}
+
+inline void throw_wrong_python_data_type_in_array(const std::string &att_name,
+                                                  long idx,
+                                                  const char *method)
+{
+    TangoSys_OMemStream o;
+    o << "Wrong Python type for attribute " << att_name
+      << ".\nElement with index " << idx << " in sequence does not "
+      << "have a correct type." << ends;
+
+    Tango::Except::throw_exception(
+            (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+            o.str(), method);
+}
+
+namespace PyAttribute
+{
+    /**
+     * Tango Attribute set_value wrapper for scalar attributes
+     *
+     * @param att attribute reference
+     * @param value new attribute value
+     */
+    template<long tangoTypeConst>
+    inline void __set_value_scalar(Tango::Attribute &att,
+                                   boost::python::object &value)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+        extract<TangoScalarType> val(value.ptr());
+        if (!val.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value()");
+        }
+        TangoScalarType cpp_val = val;
+        att.set_value(&cpp_val);
+    }
+
+    /**
+     * Tango Attribute set_value wrapper for DevEncoded attributes
+     *
+     * @param att attribute reference
+     * @param data_str new attribute data string
+     * @param data new attribute data
+     */
+    inline void __set_value(Tango::Attribute &att,
+                            boost::python::str &data_str,
+                            boost::python::str &data)
+    {
+        extract<Tango::DevString> val_str(data_str.ptr());
+        if (!val_str.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value()");
+        }
+        extract<Tango::DevUChar*> val(data.ptr());
+        if (!val.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value()");
+        }
+
+        Tango::DevString val_str_real = val_str;
+        Tango::DevUChar *val_real = val;
+        att.set_value(&val_str_real, val_real, (long)len(data));
+    }
+
+    /**
+     * Tango Attribute set_value_date_quality wrapper for scalar attributes
+     *
+     * @param att attribute reference
+     * @param value new attribute value
+     * @param t timestamp
+     * @param quality attribute quality
+     */
+    template<long tangoTypeConst>
+    inline void __set_value_date_quality_scalar(Tango::Attribute &att,
+                                                boost::python::object &value,
+                                                double t, Tango::AttrQuality quality)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        extract<TangoScalarType> val(value.ptr());
+        if (!val.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value_data_quality()");
+        }
+        TangoScalarType cpp_val = val;
+        PYTG_NEW_TIME_FROM_DOUBLE(t, tv);
+//        att.set_value_date_quality(&cpp_val, tv, quality);
+        att.set_value_date_quality(new TangoScalarType(cpp_val), tv, quality);
+    }
+
+    /**
+     * Tango Attribute set_value_date_quality wrapper for DevEncoded attributes
+     *
+     * @param att attribute reference
+     * @param data_str new attribute data string
+     * @param data new attribute data
+     * @param t timestamp
+     * @param quality attribute quality
+     */
+    inline void __set_value_date_quality(Tango::Attribute &att,
+                                         boost::python::str &data_str,
+                                         boost::python::str &data,
+                                         double t, Tango::AttrQuality quality)
+    {
+        extract<Tango::DevString> val_str(data_str.ptr());
+        if (!val_str.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value()");
+        }
+        extract<Tango::DevUChar*> val(data.ptr());
+        if (!val.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_value()");
+        }
+
+        PYTG_NEW_TIME_FROM_DOUBLE(t, tv);
+        Tango::DevString val_str_real = val_str;
+        Tango::DevUChar *val_real = val;
+        att.set_value_date_quality(&val_str_real, val_real, (long)len(data), tv, quality);
+    }
+
+    template<long tangoTypeConst>
+    inline typename TANGO_const2type(tangoTypeConst)*
+        __pyvalue_to_array(boost::python::object &seq, long x_dim, long y_dim, const std::string &)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+        typedef typename TANGO_const2arraytype(tangoTypeConst) TangoArrayType;
+
+        PyObject *seq_ptr = seq.ptr();
+        long len = (long) PySequence_Size(seq_ptr);
+        twod2oned(len, x_dim, y_dim);
+
+        TangoScalarType *tg_ptr = TangoArrayType::allocbuf(len);
+
+        for (long idx = 0; idx < len; ++idx)
+        {
+            PyObject *elt_ptr = PySequence_GetItem(seq_ptr, idx);
+
+            // The boost extract could be used:
+            // TangoScalarType val = boost::python::extract<TangoScalarType>(elt_ptr);
+            // instead of the code below.
+            // the problem is that extract is considerably slower than our
+            // convert function which only has to deal with the specific tango
+            // data types
+            try
+            {
+                TangoScalarType tg_scalar;
+                from_py<tangoTypeConst>::convert(elt_ptr, tg_scalar);
+                tg_ptr[idx] = tg_scalar;
+                Py_DECREF(elt_ptr);
+            }
+            catch(...)
+            {
+                Py_DECREF(elt_ptr);
+                TangoArrayType::freebuf(tg_ptr);
+                throw;
+            }
+        }
+        return tg_ptr;
+    }
+
+    template<>
+    inline TANGO_const2type(Tango::DEV_ENCODED)*
+        __pyvalue_to_array<Tango::DEV_ENCODED>(boost::python::object &, long, long, const std::string & fname)
+    {
+        TangoSys_OMemStream o;
+        o << "DevEncoded is only supported for SCALAR attributes." << ends;
+        Tango::Except::throw_exception(
+                (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                o.str(), fname + "()");
+        return 0;
+    }
+
+    inline void __set_value(const std::string & fname, Tango::Attribute &att, boost::python::object &value, long* x, long *y, double t = 0.0, Tango::AttrQuality* quality = 0)
+    {
+        long type = att.get_data_type();
+        Tango::AttrDataFormat format = att.get_data_format();
+
+        if (format == Tango::SCALAR)
+        {
+            if ((x && ((*x) > 1)) || (y && (*y) > 0)) {
+                TangoSys_OMemStream o;
+                o << "Cannot call " << fname;
+                if (y)
+                    o << "(data, dim_x) on scalar attribute ";
+                else
+                    o << "(data, dim_x, dim_y) on scalar attribute ";
+
+                if (quality)
+                    o << att.get_name() << ". Use set_value_date_quality(data) instead" << ends;
+                else
+                    o << att.get_name() << ". Use set_value(data) instead" << ends;
+
+                Tango::Except::throw_exception(
+                        "PyDs_WrongPythonDataTypeForAttribute",
+                        o.str(),
+                        fname + "()");
+            } else {
+                if (quality)
+                    TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_value_date_quality_scalar, att, value, t, *quality);
+                else
+                    TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_value_scalar, att, value);
+            }
+        }
+        else
+        {
+            if (!PySequence_Check(value.ptr()))
+            {
+                TangoSys_OMemStream o;
+                o << "Wrong Python type for attribute " << att.get_name()
+                  << "of type " << Tango::CmdArgTypeName[type]
+                  << ". Expected a sequence." << ends;
+
+                Tango::Except::throw_exception(
+                        "PyDs_WrongPythonDataTypeForAttribute",
+                        o.str(),
+                        fname + "()");
+            }
+            long dim_x = PySequence_Size(value.ptr()), dim_y = 0;
+            if (x)
+                dim_x = *x;
+            if (y)
+                dim_y = *y;
+
+            if (quality) {
+                //TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_value_date_quality_array, att, value, t, *quality, dim_x, dim_y);
+                PYTG_NEW_TIME_FROM_DOUBLE(t, tv);
+                TANGO_DO_ON_ATTRIBUTE_DATA_TYPE(type,
+                    att.set_value_date_quality(__pyvalue_to_array<tangoTypeConst>(value, dim_x, dim_y, fname), tv, *quality, dim_x, dim_y, true);
+                );
+            } else {
+                //TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_value_array, att, value, dim_x, dim_y);
+                TANGO_DO_ON_ATTRIBUTE_DATA_TYPE(type,
+                    att.set_value(__pyvalue_to_array<tangoTypeConst>(value, dim_x, dim_y, fname), dim_x, dim_y);
+                );
+            }
+        }
+    }
+
+    inline void __set_value(const std::string & fname, Tango::Attribute &att, boost::python::str &data_str, boost::python::str &data, double t = 0.0, Tango::AttrQuality* quality = 0)
+    {
+        if (quality)
+            __set_value_date_quality(att, data_str, data, t, *quality);
+        else
+            __set_value(att, data_str, data);
+    }
+
+    inline void set_value(Tango::Attribute &att, boost::python::object &value)
+    { __set_value("set_value", att, value, 0, 0); }
+
+    inline void set_value(Tango::Attribute &att, boost::python::str &data_str, boost::python::str &data)
+    { __set_value("set_value", att, data_str, data); }
+
+    inline void set_value(Tango::Attribute &att, boost::python::object &value, long x)
+    { __set_value("set_value", att, value, &x, 0); }
+
+    inline void set_value(Tango::Attribute &att, boost::python::object &value, long x, long y)
+    { __set_value("set_value", att, value, &x, &y); }
+
+    inline void set_value_date_quality(Tango::Attribute &att,
+                                       boost::python::object &value, double t,
+                                       Tango::AttrQuality quality)
+    { __set_value("set_value_date_quality", att, value, 0, 0, t, &quality); }
+
+    inline void set_value_date_quality(Tango::Attribute &att,
+                                       boost::python::str &data_str,
+                                       boost::python::str &data,
+                                       double t,
+                                       Tango::AttrQuality quality)
+    { __set_value("set_value_date_quality", att, data_str, data, t, &quality); }
+
+    inline void set_value_date_quality(Tango::Attribute &att,
+                                       boost::python::object &value,
+                                       double t, Tango::AttrQuality quality,
+                                       long x)
+    { __set_value("set_value_date_quality", att, value, &x, 0, t, &quality); }
+
+    inline void set_value_date_quality(Tango::Attribute &att,
+                                       boost::python::object &value,
+                                       double t, Tango::AttrQuality quality,
+                                       long x, long y)
+    { __set_value("set_value_date_quality", att, value, &x, &y, t, &quality); }
+};
+
+namespace PyWAttribute
+{
+    template<long tangoTypeConst>
+    PyObject* __get_min_value(Tango::WAttribute &att)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        TangoScalarType tg_val;
+        att.get_min_value(tg_val);
+        boost::python::object py_value(tg_val);
+
+        return boost::python::incref(py_value.ptr());
+    }
+
+    PyObject *get_min_value(Tango::WAttribute &att)
+    {
+        long type = att.get_data_type();
+
+        TANGO_DO_ON_NUMERICAL_ATTRIBUTE_DATA_TYPE(type,
+            return __get_min_value<tangoTypeConst>(att)
+        );
+        return 0;
+    }
+
+    template<long tangoTypeConst>
+    PyObject* __get_max_value(Tango::WAttribute &att)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        TangoScalarType tg_val;
+        att.get_max_value(tg_val);
+        boost::python::object py_value(tg_val);
+        return boost::python::incref(py_value.ptr());
+    }
+
+    PyObject *get_max_value(Tango::WAttribute &att)
+    {
+        long type = att.get_data_type();
+
+        TANGO_DO_ON_NUMERICAL_ATTRIBUTE_DATA_TYPE(type,
+            return __get_max_value<tangoTypeConst>(att)
+        );
+        return 0;
+    }
+
+    template<long tangoTypeConst>
+    void __set_min_value(Tango::WAttribute &att, boost::python::object &v)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        TangoScalarType tg_val = boost::python::extract<TangoScalarType>(v);
+
+        att.set_min_value(tg_val);
+    }
+
+    void set_min_value(Tango::WAttribute &att, boost::python::object &v)
+    {
+        long type = att.get_data_type();
+        TANGO_CALL_ON_NUMERICAL_ATTRIBUTE_DATA_TYPE(type, __set_min_value, att, v);
+    }
+
+    template<long tangoTypeConst>
+    void __set_max_value(Tango::WAttribute &att, boost::python::object &v)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        TangoScalarType tg_val = boost::python::extract<TangoScalarType>(v);
+
+        att.set_max_value(tg_val);
+    }
+
+    void set_max_value(Tango::WAttribute &att, boost::python::object &v)
+    {
+        long type = att.get_data_type();
+        TANGO_CALL_ON_NUMERICAL_ATTRIBUTE_DATA_TYPE(type, __set_max_value, att, v);
+    }
+
+    template<long tangoTypeConst>
+    inline void __set_write_value_scalar(Tango::WAttribute &att,
+                                         boost::python::object &value)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+        extract<TangoScalarType> val(value.ptr());
+        if (!val.check())
+        {
+            throw_wrong_python_data_type(att.get_name(), "set_write_value()");
+        }
+        TangoScalarType cpp_val = val;
+        att.set_write_value(cpp_val);
+    }
+
+    template<>
+    inline void __set_write_value_scalar<Tango::DEV_ENCODED>(Tango::WAttribute &att,
+                                                             boost::python::object &value)
+    {
+        Tango::Except::throw_exception(
+                (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                (const char *)"set_write_value is not supported for DEV_ENCODED attributes.",
+                (const char *)"set_write_value()");
+    }
+
+    template<long tangoTypeConst>
+    inline void __set_write_value_array(Tango::WAttribute &att,
+                                        boost::python::object &seq,
+                                        long x_dim, long y_dim)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+        typedef typename TANGO_const2arraytype(tangoTypeConst) TangoArrayType;
+
+        PyObject *seq_ptr = seq.ptr();
+        long len = (long) PySequence_Size(seq_ptr);
+        twod2oned(len, x_dim, y_dim);
+
+        TangoScalarType *tg_ptr = TangoArrayType::allocbuf(len);
+
+        for (long idx = 0; idx < len; ++idx)
+        {
+            PyObject *elt_ptr = PySequence_GetItem(seq_ptr, idx);
+
+            // The boost extract could be used:
+            // TangoScalarType val = boost::python::extract<TangoScalarType>(elt_ptr);
+            // instead of the code below.
+            // the problem is that extract is considerably slower than our
+            // convert function which only has to deal with the specific tango
+            // data types
+            try
+            {
+                TangoScalarType tg_scalar;
+                from_py<tangoTypeConst>::convert(elt_ptr, tg_scalar);
+                tg_ptr[idx] = tg_scalar;
+                Py_DECREF(elt_ptr);
+            }
+            catch(...)
+            {
+                Py_DECREF(elt_ptr);
+                delete [] tg_ptr;
+                throw;
+            }
+        }
+
+        try
+        {
+            att.set_write_value(tg_ptr, x_dim, y_dim);
+            delete [] tg_ptr;
+        }
+        catch(...)
+        {
+            delete [] tg_ptr;
+            throw;
+        }
+    }
+
+    template<>
+    inline void __set_write_value_array<Tango::DEV_ENCODED>(Tango::WAttribute &att,
+                                                            boost::python::object &seq,
+                                                            long x_dim, long y_dim)
+    {
+        Tango::Except::throw_exception(
+                (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                (const char *)"set_write_value is not supported for DEV_ENCODED attributes.",
+                (const char *)"set_write_value()");
+    }
+
+    inline void set_write_value(Tango::WAttribute &att, boost::python::object &value)
+    {
+        long type = att.get_data_type();
+        Tango::AttrDataFormat format = att.get_data_format();
+
+        if (format == Tango::SCALAR)
+        {
+            TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_write_value_scalar,
+                                              att, value);
+        }
+        else
+        {
+            if (!PySequence_Check(value.ptr()))
+            {
+                TangoSys_OMemStream o;
+                o << "Wrong Python type for attribute " << att.get_name()
+                  << "of type " << Tango::CmdArgTypeName[type]
+                  << ". Expected a sequence." << ends;
+
+                Tango::Except::throw_exception(
+                        (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                        o.str(),
+                        (const char *)"set_value()");
+            }
+            TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_write_value_array,
+                                              att, value,
+                                              PySequence_Size(value.ptr()), 0);
+        }
+    }
+
+    inline void set_write_value(Tango::WAttribute &att,
+                                boost::python::object &value,
+                                long x)
+    {
+        long type = att.get_data_type();
+        Tango::AttrDataFormat format = att.get_data_format();
+
+        if (format == Tango::SCALAR)
+        {
+            TangoSys_OMemStream o;
+            o << "Cannot call set_value(data, dim_x) on scalar attribute "
+              << att.get_name() << ". Use set_write_value(data) instead"
+              << ends;
+
+            Tango::Except::throw_exception(
+                    (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                    o.str(),
+                    (const char *)"set_write_value()");
+        }
+        else
+        {
+            if (!PySequence_Check(value.ptr()))
+            {
+                TangoSys_OMemStream o;
+                o << "Wrong Python type for attribute " << att.get_name()
+                  << "of type " << Tango::CmdArgTypeName[type]
+                  << ". Expected a sequence" << ends;
+
+                Tango::Except::throw_exception(
+                        (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                        o.str(),
+                        (const char *)"set_write_value()");
+            }
+            TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_write_value_array,
+                                              att, value, x, 0);
+        }
+    }
+
+    inline void set_write_value(Tango::WAttribute &att,
+                                boost::python::object &value,
+                                long x, long y)
+    {
+        long type = att.get_data_type();
+        Tango::AttrDataFormat format = att.get_data_format();
+
+        if (format == Tango::SCALAR)
+        {
+            TangoSys_OMemStream o;
+            o << "Cannot call set_write_value(data, dim_x, dim_y) "
+              << "on scalar attribute " << att.get_name()
+              << ". Use set_write_value(data) instead" << ends;
+
+            Tango::Except::throw_exception(
+                    (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                    o.str(),
+                    (const char *)"set_write_value()");
+        }
+        else
+        {
+            if (!PySequence_Check(value.ptr()))
+            {
+                TangoSys_OMemStream o;
+                o << "Wrong Python type for attribute " << att.get_name()
+                  << "of type " << Tango::CmdArgTypeName[type]
+                  << ". Expected a sequence" << ends;
+
+                Tango::Except::throw_exception(
+                        (const char *)"PyDs_WrongPythonDataTypeForAttribute",
+                        o.str(),
+                        (const char *)"set_write_value()");
+            }
+            TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __set_write_value_array,
+                                              att, value, x, y);
+        }
+    }
+
+    template<long tangoTypeConst>
+    void __get_write_value(Tango::WAttribute &att, boost::python::list &seq)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        const TangoScalarType *ptr;
+
+        long length = att.get_write_value_length();
+
+        att.get_write_value(ptr);
+
+        for (long l = 0; l < length; ++l)
+        {
+            seq.append(ptr[l]);
+        }
+    }
+
+    template<>
+    void __get_write_value<Tango::DEV_STRING>(Tango::WAttribute &att,
+                                              boost::python::list &seq)
+    {
+        const Tango::ConstDevString *ptr;
+
+        long length = att.get_write_value_length();
+
+        att.get_write_value(ptr);
+
+        for (long l = 0; l < length; ++l)
+        {
+            seq.append(ptr[l]);
+        }
+    }
+
+    inline void get_write_value(Tango::WAttribute &att,
+                                boost::python::list &value)
+    {
+        long type = att.get_data_type();
+        TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __get_write_value, att, value);
+    }
+
+    template<long tangoTypeConst>
+    void __get_write_value(Tango::WAttribute &att, PyObject **obj)
+    {
+        typedef typename TANGO_const2type(tangoTypeConst) TangoScalarType;
+
+        Tango::AttrDataFormat fmt = att.get_data_format();
+
+        if (fmt == Tango::SCALAR)
+        {
+            TangoScalarType v;
+            att.get_write_value(v);
+            boost::python::object o(v);
+            PyObject *o_ptr = o.ptr();
+            boost::python::incref(o_ptr);
+            *obj = o_ptr;
+        }
+        else
+        {
+            const TangoScalarType *ptr;
+            long length = att.get_write_value_length();
+            att.get_write_value(ptr);
+            boost::python::list o;
+            for (long l = 0; l < length; ++l)
+                o.append(ptr[l]);
+            PyObject *o_ptr = o.ptr();
+            boost::python::incref(o_ptr);
+            *obj = o_ptr;
+        }
+    }
+
+    template<>
+    void __get_write_value<Tango::DEV_STRING>(Tango::WAttribute &att, PyObject **obj)
+    {
+        Tango::AttrDataFormat fmt = att.get_data_format();
+        if (fmt == Tango::SCALAR)
+        {
+            Tango::DevString v = NULL;
+            att.get_write_value(v);
+            boost::python::object o(v);
+            PyObject *o_ptr = o.ptr();
+            boost::python::incref(o_ptr);
+            *obj = o_ptr;
+        }
+        else
+        {
+            const Tango::ConstDevString *ptr;
+            long length = att.get_write_value_length();
+            att.get_write_value(ptr);
+            boost::python::list o;
+            for (long l = 0; l < length; ++l)
+                o.append(ptr[l]);
+            PyObject *o_ptr = o.ptr();
+            boost::python::incref(o_ptr);
+            *obj = o_ptr;
+        }
+    }
+
+    inline PyObject* get_write_value(Tango::WAttribute &att)
+    {
+        long type = att.get_data_type();
+        PyObject *value = NULL;
+        TANGO_CALL_ON_ATTRIBUTE_DATA_TYPE(type, __get_write_value, att, &value);
+        return value;
+    }
+};
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(set_quality_overloads,
+                                       Tango::Attribute::set_quality, 1, 2);
+
+void export_attribute()
+{
+    enum_<Tango::Attribute::alarm_flags>("alarm_flags",
+        "an enumerated for the alarm flags")
+        .value("min_level", Tango::Attribute::min_level)
+        .value("max_level", Tango::Attribute::max_level)
+        .value("rds", Tango::Attribute::rds)
+        .value("min_warn", Tango::Attribute::min_warn)
+        .value("max_warn", Tango::Attribute::max_warn)
+        .value("numFlags", Tango::Attribute::numFlags)
+    ;
+
+    class_<Tango::Attribute>("Attribute", no_init)
+        .def("is_write_associated", &Tango::Attribute::is_writ_associated)
+        .def("is_min_alarm", &Tango::Attribute::is_min_alarm)
+        .def("is_max_alarm", &Tango::Attribute::is_max_alarm)
+        .def("is_min_warning", &Tango::Attribute::is_min_warning)
+        .def("is_max_warning", &Tango::Attribute::is_max_warning)
+        .def("is_rds_alarm", &Tango::Attribute::is_rds_alarm)
+        //TODO .def("is_alarmed", &Tango::Attribute::is_alarmed)
+        .def("is_polled", &Tango::Attribute::is_polled)
+        .def("check_alarm", &Tango::Attribute::check_alarm)
+        .def("get_writable", &Tango::Attribute::get_writable)
+        .def("get_name", &Tango::Attribute::get_name, return_value_policy<copy_non_const_reference>())
+        .def("get_data_type", &Tango::Attribute::get_data_type)
+        .def("get_data_format", &Tango::Attribute::get_data_format)
+        .def("get_assoc_name", &Tango::Attribute::get_assoc_name, return_value_policy<copy_non_const_reference>())
+        .def("get_assoc_ind", &Tango::Attribute::get_assoc_ind)
+        .def("set_assoc_ind", &Tango::Attribute::set_assoc_ind)
+        .def("get_date", &Tango::Attribute::get_date, return_internal_reference<>())
+        .def("set_date",
+             (void (Tango::Attribute::*) (Tango::TimeVal &))
+             &Tango::Attribute::set_date)
+        .def("get_label", &Tango::Attribute::get_label, return_value_policy<copy_non_const_reference>())
+        .def("get_quality", &Tango::Attribute::get_quality, return_value_policy<copy_non_const_reference>())
+        .def("set_quality", &Tango::Attribute::set_quality, set_quality_overloads())
+        .def("get_data_size", &Tango::Attribute::get_data_size)
+        .def("get_x", &Tango::Attribute::get_x)
+        .def("get_max_dim_x", &Tango::Attribute::get_max_dim_x)
+        .def("get_y", &Tango::Attribute::get_y)
+        .def("get_max_dim_y", &Tango::Attribute::get_max_dim_y)
+        .def("get_polling_period", &Tango::Attribute::get_polling_period)
+        //TODO .def("get_properties", &Tango::Attribute::get_properties)
+        //TODO .def("get_properties_2", &Tango::Attribute::get_properties_2)
+        //TODO .def("get_properties_3", &Tango::Attribute::get_properties_3)
+
+        .def("set_value",
+            (void (*) (Tango::Attribute &, boost::python::object &))
+            &PyAttribute::set_value)
+        .def("set_value",
+            (void (*) (Tango::Attribute &, boost::python::str &, boost::python::str &))
+            &PyAttribute::set_value)
+        .def("set_value",
+            (void (*) (Tango::Attribute &, boost::python::object &, long))
+            &PyAttribute::set_value)
+        .def("set_value",
+            (void (*) (Tango::Attribute &, boost::python::object &, long, long))
+            &PyAttribute::set_value)
+        .def("set_value_date_quality",
+            (void (*) (Tango::Attribute &, boost::python::object &, double t, Tango::AttrQuality quality))
+            &PyAttribute::set_value_date_quality)
+        .def("set_value_date_quality",
+            (void (*) (Tango::Attribute &, boost::python::str &, boost::python::str &, double t, Tango::AttrQuality quality))
+            &PyAttribute::set_value_date_quality)
+        .def("set_value_date_quality",
+            (void (*) (Tango::Attribute &, boost::python::object &, double t, Tango::AttrQuality quality, long))
+            &PyAttribute::set_value_date_quality)
+        .def("set_value_date_quality",
+            (void (*) (Tango::Attribute &, boost::python::object &, double t, Tango::AttrQuality quality, long, long))
+            &PyAttribute::set_value_date_quality)
+    ;
+
+    class_<Tango::WAttribute, bases<Tango::Attribute> >("WAttribute", no_init)
+        .def("get_min_value",
+            (PyObject* (*) (Tango::WAttribute &))
+            &PyWAttribute::get_min_value)
+        .def("get_max_value",
+            (PyObject* (*) (Tango::WAttribute &))
+            &PyWAttribute::get_max_value)
+        .def("set_min_value", &PyWAttribute::set_min_value)
+        .def("set_max_value", &PyWAttribute::set_min_value)
+        .def("is_min_value", &Tango::WAttribute::is_min_value)
+        .def("is_max_value", &Tango::WAttribute::is_max_value)
+        .def("get_write_value_length",&Tango::WAttribute::get_write_value_length)
+        .def("set_write_value",
+            (void (*) (Tango::WAttribute &, boost::python::object &))
+            &PyWAttribute::set_write_value)
+        .def("set_write_value",
+            (void (*) (Tango::WAttribute &, boost::python::object &, long))
+            &PyWAttribute::set_write_value)
+        .def("set_write_value",
+            (void (*) (Tango::WAttribute &, boost::python::object &, long, long))
+            &PyWAttribute::set_write_value)
+
+        // old style get_write_value
+        .def("get_write_value",
+            (void (*) (Tango::WAttribute &, boost::python::list &))
+            &PyWAttribute::get_write_value)
+
+        // new style get_write_value
+        .def("get_write_value",
+            (PyObject* (*) (Tango::WAttribute &))
+            &PyWAttribute::get_write_value)
+    ;
+
+}
