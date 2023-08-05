@@ -1,0 +1,149 @@
+{% extends "projector/home.html" %}
+
+{% load markup %}
+{% load i18n %}
+{% load permissions %}
+
+{% block extra_head %}{{ block.super }}
+<script type="text/javascript">
+    $(document).ready(function(){
+        $('#id_project_repository_url').click(function(){
+            this.select();
+            console.log('qwe');
+        });
+    });
+</script>
+{% endblock %}
+
+{% block col_main_title %}{{ project.name }}{% endblock %}
+
+{% block col_main %}
+<div class="richtemplates-panel">
+    <h5>{{ project.name }}</h5>
+    <div class="richtemplates-panel-content">
+        <h1>{{ project.name|capfirst }}</h1>
+        <ul class="nav-inline">
+            <li><a class="button-link" href="{{ project.get_absolute_url }}">{% trans "Project details" %}</a></li>
+            {% ifhasperm "project_permission.change_project" request.user project %}
+            <li><a class="button-link" href="{{ project.get_edit_url }}">{% trans "Edit" %}</a></li>
+            {% endifhasperm %}
+            <li><a class="button-link" href="{{ project.get_task_list_url }}">{% trans "Task list" %}</a></li>
+            <li><a class="button-link" href="{{ project.get_members_url }}">{% trans "Members" %}</a></li>
+            {% if project.repository_url %}
+                {% comment %}
+                We need to check repo url and provide proper one
+                as project.repository_url is an absolute url to
+                repository, not repository browser itself.
+                {% endcomment %}
+                <li><a class="button-link" href="{% filter slice:":-1" %}{{ project.get_browse_repo_url }}{% endfilter %}">{% trans "Browse repository" %}</a></li>
+            {% endif %}
+        </ul>
+
+        <ul class="messages">
+            <li class="message message-info">Clone repository:
+            <input id="id_project_repository_url" value="hg clone {{ project.get_repo_url }}"
+                size="{{ project.get_repo_url|length|add:'11' }}"
+                onblur="this.value='hg clone {{ project.get_repo_url }}';"/></li>
+        </ul>
+
+        
+        {% if "://example.com" in project.get_repo_url %}
+        <ul class="messages">
+            <li class="message message-warning">
+                {% trans "Repository URL seems to be broken. Maybe you have forgotten to " %}
+                <a href="{% url admin:sites_site_change 1 %}">{% trans "set site" %}</a> at admin panel?
+            </li>
+        </ul>
+        {% endif %}
+
+    </div>
+</div>
+    {% block col_main_extra %}
+<div class="richtemplates-panel">    
+    <h5>{% trans "Project details" %}</h5>
+    <div class="richtemplates-panel-content">
+        <div class="task-block">
+            <table class="task-block-properties">
+                <tbody>
+                    <tr>
+                        <th>{% trans "Project" %}</th>
+                        <td>{{ project.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Category" %}</th>
+                        <td>{{ project.category|default_if_none:"-" }}</th>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Author" %}</th>
+                        <td>{{ project.author }}</th>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Visibility" %}</th>
+                        <td>
+                            {% if project.is_public %}
+                            {% trans "Public" %}
+                            {% else %}
+                            {% trans "Private" %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <h2>{% trans "Description" %}:</h2>
+        <div class="block-rst">
+            {{ project.description|restructuredtext }}
+        </div>
+
+        <h2>{% trans "Milestones" %}:</h2>
+        {% for milestone in project.milestone_set.all %}
+        <h3>{{ milestone.name }}</h3>
+        {% if milestone.task_set.all %}
+        <table class="projetor-milestone-progress-table">
+            <tbody>
+                <tr>
+                    <td class="projector-milestone-progress-table-finished"
+                        width="{{ milestone.get_finished_tasks_count_as_percentage }}%">
+                        <a class="block-link" href="{{ project.get_task_list_url }}?is_resolved=2&milestone={{ milestone.id }}">
+                            {% trans "Done" %} {{ milestone.get_finished_tasks_count_as_percentage|floatformat:"2" }}%
+                        </a>
+                    </td>
+                    <td class="projector-milestone-progress-table-unfinished">
+                        <a class="block-link" href="{{ project.get_task_list_url }}?is_resolved=3&milestone={{ milestone.id }}">
+                            {% trans "Left" %} {{ milestone.get_unfinished_tasks_count_as_percentage|floatformat:"2" }}%
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        {% else %}
+            <ul class="messages">
+                <li class="message message-info">{% trans "No tasks for this milestone were found" %}</li>
+            </ul>
+        {% endif %}
+        {% empty %}
+            <ul class="messages">
+                <li class="message message-info">{% trans "No milestones defined yet" %}</li>
+            </ul>
+        {% endfor %}
+
+        <h2>{% trans "Timeline" %}:</h2>
+        <ul class="nav-vertical">
+            {% for entry in project.timelineentry_set.all %}
+            <li>{{ entry.action }} by {{ entry.user }} at {{ entry.created_at|date:"Y-m-d H:i:s" }}</li>
+            {% empty %}
+            <li>
+                <ul class="messages">
+                    <li class="message message-info">{% trans "No timeline entries defined yet" %}</li>
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+        
+        
+    </div>
+</div>
+    {% endblock col_main_extra %}
+
+{% endblock col_main %}
+
