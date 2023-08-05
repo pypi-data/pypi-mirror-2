@@ -1,0 +1,205 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="here/prefs_main_template/macros/master"
+      i18n:domain="collective.multisitepanel">
+
+<body>
+<div metal:fill-slot="prefs_configlet_main"
+	tal:define="allSites view/listAllSites;
+				portal_roles view/role_order;
+				searchstring request/searchstring | nothing;
+				userid request/userid | nothing;">
+	
+	<h1 class="documentFirstHeading">
+		<span i18n:translate="msp_title">Multisite panel</span>:
+		<span tal:omit-tag="" i18n:domain="plone" i18n:translate="">Users and Groups</span>
+	</h1>
+	
+      <a href="#" i18n:domain="plone" i18n:translate=""
+         class="link-parent"
+         tal:define="link view/back_link | nothing"
+         tal:condition="link"
+         tal:content="link/label"
+         tal:attributes="href link/url">
+        Up to Site Setup
+      </a>
+
+	<div metal:use-macro="here/global_statusmessage/macros/portal_message">
+		Portal status message
+	</div>
+
+	<tal:listSites condition="python: not userid and not searchstring">
+		
+
+	<table class="listing">
+			<tr>
+				<th colspan="6" tal:attributes="colspan python:len(portal_roles)+2">
+					<form action=""
+							class="enableAutoFocus"
+							name="users_search"
+							method="post"
+							tal:attributes="action string:${context/absolute_url}/${view/__name__}">
+						<span tal:omit-tag="" i18n:translate="label_user_search">User Search</span>:
+						<input class="quickSearch"
+							type="text"
+							name="searchstring"
+							value=""
+							tal:attributes="value searchstring;"
+						/>
+						
+						<input type="submit"
+							class="searchButton"
+							name="form.button.Search"
+							value="Search"
+							i18n:attributes="value label_search;"
+						/>
+					</form>
+				</th>
+			</tr>
+			<tr>
+				<th rowspan="2">Sito</th>
+				<th rowspan="2">Utenti Totali</th>
+				<th tal:attributes="colspan python:len(portal_roles)">ruoli</th>
+			</tr>
+			<tr>
+				<th tal:repeat="portal_role portal_roles" tal:content="portal_role" i18n:translate="">Role</th>
+			</tr>
+			<tal:row repeat="this_site allSites">
+				<tr tal:define="oddrow repeat/this_site/odd;
+								siteName python:this_site[0];
+								siteApp python:this_site[1];
+								siteUsers python:view.listUidBySite(siteApp)"
+					tal:attributes="class python: oddrow is True and 'even' or 'odd'">
+					
+					<td >
+						<a tal:attributes="href python:siteApp.absolute_url()"
+							title="Go to site home">
+							<img tal:attributes="src string:${siteApp/absolute_url}/favicon.ico" alt="">
+							<span tal:content="python:siteName">nome del sito</span>
+						</a>
+					</td>
+					<td tal:content="python:len(siteUsers)">tot</td>
+					<tal:countroles repeat="portal_role portal_roles">
+						<td tal:content="python:len(view.filterUidByRole(siteApp,portal_role))"></td>
+					</tal:countroles>
+				</tr>
+			</tal:row>
+		</table>
+	</tal:listSites>
+	<tal:selectUser tal:condition="python: searchstring and not userid">
+		<a class="link-parent" tal:attributes="href string:${context/absolute_url}/${view/__name__}">user dashboard</a>
+		<p class="documentDescription" i18n:translate="">Select user</p>
+		<form action=""
+				class="enableAutoFocus"
+				name="users_search"
+				method="post"
+				tal:attributes="action string:${context/absolute_url}/${view/__name__}">
+			<ul	tal:define="distinctUsers python:view.multisite_searchUser(searchstring)">
+				<li tal:repeat="memberIndex distinctUsers">
+					<tal:member define="member python:distinctUsers[memberIndex][0];
+								memberSites python:distinctUsers[memberIndex][1]">
+						<input type="radio" name="userid" tal:attributes="value python:member.getId()" />
+						<span tal:define="fullname python:member.getProperty('fullname')"
+							tal:content="string: ${member/getId} (${fullname})"></span>
+							<div class="formHelp" title="Lista dei siti dove è presente l'utente"
+									tal:content="memberSites">
+								lista siti
+							</div>
+					</tal:member>
+				</li>
+			</ul>
+			<input type="submit"
+					i18n:translate=""
+					i18n:attributes="value"
+					name="form.button.Select"
+					value="Select"
+					class="context" />
+		</form>
+	</tal:selectUser>
+	<tal:search tal:condition="userid">
+		<a class="link-parent" tal:attributes="href string:${context/absolute_url}/${view/__name__}">user dashboard</a>
+		<p class="documentDescription">
+			User: <span tal:content="userid">userid</span>
+		</p>
+		<table class="listing">
+			<tr>
+				<th colspan="4">
+					<form action=""
+							class="enableAutoFocus"
+							name="users_search"
+							method="post"
+							tal:attributes="action string:${context/absolute_url}/${view/__name__}">
+						<span tal:omit-tag="" i18n:translate="label_user_search">User Search</span>:
+						<input class="quickSearch"
+							type="text"
+							name="searchstring"
+							value=""
+							tal:attributes="value searchstring;"
+						/>
+						
+						<input type="submit"
+							class="searchButton"
+							name="form.button.Search"
+							value="Search"
+							i18n:attributes="value label_search;"
+						/>
+					</form>
+				</th>
+			</tr>
+			<tr>
+				<th>site</th>
+				<th>user</th>
+				<th>roles</th>
+				<th>groups</th>
+			</tr>
+			<tal:row repeat="this_site allSites">
+				<tr tal:define="oddrow repeat/this_site/odd;
+								siteName python:this_site[0];
+								siteApp python:this_site[1];
+								member python:view.multisite_getMemberById(siteApp,userid);
+								mq python:modules['ZTUtils'].make_query;
+								userquery python:mq(userid=userid);"
+					tal:attributes="class python: oddrow is True and 'even' or 'odd'"
+					tal:condition="member">
+					
+					<td >
+						<a tal:attributes="href python:siteApp.absolute_url()"
+							title="Go to site home">
+							<img tal:attributes="src string:${siteApp/absolute_url}/favicon.ico" alt="">
+							<span tal:content="python:siteName">nome del sito</span>
+						</a>
+					</td>
+					<td>
+						<a href="prefs_user_details"
+							tal:attributes="href string:${siteApp/absolute_url}/prefs_user_details?${userquery}">
+							<tal:block replace="structure portal/user.gif"/>&nbsp;<span tal:replace="userid">username</span>
+							(<span tal:replace="python:member.getProperty('fullname')">Full Name</span>)
+						</a>
+					</td>
+					<td tal:define="roles python:member.getRoles()">
+						<ul>
+							<li tal:repeat="role roles"
+								tal:content="role">role</li>
+						</ul>
+					</td>
+					<td tal:define="groups python:member.getGroups()">
+						<ul>
+							<li tal:repeat="group groups">
+								<a href="prefs_user_details"
+									tal:define="groupquery python:mq(groupname=group);"
+									tal:attributes="href string:${siteApp/absolute_url}/prefs_group_members?${groupquery}">
+									<tal:block replace="structure portal/group.gif"/>&nbsp;<span tal:content="group">group name</span>
+								</a>
+							</li>
+						</ul>
+					</td>
+				</tr>
+			</tal:row>
+		</table>
+	</tal:search>
+</div>
+</body>
+</html>
