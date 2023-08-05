@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+WisBak - simple full/differential backup system
+See README.txt for information.
+
+© Copyright 2010 Éric St-Jean, esj@wwd.ca
+
+This file is part of WisBak.
+
+    WisBak is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    WisBak is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with WisBak.  If not, see <http://www.gnu.org/licenses/>.
+"""
+import logging
+import optparse
+import os
+
+from wisbak import CONFIG_FILE, WisBak
+
+if __name__=='__main__':
+    parser = optparse.OptionParser()
+    group = optparse.OptionGroup(parser, "Basic Options")
+    group.add_option("-f", "--file", dest="configfile", default=CONFIG_FILE,
+                      help="read config from FILE [%s]"%CONFIG_FILE, 
+                      metavar="FILE")
+    group.add_option("-l", "--longhelp", action="store_true", dest="long_help", 
+                      default=False,
+                      help="Show long help documentation")
+    group.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose", default=False,
+                      help="print more messages [false]")
+    group.add_option("-q", "--quiet",
+                      action="store_true", dest="quiet", default=False,
+                      help="don't print anything [false]")
+    group.add_option("-y", "--yes", action="store_true", dest="yes", 
+                      default=False,
+                      help="Assume yes is the answer to all my questions [no]")
+    parser.add_option_group(group)
+    group = optparse.OptionGroup(parser, "Backup Options")
+    group.add_option("-0", "--level0", action="store_true", dest="level0", 
+                      default=False,
+                      help="Force a level 0 (full) backup even if backup media "
+                           "hasn't changed [no]")
+    group.add_option("-d", "--deleteold", action="store_true", dest="delete_old", 
+                      default=False,
+                      help="Delete old backups when backup media has been "
+                           "swapped [no]")
+    parser.add_option_group(group)
+    group = optparse.OptionGroup(parser, "Administrative Options")
+    group.add_option("-a", "--add", dest="newdisk", default=None,
+                      help="Configure disk to use for backups", 
+                      metavar="DEVICE")
+    group.add_option("-m", "--mount", action="store_true", dest="mount", 
+                      default=False,
+                      help="Just unlock and mount the backup media "
+                           "(the next backup run will unmount it)")
+    group.add_option("-u", "--umount", action="store_true", dest="umount", 
+                      default=False,
+                      help="Unmount and lock the media, making it ready for "
+                           "removal. (Do this if the last backup couldn't "
+                           "unmount it)")
+    group.add_option('', "--cronscript", action="store_true", 
+                     dest="cron_script", default=False,
+                     help="Setup a daily cron script to run this")
+    parser.add_option_group(group)
+
+    (options, args) = parser.parse_args()
+
+    if options.long_help:
+        print __doc__
+        parser.print_help()
+        sys.exit(0)
+
+    # set the root logger to send all messages to all handlers
+    # then set the stdout logger to only output wanted messages
+    formatter = logging.Formatter('%(message)s')
+    errhandler = logging.StreamHandler()
+    errhandler.setFormatter(formatter)
+    if options.verbose:
+        errhandler.setLevel(logging.DEBUG)
+    elif options.quiet:
+        errhandler.setLevel(logging.CRITICAL)
+    else:
+        errhandler.setLevel(logging.WARN)
+    logging.getLogger().addHandler(errhandler)
+    logging.getLogger().setLevel(logging.DEBUG)
+    options.__dict__.pop('verbose')
+    options.__dict__.pop('quiet')
+    options.__dict__.pop('long_help')
+    
+    wb = WisBak(**options.__dict__)
+    wb.go()
+
