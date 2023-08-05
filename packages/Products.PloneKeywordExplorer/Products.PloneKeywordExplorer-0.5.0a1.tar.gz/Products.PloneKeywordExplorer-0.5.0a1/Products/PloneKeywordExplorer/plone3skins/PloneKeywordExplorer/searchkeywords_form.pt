@@ -1,0 +1,211 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en-US"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plonekeywordexplorer">
+
+  <metal:head fill-slot="top_slot"
+              tal:define="dummy python:request.set('disable_border',1)" />
+
+  <metal:cssslot fill-slot="css_slot">
+    <style type="text/css">
+      #keywordexplorer li {
+      display: inline;
+      background: url(bullet.gif) no-repeat left;
+      padding-right: 0.5em;
+      padding-left: 1em;
+      font-size: x-small;
+      }
+    </style>
+  </metal:cssslot>
+
+
+  <div id="keywordexplorer" metal:fill-slot="main"
+       tal:define="ks_tool here/plone_keyword_explorer_tool;
+                   Batch python:modules['Products.CMFPlone'].Batch;
+                   b_size python:10;b_start python:0;b_start request/b_start | b_start;
+                   desc_length python:here.portal_properties.site_properties.search_results_description_length;
+                   desc_ellipsis python:here.portal_properties.site_properties.ellipsis;
+                   subjects python:ks_tool.get_subjects(request.get('Subject',[]));
+                   documents python:ks_tool.get_documents_for_subjects(subjects);
+                   other_subjects python:ks_tool.get_other_subjects(documents, subjects);
+                   other_subjects_sorted python:other_subjects.keys();
+                   dummy python:other_subjects_sorted.sort();" >
+
+    <h1 i18n:translate="title_keyword_search">Keyword Search</h1>
+
+    <p tal:condition="python:subjects" i18n:translate="extend_search">Narrow down you search by selecting further keywords.</p>
+    
+    <div tal:condition="python:not subjects"
+         tal:define="uniqueValuesForSubject python:here.portal_catalog.uniqueValuesFor('Subject')">
+      <p tal:condition="uniqueValuesForSubject" i18n:translate="label_select_keyword">
+        Select a first keyword to search for.
+      </p>
+      
+      <p tal:condition="python:not uniqueValuesForSubject">
+        <a href=""
+           tal:attributes="href python:'%s?no_subject=1'%template.id"
+           i18n:translate="no_keyword">[No Keyword]
+        </a>
+      </p>
+      
+      <ul>
+        <li tal:repeat="subject uniqueValuesForSubject"><a href="" tal:attributes="href python:'%s?Subject.query:list:record=%s'%(template.id, subject)" tal:content="subject">Subject</a> </li>
+      </ul>
+      <br /><a href="" tal:attributes="href python:'%s?no_subject=1'%template.id"
+               i18n:translate="no_keyword">[No Keyword]</a>
+    </div>
+    
+    <fieldset tal:condition="subjects">
+      
+      <legend i18n:translate="current_keyword">Currently selected Keywords:</legend>
+      <p i18n:translate="text_click_to_remove" class="formHelp">
+        Click on a keyword to remove it from your search criteria.
+      </p>
+      <ul>
+        <li tal:repeat="subject python:subjects"><a href="" title="click to remove"
+                                                    tal:attributes="href python:template.id+ks_tool.get_subjects_url(subjects, exclude=subject)"
+                                                    tal:content="python:subject" i18n:attributes="title">Subject</a> </li>
+      </ul>
+      <br />
+      <ul>
+        <li>
+          <a href="" title="click to remove all"
+             tal:attributes="href string:${portal_url}/searchkeywords_form"
+             i18n:translate="text_click_to_remove_all">
+            Click here to remove all keywords.
+          </a>
+        </li>
+      </ul>
+    </fieldset>
+    
+    <fieldset tal:condition="other_subjects">
+      <legend i18n:translate="further_keyword">Add a keyword to your search :</legend>
+      <p i18n:translate="text_click_to_add" class="formHelp">
+        Click on a keyword to add it and affinate your search.
+      </p>
+      <ul>
+        <li tal:repeat="other_subject python:other_subjects_sorted">
+          <a href=""
+             title="click to select" 
+             tal:attributes="href python:template.id+ks_tool.get_subjects_url(subjects, include=other_subject)"
+             tal:content="python:other_subject" i18n:attributes="title">Subject</a>
+        </li>
+      </ul>
+    </fieldset>
+    
+    <div tal:condition="python:documents"
+         tal:define="batch python:Batch(documents, b_size, int(b_start), orphan=1);">
+      <h4>
+        <span tal:omit-tag="" i18n:translate="batch_x_items_matching_your_criteria">
+          <span tal:omit-tag="" i18n:name="number" tal:content="python:len(documents)">234</span> items matching your criteria.</span>
+        <a href="" tal:attributes="href string:${here/absolute_url}/search_rss?${request/QUERY_STRING}">
+          <img
+             i18n:attributes="title RSS-title ; alt RSS-alt"
+             tal:attributes="src string:$portal_url/rss.gif"
+             src="rss.gif"
+             alt="RSS Feed"
+             title="RSS feed of these search results" />
+        </a>
+      </h4>
+      
+      <!-- Search results -->
+      
+      <dl i18n:domain="plone">
+        <tal:results repeat="result batch">
+          <dt>
+            <a href="#"
+               tal:attributes="href result/url">
+              <img src="#"
+                   height="16"
+                   width="16"
+                   alt=""
+                   tal:on-error="structure python:path('here/linkOpaque.gif')"
+                   tal:replace="structure python:path('here/%s' % result['icon'])" />
+            </a>
+            &nbsp;
+            <a  href="#" tal:attributes="href result/url"
+                tal:content="result/title" />
+            <span class="discreet" i18n:translate="results_by_author">
+              by <span tal:replace="result/author" i18n:name="author">Author</span>,
+              <span tal:replace="python:here.toLocalizedTime(result['modified'], long_format=1)" 
+                    i18n:name="date">Modification Date</span>
+            </span>
+            
+          </dt>
+          <dd style="margin-bottom: 0em;"
+              tal:content="python:plone_view.cropText(result['description'], desc_length, desc_ellipsis)"> Description </dd>
+          <dd><ul tal:define="document_subjects python:list(result['subject']);
+                              dummy python:document_subjects.sort()">
+              <li tal:repeat="subject python:document_subjects">
+                <strong tal:condition="python:subject in subjects" tal:content="subject">Subject</strong>
+                <a href=""
+                   tal:condition="python:not subject in subjects"
+                   tal:attributes="href python:template.id+ks_tool.get_subjects_url(subjects, include=subject)"
+                   tal:content="python:subject">Subject</a>
+              </li>
+          </ul></dd>
+          
+        </tal:results>
+      </dl>
+      
+      <!-- Navigation -->
+      <div metal:use-macro="here/batch_macros/macros/navigation" />
+      
+    </div>
+    
+    <h2 tal:condition="python:subjects and not documents" i18n:translate="description_no_results_found">No results were found.</h2>
+    
+    <div tal:condition="python:request.has_key('no_subject')"
+         tal:define="results python:ks_tool.get_documents_without_subjects()">
+      
+      <h2 i18n:translate="heading_search_results">Documents without Keywords</h2>
+      
+      <div tal:condition="results"
+           tal:define="batch python:Batch(results, b_size, int(b_start), orphan=1);">
+        
+        <h4>
+          <span i18n:translate="batch_x_items_matching_your_criteria">
+            <span i18n:name="number" tal:content="python:len(results)">234</span> items matching your criteria.</span>
+        </h4>
+        
+        <!-- Search results -->
+        
+        <dl i18n:domain="plone" tal:condition="here/contentValues">
+          <tal:results repeat="result batch">
+            <dt tal:define="url result/getURL">
+              <a href="#" tal:attributes="href url">
+                <img src="#"
+                     height="16"
+                     width="16"
+                     alt=""
+                     tal:on-error="structure python:path('here/linkOpaque.gif')"
+                     tal:replace="structure python:path('here/%s' % result.getIcon)" />
+              </a>
+              &nbsp;
+              <a href="#"
+                 tal:attributes="href url"
+                 tal:content="python:result.Title or result.getId" />
+              
+              <span class="discreet" i18n:translate="results_by_author">
+                by <span tal:replace="result/Creator" i18n:name="author">Author</span>,
+                <span tal:replace="python:here.toLocalizedTime(result.ModificationDate, long_format=1)"
+                      i18n:name="date">Modification Date</span>
+              </span>
+              
+            </dt>
+            
+            <dd tal:content="python:here.cropText(result.Description, desc_length, desc_ellipsis)"> Description </dd>
+          </tal:results>
+        </dl>
+        
+        <!-- Navigation -->
+        <div metal:use-macro="here/batch_macros/macros/navigation" />
+      </div>
+      
+      <h4 tal:condition="not: results" i18n:translate="description_no_results_found">No results were found.</h4>
+    </div>
+  </div>
+</html>
