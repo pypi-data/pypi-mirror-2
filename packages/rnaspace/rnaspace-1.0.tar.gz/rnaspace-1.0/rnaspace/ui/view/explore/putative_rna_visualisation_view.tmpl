@@ -1,0 +1,470 @@
+##
+## RNAspace: non-coding RNA annotation platform
+## Copyright (C) 2009  CNRS, INRA, INRIA, Univ. Paris-Sud 11
+## 
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+## 
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+## 
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+
+
+#import math
+#from rnaspace.ui.view.popup_template import popup_template
+#from rnaspace.core.putative_rna import putative_rna as putative_rna_class
+
+#extends popup_template
+
+#def page_title: RNA visualization
+
+#block import_ressources
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/putative_rna_visualisation.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.tooltip.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.formvalidation.1.1.5.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.core.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.dialog.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.draggable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.resizable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.bgiframe.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.alerts.js">
+</script>
+<link href="${mount_point}ressource/css/jquery.form.css" 
+      rel="stylesheet" type="text/css" />
+<link href="${mount_point}ressource/css/jquery.ui.core.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.dialog.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.theme.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+#end block
+
+#block jquery
+var mount_point = "${mount_point}";
+putative_rna_visualisation(mount_point);
+#end block
+
+#block javascript
+	function parseStructure(structure) {
+		var result = new Array(structure.length) ;
+		var p = new Array() ;
+		for (var i=0; i<structure.length; i++) {
+			if (structure[i] == "(") {
+				p.push(i)
+			} else if (structure[i] == ".") {
+				result[i] = -1;
+			} else {
+				if (p.length == 0) {
+					return -1;
+				}
+				var j = p.pop();
+				result[i] = j;
+				result[j] = i;
+			}
+		}
+		if (p.length != 0) {
+			return -1;
+		} else {
+			return result
+		}
+	}
+#end block
+
+#block page_content
+
+<div id="rna_visualisation_dialog" title=""></div>
+
+<input type="hidden" id="original_start_position" 
+       value="$save_rna.start_position" />
+<input type="hidden" id="original_stop_position" 
+       value="$save_rna.stop_position" />
+<input type="hidden" id="original_strand" value="$save_rna.strand" />
+<input type="hidden" id="original_nb_alignments" 
+       value="$len($save_rna.alignment)" />
+<input type="hidden" id="original_nb_structures" 
+       value="$len($save_rna.structure)" />
+<input type="hidden" id="original_id" value="$save_rna.user_id" />
+<input type="hidden" id="genome_size" value="$genome_size" />
+<input type="hidden" id="rna_names_already_used" 
+       value="$rna_names_already_used" />
+<input type="hidden" id="max_rna_size_for_structure_prediction" 
+       value="$max_rna_size_for_structure_prediction" />
+
+#set $rna_size = $len($putative_rna.sequence)
+<input type="hidden" id="rna_size" value="$rna_size" />
+<input type="hidden" id="error" value="$error" />
+<input type="hidden" id="authkey" value="$authkey" />
+
+<form action="${mount_point}explore/rnavisualisation/index?authkey=$authkey" 
+      id="rna_form" name="rna_form" method="post">
+  
+  <input type="hidden" name="mode" id="mode" value="$mode" />	
+  <input type="hidden" name="rna_id" id="rna_id" 
+	 value="$putative_rna.sys_id" />	
+  <input type="hidden" name="seq_id" id="seq_id" 
+	 value="$putative_rna.genomic_sequence_id" />	
+  <input type="hidden" name="action" id="action" value="" />	
+  <input type="hidden" name="predictor" id="predictor" value="" />	
+  <input type="hidden" name="structure_to_delete" 
+	 id="structure_to_delete" value="" />	
+  <input type="hidden" name="current_sequence_id" 
+	 id="current_sequence_id" value="$current_sequence_id" />
+  <input type="hidden" name="alignment_to_delete"
+	 id="alignment_to_delete" value="" />
+
+  #if $mode == "merge"
+  <div class="content_header"> 
+    Considering the selected existing predicted RNA, a merged
+    prediction is proposed and detailed thereafter
+    <input type="hidden" name="nb_putative_rnas" id="nb_putative_rnas" value="$len($putative_rnas)" />
+    [<a href="${mount_point}help/#help5_2" target="blank">?</a>]<br />
+    <table width="95%" align="center">
+      <tr>
+     	<td>
+      	  <div class="cbb_content2">
+            <table width="99%" align="center">
+              <tr align="center" class="bluebottomborder">
+				<td><b>ID</b></td>
+				<td><b>SeqName</b></td>
+				<td><b>Family</b></td>
+				<td><b>Begin</b></td>
+				<td><b>End</b></td>
+				<td><b>Size</b></td>
+				<td><b>Strand</b></td>
+				<td><b>Replicon</b></td>
+	      		<td><b>Domain</b></td>
+				<td><b>Predictor</b></td>
+              </tr>
+              
+              #for $i, $rna in enumerate($putative_rnas)
+              <tr align="center">
+      			<td>
+	              	<input type="hidden" name="putative_rna$i" id="putative_rna$i" value="$rna.sys_id" />	
+      				$rna.user_id
+      			</td>
+      			<td>$rna.genomic_sequence_id</td>
+      			<td>$rna.family</td>
+      			<td>$rna.start_position</td>
+      			<td>$rna.stop_position</td>
+      			#set $size = ($rna.stop_position - $rna.start_position + 1)
+      			<td>$size</td>
+      			<td>$rna.strand</td>
+      			<td>$rna.replicon</td>
+				<td>$rna.domain</td>
+      			<td>$rna.program_name</td>
+      	      </tr>
+              #end for
+              
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+  #end if
+
+  <div class="cbb_header">
+    <div class="cbb_title">RNA features</div>
+    <div class="cbb_content">
+      <br /><br />
+      <table width="70%">
+	<tr>
+          #if $mode != "display"
+              <td class="bluerightborder">
+          #else
+              <td>
+          #end if
+	    
+	  <table width="100%">
+	    <tr>
+              <td>ID:</td>
+              <td>
+		 #if $mode != "display"
+		 <input type="text" required="true" 
+			mask="putative_rna_id" class="customizeinput" 
+			name="user_rna_id" id="ID" 
+			value="$putative_rna.user_id" />
+	 	 #else
+			$putative_rna.user_id
+		 #end if 
+	      </td>
+	    </tr>
+	    <tr>
+	      <td>Family:</td>
+	      <td>
+		#if $mode != "display"
+		<input type="text" required="true" mask="family" 
+		       class="customizeinput" name="family"
+		       id="Family" value="$putative_rna.family" />
+		#else
+		$putative_rna.family
+		#end if 
+	      </td>
+	    </tr>
+	    <tr>
+	      <td>Sequence name:</td>
+	      <td>
+		#if $len($sequences_id) == 1
+		    $sequences_id[0]
+		#else
+		    <select class="select" required="true" 
+			    id="sequence_id" style="width: 10em">
+		      #for $i in range($len($sequences_id))
+		          #if $sequences_id[$i] == $current_sequence_id
+		          <option selected value="$sequences_id[$i]"> 
+			    $sequences_id[$i] 
+			  </option>
+			  #else
+		          <option value="$sequences_id[$i]"> 
+			    $sequences_id[$i] 
+			  </option>
+			  #end if
+		      #end for
+		    </select>
+		#end if
+		    (<i>$putative_rna.species $putative_rna.strain</i> - $putative_rna.domain - $putative_rna.replicon)
+	      </td>
+	    </tr>
+	   	   
+	    #if $mode != "display"
+	    <tr>
+	      <td>Start:</td>
+	      <td>
+		<input type="text" required="true" mask="numeric" 
+		       class="customizeinput" id="Start" 
+		       name="start_position_value" 
+		       value="$putative_rna.start_position" />
+	    <input type="hidden" id="start_position" 
+		   name="start_position" value="$putative_rna.start_position" />
+	      </td>
+	    </tr>
+	    <tr>
+	      <td>End:</td>
+	      <td>
+		<input type="text" required="true" mask="numeric" 
+		       class="customizeinput" id="End" 
+		       name="stop_position_value" 
+		       value="$putative_rna.stop_position" />
+	    <input type="hidden" id="stop_position" 
+		   name="stop_position" value="$putative_rna.stop_position" />
+	      </td>
+	    </tr>
+	    <tr>
+	      <td>Strand:</td>
+	      <td>
+		<input type="text" required="true" mask="strand" 
+		       class="customizeinput" id="Strand" 
+		       name="strand_value"
+		       value="$putative_rna.strand" />
+	    <input type="hidden" id="strand" name="strand" 
+		   value="$putative_rna.strand" />
+	      </td>
+	    </tr>
+	    #else
+	    <tr><td>Start: </td><td>$putative_rna.start_position</td></tr>
+	    <tr><td>End:  </td><td>$putative_rna.stop_position</td></tr>
+	    <tr><td>Strand:</td><td>$putative_rna.strand</td></tr>
+	    #end if
+	    #if $mode != "creation"
+	    <tr>
+	      <td>Predicted by:</td> 
+	      <td> 
+		<i> $putative_rna.program_name
+		$putative_rna.program_version </i> with a
+		$putative_rna.score score on
+		$putative_rna.day-$putative_rna.month-$putative_rna.year
+	      </td>
+	    </tr>
+	    #end if
+	  </table>
+	  
+	  </td>
+	  #if $mode != "display"
+	  <td align="right"><input type="button" id="update" class="button" value="Update preview" /> </td>
+	  #end if
+	  </tr></table>
+     </div>
+     
+     <div class="cbb_title">Genome context</div>
+     <div class="cbb_content">
+      <br />
+      <pre>$genomical_context[0] ... [$putative_rna.user_id] ... $genomical_context[1]</pre>
+     </div>
+	 
+     <div class="cbb_title">Sequence and structure(s)</div>
+     <div class="cbb_content">
+       <br />
+	  #set $nb_rna_ligne = $math.ceil($float($rna_size)/$float($rna_size_to_display))
+	  #set $max_line_index = $int($nb_rna_ligne) * $int($rna_size_to_display)
+	  #set $final_val = ""
+	  #for $i in range($int($nb_rna_ligne))
+			
+			#if $i == 0
+			
+				#if $len($putative_rna.user_id) > $ids_max_length
+		          #set $final_val += "<span title='" + $putative_rna.user_id + "'>[" + $putative_rna.user_id[0:$ids_max_length-2] + "]</span>"
+				#else
+				  #set $white_spaces = $ids_max_length - $len($putative_rna.user_id)
+				  #set $final_val += $putative_rna.user_id
+				  #for $l in range($white_spaces)
+				    #set $final_val += " "
+				  #end for
+				#end if
+			#else
+				#for $l in range($int($ids_max_length))
+				  #set $final_val += " "
+				#end for
+			#end if
+			
+			#set $line_index = $int($i) * $int($rna_size_to_display) + 1
+			#set $white_spaces = $len($str($max_line_index)) - $len($str($line_index))
+			#for $l in range($white_spaces)
+			  #set $final_val += " "
+			#end for
+			#set $final_val += $str($line_index)
+
+			#set $final_val += "  " + $putative_rna.sequence[$i*$rna_size_to_display:$i*$rna_size_to_display+$rna_size_to_display] + "<br />"
+   		
+   			#for $struct in range($len($putative_rna.structure))
+   				#set $struct_index = $struct + 1
+   				
+				#if $len($putative_rna.structure[$struct].predictor) > $ids_max_length
+		          #set $final_val += "<span title='" + $putative_rna.structure[$struct].predictor + "'>[" + $putative_rna.structure[$struct].predictor[0:$ids_max_length-2] + "]</span>"
+				#else
+				  #set $white_spaces = $ids_max_length - $len($putative_rna.structure[$struct].predictor)
+				  #set $final_val += $putative_rna.structure[$struct].predictor
+				  #for $l in range($white_spaces)
+				    #set $final_val += " "
+				  #end for
+				#end if
+				#for $l in range($len($str($max_line_index)))
+			  		#set $final_val += " "
+				#end for
+   				#set $final_val += "  " + $putative_rna.structure[$struct].structure[$i*$rna_size_to_display:$i*$rna_size_to_display+$rna_size_to_display] + "<br />"
+   			#end for
+			#if $len($putative_rna.structure) > 0
+				#set $final_val += "<br />"
+			#end if
+		#end for
+		<pre>$final_val</pre>
+
+		<input type="hidden" id="nb_structures" name="nb_structures" value="$len($putative_rna.structure)" />
+		#if $len($putative_rna.structure) > 0
+			<table align="center">
+			#for $i in range($len($putative_rna.structure))
+				#set $number = $i + 1
+			
+	  			#if $i%3 == 0
+	  				#if $i != 0
+	  					</tr>
+	  				#end if
+					<tr>
+				#end if
+				<td align="center">
+					<input type="hidden" id="structure$i" name="structure$i" value="$putative_rna.structure[$i].structure" />
+					<input type="hidden" id="structure_predictor$i" name="structure_predictor$i" value="$putative_rna.structure[$i].predictor" />
+					<input type="hidden" id="structure_fenergy$i" name="structure_fenergy$i" value="$putative_rna.structure[$i].free_energy" />
+					<input type="hidden" id="structure_description_ss_img-$i" name="structure_description_ss_img-$i" value="Predictor : $putative_rna.structure[$i].predictor (free energy = $putative_rna.structure[$i].free_energy)" />
+					<a id="ss_img-$i" href="${mount_point}explore/rnavisualisation/picture?name=$structures_picture[$i]&amp;authkey=$authkey">
+		    			  <img class="border0" src="${mount_point}explore/rnavisualisation/picture?name=$structures_picture[$i]&amp;authkey=$authkey" width="300" height="300" alt="structure"/>
+		    			</a>
+		    		<br />
+					#if $len($putative_rna.structure[$i].predictor) > $ids_max_length
+			          Structure by <span title="$putative_rna.structure[$i].predictor">[$putative_rna.structure[$i].predictor[0:$ids_max_length-2]]</span>
+					#else
+					  Structure by $putative_rna.structure[$i].predictor
+					#end if
+					#if $mode != "display"
+						<input type="button" id="del_structure-$i" name="$i" class="button" style="margin-left:15px" value="Remove in preview" /> 
+					#end if 
+				</td>
+				
+			#end for
+			</tr>
+			</table>
+		#end if
+		
+		#if $mode != "display"
+		    </div>
+		    <div class="cbb_title">New secondary structure</div>
+		    <div class="cbb_content">
+		        <br /><br />
+				You can type or paste a secondary structure in bracket-dot format.<br />
+                Alternatively you can compute the minimal free energy secondary
+                structure with:   
+				#for $predictor in $predictors
+					<input type="button" id="predict_ss" class="button" name="$predictor" value="$predictor" />
+				#end for
+				<br /><br />
+				<input type="hidden" id="new_structure_predictor" name="new_structure_predictor" value="$new_structure.predictor" />
+				<input type="hidden" id="new_structure_fenergy" name="new_structure_fenergy" value="$new_structure.free_energy" />
+				<input type="text" class="customizeinput" id="new_structure" name="new_structure" value="$new_structure.structure" size="80px" />
+				<input type="button" id="add_structure" class="button" value="Add this structure in the preview page" /> 
+		#end if
+     </div>
+	
+	<input type="hidden" id="nb_alignments" name="nb_alignments" value="$len($putative_rna.alignment)" />
+	#if $mode != "creation"
+	 #if $len($putative_rna.alignment) > 0
+      <div class="cbb_title">Alignment(s)</div>
+      <div class="cbb_content">
+        <br /><br />
+	    #set $url = $mount_point+"explore/alignment/index?authkey="+$authkey+"&amp;mode=display_all&amp;prna_id="+$putative_rna.sys_id+"&amp;page_number=1"
+        This prediction is included in $len($putative_rna.alignment)
+	    <a href="$url"> alignment(s) </a>
+	  </div>
+	 #end if						
+	#end if
+   </div>
+
+<div class="cob_header">
+  <div class="cob_content" style="text-align:center;padding:3px;">
+    #if $mode == "creation" or $mode == "merge"
+      <input type="button" class="button_bp" id="add_prediction"
+	     value="Save" />
+      <input type="button" class="button_bp" id="back" 
+	     value="Back to explore" />
+    #elif $mode == "edition" 
+      <input type="button" class="button_bp" id="reset" 
+	     value="Reset initial values" />
+      <input type="button" class="button_bp" id="save" value="Save" />
+      <input type="button" class="button_bp" id="cancel"
+	     value="Cancel" />
+    #else
+      <input type="button" class="button_bp" id="edit" value="Edit" />
+      <input type="button" class="button_bp" id="back" 
+	     value="Back to explore" />
+    #end if
+  </div>
+</div>
+  
+   <div style="clear:both;"></div>
+	
+ </form>
+
+#end block

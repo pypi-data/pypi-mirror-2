@@ -1,0 +1,272 @@
+##
+## RNAspace: non-coding RNA annotation platform
+## Copyright (C) 2009  CNRS, INRA, INRIA, Univ. Paris-Sud 11
+## 
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+## 
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+## 
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+#from rnaspace.ui.view.explore.alignment_helper import alignment_helper
+#extends alignment_helper
+#def page_title: Alignment
+
+#block import_ressources 
+<link href="${mount_point}ressource/css/sequence_colors.css" 
+      rel="stylesheet" type="text/css" />
+<link href="${mount_point}ressource/css/rnaspace.css" 
+      rel="stylesheet" type="text/css" />
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.core.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.dialog.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.draggable.min.js">
+</script>
+<script type="text/javascript"
+	src="${mount_point}ressource/js/jquery.ui.resizable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.bgiframe.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.alerts.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/explore.alignment.js">
+</script>
+<link href="${mount_point}ressource/css/jquery.ui.core.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.dialog.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.theme.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+#end block
+
+#block jquery
+var mount_point = "${mount_point}";
+alignment(mount_point);
+#end block
+
+#block javascript
+#end block
+
+#block page_content
+
+<div id="alignment_visualisation_dialog" title=""></div>
+
+#if $bad
+<div class="content_header">
+  The  selected  input  data  contains  sequences  of  significantly
+  different size. 
+  <br />
+  This can lead to bad quality alignments and secondary structure inference.
+</div>
+#end if
+
+
+<form id="alignment_form" name="form" enctype="multipart/form-data" 
+      method="post" action="${mount_point}explore/alignment">
+
+  <input type="hidden" name="authkey" id="authkey" value="$authkey" />
+  <input type="hidden" name="page_number" id="page_number"
+	 value="$page" />
+  <input type="hidden" name="mode" id="mode" value="$mode" />
+  <input type="hidden" name="prna_id" id="prna_id" value="$prna_id" />
+  <input type="hidden" name="nb_pages" id="nb_pages" 
+	 value="$nb_pages" />
+
+  <div id="pages">
+    $get_page_navigation($page, $prna_id, $authkey, $nb_pages, $mount_point)
+  </div>
+
+  <div class="content_header">
+
+    #set ($user, $db) = $split_db_user_sequences($aligns)
+    <div class="subheader">User sequence(s)</div>
+
+       <div class="cbb_contentAlign">
+        <table width="99%" align="center">
+         <tr align="center" class="bluebottomborder">
+	      <td><b>ID</b></td>
+	      <td><b>SeqName</b></td>
+	      <td><b>Family</b></td>
+	      <td><b>Begin</b></td>
+	      <td><b>End</b></td>
+	      <td><b>Size</b></td>
+	      <td><b>Strand</b></td>
+	      <td><b>Software</b></td>
+	     </tr>
+ 
+	      #set $done = []
+	      #for $align_id in $user:
+	       #for $prna in $user[$align_id]:
+	        #if $prna.rna_id not in $done
+	         <tr align="center">
+		   #set href = $mount_point+ 'explore/rnavisualisation/index'
+		   #set href = href+'?mode=display&amp;rna_id='+$prna.rna_id
+		   #set href = href + '&amp;authkey=' + $authkey
+		     #if len($prna.user_id) > 20
+	          <td>
+		       <a id="p_$prna.rna_id" class="putative_link"
+			  href="${href}">
+			   $prna.user_id[0:19]
+		       </a>
+		      </td>
+		     #else
+		      <td>
+		       <a id="p_$prna.rna_id" class="putative_link"
+			  href="${href}">
+			   $prna.user_id
+		       </a>
+		      </td>
+		     #end if
+	
+		     <td>$prna.genomic_sequence_id</td>
+		     #for $uprna in $aligns[$align_id]['prnas']
+		      #if $uprna.sys_id == $prna.rna_id
+	           <td>
+	            #if $len($uprna.family) > $max_item_length
+		         <span title="$uprna.family">[$uprna.family[0:$max_item_length]...]</span>
+		        #else
+			     $uprna.family
+		        #end if
+		       </td>
+	           <td>$uprna.start_position</td> 
+	           <td>$uprna.stop_position</td>
+		       <td>$uprna.size</td>
+		       <td>$uprna.strand</td>
+		       <td>
+		        #if $len($uprna.program_name) > $max_item_length
+		         <span title="$uprna.program_name">[$uprna.program_name[0:$max_item_length]...]</span>
+		        #else
+			     $uprna.program_name
+		        #end if
+		       </td>	       
+		      #end if
+		     #end for
+		     $done.append($prna.rna_id) 	  
+	         </tr>
+	        #end if
+	       #end for
+	      #end for
+         </table>
+        </div>
+
+       #if len($db) > 0
+	   <br />
+       <div class="subheader">Database sequence(s)</div>   
+       <div class="cbb_contentAlign">
+        <table width="99%" align="center">
+         <tr align="center" class="tr_borderbottom">
+	      <td><b>Sequence Description</b></td>
+	      <td><b>database</b></td>
+	      <td><b>Begin</b></td>
+	      <td><b>End</b></td>
+         </tr>
+
+         #for $align_id in $db
+          #for $prna in $db[$align_id] 
+          <tr align="center">
+	       #if len($prna.user_id) > 120
+	        <td align="left">
+	         <span>
+	           $prna.user_id[1:120]
+	         </span>
+	        </td>
+	       #else
+	        <td align="left">
+	         <span>
+	           $prna.user_id[1:]
+	         </span>
+	        </td>
+	       #end if
+	       <td>$prna.genomic_sequence_id[1:30]</td>
+	       <td>$prna.start</td>	
+	       <td>$prna.stop</td>
+	      </tr>
+          #end for
+         #end for
+        </table>
+       </div>
+       #end if
+
+  </div>
+
+  <div class="cbb_header">
+      #set $save = False
+  	  #for $align_id in $aligns
+          #set $program = $aligns[$align_id]['program']
+          #set $entries = $aligns[$align_id]['entries']
+          #set $rnas = $aligns[$align_id]['rnas']
+          #set $score = $aligns[$align_id]['score']
+          #set $evalue = $aligns[$align_id]['evalue']
+          #set $pvalue = $aligns[$align_id]['pvalue']
+
+          $get_aligment_header($align_id, $program, $entries, $rnas, 
+                               $score, $evalue, $pvalue)
+
+          <div class="alignment_content">
+	    <table>
+	      <tr>
+		<td>
+		  <div class="alignment_html">
+		    <pre>$print_rna_m($aligns[$align_id]['rnas'])</pre>
+		  </div>
+		</td>
+		<td>
+		  #if $aligns[$align_id]['consensus'] is not None:
+		  <div class="alignment_consensus">
+		  
+		    <a id="ss_img" name="Consensus" 
+		       href="$aligns[$align_id]['consensus']">
+		      <img class="border0" 
+			   src="$aligns[$align_id]['consensus']" 
+			   width="300" height="300" alt="consensus" />
+		    </a>
+		    <span>consensus</span>
+		  </div>
+		  #end if
+		</td>
+	      </tr>
+	    </table>
+
+	    #if not $aligns[$align_id]['saved']
+	     #set $save = $align_id
+	    #end if
+
+	  </div>
+      </div>
+      #end for
+  </div>
+
+  <div id="pages_bottom" >
+    $get_page_navigation($page, $prna_id, $authkey, $nb_pages, $mount_point)
+  </div>
+
+
+   <div class="cob_header">
+    <div class="cob_content" style="text-align:center;padding:3px;">
+     #if $save
+      <input type="button" value="Save" class="button_bp alignment_save_b" id="$save"/>
+     #end if
+      
+     <input  id="back" class="button_bp" type="submit" name="back" value="Back to explore" />
+    </div>
+   </div>
+   <div style="clear:right"> </div>
+
+</form>
+
+#end block

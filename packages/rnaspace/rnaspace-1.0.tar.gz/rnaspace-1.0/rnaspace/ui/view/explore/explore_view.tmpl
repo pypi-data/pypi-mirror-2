@@ -1,0 +1,540 @@
+##
+## RNAspace: non-coding RNA annotation platform
+## Copyright (C) 2009  CNRS, INRA, INRIA, Univ. Paris-Sud 11
+## 
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+## 
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+## 
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+
+#import math
+#import re
+#from rnaspace.ui.view.rnaspace_template import rnaspace_template
+#extends rnaspace_template
+
+#def explore_id: active
+#def header_title: Explore/Edit
+
+#def info_boxes
+#if $authentification_platform
+active#slurp
+#else
+inactive#slurp
+#end if
+#end def
+
+#block import_ressources
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/explore.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/explore.dialogs.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.formvalidation.1.1.5.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.core.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.dialog.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.draggable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.resizable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.bgiframe.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.alerts.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.tooltip.js">
+</script>
+<link href="${mount_point}ressource/css/jquery.form.css" 
+      rel="stylesheet" type="text/css" />
+<link href="${mount_point}ressource/css/jquery.ui.core.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.dialog.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.theme.css" 
+      rel="stylesheet" type="text/css" media="screen" />
+#end block
+
+#block jquery
+var mount_point = "${mount_point}";
+explore(mount_point);
+#end block
+
+#block javascript
+	function getAvailableCombinaison() {
+		return $available_combinaisons
+	}
+#end block
+
+#block page_content
+
+<div id="explore_dialog" title=""></div>
+
+<div class="content_header"> 
+   #set $nb_criteria = $len($filter)
+   #set $nb_page = $math.ceil($float($len($putative_rnas))/$float($nb_putative_rnas_per_page)) 
+   #if $int($len($putative_rnas)) == 0
+      #set $first_item = 0 
+	  #set $last_item = 0
+   #else
+	  #set $first_item = ($int($current_page)-1)*$int($nb_putative_rnas_per_page) + 1
+	  #set $last_item = ($int($current_page)-1)*$int($nb_putative_rnas_per_page) + $int($nb_putative_rnas_per_page)
+   #end if
+	
+   #if $int($current_page) == $int($nb_page)
+	  #set $last_item = $len($putative_rnas)
+   #end if
+	
+   #set $nb_putative_rna_on_this_page = $int($last_item) - $int($first_item) + 1
+
+	
+	 
+   #set $runs_value = ""
+   <b>Results for job $project_id: $len_all_rna RNAs</b> 
+   #for $run in $sorted($runs_info.keys())
+      #set $runs_value += "run " + $run + ": " + $str($runs_info[$run]["nb_total"]) + " RNAs, "
+   #end for
+   #set $runs_value = $runs_value[:$len($runs_value)-2]
+   ($runs_value) <br />
+
+  
+   <table width="95%" align="center">
+     <tr>
+       <td valign="top" width="50%">
+	 <div class="cbb_content2">
+	   <table width="99%" align="center">
+             <tr>
+	       <td colspan="4" align="center" class="bluebottomborder">
+		 <b>Gene finder(s)</b>
+	       </td>
+	     </tr>
+             #for $run in $sorted($runs_info.keys())
+                 #for $evt in $runs_info[$run]["events"]
+      	         <tr>
+      		   <td>$evt.nb_prediction RNAs</td>
+      		   <td>$evt.gene_finder_name</td>
+      		   <td>$evt.run_id</td>
+      		 </tr>
+                 #end for       
+	     #end for
+	   </table>
+	 </div>
+       </td>
+       <td valign="top" width="50%">
+	 <div class="cbb_content2">
+	   <table width="99%" align="center">
+             <tr>
+	       <td colspan="6"  align="center"  class="bluebottomborder">
+		 <b>Query sequence(s)</b>
+	       </td>
+	     </tr>
+             #for $i in range($len($sequences))
+             <tr>
+               <td>
+		 <a href="" id="sequence_info-$i" name="$sequences[$i].id"> 
+		   $sequences[$i].id </a>
+	       </td>
+	       <td>$len($sequences[$i].data) nt</td>
+	       <td>$sequences[$i].domain</td>
+	       <td>$sequences[$i].species</td>
+	       <td>$sequences[$i].strain</td>
+	       <td>$sequences[$i].replicon</td>
+	     </tr>
+	     #end for
+	   </table>
+	 </div>
+       </td>
+     </tr>
+   </table>
+</div>
+ 
+<div class="content_header"> 
+  The table of results may be sorted by clicking on the column titles.
+  You can select predictions by ticking the check boxes in the left column 
+  and perform actions on them using the down-drop lists below the table. 
+  [<a href="${mount_point}help#help5_2" target="blank">?</a>]
+  <br />
+  You can apply successive filters on the list of displayed results using the
+  filter below. [<a href="${mount_point}help#help5_1" target="blank">?</a>]
+</div>
+
+<input type="hidden" id="nb_page" value="$nb_page" />
+<input type="hidden" id="authkey" value="$authkey" />
+
+<form action="${mount_point}explore/index?authkey=$authkey" 
+      id="explore_form" name="explore_form" method="post">
+  <div class="cbb_header" style="width:55%;">
+   <div class="cbb_filter">
+    <input type="hidden" name="nb_criteria" id="nb_criteria"  
+	   value="$nb_criteria" /> 
+    <input type="hidden" name="to_delete" id="to_delete" value="none" /> 
+    <input type="hidden" name="sort_by" id="sort_by" value="$sort_by" /> 
+    <input type="hidden" name="ascent" id="ascent" value="$ascent" />
+    <input type="hidden" name="current_page" id="current_page" 
+	   value="$current_page" /> 
+    <input type="hidden" name="display_mode" id="display_mode" 
+	   value="$display_mode" />
+    <input type="hidden" name="nb_putative_rnas_per_page" 
+	   id="nb_putative_rnas_per_page" value="$nb_putative_rnas_per_page" /> 
+    <input type="hidden" name="nb_checkbox" id="nb_checkbox" 
+	   value="$nb_putative_rna_on_this_page" />
+    <input type="hidden" name="action" id="action" value="" />
+    <input type="hidden" name="new_family" id="new_family" value="" />
+    <input type="hidden" name="export_format" id="export_format" value="" />
+    <input type="hidden" name="mount_point" id="mount_point" 
+	   value="${mount_point}" />
+    <div id="info"></div>
+    
+    <table>
+     <tr>
+	  <td><i> Field </i></td>
+	  <td><i> Operator </i></td>
+	  <td><i> Value </i></td>
+	  <td></td>
+     </tr>
+      
+     #for $i in range($int($nb_criteria))
+     <tr>
+	 #set $name_value = "criteria" + $str($i)
+	 #set $name_value2 = "operators" + $str($i)
+	 #set $name_value3 = "value" + $str($i)
+	  <td>
+	   <select class="select" id="update_operator-$i" 
+		   name="$name_value" style="width: 10em">
+	     #for $j in range($len($all_attributs_name))
+	     #if $all_attributs_name[$j][1] == $filter.get_criteria($i).characteristic
+	     <option selected="selected" value="$all_attributs_name[$j][1]"> 
+	       $all_attributs_name[$j][0] 
+	     </option>
+	     #else
+	     <option value="$all_attributs_name[$j][1]"> 
+	       $all_attributs_name[$j][0]
+	     </option>
+	     #end if
+	     #end for
+	   </select>
+	  </td>
+	
+	  <td>
+	   
+	   #set $operators_available_for_this_criteria = $available_combinaisons[$filter.get_criteria($i).characteristic]
+	   <select class="select" id="$name_value"
+		   name="$name_value2" style="width: 10em">
+	     #for $j in range($len($operators_available_for_this_criteria))
+	     	#set $html_val = $operators_available_for_this_criteria[$j].replace('<', '&lt;').replace('>', '&gt;')
+	     	#if $operators_available_for_this_criteria[$j] == $filter.get_criteria($i).operator
+	     		<option selected="selected" 
+		     	value="$html_val"> 
+	       		$html_val 
+	     		</option>
+	     	#else
+	     		<option value="$html_val"> 
+	       		$html_val
+	     		</option>
+	     	#end if
+	     #end for
+	   </select>	
+	  </td>
+	
+	  <td>
+	   <input type="text" class="customizeinput" size="12" 
+		  name="$name_value3" value="$filter.get_criteria($i).value" />
+	  </td>
+	
+	  <td>
+	   <button class="button" id="update_criteria-$i" type="button"> 
+	     Upd 
+	   </button>
+	   <button class="button" id="delete_criteria-$i" name="$str($i)" 
+		   type="button"> Del </button>		
+	  </td>
+	 </tr>
+     #end for
+    
+     <tr>
+	  <td>
+	   <select class="select" id="update_operator" 
+		   name="criteria" style="width: 10em">
+	     <option selected="selected" value="-1"> Criterium </option>
+	     #for $i in range($len($all_attributs_name))
+	     <option value="$all_attributs_name[$i][1]"> 
+	       $all_attributs_name[$i][0] 
+	     </option>
+	     #end for
+	   </select>
+	  </td>
+	
+	  <td>
+	   <select class="select" id="criteria" 
+		   name="operators" style="width: 10em">
+	     <option selected="selected" value="-1"> Comparison </option>
+	   </select>
+ 	  </td>
+	
+	  <td>
+	    <input type="text" class="customizeinput" size="12" 
+		   id="value" name="value" value="Give value" /> 
+	  </td>
+	  <td>
+	    <button class="button" id="add_criteria" type="button"> 
+	      Add/Update 
+	    </button> 
+	  </td>
+     </tr>    
+    </table>
+   </div>
+  </div>
+ 
+  <div style="clear:left;">
+    <table width="100%">
+      <tr>
+	<td align="left" width="25%">
+	  Predictions $first_item - $last_item of $len($putative_rnas)
+	</td>
+	<td align="center" width="50%">
+	  Display
+	  <select class="select" id="display">
+	    #if $display_mode == "terse_set"
+	    <option selected="selected" value="terse_set"> Terse set </option>
+	    <option value="all"> All </option>
+	    #else
+	    <option value="terse_set"> Terse set </option>
+	    <option selected="selected" value="all"> All </option>	
+	    #end if
+	  </select>
+	  Show
+	  <select class="select" id="show">
+	    #for i in range($len($show_allowed))
+	    #if $int($show_allowed[$i]) == $int($nb_putative_rnas_per_page)
+	    <option selected="selected" value="$show_allowed[$i]"> 
+	      $show_allowed[$i] 
+	    </option>
+	    #else
+	    <option value="$show_allowed[$i]"> $show_allowed[$i] </option>
+	    #end if
+	    #end for
+	  </select>
+	</td>
+	<td align="right" width="25%">
+ 	  #if $int($current_page) > 1
+    	      #set $previous_page = $int($current_page) - 1
+	  #else
+	      #set $previous_page = 1
+	  #end if
+	
+	  #if $int($current_page) < $int($nb_page)
+	      #set $next_page = $int($current_page) + 1
+	  #else
+	      #set $next_page = $nb_page
+	  #end if
+	  
+	  #if $int($current_page) > 1
+	    <a href="" class="change_page" name="1">&lt;&lt;</a>
+	    &nbsp; 
+	    <a href="" class="change_page" name="$previous_page">&lt;</a>
+	    &nbsp; 
+	  #end if
+	    Page <input class="customizeinput" id="change_from_text" 
+			type="text" size="1" 
+	
+	  #if $int($len($putative_rnas)) == 0
+	    value="0" /> 
+	  #else
+	    value="$current_page" /> 
+	  #end if
+	
+	  of $int($nb_page) 
+	
+	  #if $int($current_page) < $int($nb_page)
+	    &nbsp;
+	    <a href="" class="change_page" name="$next_page">&gt;</a>
+	    &nbsp; 
+	    <a href="" class="change_page" name="$int($nb_page)">&gt;&gt;</a>
+	  #end if
+ 	
+	</td>
+      </tr>
+    </table>
+  </div>
+
+  <div style="overflow:auto;">
+    
+    <table class="results">
+      <tr class="pair entete">
+	<th style="width:35px"> 
+	  <a href="" id="select_all_none"> 
+	    <span id="all_none">All</span>
+	  </a> 
+	</th>
+	#for $i in $range($len($attributs_to_show))
+	<th> 
+	  <a class="sort_table" name="$attributs_to_show[$i][1]" href=""> 
+	    $attributs_to_show[$i][0] 
+	  </a> 
+	</th>
+	#end for
+      </tr>
+	
+      #set $checkbox_number = 0
+      #for $i in range($len($putative_rnas))
+	
+	  #if $i%2 == 0
+	    #set $class_id = "pair"
+	  #else
+	    #set $class_id = "impair"
+	  #end if
+	
+	  #if $int($i) >= (($int($current_page)-1)*$int($nb_putative_rnas_per_page))
+	  #if $int($i) < (($int($current_page)-1)*$int($nb_putative_rnas_per_page) + $int($nb_putative_rnas_per_page))
+	  
+	  <tr class="$class_id">
+	    #set $checkbox_id = "checkbox" + $str($checkbox_number)
+	    <td>
+	      <input type="checkbox" name="$checkbox_id" value="$putative_rnas[$i].sys_id" />
+	    </td>
+
+	    #set $checkbox_number += 1
+	    #for $j in $range($len($attributs_to_show))
+	    
+	    #set $col_id = $attributs_to_show[$j][1] + $str($i) 
+	    
+	    <td id="$col_id">
+	      #set $item = $putative_rnas[$i].get_x($attributs_to_show[$j][1])
+	      #if $type($item) == $type([])
+	          #set $item = $str($len($item))
+	      #else
+	          #set $item = $str($item)
+	      #end if
+	      #if $attributs_to_show[$j][0] == "ID"
+	           #set $link = $mount_point + "explore/rnavisualisation/index?authkey=" + $authkey + "&amp;mode=display&amp;rna_id=" + $putative_rnas[$i].sys_id
+		   #if $item != ""
+		       #if $len($item) > $max_item_length
+		          <a href="$link"><span title="$item">[$item[0:$max_item_length]...]</span></a>
+		       #else
+		          <a href="$link">$item</a>
+		       #end if
+		   #end if
+		 
+	      #else
+		   #if $item != ""
+		       #if $len($item) > $max_item_length
+		           <span title="$item">[$item[0:$max_item_length]...]</span>
+		       #else
+			   $item
+		       #end if
+		   #else
+			   *
+ 	           #end if
+		 
+     	      #end if
+
+           </td> 
+           #end for
+          </tr>
+          #end if
+          #end if
+
+       #end for 
+
+    </table>
+  </div>
+
+<div class="cob_left">
+ <div class="cob_content" style="padding:0px 0px 2px 1px">
+  <table width="100%">
+    <tr>
+      <td>
+	<img src="${mount_point}ressource/img/icon/up.gif" alt="up" />
+      </td>
+      <td>With <b>selected</b> predictions:</td>
+      <td align="right">
+	<img src="${mount_point}ressource/img/icon/edit.png" alt="edit" />
+      </td>
+      <td align="left">
+	<select class="select" id="select_edition" style="width: 10em">
+  	  <option selected="selected" value="edit"> Edit... </option>
+  	  <option value="same_family"> rename family </option>
+  	  <option value="split"> split into 2 families </option>
+  	  <option value="add"> add a new prediction </option>
+  	  <option value="merge"> merge predictions </option>
+  	  <option value="delete"> delete </option>
+  	 </select>
+      </td>
+      <td align="right">
+	<img src="${mount_point}ressource/img/icon/analyse.png"
+	     alt="analyse" />
+      </td>
+      <td align="left">
+	<select class="select" id="select_analyse" style="width: 10em">
+	  <option selected="selected" value="analyse"> Analyse... </option>
+	  <option value="alignment"> alignment </option>
+	  <option value="cgview"> view with CGView </option>
+	</select>
+      </td>
+      <td align="right">
+	<img src="${mount_point}ressource/img/icon/export.png" alt="export" />
+      </td>
+      <td align="left">
+	<select class="selectexport" id="select_export" style="width: 10em">
+	  <option selected="selected" value="export"> Export... </option>
+	  <option value="rnaml"> to RNAML </option>
+          <option value="fasta"> to multiFASTA </option>
+          <option value="gff"> to GFF </option>
+          <option value="apollo_gff"> to Apollo GFF </option>
+	</select>
+      </td>
+      <td>
+	<img src="${mount_point}ressource/img/icon/up.gif" alt="up" />
+      </td>
+    </tr>
+  </table>
+ </div>
+</div>
+
+
+<div class="cob_right">
+  <div class="cob_content" style="padding:0px 0px 2px 1px">
+    <table width="100%">
+      <tr>
+	<td>With <b>all</b> predictions:</td>
+	<td align="right">
+	  <img src="${mount_point}ressource/img/icon/export.png"
+	       alt="export" />
+	</td>
+	<td align="left">
+	  <select class="selectexport" id="select_export_all" 
+		  style="width: 10em">
+	    <option selected="selected" value="export"> EXPORT... </option>
+	    <option value="rnaml"> to RNAML </option>
+            <option value="fasta"> to multiFASTA </option>
+            <option value="gff"> to GFF </option>
+            <option value="apollo_gff"> to Apollo GFF </option>
+          </select>
+	</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+</form>
+
+#end block

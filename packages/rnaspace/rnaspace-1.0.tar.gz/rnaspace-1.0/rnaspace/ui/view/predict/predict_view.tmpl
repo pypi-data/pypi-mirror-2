@@ -1,0 +1,357 @@
+##
+## RNAspace: non-coding RNA annotation platform
+## Copyright (C) 2009  CNRS, INRA, INRIA, Univ. Paris-Sud 11
+## 
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+## 
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+## 
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+
+#from rnaspace.ui.view.rnaspace_template import rnaspace_template
+#extends rnaspace_template
+#from rnaspace.ui.view.predict.predict_helper import *
+
+#def predict_id: active
+#def header_title: Predict
+
+#def info_boxes
+#if $authentification_platform
+active#slurp
+#else
+inactive#slurp
+#end if
+#end def
+
+#def explore_id
+#if not $user_has_done_a_run
+notaccessible#slurp
+#else
+inactive#slurp
+#end if
+#end def
+
+
+#block import_ressources
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.core.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.dialog.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.draggable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.resizable.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.bgiframe.min.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.ui.alerts.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.asmselect.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.livequery.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/jquery.form.js">
+</script>
+<script type="text/javascript" 
+	src="${mount_point}ressource/js/predict.js">
+</script>
+
+<link href="${mount_point}ressource/css/jquery.ui.core.css" rel="stylesheet" 
+      type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.dialog.css" rel="stylesheet" 
+      type="text/css" media="screen" />
+<link href="${mount_point}ressource/css/jquery.ui.theme.css" rel="stylesheet" 
+      type="text/css" media="screen" />
+<link rel="stylesheet" type="text/css" 
+      href="${mount_point}ressource/css/jquery.asmselect.css" />
+<link href="${mount_point}ressource/css/rnaspace.css" rel="stylesheet" type="text/css" />
+#end block
+
+#block javascript
+#end block
+
+#block jquery
+var mount_point = "${mount_point}";
+init_predict(mount_point);
+#end block
+
+## Return a line for a predictor
+#def get_predictor_view($predictor, $maxopts) 
+  #if($predictor.database == "1" and $dbnames is not None) or $predictor.database == "0"
+
+  #set $ptype = $predictor.type.split('_')[0]
+  <tr>
+    ## get the checkbox according to previously checked softs
+    <td>
+      <div class="check">
+	$get_checked($predictor, $checked_softs)
+      </div>
+    </td>
+
+    ## get the name + the type of the predictor: "name (type)" 
+    <td>
+      <div class="softname_${ptype}">
+	$get_name($predictor)
+	[<a href="" class="toggle_help">more</a>]
+      </div>
+    </td>
+
+    #set $num_tds = 2
+
+    ## if some basic options exist, they have to appear on the predict page.
+    #for $opt in $predictor.basic_options:
+    #if $opt != ''
+    <td class="desc_${ptype}">$predictor.options_desc[$opt]</td>
+    <td class="selection_${ptype}">
+      $get_option($predictor, $opt, $updated)
+    </td>
+    #set $num_tds += 2
+    #end if
+    #end for
+
+    #set $num_options = $get_number_options($predictor)
+    #set $num_basic_options = $get_number_basic_options($predictor)
+
+    ## generate the databases selectbox if required by the predictor
+    #if $predictor.database == "1"
+    <td class="desc_${ptype}">Database: </td>
+    <td class="selection_${ptype}">
+      <select class="limited_width select" name="db_${predictor.name}"
+	      size="1"> 
+	#for $database in $dbnames:
+	<option>$database</option>
+	#end for
+      </select>
+    </td>
+    #set $num_tds += 2
+    #set $num_basic_options += 1
+    #end if
+    
+    ## we need to add empty column in order to align the parameters buttons.
+    #for $i in range($num_basic_options, $maxopts):
+    <td></td><td></td>
+    #set $num_tds += 2
+    #end for
+
+    ## if the predictor has some options that are not displayed on the predict
+    ## page, put a "parameters" button
+    #if $num_options - len($predictor.basic_options) > 0
+    <td>
+      <div class="parameters">
+	<input class="button parameters_button" type="submit"
+	       name="param_button_${ptype}_$predictor.name"
+	       value="parameters" />
+      </div>
+    </td>
+    #else
+    <td></td>
+    #end if
+  </tr>
+  #set $num_tds += 1
+  <tr style="display:none;">
+    ## this div only appear when clicking on the more link
+    <td colspan="${num_tds}">
+      <div class="soft_description">
+	$predictor.description [<a href="${mount_point}help#$predictor.name"
+				   target="blank">?</a>]
+      </div>
+    </td>
+  </tr>
+  #end if
+#end def
+
+
+## Return a line for a comparative analysis predictor.
+## It differs from the other predictors because CA predictors are in a little 
+## box.
+#def get_comp_view($predictor, $i) 
+  ## $i in the line number of the predictor in its box.
+  ## It is used to select the first predictor when user load the predict
+  ## page the first time.
+
+  <div class="soft_box_line">
+    <div class="soft_box_name">
+      $get_radio($predictor, $selected, $i)
+      [<a href="" class="toggle_help">more</a>]
+    </div>
+
+    #set $name = $get_param_button_name($predictor)
+
+    <input class="button parameters_button" type="submit"
+	   name="$name" value="parameters" />
+  </div>
+
+  <div class="soft_description">
+    ${predictor.description} [<a href="${mount_point}help#$predictor.name"
+				 target="blank">?</a>]
+  </div>
+
+  <br />
+#end def
+
+#block page_content
+
+  <div id="parameters_dialog"></div>
+
+  <div class="content_header">
+    For the sake of clarity, available annotation tools are organized 
+    in three sections. Select one or several gene finders to analyse your data.
+    [<a href="${mount_point}help/#help4" target="blank">?</a>]<br />
+    <i>Remark:</i> Maximum allowed running time for a gene finder is 
+    <b>8 hours</b>. 
+  </div>
+
+  <input type="hidden" id="authkey" value="$authkey" />
+
+  <form enctype="multipart/form-data" method="post" 
+	action="${mount_point}predict/submit?authkey=$authkey" 
+	id="predict_form">
+
+    <div class="cbb_header">
+      #if $known_part
+      #set $kmaxopts = $get_max_number_options($known_softs)
+      <div class="cbb_title"> Homology search</div> 
+      <div class="cbb_content">
+	<div>
+	  These tools identify regions that are similar to known non-coding
+	  RNAs. Similarity is detected at the sequence level and/or at the
+	  structure level. [<a href="${mount_point}help/#help4_1" 
+			       target="blank">?</a>]
+	  <br /><br />
+	</div>
+	<div class="predict_content">
+	  <table class="predict-table">
+	  #for $known in $known_softs:
+	    $get_predictor_view($known, $kmaxopts)
+	  #end for
+	  </table>
+	  <br /> 
+	</div>
+      </div>
+      #end if
+
+      #if $comparative_part
+      <div class="cbb_title"> Comparative Analysis</div>
+      <div class="cbb_content">
+	
+	<div>
+	  You can compare your data to a selection of genome sequences from
+	  different species to find out significantly conserved regions that
+	  exhibit a consensus secondary structure. Only bacterial and archeal
+	  genomes are available by now.
+	  [<a href="${mount_point}help/#help4_2" target="blank">?</a>]
+	  <br />
+	</div>
+
+	<h4>1. Select a set of organisms (at most four)</h4>
+	<div class="predict_subcontent">
+	  <select class="select" id="species_list" name="species_names" 
+		  size="10" multiple="multiple" title="Select an organism">
+	    #for $s in $species:
+	    #if $selected_species is not None and $s in $selected_species
+	    <option selected="selected">$s</option>
+	    #else
+	    <option>$s</option>
+	    #end if
+	    #end for
+	  </select>
+	</div>
+	
+	<br />
+	<h4>2. Define your comparative analysis method</h4>
+	<div class="predict_subcontent">
+	  <div>
+
+	    <div class="conservation_soft">
+	      <div class="soft_box_title">Sequence alignment</div>
+	      <div class="soft_box">
+		#for ($i, $cons_soft) in enumerate($cons_softs)
+		$get_comp_view($cons_soft, $i)
+		#end for
+	      </div>
+	    </div>
+	    
+	    <div class="aggregation_soft">
+	      <div class="soft_box_title">Sequence aggregation</div>
+	      <div class="soft_box">
+		#for ($i, $agg_soft) in enumerate($agg_softs)
+		$get_comp_view($agg_soft, $i)
+		#end for
+	      </div>
+	    </div>
+	    
+	    <div class="inference_soft">
+	      <div class="soft_box_title">Structure inference</div>
+	      <div class="soft_box">
+		#for ($i, $inf_soft) in enumerate($inf_softs)
+		$get_comp_view($inf_soft, $i)
+		#end for
+	      </div>
+	    </div>
+	    	    
+	  </div>
+	  <div class="row"></div>
+	  <br />	
+	</div>
+      </div>
+      #end if
+
+      #if $abinitio_part
+      #set $amaxopts = $get_max_number_options($abinitio_softs)
+      <div class="cbb_title"> <em>Ab initio</em> prediction </div>
+      
+      <div class="cbb_content">
+       The last kind of prediction tools uses intrinsical statistical 
+       feature of the data.
+       [<a href="${mount_point}help/#help4_3" target="blank">?</a>]
+       <br/><br/>
+	  <div class="predict_content">
+	    <table class="predict-table">
+	      #for $abinitio in $abinitio_softs:
+	      $get_predictor_view($abinitio, $amaxopts)
+	      #end for
+	    </table>
+	  <br/>
+	</div>
+      </div>
+
+      #end if
+
+    </div>
+    
+    <div class="cob_header">
+     <div class="cob_content" 
+	  style="text-align:center;padding:1px 3px 1px 3px;">
+      <input type="checkbox" name="combine" style="vertical-align:middle" />
+      <label style="vertical-align:middle;">
+       Combine results [<a href="${mount_point}help/#help4_4" 
+			   target="blank">?</a>]
+      </label>
+      &nbsp; &nbsp; &nbsp; 
+      <input id="predict_submit" class="button_bp" 
+	     style="vertical-align:middle"
+	     type="submit" name="submit_run" value="Run" />
+     </div>
+    </div>
+    <div style="clear:right"> </div>
+    
+  </form>
+  
+  #end block

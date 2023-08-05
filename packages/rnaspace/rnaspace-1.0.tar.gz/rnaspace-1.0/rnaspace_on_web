@@ -1,0 +1,107 @@
+#!/usr/bin/env python
+
+#
+# RNAspace: non-coding RNA annotation platform
+# Copyright (C) 2009  CNRS, INRA, INRIA, Univ. Paris-Sud 11
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+"""
+    python %prog [-h] [-c CHERRYPY_CONF] [-r RNASPACE_CONF] [-p PREDICTORS_CONF_DIR]
+
+Launch RNAspace server and deploy the website
+"""
+
+import os
+import cherrypy
+from optparse import OptionParser
+
+import rnaspace
+from rnaspace.ui.controller.rnaspace_controller import rnaspace_controller
+import rnaspace.dao.storage_configuration_reader as scr
+
+STATIC_DIR = os.path.abspath(os.path.join(rnaspace.__path__[0],
+                                          "ui/ressource/"))
+
+def get_opt_parser():
+    
+    parser = OptionParser(usage=__doc__)
+    parser.add_option("-c", "--cherrypy",
+                      action="store",
+                      type="string",
+                      dest="cherrypy",
+                      default="cfg/cherrypy.cfg",
+                      metavar="CHERRYPY_CONF",
+                      help="Cherrypy configuration file")
+    parser.add_option("-r", "--rnaspace",
+                      action="store",
+                      type="string",
+                      dest="rnaspace",
+                      default="cfg/rnaspace.cfg",
+                      metavar="RNASPACE_CONF",
+                      help="RNAspace configuration file")
+    parser.add_option("-p", "--predictors_conf_dir",
+                      action="store",
+                      type="string",
+                      dest="predictors_conf_dir",
+                      default="cfg/predictors",
+                      metavar="PREDICTORS_CONF_DIR",
+                      help="Directory that contains the predictors conf files")
+    return parser
+
+def main():
+    parser = get_opt_parser()
+    (opts, args) = parser.parse_args()
+
+    predictors_conf_dir = opts.predictors_conf_dir        
+    conf_cherrypy = opts.cherrypy
+    conf_rnaspace = opts.rnaspace
+
+    if not os.path.isfile(conf_cherrypy):
+        print '[Error] Can not find "%s"\n' % conf_cherrypy
+        parser.print_help()
+        return
+    if not os.path.isfile(conf_rnaspace):
+        print '[Error] Can not find "%s"\n' % conf_rnaspace
+        parser.print_help()
+        return
+    if not os.path.isdir(predictors_conf_dir):
+        print '[Error] "%s" is not a directory\n' % predictors_conf_dir
+        parser.print_help()
+        return
+        
+    rnaspace.update_conf(conf_rnaspace, predictors_conf_dir)
+
+    root = rnaspace_controller()
+    app_conf = {'/': {'tools.staticdir.root': STATIC_DIR},
+                '/ressource/img': {'tools.staticdir.on'  : True,
+                                   'tools.staticdir.dir' : 'img'},
+                '/ressource/css': {'tools.staticdir.on'  : True,
+                                   'tools.staticdir.dir' : 'css'},
+                '/ressource/js': {'tools.staticdir.on'  : True,
+                                  'tools.staticdir.dir' : 'js'},
+                '/ressource/applet': {'tools.staticdir.on'  : True,
+                                      'tools.staticdir.dir' : 'applet'}
+                }
+
+    cherrypy.config.update(conf_cherrypy)
+    scri = scr.storage_configuration_reader()
+    cherrypy.quickstart(root, scri.get("global", "mount_point"),
+                        config=app_conf)
+
+
+if __name__ == '__main__':
+    main()
