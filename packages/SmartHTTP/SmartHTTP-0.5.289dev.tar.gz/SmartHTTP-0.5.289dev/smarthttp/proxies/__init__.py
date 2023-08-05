@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""
+..
+    SmartHTTP 
+    Release 0.5 rev. 289 on 2010-08-19 09:27:31.860316
+    Copyright (C) 2009-2010,
+    Authors: Dan Kluev <dan@kluev.name>
+
+    Module smarthttp.proxies
+    Proxy managers and handlers
+    Last changed on 2010-05-29 00:41:07+11:00 rev. 249:c664b92c9e32 by Dan Kluev <dan@kluev.name>
+
+..
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+Proxy managers and handlers
+===========================
+
+Should implement:
+1. Proxy manager - keeps proxy stats, rotates proxies between clients
+2. Proxy protocol implementations (HTTP, SOCKS4/5, CGI proxies)
+3. Implementation of proxy chains
+
+.. _smarthttp.proxies-ProxyManager:
+
+:class:`ProxyManager`
+---------------------
+
+
+
+.. autoclass:: ProxyManager
+    :members:
+    :undoc-members:
+
+"""
+__docformat__ = 'restructuredtext'
+
+class ProxyManager(object):
+    pass
+
+
