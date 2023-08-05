@@ -1,0 +1,184 @@
+#! /usr/bin/env python
+
+# from __future__ import with_statement
+
+"""\
+Usage: %prog [options] spcfile.spc
+
+Make a SUSY mass spectrum plot, in the make-plots .dat format.
+
+TODOs:
+  * Label collision avoidance?
+  * Read plot details from defs file?
+"""
+
+class XEdges(object):
+    def __init__(self, left, offset=0.0, width=2.0):
+        self.offset = offset
+        self.left = left + offset
+        self.width = width
+    @property
+    def right(self):
+        return self.left + self.width
+    @property
+    def centre(self):
+        return (self.left + self.right)/2.0
+
+
+class Label(object):
+    def __init__(self, text, offset=None):
+        self.text = text
+        self.offset = None
+    def __str__(self):
+        return self.text
+
+
+class ParticleDetails(object):
+    def __init__(self, label, xnom, xoffset, color="black", labelpos="L", mass=None):
+        self.label = label
+        self.mass = mass
+        self.xedges = XEdges(xnom, xoffset)
+        self.color = color
+        self.labelpos = labelpos
+
+
+XHIGGS = 0.0
+XSLEPTON = 5.0
+XGAUGINO = 10.0
+XSUSYQCD = 15.0
+
+PDETAILS = {
+    25 : ParticleDetails(Label(r"$h^0$"), XHIGGS, -0.2, color="blue"),
+    35 : ParticleDetails(Label(r"$H^0$"), XHIGGS, -0.2, color="blue"),
+    36 : ParticleDetails(Label(r"$A^0$"), XHIGGS, -0.2, color="blue"),
+    37 : ParticleDetails(Label(r"$H^\pm$"), XHIGGS, 0.2, color="red"),
+    1000011 : ParticleDetails(Label(r"$\tilde{\ell}_\text{L}$"), XSLEPTON, -0.2, color="blue"),
+    2000011 : ParticleDetails(Label(r"$\tilde{\ell}_\text{R}$"), XSLEPTON, -0.2, color="blue"),
+    1000015 : ParticleDetails(Label(r"$\tilde{\tau}_1$"), XSLEPTON, 0.2, color="red"),
+    2000015 : ParticleDetails(Label(r"$\tilde{\tau}_2$"), XSLEPTON, 0.2, color="red"),
+    1000012 : ParticleDetails(Label(r"$\tilde{\nu}_\text{L}$"), XSLEPTON, -0.2, color="blue"),
+    1000016 : ParticleDetails(Label(r"$\tilde{\nu}_\tau$"), XSLEPTON, 0.2, color="red"),
+    1000022 : ParticleDetails(Label(r"$\tilde{\chi}_1^0$"), XGAUGINO, -0.2, color="blue"),
+    1000023 : ParticleDetails(Label(r"$\tilde{\chi}_2^0$"), XGAUGINO, -0.2, color="blue"),
+    1000025 : ParticleDetails(Label(r"$\tilde{\chi}_3^0$"), XGAUGINO, -0.2, color="blue"),
+    1000035 : ParticleDetails(Label(r"$\tilde{\chi}_4^0$"), XGAUGINO, -0.2, color="blue"),
+    1000024 : ParticleDetails(Label(r"$\tilde{\chi}_1^\pm$"), XGAUGINO, 0.2, color="red"),
+    1000037 : ParticleDetails(Label(r"$\tilde{\chi}_2^\pm$"), XGAUGINO, 0.2, color="red"),
+    1000021 : ParticleDetails(Label(r"$\tilde{g}$"), XSUSYQCD, -0.3, color="black!50!blue!30!green"),
+    1000001 : ParticleDetails(Label(r"$\tilde{q}_\text{L}$"), XSUSYQCD, -0.1, color="blue"),
+    2000001 : ParticleDetails(Label(r"$\tilde{q}_\text{R}$"), XSUSYQCD, -0.1, color="blue"),
+    1000005 : ParticleDetails(Label(r"$\tilde{b}_1$"), XSUSYQCD, 0.2, color="black!50!blue!30!green"),
+    2000005 : ParticleDetails(Label(r"$\tilde{b}_2$"), XSUSYQCD, 0.2, color="black!50!blue!30!green"),
+    1000006 : ParticleDetails(Label(r"$\tilde{t}_1$"), XSUSYQCD, 0.2, color="red"),
+    2000006 : ParticleDetails(Label(r"$\tilde{t}_2$"), XSUSYQCD, 0.2, color="red")
+}
+
+
+import sys, optparse
+parser = optparse.OptionParser(usage=__doc__)
+parser.add_option("-o", "--out", metavar="FILE",
+                  help="write dat format output for make-plots to FILE",
+                  dest="OUTFILE", default=None)
+parser.add_option("--decays-minbr", metavar="BR",
+                  help="show decay lines for decays with a branching ratio of > BR (default: %default)",
+                  dest="DECAYS_MINBR", type=float, default=1.0)
+parser.add_option("--no-particle-labels", action="store_false",
+                  help="don't show text labels for particle IDs (default: show)",
+                  dest="PARTICLES_LABELS", default=True)
+parser.add_option("--log", action="store_true",
+                  help="show spectrum on a logarithmic axis (default: %default)",
+                  dest="LOGSCALE", default=False)
+opts, args = parser.parse_args()
+if len(args) != 1:
+    parser.print_help()
+    sys.exit(1)
+
+## Choose output file
+if opts.OUTFILE is None:
+    import os
+    o = os.path.basename(args[0])
+    if "." in o:
+        o = o[:o.rindex(".")]
+    opts.OUTFILE = o + ".dat"
+out = ""
+
+## Read spectrum file
+import pyslha
+BLOCKS, DECAYS = pyslha.readSLHAFile(args[0])
+
+## Set mass values in PDETAILS
+massblock = BLOCKS["MASS"]
+for pid in PDETAILS.keys():
+    PDETAILS[pid].mass = abs(massblock.entries[pid])
+
+## Write plot
+out += "# BEGIN PLOT\n"
+out += "XMin=-2\n"
+out += "XMax=19\n"
+if opts.LOGSCALE:
+    out += "LogY=1\n"
+else:
+    out += "LogY=0\n"
+    out += "YMin=0\n"
+out += "XCustomTicks=1.0	Higgs	6.0	Sleptons	11.0	Gauginos	16.0	Squarks\n"
+out += "YLabel=Mass / GeV\n"
+out += "DrawSpecialFirst=1\n"
+out += "# END PLOT\n\n"
+
+
+## Mass lines
+for pid, pdetail in sorted(PDETAILS.iteritems()):
+    out += """
+# BEGIN HISTOGRAM %s
+ErrorBars=1
+LineWidth=1pt
+LineColor=%s
+%f	%f	%e	0
+# END HISTOGRAM\n""" % ("pid"+str(pid), pdetail.color,
+                      pdetail.xedges.left, pdetail.xedges.right,
+                      pdetail.mass)
+
+
+## Labels
+if opts.PARTICLES_LABELS:
+    out += """
+# BEGIN SPECIAL labels\n"""
+    for pid, pdetail in sorted(PDETAILS.iteritems()):
+        labelx = None
+        offset = pdetail.label.offset or 0.2
+        anchor = None
+        if pdetail.xedges.offset <= 0:
+            labelx = pdetail.xedges.left - offset
+            anchor = "r"
+        else:
+            labelx = pdetail.xedges.right + offset
+            anchor = "l"
+        out += r"\rput[%s]\physicscoor(%f,%f){%s}" % (anchor, labelx, pdetail.mass, pdetail.label.text)
+    out += "\n# END SPECIAL\n"
+
+
+## Decays
+for pid, detail in sorted(PDETAILS.iteritems()):
+    if DECAYS.has_key(pid):
+        xyfrom = (detail.xedges.centre, detail.mass)
+        for d in DECAYS[pid].decays:
+            if d.br > opts.DECAYS_MINBR:
+                for pid2 in d.ids:
+                    if PDETAILS.has_key(pid2):
+                        xyto = (PDETAILS[pid2].xedges.centre, PDETAILS[pid2].mass)
+                        ## Color/thickness by branching ratio
+                        out += r"""
+# BEGIN SPECIAL decay_%d_%d
+\psset{arrowsize=0.1}
+\psline[linestyle=dashed,dash=3px 2px,linecolor=gray]{->}\physicscoor(%f,%f)\physicscoor(%f,%f)
+# END SPECIAL
+""" % (pid, pid2, xyfrom[0], xyfrom[1], xyto[0], xyto[1])
+
+
+## Write it out
+f = sys.stdout
+if opts.OUTFILE != "-":
+    f = open(opts.OUTFILE, "w")
+f.write(out)
+if f is not sys.stdout:
+    f.close()

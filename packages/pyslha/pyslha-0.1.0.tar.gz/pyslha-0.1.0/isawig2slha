@@ -1,0 +1,197 @@
+#! /usr/bin/env python
+
+"""\
+Usage: %prog IN.isa [OUT.spc]
+
+Convert a HERWIG/ISAWIG model/decay spectrum file to an SLHA spectrum input
+file.
+
+Conversion based on the HERWIG SUSY specification format, from
+http://www.hep.phy.cam.ac.uk/~richardn/HERWIG/ISAWIG/file.html
+"""
+
+__author__ = "Andy Buckley <andy.buckley@cern.ch"
+
+
+## PDG MC ID codes mapped to HERWIG SUSY ID codes, based on
+## http://www.hep.phy.cam.ac.uk/~richardn/HERWIG/ISAWIG/susycodes.html
+HERWIGID2PDGID = {}
+HERWIGID2PDGID[203] =  25 ## HIGGSL0
+HERWIGID2PDGID[204] =  35 ## HIGGSH0
+HERWIGID2PDGID[205] =  36 ## HIGGSA0
+HERWIGID2PDGID[206] =  37 ## HIGGS+
+HERWIGID2PDGID[207] = -37 ## HIGGS-
+HERWIGID2PDGID[401] =  1000001 ## SSDLBR
+HERWIGID2PDGID[407] = -1000001 ## SSDLBR
+HERWIGID2PDGID[402] =  1000002 ## SSULBR
+HERWIGID2PDGID[408] = -1000002 ## SSUL
+HERWIGID2PDGID[403] =  1000003 ## SSSLBR
+HERWIGID2PDGID[409] = -1000003 ## SSSL
+HERWIGID2PDGID[404] =  1000004 ## SSCLBR
+HERWIGID2PDGID[410] = -1000004 ## SSCL
+HERWIGID2PDGID[405] =  1000005 ## SSB1BR
+HERWIGID2PDGID[411] = -1000005 ## SSB1
+HERWIGID2PDGID[406] =  1000006 ## SST1BR
+HERWIGID2PDGID[412] = -1000006 ## SST1
+HERWIGID2PDGID[413] =  2000001 ## SSDR
+HERWIGID2PDGID[419] = -2000001 ## SSDRBR
+HERWIGID2PDGID[414] =  2000002 ## SSUR
+HERWIGID2PDGID[420] = -2000002 ## SSURBR
+HERWIGID2PDGID[415] =  2000003 ## SSSR
+HERWIGID2PDGID[421] = -2000003 ## SSSRBR
+HERWIGID2PDGID[416] =  2000004 ## SSCR
+HERWIGID2PDGID[422] = -2000004 ## SSCRBR
+HERWIGID2PDGID[417] =  2000005 ## SSB2
+HERWIGID2PDGID[423] = -2000005 ## SSB2BR
+HERWIGID2PDGID[418] =  2000006 ## SST2
+HERWIGID2PDGID[424] = -2000006 ## SST2BR
+HERWIGID2PDGID[425] =  1000011 ## SSEL-
+HERWIGID2PDGID[431] = -1000011 ## SSEL+
+HERWIGID2PDGID[426] =  1000012 ## SSNUEL
+HERWIGID2PDGID[432] = -1000012 ## SSNUELBR
+HERWIGID2PDGID[427] =  1000013 ## SSMUL-
+HERWIGID2PDGID[433] = -1000013 ## SSMUL+
+HERWIGID2PDGID[428] =  1000014 ## SSNUMUL
+HERWIGID2PDGID[434] = -1000014 ## SSNUMLBR
+HERWIGID2PDGID[429] =  1000015 ## SSTAU1-
+HERWIGID2PDGID[435] = -1000015 ## SSTAU1+
+HERWIGID2PDGID[430] =  1000016 ## SSNUTL
+HERWIGID2PDGID[436] = -1000016 ## SSNUTLBR
+HERWIGID2PDGID[437] =  2000011 ## SSEL-
+HERWIGID2PDGID[443] = -2000011 ## SSEL+
+HERWIGID2PDGID[438] =  2000012 ## SSNUEL
+HERWIGID2PDGID[444] = -2000012 ## SSNUELBR
+HERWIGID2PDGID[439] =  2000013 ## SSMUL-
+HERWIGID2PDGID[445] = -2000013 ## SSMUL+
+HERWIGID2PDGID[440] =  2000014 ## SSNUMUL
+HERWIGID2PDGID[446] = -2000014 ## SSNUMLBR
+HERWIGID2PDGID[441] =  2000015 ## SSTAU1-
+HERWIGID2PDGID[447] = -2000015 ## SSTAU1+
+HERWIGID2PDGID[442] =  2000016 ## SSNUTL
+HERWIGID2PDGID[448] = -2000016 ## SSNUTLBR
+HERWIGID2PDGID[449] =  1000021 ## GLUINO
+HERWIGID2PDGID[450] =  1000022 ## NTLINO1
+HERWIGID2PDGID[451] =  1000023 ## NTLINO2
+HERWIGID2PDGID[452] =  1000025 ## NTLINO3
+HERWIGID2PDGID[453] =  1000035 ## NTLINO4
+HERWIGID2PDGID[454] =  1000024 ## CHGINO1+
+HERWIGID2PDGID[456] = -1000024 ## CHGINO1-
+HERWIGID2PDGID[455] =  1000037 ## CHGINO2+
+HERWIGID2PDGID[457] = -1000037 ## CHGINO2-
+HERWIGID2PDGID[458] =  1000039 ## GRAVTINO
+
+
+import sys, optparse
+parser = optparse.OptionParser(usage=__doc__)
+opts, args = parser.parse_args()
+if len(args) < 1 or len(args) > 2:
+    parser.print_help()
+    sys.exit(1)
+
+## Choose output file
+import os
+o = os.path.basename(args[0])
+if "." in o:
+    o = o[:o.rindex(".")]
+opts.OUTFILE = o + ".spc"
+if len(args) == 2:
+    opts.OUTFILE = args[1]
+
+
+## Read spectrum file
+import pyslha
+BLOCKS, DECAYS = {}, {}
+
+
+
+# # pyslha.readSLHAFile(args[0])
+# # MASSES = BLOCKS["MASS"].entries
+# # PIDS = MASSES.keys()
+
+
+# ## Init output string
+# out = ""
+
+# ## First write out masses section:
+# ##   Number of SUSY + top particles
+# ##   IDHW, RMASS(IDHW), RLTIM(IDHW)
+# ##   repeated for each particle
+# ## IDHW is the HERWIG identity code.
+# ## RMASS and RTLIM are the mass in GeV, and lifetime in seconds respectively.
+# massout = ""
+# for pid in PIDS:
+#     if pid < 6:
+#         continue
+#     if MASSES.has_key(pid) and DECAYS.has_key(pid):
+#         width = DECAYS[pid].totalwidth
+#         lifetime = -1
+#         if width > 0:
+#             lifetime = 1.0/(width * 1.51926778e24) ## == hbar/E in seconds
+#         massout += "%d %e %e\n" % (HERWIGID2PDGID.get(pid, pid), MASSES[pid], lifetime)
+#     else:
+#         print "PID %d not found!" % pid
+# out += "%d\n" % massout.count("\n")
+# out += massout
+
+
+# ## Next each particles decay modes together with their branching ratios and matrix element codes
+# ##   Number of decay modes for a given particle (IDK)
+# ##     IDK(*), BRFRAC(*), NME(*) & IDKPRD(1-5,*)
+# ##     repeated for each mode.
+# ##   Repeated for each particle.
+# ## IDK is the HERWIG code for the decaying particle, BRFRAC is the branching ratio of
+# ## the decay mode. NME is a code for the matrix element to be used, either from the
+# ## SUSY elements or the main HERWIG MEs. IDKPRD are the HERWIG identity codes of the decay products.
+# for pid in PIDS:
+#     if DECAYS.has_key(pid):
+#         decayout = "%d\n" % len(DECAYS[pid].decays)
+#         for d in DECAYS[pid].decays:
+#             ## TODO: Identify decay matrix element to use
+#             decayout += "%d %e 0 " % (HERWIGID2PDGID.get(pid, pid), d.br)
+#             ## TODO: Order decay products as required
+#             ids = [0,0,0,0,0]
+#             for i, pid in enumerate(d.ids):
+#                 ids[i] = pid
+#             ids = map(str, ids)
+#             decayout += " ".join(ids) + "\n"
+#         out += decayout
+
+
+# ## Now the SUSY parameters
+# ## TANB, ALPHAH:
+# out += "%e %e\n" % (BLOCKS["MINPAR"].entries[3], BLOCKS["ALPHA"].entries[0])
+# ## Neutralino mixing matrix
+# nmix = BLOCKS["NMIX"].entries
+# for i in xrange(1, 5):
+#     out += "%e %e %e %e\n" % (nmix[i][1], nmix[i][2], nmix[i][3], nmix[i][4])
+# ## Chargino mixing matrices V and U
+# vmix = BLOCKS["VMIX"].entries
+# out += "%e %e %e %e\n" % (vmix[1][1], vmix[1][2], vmix[2][1], vmix[2][2])
+# umix = BLOCKS["UMIX"].entries
+# out += "%e %e %e %e\n" % (umix[1][1], umix[1][2], umix[2][1], umix[2][2])
+# # THETAT,THETAB,THETAL
+# import math
+# out += "%e %e %e\n" % (math.acos(BLOCKS["STOPMIX"].entries[1][1]),
+#                        math.acos(BLOCKS["SBOTMIX"].entries[1][1]),
+#                        math.acos(BLOCKS["STAUMIX"].entries[1][1]))
+# # ATSS,ABSS,ALSS
+# out += "%e %e %e\n" % (BLOCKS["AU"].entries[3][3],
+#                        BLOCKS["AD"].entries[3][3],
+#                        BLOCKS["AE"].entries[3][3])
+# # MUSS == sign(mu)
+# out += "%f\n" % BLOCKS["MINPAR"].entries[4]
+
+
+# ## TODO: Handle RPV SUSY
+
+
+## Write SLHA objects to string / file object
+out = ""
+
+## Write it out
+f = sys.stdout
+if opts.OUTFILE != "-":
+    f = open(opts.OUTFILE, "w")
+f.write(out)
+if f is not sys.stdout:
+    f.close()
