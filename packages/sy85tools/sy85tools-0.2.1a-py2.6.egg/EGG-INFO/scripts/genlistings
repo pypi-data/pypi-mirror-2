@@ -1,0 +1,58 @@
+#!/Users/chris/work/sy85tools/svn/venv/bin/python
+
+# genlsitings - Search all .G01 files below directory given as first argument
+#               and write a file with a listing of its content for each file
+#               to the directory gievn as second argument.
+
+import os
+import sys
+
+from sy85.scripts.sy85all import main
+
+try:
+    workdir = sys.argv[1]
+    destdir = sys.argv[2]
+    if not os.path.isdir(destdir):
+        raise ValueError("Destination path '%s' does not exist or is not a "
+            'directory.' % destdir)
+except (IndexError, ValueError) as exc:
+    print exc
+    print "Usage: genlistings SRCDIR DESTDIR"
+    sys.exit(2)
+
+gfiles = []
+names = set()
+
+print "Reading directory '%s'..." % workdir
+
+for dir_, dirnames, files in os.walk(workdir):
+    for file in files:
+        basename, ext = os.path.splitext(file.lower())
+        name = basename
+        if ext == '.g01':
+            path = os.path.join(dir_, file)
+            i = 0
+            while True:
+                if name in names:
+                    name = "%s_%02i" % (basename, i)
+                else:
+                    break
+                i +=1
+            gfiles.append((path, name))
+            names.add(name)
+
+print "Found %i SY85 .G01 files." % len(gfiles)
+
+print "Writing output files to '%s'..." % destdir
+
+listings = []
+for path, name in sorted(gfiles):
+    outfile = os.path.join(destdir, name + '.txt')
+    try:
+        main(['-o', outfile, path])
+    except StandardError as exc:
+        print >>sys.stderr, "Cannot create listing for '%s': %s" % (path, exc)
+    else:
+        listings.append(outfile)
+
+print "Generated listing out of %s files." % len(listings)
