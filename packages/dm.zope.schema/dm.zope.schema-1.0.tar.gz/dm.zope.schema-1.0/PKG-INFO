@@ -1,0 +1,116 @@
+Metadata-Version: 1.0
+Name: dm.zope.schema
+Version: 1.0
+Summary: 'zope.schema' extensions
+Home-page: http://pypi.python.org/pypi/dm.zope.schema
+Author: Dieter Maurer
+Author-email: dieter@handshake.de
+License: ZPL
+Description: This package contains extensions for ``zope.schema``.
+        
+        =======
+        Modules
+        =======
+        
+        verify
+        ======
+        
+        A companion to ``zope.interface.verify`` for the schema part of
+        interfaces.
+        
+        It contains the function
+        ``verify_schema(``\ *iface*, *obj*, *context*\ ``=None``, *check_declaration*\ ``=True)``
+        which verifies that *obj* satisfies the schema part of interface *iface*.
+        Schema fields need to get bound to a context before they can be validated.
+        *context* specifies this context and defaults to *obj*.
+        *check_declaration* checks that *obj* declares to privide *iface*.
+        
+        schema
+        ======
+        
+        The main content is the mixin class ``SchemaConfigured``. It supports
+        configuration according the schema part of the interfaces implemented
+        by the ``SchemaConfigured`` derived class.
+        
+        Occasionally, function ``schemadict`` might be usefull. It extracts
+        the schema part of an interface or interface specification as a dictionary.
+        
+        The field ``Object`` is a replacement for ``zope.schema.Object``. The
+        latter lacks field information in validation errors
+        (https://bugs.launchpad.net/zope.schema/+bug/620324) which makes identification
+        of the affected fields unnecessarily difficult. Occasionally, one wants
+        to suppress the check that a validated object explicitly declares
+        to provide the interface. ``Object`` has the additional
+        property ``check_declaration`` to control this (defaults to ``True``).
+        
+        
+        ========
+        Examples
+        ========
+        
+        Setup: It defines two schemas ``S1`` and ``S2``, an
+        interface ``I`` and a class ``C`` deriving from ``SchemaConfigured``
+        implementing the schemas and the interface.
+        
+        >>> from zope.interface import Interface, implements, providedBy
+        >>> from zope.schema import Int
+        >>> 
+        >>> from dm.zope.schema.schema import SchemaConfigured, schemadict
+        >>> from dm.zope.schema.verify import verify_schema
+        >>> 
+        >>> class S1(Interface): i1 = Int(default=0)
+        ... 
+        >>> class S2(Interface): i2 = Int(default=1)
+        ... 
+        >>> class I(Interface):
+        ...   def method(): pass
+        ... 
+        >>> class C(SchemaConfigured):
+        ...   implements(S1, S2, I)
+        ...   def method(self): pass
+        ... 
+        
+        
+        ``C`` instances have attributes corresponding to the schema fields.
+        If no arguments are given for the constructor, they get the field default
+        as value. Provided (keyword!) arguments override the defaults.
+        
+        >>> c = C()
+        >>> c.i1
+        0
+        >>> c.i2
+        1
+        >>> c = C(i1=5)
+        >>> c.i1
+        5
+        
+        The constructor rejects keyword arguments not defined in the schema
+        in order to quickly detect spelling errors. However, this hampers
+        the use of ``super`` in the class hierarchy for the ``__init__`` method.
+        Maybe, future versions will provide a means to control this check.
+        
+        >>> c = C(x=5)
+        Traceback (most recent call last):
+          ...
+        TypeError: non schema keyword argument: x
+        
+        If the field values are appropriate, ``C`` instances provide the
+        schemas (as verified by ``verify_schema``). Otherwise, ``verify_schema``
+        will raise an exception. This example should also the elementary use
+        of ``verify_schema``.
+        
+        >>> verify_schema(S1, c)
+        >>> c.i1=None
+        >>> verify_schema(S1, c)
+        Traceback (most recent call last):
+          ...
+        zope.schema.interfaces.WrongContainedType: [('i1', RequiredMissing())]
+Keywords: application development zope schema
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Framework :: Zope2
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Utilities
