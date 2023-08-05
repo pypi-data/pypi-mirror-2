@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# clang-fake-gcc
+# ==============
+#
+# Strip out useless arguments out of gcc calls when going for clang.
+#
+# This thing is especially useful for you guys who like to compile Python
+# extensions in C with Clang::
+# 
+#     CC=clang-fake-gcc python setup.py build
+#
+# Nice, huh?
+
+S=( )
+I=0
+SKIPS=0
+for ARG; do
+    if test "$SKIPS" -gt 0; then
+        SKIPS=$((SKIPS - 1))
+        continue
+    fi
+    case "$ARG" in
+        -D*|-I*|-isysroot*)
+            ;;
+        -o|-arch)
+            SKIPS=$((SKIPS + 1))
+            continue
+            ;;
+        -*)
+            continue
+            ;;
+    esac
+    S[$I]="$ARG"
+    I=$(($I + 1))
+done
+exec "${CLANG:-clang}" "${S[@]}"
