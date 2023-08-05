@@ -1,0 +1,68 @@
+This is a plugin for ``dm.zope.rpc``, a protocol independent
+middleware to expose web services over a variety of rpc protocols.
+
+This package is using ``suds``, an advanced soap (1.1) client library under
+the LGPL license.
+``suds`` is slightly abused by using it to implement a server component.
+This abuse requires the use of undocumented implementation details
+which may change between ``suds`` versions. The package has been
+implemented with ``suds==0.3.9``. It may not work with other versions.
+
+
+Limitations
+===========
+
+The current implementation does not handle exceptions.
+They are not transformed into SOAP ``Fault`` messages (as required
+by SOAP 1.1) but
+reported by the underlying transport protocol ("HTTP") (using
+HTTP error codes with HTML messages).
+The reason for this limitation: SOAP 1.1 has no complete
+(self contained) specification for its ``Fault`` element but requires
+externally defined namespaces for completion and I have not yet
+understood the interaction between WSDL defined exceptions and
+SOAP ``Fault`` elements. Once, I have understood WSDL specified
+exceptions, this limitation might be removed.
+
+SOAP and WSDL are complex standards with a large number of features.
+This package does not support all features. For example, it
+ignores all SOAP headers, even headers with a ``must_understand``
+declaration (in violation of the SOAP specification).
+In addition, only a small set of features has been tested:
+for example, only the ``document`` binding; other bindungs might
+(or might not) work. Over time, more features might be supported,
+might have been tested.
+
+The current implementation makes use of ``suds`` WSDL caching. This
+can be confusing during WSDL development, as modifications are not
+seen until the cache times out. Delete the ``suds`` cache files in such
+a case (they usually are in a ``suds`` subfolder of the folder typically
+used for temporary files).
+
+
+
+Configuration
+=============
+
+As usual with ``dm.zope.rpc`` protocol handlers, configuration
+is via a marshaller instance.
+The WSDL specific configuration of the  ``WsdlMarshaller`` is
+via the fields ``wsdl_map`` and ``default_namespace``.
+``wsdl_map`` maps the namespace found in a method invocation to
+an url which provides access to the WSDL for this namespace.
+``default_namespace`` is the namespace to be used for GET requests
+when method and parameters are specified directly in the url and
+not via a request entity.
+
+You can find a (simple) example configuration in ``tests.soap``.
+
+
+Misc
+====
+
+The package has been tested under Zope 2.12 and Zope 2.10.
+For Zope versions before 2.12, a properly configured
+``dm.zopepatches.xmlrpc`` is required, to prevent Zope's
+builtin xmlrpc support to interfere. The above mentioned example
+configuration shows how ``dm.zopepatches.xmlrpc`` can be configured.
+
