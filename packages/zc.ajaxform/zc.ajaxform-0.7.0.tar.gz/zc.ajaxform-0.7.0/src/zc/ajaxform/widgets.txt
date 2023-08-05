@@ -1,0 +1,932 @@
+Ajax widgets
+============
+
+The zc.ajaxform.form module provides ajax form support.
+
+Widgets are looked up for fields and requests providing
+zc.ajaxform.interfaces.IAjaxRequest.
+
+Ajax widgets must implement zc.ajaxform.interfaces.IInputWidget. In
+particular, they must provide a js_config method in addition to the
+usual input-widget behavior defined by
+zope.app.form.interfaces.IInputWidget. A number of widgets are defined
+by the zc.ajaxform.widgets module.  We'll test/demonstrate those later.
+There is also a base class that provides some help with implementing
+IInputWidget.   It subclasses zope.app.form.InputWidget, which also
+automates some of the more mundate aspects of implementing input
+widgets.
+
+zc.ajaxform.widgets.Base
+------------------------
+
+The zc.ajaxform.widgets.Base provides a basic widget implementation and
+hooks that can be overridden for specific widget types.  These hooks
+are:
+
+  widget_constructor
+      This is a string attribute giving the name of a Javascript
+      constructor to call.
+
+  formValue(v)
+      Convert an application value to a value that can be marshaled to
+      JSON and used to initialize the Ext widget.
+
+  value(v)
+      Convert a raw value sent from the client to an application value.
+  
+  _is_missing(self, v)
+      Return a boolean value indicating whether the given raw value is
+      equivalent to the user not providing a value.
+
+Other methods from zc.ajaxform.interfaces.IInputWidget may also be
+overridden as needed. For example, zc.ajaxform.widgets.InputBool
+overrides hasInput, and getInputValue.
+
+To see how this works, we'll try some examples with the base widget:
+
+    >>> import zope.publisher.browser
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> import zc.ajaxform.widgets
+    >>> import zope.schema
+    >>> f = zope.schema.TextLine(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.Base(f, request)
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> from pprint import pprint
+    >>> pprint(w.js_config(), width=1)
+    Traceback (most recent call last):
+    ...
+    ValueError: widget_constructor not defined.
+
+Oops, let's make this a text widget. Normally we'd do this in a widget
+class. We'll just hack the widget instance. :)
+
+    >>> w.widget_constructor = 'zc.ajaxform.widgets.InputText'
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zc.ajaxform.widgets.InputText'}
+   
+Let's add some data to the request:
+
+    >>> request.form['f'] = 'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', WrongType(...))
+
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+
+    >>> w.getInputValue()
+    u'xxx'
+
+Let's try overriding some methods:
+
+    >>> w.value = lambda raw: raw+' cooked'
+    >>> w.formValue = lambda v: v[:-7]
+    >>> w._is_missing = lambda raw: raw == u'xxx'
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'foo'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+
+    >>> w.getInputValue()
+    u'foo cooked'
+
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zc.ajaxform.widgets.InputText'}
+
+    >>> w.setRenderedValue(w.getInputValue())
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'value': u'foo',
+     'widget_constructor': 'zc.ajaxform.widgets.InputText'}
+
+The field constraint doesn't get checked on the client, but is checked
+on the server:
+
+    >>> import re, zope.schema.interfaces
+    >>> def digits(v):
+    ...     if not re.match('\d+$', v):
+    ...         raise zope.schema.interfaces.ValidationError(
+    ...             "Must be a number")
+    ...     return True
+
+    >>> f = zope.schema.TextLine(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    constraint=digits)
+    >>> w = zc.ajaxform.widgets.Base(f, request)
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', ValidationError('Must be a number'))
+
+
+
+    >>> request.form['f'] = u'123'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+
+    >>> w.getInputValue()
+    u'123'
+
+Boolean Data
+------------
+
+The boolean widget uses a Ext checkbox field:
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Bool(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputBool(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Bool'}
+
+    >>> w.formValue(None), w.formValue(True), w.formValue(False)
+    (None, True, False)
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+
+    >>> w.getInputValue()
+    False
+
+Note that unchecked Ext check boxes, like unchecked HTML checkboxes
+aren't included in form data, so this widget treats lack of form data
+as a "false" value [#noinput]_.
+
+    >>> request.form['f'] = 'on'
+    >>> w.getInputValue()
+    True
+
+.. Edge case.  Required matches field:
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Bool(
+    ...    __name__='f', title=u'label', description=u'hint', required=False)
+    >>> w = zc.ajaxform.widgets.InputBool(f, request)
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (False, True, True)
+
+
+Text Data
+---------
+
+There are widgets for both single- and multi-line text.
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.TextLine(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputTextLine(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'minLength': 0,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.TextLine'}
+
+    >>> w.formValue(None), w.formValue(u'xxx')
+    (None, u'xxx')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxx'
+
+Constraints are included in the widget data and are checked on the
+server:
+
+    >>> f = zope.schema.TextLine(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    min_length=5, max_length=30)
+    >>> w = zc.ajaxform.widgets.InputTextLine(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'maxLength': 30,
+     'minLength': 5,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.TextLine'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooShort(u'xxx', 5))
+
+
+    >>> request.form['f'] = u'x'*9
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxxxxxxxx'
+
+    >>> request.form['f'] = u'x'*33
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooLong(...))
+
+
+newlines aren't allowed in text lines:
+
+    >>> request.form['f'] = u'foo\nbar'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', ConstraintNotSatisfied(u'foo\nbar'))
+
+
+Password field becomes input whose type is 'password':
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Password(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputPassword(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'minLength': 0,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Password'}
+
+    >>> w.formValue(None), w.formValue(u'xxx')
+    (None, u'xxx')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxx'
+
+Constraints are included in the widget data and are checked on the
+server:
+
+    >>> f = zope.schema.Password(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    min_length=5, max_length=30)
+    >>> w = zc.ajaxform.widgets.InputPassword(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'maxLength': 30,
+     'minLength': 5,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Password'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooShort(u'xxx', 5))
+
+
+    >>> request.form['f'] = u'x'*9
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxxxxxxxx'
+
+    >>> request.form['f'] = u'x'*33
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooLong(...))
+
+
+newlines aren't allowed in passwords:
+
+    >>> request.form['f'] = u'foo\nbar'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', ConstraintNotSatisfied(u'foo\nbar'))
+
+Text fields become text areas:
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Text(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputText(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'minLength': 0,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Text'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxx'
+
+Constraints are included in the widget data and are checked on the
+server:
+
+    >>> f = zope.schema.Text(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    min_length=5, max_length=30)
+    >>> w = zc.ajaxform.widgets.InputText(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'maxLength': 30,
+     'minLength': 5,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Text'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooShort(u'xxx', 5))
+
+
+    >>> request.form['f'] = u'x'*9
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxxxxxxxx'
+
+    >>> request.form['f'] = u'x'*33
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooLong(...))
+
+
+newlines are allowed in text lines:
+
+    >>> request.form['f'] = u'foo\nbar'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'foo\nbar'
+
+
+Rich Text
+---------
+
+Using an HtmlFragment field from zope.html.field triggers a rich text wiget to
+be used.
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> import zope.html.field
+    >>> f = zope.html.field.HtmlFragment(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputRichText(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'minLength': 0,
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zc.ajaxform.widgets.RichText'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxx'
+
+
+Integers
+--------
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Int(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputInt(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Int'}
+
+Note that we use a custom widget constructor, which provides
+integer-specific validation on the client.
+
+    >>> w.formValue(None), w.formValue(42)
+    (None, u'42')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    ConversionError: (u"Invalid integer: u'xxx'", None)
+
+    >>> request.form['f'] = u'33'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    33
+
+
+Constraints are included in the widget data and are checked on the
+server:
+
+    >>> f = zope.schema.Int(
+    ...    __name__='f', title=u'label', description=u'hint', min=1, max=9)
+    >>> w = zc.ajaxform.widgets.InputInt(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'field_max': 9,
+     'field_min': 1,
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Int'}
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    WidgetInputError: ('f', u'label', TooBig(33, 9))
+
+
+    >>> request.form['f'] = u'3'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    3
+
+Simple Choices
+--------------
+
+Choices from simple vocabularies are supported:
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Choice(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    values=['red', 'green', 'blue', 1, 2, 3])
+    >>> w = zc.ajaxform.widgets.InputChoiceTokenized(f, f.source, request)
+
+Note that we passed the field, its source, and the request. This is
+because InputChoiceTokenized adapts a choice field, a simple
+vocabulary, and a request.
+
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'hiddenName': 'f.value',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'values': [['red',
+                 u'red'],
+                ['green',
+                 u'green'],
+                ['blue',
+                 u'blue'],
+                ['1',
+                 u'1'],
+                ['2',
+                 u'2'],
+                ['3',
+                 u'3']],
+     'widget_constructor': 'zope.schema.Choice'}
+
+    >>> w.formValue(None), w.formValue(2)
+    (None, '2')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'2'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    2
+
+Iterable-source Choices
+-----------------------
+
+Iterable sources are handled similarly to simple vocabularies.  A list
+of values is included in the Javascript config:
+
+    >>> import zope.interface
+    >>> class Chars(list):
+    ...     zope.interface.implements(zope.schema.interfaces.IIterableSource)
+
+    >>> class Term:
+    ...     def __init__(self, c):
+    ...         self.value = self.title = c
+    ...         self.token = hex(ord(c))
+
+    >>> class Terms:
+    ...     def __init__(self, source, request):
+    ...         pass
+    ...     def getTerm(self, v):
+    ...         return Term(v)
+    ...     def getValue(self, token):
+    ...         return unichr(int(token, 16))
+
+    >>> zope.component.provideAdapter(
+    ...     Terms, (Chars, zope.publisher.interfaces.browser.IBrowserRequest),
+    ...     zope.app.form.browser.interfaces.ITerms)
+
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Choice(
+    ...    __name__='f', title=u'label', description=u'hint',
+    ...    source=Chars('ABCDEFG'))
+    >>> w = zc.ajaxform.widgets.InputChoiceIterable(f, f.source, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'values': [['0x41',
+                 'A'],
+                ['0x42',
+                 'B'],
+                ['0x43',
+                 'C'],
+                ['0x44',
+                 'D'],
+                ['0x45',
+                 'E'],
+                ['0x46',
+                 'F'],
+                ['0x47',
+                 'G']],
+     'widget_constructor': 'zope.schema.Choice'}
+
+    >>> w.formValue(None), w.formValue('D')
+    (None, '0x44')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'0x43'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'C'
+
+
+ComboBox
+--------
+
+A `ComboBox` is a hybrid of textline and choice inputs.  The input allows for
+either textline input or a menu selection.
+
+Validation is the same as it would be for a normal `InputTextLine`.
+
+    >>> import zc.sourcefactory.basic
+
+    >>> class Pets(zc.sourcefactory.basic.BasicSourceFactory):
+    ...
+    ...     def getValues(self):
+    ...         return ('Dog', 'Cat', 'Hamster')
+
+    >>> f = zope.schema.TextLine(
+    ...     __name__=u'pet',
+    ...     title=u'Pet',
+    ...     description=u'Your best friend.',
+    ...     required=True)
+
+    >>> w = zc.ajaxform.widgets.ComboBox(f, Pets(), request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'Your best friend.',
+     'fieldLabel': u'Pet',
+     'id': u'pet',
+     'name': u'pet',
+     'required': True,
+     'values': [['c935d187f0b998ef720390f85014ed1e',
+                 u'Dog'],
+                ['fa3ebd6742c360b2d9652b7f78d9bd7d',
+                 u'Cat'],
+                ['0c0a10a24d7361f0c53767f8a8e5efdc',
+                 u'Hamster']],
+     'widget_constructor': 'zc.ajaxform.widgets.ComboBox'}
+
+    >>> print w.formValue(None)
+    None
+    >>> w.formValue(u'Cat')
+    u'Cat'
+    >>> w.formValue(u'Rock')
+    u'Rock'
+
+    >>> w.required
+    True
+    >>> w.hasInput()
+    False
+    >>> w.hasValidInput()
+    False
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: (u'pet', u'Pet', u'Pet: Missing Input')
+
+    >>> request.form['pet'] = u'Parrot'
+    >>> w.hasInput()
+    True
+    >>> w.hasValidInput()
+    True
+    >>> w.getInputValue()
+    u'Parrot'
+
+
+Timezones
+---------
+
+    >>> f = zope.schema.Choice(
+    ...     __name__='tz',
+    ...     title=u'Timezone',
+    ...     description=u'Some timezone',
+    ...     source=zc.form.interfaces.AvailableTimeZones())
+    >>> w = zc.ajaxform.widgets.InputTimeZone(f,  'ignored source', request)
+
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'Some timezone',
+     'fieldLabel': u'Timezone',
+     'hiddenName': 'tz.value',
+     'id': 'tz',
+     'name': 'tz',
+     'required': True,
+     'values': [['Africa/Abidjan',
+                 u'Africa/Abidjan'],
+                ...],
+     'widget_constructor': 'zope.schema.Choice'}
+
+    >>> print w.formValue(None)
+    None
+    >>> import pytz
+    >>> w.formValue(pytz.utc)
+    'UTC'
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('tz', u'Timezone', u'Timezone: Missing Input')
+
+    >>> request.form['tz'] = u'UTC'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    <UTC>
+
+Decimals
+--------
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.Decimal(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.InputDecimal(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'allowBlank': False,
+     'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zope.schema.Decimal'}
+
+Note that we use a custom widget constructor, which provides
+decimal-specific validation on the client.
+
+    >>> import decimal
+    >>> w.formValue(None), w.formValue(decimal.Decimal("42.1"))
+    (None, u'42.1')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    ConversionError: (u"Invalid decimal: u'xxx'", None)
+
+    >>> request.form['f'] = u'33.1'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    '33.1'
+
+Hidden fields
+-------------
+
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> f = zope.schema.TextLine(
+    ...    __name__='f', title=u'label', description=u'hint')
+    >>> w = zc.ajaxform.widgets.Hidden(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'hint',
+     'fieldLabel': u'label',
+     'id': 'f',
+     'name': 'f',
+     'required': True,
+     'widget_constructor': 'zc.ajaxform.widgets.Hidden'}
+
+    >>> w.formValue(None), w.formValue(u'xxx')
+    (None, u'xxx')
+
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, False, False)
+    >>> w.getInputValue()
+    Traceback (most recent call last):
+    ...
+    MissingInputError: ('f', u'label', u'label: Missing Input')
+
+    >>> request.form['f'] = u'xxx'
+    >>> w.required, w.hasInput(), w.hasValidInput()
+    (True, True, True)
+    >>> w.getInputValue()
+    u'xxx'
+
+
+.. [#noinput] Another way we might handle widgets that don't send data
+   on certain inputs would be to add extra hidden fields. This is
+   might be be something we do or allow in the future.
+
+Record Lists
+------------
+
+    >>> import zope.formlib.form
+    >>> import zc.ajaxform.interfaces
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> zope.interface.directlyProvides(
+    ...         request,
+    ...         zc.ajaxform.interfaces.IAjaxRequest,
+    ...         zope.interface.directlyProvidedBy(request),
+    ...         )
+    >>> class IAddress(zope.interface.Interface):
+    ...     street = zope.schema.TextLine(
+    ...         __name__ = u'street',
+    ...         title = u"Street",
+    ...         description = u"The street",
+    ...         )
+    ...     city = zope.schema.TextLine(
+    ...         __name__ = u'city',
+    ...         title = u"City",
+    ...         description = u"The city",
+    ...         )
+    >>> f = zope.schema.List(
+    ...    __name__='list',
+    ...    title=u'List',
+    ...    description=u'a list',
+    ...    value_type=zope.schema.Object(schema=IAddress))
+    >>> w = zc.ajaxform.widgets.RecordList(f, request)
+    >>> pprint(w.js_config(), width=1)
+    {'fieldHint': u'a list',
+     'fieldLabel': u'List',
+     'id': 'list',
+     'name': 'list',
+     'record_schema': {'readonly': False,
+                       'widgets': [{'fieldHint': u'The street',
+                                    'fieldLabel': u'Street',
+                                    'id': u'street',
+                                    'minLength': 0,
+                                    'name': u'street',
+                                    'required': True,
+                                    'widget_constructor': 'zope.schema.TextLine'},
+                                   {'fieldHint': u'The city',
+                                    'fieldLabel': u'City',
+                                    'id': u'city',
+                                    'minLength': 0,
+                                    'name': u'city',
+                                    'required': True,
+                                    'widget_constructor': 'zope.schema.TextLine'}]},
+     'required': True,
+     'widget_constructor': 'zope.schema.List'}

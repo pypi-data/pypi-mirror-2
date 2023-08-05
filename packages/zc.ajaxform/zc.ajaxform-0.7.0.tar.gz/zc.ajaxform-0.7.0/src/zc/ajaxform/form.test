@@ -1,0 +1,927 @@
+Form Processing
+===============
+
+zc.ajaxform.form provides support for server-generated forms based on
+the zope.formlib library.
+
+Forms are meant to be used as parts of larger applications.  A form
+provides output of JSON data for building javascript forms.  Forms also
+provide validation and call actions with validated data to perform
+actions on form submit.
+
+To create a form, just create a form class as a subclass of
+zc.ajaxform.form.Form. This base class provides:
+
+- an ajax __call__ method that returns a form definition,
+
+- traversal to form actions, in much the same way that
+  zc.ajaxform.application.Application [#application]_ provides traversal
+  to json methods,
+
+- a definitions method that can be used by ajax methods to get a form
+  definition as Python data, and
+
+- a getObjectData method for getting initial form data from an
+  existing object.
+
+Here's a simple example:
+
+.. include:: form_example.py
+   :literal:
+
+Note that we've nested our form definition in an application.  We can
+define the form class elsewhere and use it, but if a form is only used
+in an application, then it's often easiest to define it within an
+application class.  Forms are instantiated by calling them with a
+single argument.  This argument, the application, becomes the form's `app`
+attribute.  The application's context becomes the form's context.  Form
+classes are automatically instantiated when a form class is assigned to
+an attribute in a class and accessed through an instance
+[#form_classes_are_descriptors]_.
+
+Let's try accessing our form, which can be found in its python form
+in form_example.py:
+
+    >>> import zope.testbrowser.testing
+    >>> from zc.ajaxform.testing import call_form, print_form
+    >>> browser = zope.testbrowser.testing.Browser()
+    >>> browser.open('http://localhost/form.html?login')
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm')
+    {u'definition': {u'actions': [{u'label': u'Register',
+                                   u'name': u'ExampleForm.actions.register',
+                                   u'url': u'ExampleForm/register'}],
+                     u'left_fields': {u'addresses': False,
+                                      u'age': True,
+                                      u'description': False,
+                                      u'favorite_color': False,
+                                      u'first_name': True,
+                                      u'happy': False,
+                                      u'last_name': True,
+                                      u'other': True,
+                                      u'pet': False,
+                                      u'secret': False,
+                                      u'siblings': False,
+                                      u'temperment': False,
+                                      u'weight': False},
+                     u'prefix': u'ExampleForm',
+                     u'widgets': [{u'fieldHint': u'Given name.',
+                                   u'fieldLabel': u'First name',
+                                   u'id': u'first_name',
+                                   u'minLength': 0,
+                                   u'name': u'first_name',
+                                   u'required': True,
+                                   u'value': u'Happy',
+                                   u'widget_constructor': u'zope.schema.TextLine'},
+                                  {u'fieldHint': u'Family name.',
+                                   u'fieldLabel': u'Last name',
+                                   u'id': u'last_name',
+                                   u'minLength': 0,
+                                   u'name': u'last_name',
+                                   u'required': True,
+                                   u'value': u'Camper',
+                                   u'widget_constructor': u'zope.schema.TextLine'},
+                                  {u'fieldHint': u'',
+                                   u'fieldLabel': u'Favorite color',
+                                   u'id': u'favorite_color',
+                                   u'minLength': 0,
+                                   u'name': u'favorite_color',
+                                   u'required': False,
+                                   u'value': u'Blue',
+                                   u'widget_constructor': u'zope.schema.TextLine'},
+                                  {u'allowBlank': False,
+                                   u'fieldHint': u'Age in years',
+                                   u'fieldLabel': u'Age',
+                                   u'field_max': 200,
+                                   u'field_min': 0,
+                                   u'id': u'age',
+                                   u'name': u'age',
+                                   u'required': True,
+                                   u'value': u'23',
+                                   u'widget_constructor': u'zope.schema.Int'},
+                                  {u'fieldHint': u'Are they happy?',
+                                   u'fieldLabel': u'Happy',
+                                   u'id': u'happy',
+                                   u'name': u'happy',
+                                   u'required': True,
+                                   u'value': True,
+                                   u'widget_constructor': u'zope.schema.Bool'},
+                                  {u'fieldHint': u"This person's best friend.",
+                                   u'fieldLabel': u'Pet',
+                                   u'id': u'pet',
+                                   u'name': u'pet',
+                                   u'required': False,
+                                   u'values': [[u'c935d187f0b998ef720390f85014ed1e',
+                                                u'Dog'],
+                                               [u'fa3ebd6742c360b2d9652b7f78d9bd7d',
+                                                u'Cat'],
+                                               [u'071642fa72ba780ee90ed36350d82745',
+                                                u'Fish']],
+                                   u'widget_constructor': u'zc.ajaxform.widgets.ComboBox'},
+                                  {u'allowBlank': False,
+                                   u'fieldHint': u'What is the person like?',
+                                   u'fieldLabel': u'Temperment',
+                                   u'hiddenName': u'temperment.value',
+                                   u'id': u'temperment',
+                                   u'name': u'temperment',
+                                   u'required': True,
+                                   u'value': u'Right Neighborly',
+                                   u'values': [[u'Nice',
+                                                u'Nice'],
+                                               [u'Mean',
+                                                u'Mean'],
+                                               [u'Ornery',
+                                                u'Ornery'],
+                                               [u'Right Neighborly',
+                                                u'Right Neighborly']],
+                                   u'widget_constructor': u'zope.schema.Choice'},
+                                  {u'allowBlank': False,
+                                   u'fieldHint': u'Weight in lbs?',
+                                   u'fieldLabel': u'Weight',
+                                   u'id': u'weight',
+                                   u'name': u'weight',
+                                   u'required': True,
+                                   u'widget_constructor': u'zope.schema.Decimal'},
+                                  {u'fieldHint': u'What do they look like?',
+                                   u'fieldLabel': u'Description',
+                                   u'id': u'description',
+                                   u'minLength': 0,
+                                   u'name': u'description',
+                                   u'required': True,
+                                   u'value': u'10ft tall\nRazor sharp scales.',
+                                   u'widget_constructor': u'zope.schema.Text'},
+                                  {u'fieldHint': u"Don't tell anybody",
+                                   u'fieldLabel': u'Secret Key',
+                                   u'id': u'secret',
+                                   u'name': u'secret',
+                                   u'required': True,
+                                   u'value': u'5ecret sauce',
+                                   u'widget_constructor': u'zc.ajaxform.widgets.Hidden'},
+                                  {u'allowBlank': False,
+                                   u'fieldHint': u'Number of siblings',
+                                   u'fieldLabel': u'Siblings',
+                                   u'field_max': 8,
+                                   u'field_min': 0,
+                                   u'id': u'siblings',
+                                   u'name': u'siblings',
+                                   u'required': True,
+                                   u'value': u'1',
+                                   u'widget_constructor': u'zc.ajaxform.widgets.NumberSpinner'},
+                                  {u'fieldHint': u'All my wonderful homes',
+                                   u'fieldLabel': u'Addresses',
+                                   u'id': u'addresses',
+                                   u'name': u'addresses',
+                                   u'record_schema': {u'readonly': False,
+                                                      u'widgets': [{u'fieldHint': u'The street',
+                                                                    u'fieldLabel': u'Street',
+                                                                    u'id': u'street',
+                                                                    u'minLength': 0,
+                                                                    u'name': u'street',
+                                                                    u'required': True,
+                                                                    u'widget_constructor': u'zope.schema.TextLine'},
+                                                                   {u'fieldHint': u'The city',
+                                                                    u'fieldLabel': u'City',
+                                                                    u'id': u'city',
+                                                                    u'minLength': 0,
+                                                                    u'name': u'city',
+                                                                    u'required': True,
+                                                                    u'widget_constructor': u'zope.schema.TextLine'},
+                                                                   {u'allowBlank': False,
+                                                                    u'fieldHint': u'The awesomeness on a scale of 1 to 10',
+                                                                    u'fieldLabel': u'Awesomeness',
+                                                                    u'field_max': 10,
+                                                                    u'field_min': 1,
+                                                                    u'id': u'awesomeness',
+                                                                    u'name': u'awesomeness',
+                                                                    u'required': True,
+                                                                    u'widget_constructor': u'zope.schema.Int'}]},
+                                   u'required': True,
+                                   u'value': [{u'awesomeness': u'9',
+                                               u'city': u'fakeville',
+                                               u'street': u'123 fake street'},
+                                              {u'awesomeness': u'9001',
+                                               u'city': u'falsetown',
+                                               u'street': u'345 false street'}],
+                                   u'widget_constructor': u'zope.schema.List'},
+                                  {u'fieldHint': u'Any other notes',
+                                   u'fieldLabel': u'Other',
+                                   u'id': u'other',
+                                   u'minLength': 0,
+                                   u'name': u'other',
+                                   u'required': True,
+                                   u'value': u"I've got a magic toenail",
+                                   u'widget_constructor': u'zope.schema.Text'}]}}
+
+Our application is at: "http://localhost/form.html". The form is
+exposed as an ajax method named "ExampleForm", which comes from the attribute
+name in the class definition.
+
+The form definition contains both action definitions and widget
+definitions. The widget definitions may be full js field definitions
+or name a widget_constructor, which is a Javascript helper provided by
+the zc.ajaxform resource library that provides additional information,
+like Javascript validators, that can't be expressed in JSON.
+
+There is an action definition for each action defined in the form.  The
+action information includes the url to post the result to, relative to
+the application.
+
+Note that the name of the form class is used as the form prefix and
+that the form prefix is used as the prefix for widget and action names
+and ids [#actionids]_.
+
+Let's post a result back:
+
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm/register',
+    ...            {'first_name': 'Bob',
+    ...             'last_name': '',
+    ...             'favorite_color': '',
+    ...             'age': '-1',
+    ...             })
+    {u'errors': {u'addresses': u'Addresses: Missing Input',
+                 u'age': u'Value is too small',
+                 u'description': u'Description: Missing Input',
+                 u'last_name': u'Last name: Missing Input',
+                 u'other': u'Other: Missing Input',
+                 u'secret': u'Secret Key: Missing Input',
+                 u'siblings': u'Siblings: Missing Input',
+                 u'temperment': u'Temperment: Missing Input',
+                 u'weight': u'Weight: Missing Input'}}
+
+The result had 9 problems:
+
+- We didn't provide a last name, description, secret key,
+  number of siblings, temperment, or weight, which are all required
+
+- In the form we did not specify deleting either of our two current
+  address records, but also ommitted their data, and the first of them
+  reported a missing field. Following this we will delete them both and
+  add a new record.
+
+- We specified an invalid age.
+
+Let's pass valid data:
+
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm/register',
+    ...            {'first_name': 'Bob',
+    ...             'last_name': 'Zope',
+    ...             'favorite_color': '',
+    ...             'age': '11',
+    ...             'addresses.street.0': '123 Fake Ln.',
+    ...             'addresses.city.0': 'Fakeville',
+    ...             'addresses.awesomeness.0': 7,
+    ...             'description': 'Hello',
+    ...             'other': 'So nice to meet you',
+    ...             'secret': 'Oh nothing',
+    ...             'siblings': 1,
+    ...             'temperment': 'Nice',
+    ...             'weight': '170.5',
+    ...             'pet': 'Carrier Pigeon'
+    ...             })
+    {u'data': {u'addresses': [{u'awesomeness': 7,
+                               u'city': u'Fakeville',
+                               u'street': u'123 Fake Ln.'}],
+               u'age': 11,
+               u'description': u'Hello',
+               u'favorite_color': u'',
+               u'first_name': u'Bob',
+               u'happy': False,
+               u'last_name': u'Zope',
+               u'other': u'So nice to meet you',
+               u'pet': u'Carrier Pigeon',
+               u'secret': u'Oh nothing',
+               u'siblings': 1,
+               u'temperment': u'Nice',
+               u'weight': u'170.5'},
+     u'self_app_class_name': u'FormExample',
+     u'self_class_name': u'ExampleForm',
+     u'self_context_class_name': u'Folder'}
+
+Here we get a successful result.  Our contrived action in the example
+simply echoed back the data it was passed,  Note, in particular that:
+
+- the data keys have the form prefix removed, and
+
+- the value of the age key is an integer, since the field was an
+  integer field.
+
+Note that for the list field, the original request added a prefix of the list
+field name to prevent collisions with a field with the same name in another
+list field (if it existed).
+
+The action also prints out the classes of its self argument, its app
+and its context. Actions are methods of forms so their `self` argument is the
+form. The form's `app` is the app through which it is accessed and
+`context` is the app's context.
+
+For list widgets if a field in its record is missing and it is required, the
+error reported lists the field name:
+
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm/register',
+    ...            {'first_name': 'Bob',
+    ...             'last_name': 'Zope',
+    ...             'favorite_color': '',
+    ...             'age': '11',
+    ...             'addresses.street.0': '123 Fake Ln.',
+    ...             'addresses.city.0': 'Fakeville',
+    ...             'addresses.awesomeness.0': 7,
+    ...             'addresses.street.1': 'The 2nd Missing field St.',
+    ...             'addresses.awesomeness.1': 3,
+    ...             'description': 'Hello',
+    ...             'other': 'So nice to meet you',
+    ...             'secret': 'Oh nothing',
+    ...             'siblings': 1,
+    ...             'temperment': 'Nice',
+    ...             'weight': '170.5',
+    ...             'pet': 'Carrier Pigeon'
+    ...             })
+    {u'errors': {u'addresses': u'City: Missing Input'}}
+
+Let's provide this value now:
+
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm/register',
+    ...            {'first_name': 'Bob',
+    ...             'last_name': 'Zope',
+    ...             'favorite_color': '',
+    ...             'age': '11',
+    ...             'addresses.street.0': '123 Fake Ln.',
+    ...             'addresses.city.0': 'Fakeville',
+    ...             'addresses.awesomeness.0': 7,
+    ...             'addresses.street.1': 'The 2nd Missing field St.',
+    ...             'addresses.city.1': 'A Void',
+    ...             'addresses.awesomeness.1': '3',
+    ...             'description': 'Hello',
+    ...             'other': 'So nice to meet you',
+    ...             'secret': 'Oh nothing',
+    ...             'siblings': 1,
+    ...             'temperment': 'Nice',
+    ...             'weight': '170.5',
+    ...             'pet': 'Carrier Pigeon'
+    ...             })
+    {u'data': {u'addresses': [{u'awesomeness': 7,
+                               u'city': u'Fakeville',
+                               u'street': u'123 Fake Ln.'},
+                              {u'awesomeness': 3,
+                               u'city': u'A Void',
+                               u'street': u'The 2nd Missing field St.'}],
+               u'age': 11,
+               u'description': u'Hello',
+               u'favorite_color': u'',
+               u'first_name': u'Bob',
+               u'happy': False,
+               u'last_name': u'Zope',
+               u'other': u'So nice to meet you',
+               u'pet': u'Carrier Pigeon',
+               u'secret': u'Oh nothing',
+               u'siblings': 1,
+               u'temperment': u'Nice',
+               u'weight': u'170.5'},
+     u'self_app_class_name': u'FormExample',
+     u'self_class_name': u'ExampleForm',
+     u'self_context_class_name': u'Folder'}
+
+
+Reordering items in a list is accomplished by reordering the suffix for the
+record fields:
+
+    >>> print_form(browser, 'http://localhost/form.html/ExampleForm/register',
+    ...            {'first_name': 'Bob',
+    ...             'last_name': 'Zope',
+    ...             'favorite_color': '',
+    ...             'age': '11',
+    ...             'addresses.street.1': '123 Fake Ln.',
+    ...             'addresses.city.1': 'Fakeville',
+    ...             'addresses.awesomeness.1': 7,
+    ...             'addresses.street.0': 'The 2nd Missing field St.',
+    ...             'addresses.city.0': 'A Void',
+    ...             'addresses.awesomeness.0': 3,
+    ...             'description': 'Hello',
+    ...             'other': 'So nice to meet you',
+    ...             'secret': 'Oh nothing',
+    ...             'siblings': 1,
+    ...             'temperment': 'Nice',
+    ...             'weight': '170.5',
+    ...             'pet': 'Carrier Pigeon'
+    ...             })
+    {u'data': {u'addresses': [{u'awesomeness': 3,
+                               u'city': u'A Void',
+                               u'street': u'The 2nd Missing field St.'},
+                              {u'awesomeness': 7,
+                               u'city': u'Fakeville',
+                               u'street': u'123 Fake Ln.'}],
+               u'age': 11,
+               u'description': u'Hello',
+               u'favorite_color': u'',
+               u'first_name': u'Bob',
+               u'happy': False,
+               u'last_name': u'Zope',
+               u'other': u'So nice to meet you',
+               u'pet': u'Carrier Pigeon',
+               u'secret': u'Oh nothing',
+               u'siblings': 1,
+               u'temperment': u'Nice',
+               u'weight': u'170.5'},
+     u'self_app_class_name': u'FormExample',
+     u'self_class_name': u'ExampleForm',
+     u'self_context_class_name': u'Folder'}
+
+
+
+Getting definitions from Python
+-------------------------------
+
+Sometimes we want to get form definitions from Python.  The form
+__call__ method returns a JSON string.  We can get Python data by
+calling get_definition.
+
+    >>> import zc.ajaxform.form_example
+    >>> import zope.publisher.browser
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> import zc.ajaxform.interfaces
+    >>> import zope.interface
+    >>> zope.interface.alsoProvides(
+    ...     request, zc.ajaxform.interfaces.IAjaxRequest)
+    >>> ex = zc.ajaxform.form_example.FormExample(None, request)
+    >>> from pprint import pprint
+    >>> pprint(ex.ExampleForm.get_definition(), width=1)
+    {'actions': [{'label': 'Register',
+                  'name': u'ExampleForm.actions.register',
+                  'url': u'ExampleForm/register'}],
+     'left_fields': {'addresses': False,
+                     'age': True,
+                     'description': False,
+                     'favorite_color': False,
+                     'first_name': True,
+                     'happy': False,
+                     'last_name': True,
+                     'other': True,
+                     'pet': False,
+                     'secret': False,
+                     'siblings': False,
+                     'temperment': False,
+                     'weight': False},
+     'prefix': 'ExampleForm',
+     'widgets': [{'fieldHint': u'Given name.',
+                  'fieldLabel': u'First name',
+                  'id': 'first_name',
+                  'minLength': 0,
+                  'name': 'first_name',
+                  'required': True,
+                  'value': u'Happy',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'fieldHint': u'Family name.',
+                  'fieldLabel': u'Last name',
+                  'id': 'last_name',
+                  'minLength': 0,
+                  'name': 'last_name',
+                  'required': True,
+                  'value': u'Camper',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'fieldHint': u'',
+                  'fieldLabel': u'Favorite color',
+                  'id': 'favorite_color',
+                  'minLength': 0,
+                  'name': 'favorite_color',
+                  'required': False,
+                  'value': u'Blue',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Age in years',
+                  'fieldLabel': u'Age',
+                  'field_max': 200,
+                  'field_min': 0,
+                  'id': 'age',
+                  'name': 'age',
+                  'required': True,
+                  'value': u'23',
+                  'widget_constructor': 'zope.schema.Int'},
+                 {'fieldHint': u'Are they happy?',
+                  'fieldLabel': u'Happy',
+                  'id': 'happy',
+                  'name': 'happy',
+                  'required': True,
+                  'value': True,
+                  'widget_constructor': 'zope.schema.Bool'},
+                 {'fieldHint': u"This person's best friend.",
+                  'fieldLabel': u'Pet',
+                  'id': 'pet',
+                  'name': 'pet',
+                  'required': False,
+                  'values': [['c935d187f0b998ef720390f85014ed1e',
+                              u'Dog'],
+                             ['fa3ebd6742c360b2d9652b7f78d9bd7d',
+                              u'Cat'],
+                             ['071642fa72ba780ee90ed36350d82745',
+                              u'Fish']],
+                  'widget_constructor': 'zc.ajaxform.widgets.ComboBox'},
+                 {'allowBlank': False,
+                  'fieldHint': u'What is the person like?',
+                  'fieldLabel': u'Temperment',
+                  'hiddenName': 'temperment.value',
+                  'id': 'temperment',
+                  'name': 'temperment',
+                  'required': True,
+                  'value': 'Right Neighborly',
+                  'values': [['Nice',
+                              u'Nice'],
+                             ['Mean',
+                              u'Mean'],
+                             ['Ornery',
+                              u'Ornery'],
+                             ['Right Neighborly',
+                              u'Right Neighborly']],
+                  'widget_constructor': 'zope.schema.Choice'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Weight in lbs?',
+                  'fieldLabel': u'Weight',
+                  'id': 'weight',
+                  'name': 'weight',
+                  'required': True,
+                  'widget_constructor': 'zope.schema.Decimal'},
+                 {'fieldHint': u'What do they look like?',
+                  'fieldLabel': u'Description',
+                  'id': 'description',
+                  'minLength': 0,
+                  'name': 'description',
+                  'required': True,
+                  'value': u'10ft tall\nRazor sharp scales.',
+                  'widget_constructor': 'zope.schema.Text'},
+                 {'fieldHint': u"Don't tell anybody",
+                  'fieldLabel': u'Secret Key',
+                  'id': 'secret',
+                  'name': 'secret',
+                  'required': True,
+                  'value': u'5ecret sauce',
+                  'widget_constructor': 'zc.ajaxform.widgets.Hidden'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Number of siblings',
+                  'fieldLabel': u'Siblings',
+                  'field_max': 8,
+                  'field_min': 0,
+                  'id': 'siblings',
+                  'name': 'siblings',
+                  'required': True,
+                  'value': u'1',
+                  'widget_constructor': 'zc.ajaxform.widgets.NumberSpinner'},
+                 {'fieldHint': u'All my wonderful homes',
+                  'fieldLabel': u'Addresses',
+                  'id': 'addresses',
+                  'name': 'addresses',
+                  'record_schema': {'readonly': False,
+                                    'widgets': [{'fieldHint': u'The street',
+                                                 'fieldLabel': u'Street',
+                                                 'id': 'street',
+                                                 'minLength': 0,
+                                                 'name': 'street',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.TextLine'},
+                                                {'fieldHint': u'The city',
+                                                 'fieldLabel': u'City',
+                                                 'id': 'city',
+                                                 'minLength': 0,
+                                                 'name': 'city',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.TextLine'},
+                                                {'allowBlank': False,
+                                                 'fieldHint': u'The awesomeness on a scale of 1 to 10',
+                                                 'fieldLabel': u'Awesomeness',
+                                                 'field_max': 10,
+                                                 'field_min': 1,
+                                                 'id': 'awesomeness',
+                                                 'name': 'awesomeness',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.Int'}]},
+                  'required': True,
+                  'value': [{'awesomeness': u'9',
+                             'city': u'fakeville',
+                             'street': u'123 fake street'},
+                            {'awesomeness': u'9001',
+                             'city': u'falsetown',
+                             'street': u'345 false street'}],
+                  'widget_constructor': 'zope.schema.List'},
+                 {'fieldHint': u'Any other notes',
+                  'fieldLabel': u'Other',
+                  'id': 'other',
+                  'minLength': 0,
+                  'name': 'other',
+                  'required': True,
+                  'value': u"I've got a magic toenail",
+                  'widget_constructor': 'zope.schema.Text'}]}
+
+Note that we had to stamp the request with IAjaxRequest.  This is done
+during application traversal.  We need it so widgets can get looked
+up.
+
+
+Base and prefix
+---------------
+
+Forms have base_href and prefix variables.  The base_href is used to compute
+URLs for form actions.  A form's base_href defaults to its class name.
+The form's base_href also includes the base_href of its app, if its app has
+a base_href. This is useful for sub-applications. Let's give our sample
+application a base_href attribute as if it were a sub-application:
+
+    >>> ex = zc.ajaxform.form_example.FormExample(None, request)
+    >>> ex.base_href = 'sample'
+    >>> ex.ExampleForm.base_href
+    'sample/ExampleForm'
+
+    >>> pprint(ex.ExampleForm.get_definition(), width=1)
+    {'actions': [{'label': 'Register',
+                  'name': u'sample.ExampleForm.actions.register',
+                  'url': u'sample/ExampleForm/register'}],
+     'left_fields': {'addresses': False,
+                     'age': True,
+                     'description': False,
+                     'favorite_color': False,
+                     'first_name': True,
+                     'happy': False,
+                     'last_name': True,
+                     'other': True,
+                     'pet': False,
+                     'secret': False,
+                     'siblings': False,
+                     'temperment': False,
+                     'weight': False},
+     'prefix': 'sample.ExampleForm',
+     'widgets': [{'fieldHint': u'Given name.',
+                  'fieldLabel': u'First name',
+                  'id': 'first_name',
+                  'minLength': 0,
+                  'name': 'first_name',
+                  'required': True,
+                  'value': u'Happy',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'fieldHint': u'Family name.',
+                  'fieldLabel': u'Last name',
+                  'id': 'last_name',
+                  'minLength': 0,
+                  'name': 'last_name',
+                  'required': True,
+                  'value': u'Camper',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'fieldHint': u'',
+                  'fieldLabel': u'Favorite color',
+                  'id': 'favorite_color',
+                  'minLength': 0,
+                  'name': 'favorite_color',
+                  'required': False,
+                  'value': u'Blue',
+                  'widget_constructor': 'zope.schema.TextLine'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Age in years',
+                  'fieldLabel': u'Age',
+                  'field_max': 200,
+                  'field_min': 0,
+                  'id': 'age',
+                  'name': 'age',
+                  'required': True,
+                  'value': u'23',
+                  'widget_constructor': 'zope.schema.Int'},
+                 {'fieldHint': u'Are they happy?',
+                  'fieldLabel': u'Happy',
+                  'id': 'happy',
+                  'name': 'happy',
+                  'required': True,
+                  'value': True,
+                  'widget_constructor': 'zope.schema.Bool'},
+                 {'fieldHint': u"This person's best friend.",
+                  'fieldLabel': u'Pet',
+                  'id': 'pet',
+                  'name': 'pet',
+                  'required': False,
+                  'values': [['c935d187f0b998ef720390f85014ed1e',
+                              u'Dog'],
+                             ['fa3ebd6742c360b2d9652b7f78d9bd7d',
+                              u'Cat'],
+                             ['071642fa72ba780ee90ed36350d82745',
+                              u'Fish']],
+                  'widget_constructor': 'zc.ajaxform.widgets.ComboBox'},
+                 {'allowBlank': False,
+                  'fieldHint': u'What is the person like?',
+                  'fieldLabel': u'Temperment',
+                  'hiddenName': 'temperment.value',
+                  'id': 'temperment',
+                  'name': 'temperment',
+                  'required': True,
+                  'value': 'Right Neighborly',
+                  'values': [['Nice',
+                              u'Nice'],
+                             ['Mean',
+                              u'Mean'],
+                             ['Ornery',
+                              u'Ornery'],
+                             ['Right Neighborly',
+                              u'Right Neighborly']],
+                  'widget_constructor': 'zope.schema.Choice'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Weight in lbs?',
+                  'fieldLabel': u'Weight',
+                  'id': 'weight',
+                  'name': 'weight',
+                  'required': True,
+                  'widget_constructor': 'zope.schema.Decimal'},
+                 {'fieldHint': u'What do they look like?',
+                  'fieldLabel': u'Description',
+                  'id': 'description',
+                  'minLength': 0,
+                  'name': 'description',
+                  'required': True,
+                  'value': u'10ft tall\nRazor sharp scales.',
+                  'widget_constructor': 'zope.schema.Text'},
+                 {'fieldHint': u"Don't tell anybody",
+                  'fieldLabel': u'Secret Key',
+                  'id': 'secret',
+                  'name': 'secret',
+                  'required': True,
+                  'value': u'5ecret sauce',
+                  'widget_constructor': 'zc.ajaxform.widgets.Hidden'},
+                 {'allowBlank': False,
+                  'fieldHint': u'Number of siblings',
+                  'fieldLabel': u'Siblings',
+                  'field_max': 8,
+                  'field_min': 0,
+                  'id': 'siblings',
+                  'name': 'siblings',
+                  'required': True,
+                  'value': u'1',
+                  'widget_constructor': 'zc.ajaxform.widgets.NumberSpinner'},
+                 {'fieldHint': u'All my wonderful homes',
+                  'fieldLabel': u'Addresses',
+                  'id': 'addresses',
+                  'name': 'addresses',
+                  'record_schema': {'readonly': False,
+                                    'widgets': [{'fieldHint': u'The street',
+                                                 'fieldLabel': u'Street',
+                                                 'id': 'street',
+                                                 'minLength': 0,
+                                                 'name': 'street',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.TextLine'},
+                                                {'fieldHint': u'The city',
+                                                 'fieldLabel': u'City',
+                                                 'id': 'city',
+                                                 'minLength': 0,
+                                                 'name': 'city',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.TextLine'},
+                                                {'allowBlank': False,
+                                                 'fieldHint': u'The awesomeness on a scale of 1 to 10',
+                                                 'fieldLabel': u'Awesomeness',
+                                                 'field_max': 10,
+                                                 'field_min': 1,
+                                                 'id': 'awesomeness',
+                                                 'name': 'awesomeness',
+                                                 'required': True,
+                                                 'widget_constructor': 'zope.schema.Int'}]},
+                  'required': True,
+                  'value': [{'awesomeness': u'9',
+                             'city': u'fakeville',
+                             'street': u'123 fake street'},
+                            {'awesomeness': u'9001',
+                             'city': u'falsetown',
+                             'street': u'345 false street'}],
+                  'widget_constructor': 'zope.schema.List'},
+                 {'fieldHint': u'Any other notes',
+                  'fieldLabel': u'Other',
+                  'id': 'other',
+                  'minLength': 0,
+                  'name': 'other',
+                  'required': True,
+                  'value': u"I've got a magic toenail",
+                  'widget_constructor': 'zope.schema.Text'}]}
+
+Note that the action URL now includes "sample/" as a prefix.  Also
+note that the widget and action names have "" as a prefix.  The
+form prefix is simply its base with "/"s converted to "."s.
+
+    >>> ex.ExampleForm.prefix
+    'sample.ExampleForm'
+
+
+Form data
+---------
+
+Ajax forms are a bit different from normal web forms because the data
+and the form definition can be fetched separately.  For example, we
+may use the same form to edit multiple objects.  Form objects have a
+getObjectData method that returns data suitable for editing form field
+values.  Let's create a person and use out form to get data for them:
+
+    >>> bob = zc.ajaxform.form_example.Person(
+    ...     first_name='bob',
+    ...     last_name='smith',
+    ...     favorite_color=None,
+    ...     age=11,
+    ...     happy=True,
+    ...     pet=u'Cockatiel',
+    ...     temperment='Nice',
+    ...     weight = 175.5,
+    ...     description = 'A real cool guy',
+    ...     secret = 'Noone knows!',
+    ...     siblings = 1,
+    ...     addresses = [],
+    ...     other = 'stuff')
+    >>> pprint(ex.ExampleForm.getObjectData(bob), width=1)
+    {'addresses': [],
+     'age': u'11',
+     'description': u'A real cool guy',
+     'first_name': u'bob',
+     'happy': True,
+     'last_name': u'smith',
+     'other': u'stuff',
+     'pet': u'Cockatiel',
+     'secret': u'Noone knows!',
+     'siblings': u'1',
+     'temperment': 'Nice',
+     'weight': u'175.5'}
+
+We didn't set the favorite_color for the person, so it is ommitted
+from the data.
+
+We can pass in a dictionary of values that take precedence over object data:
+
+    >>> pprint(ex.ExampleForm.getObjectData(
+    ...            bob, {'age': u'1'}),
+    ...        width=1)
+    {'addresses': [],
+     'age': u'1',
+     'description': u'A real cool guy',
+     'first_name': u'bob',
+     'happy': True,
+     'last_name': u'smith',
+     'other': u'stuff',
+     'pet': u'Cockatiel',
+     'secret': u'Noone knows!',
+     'siblings': u'1',
+     'temperment': 'Nice',
+     'weight': u'175.5'}
+
+
+Display Options
+---------------
+
+Additional display options may be sent in the widget definition if the widget
+can be adapted to `IDisplayOptions`.  The result of the adaptation only need
+be JSON serializable.
+
+    >>> import zope.app.form.interfaces
+
+    >>> def example_options(widget):
+    ...     field, name = widget.context, widget.context.__name__
+    ...     if name == 'favorite_color':
+    ...         return {'picker': 'crayons'}
+    ...     elif name == 'secret':
+    ...         return 'super-secret'
+    ...     else:
+    ...         return None
+
+    >>> site_manager = zope.component.getSiteManager()
+    >>> site_manager.registerAdapter(
+    ...     example_options,
+    ...     required=(zope.app.form.interfaces.IWidget,),
+    ...     provided=zc.ajaxform.interfaces.IDisplayOptions)
+
+    >>> result = call_form(
+    ...     browser, 'http://localhost/form.html/ExampleForm')
+
+    >>> widgets = result['definition']['widgets']
+    >>> for widget in widgets:
+    ...     if widget.get('display_options'):
+    ...         print widget['name'] + ':', widget['display_options']
+    favorite_color: {u'picker': u'crayons'}
+    secret: super-secret
+
+Finally, clean up.
+
+    >>> site_manager.unregisterAdapter(
+    ...     example_options,
+    ...     required=(zope.app.form.interfaces.IWidget,),
+    ...     provided=zc.ajaxform.interfaces.IDisplayOptions)
+    True
+
+
+To-do (maybe)
+-------------
+
+More widgets!
+
+Interface invariants
+
+Actions:
+
+- conditions
+
+- validators
+
+- failure handlers
+
+
+.. [#application] See application.txt
+
+.. [#form_classes_are_descriptors] Form classes are also
+   descriptors. They get called with the instance they're accessed
+   through.
+
+.. [#actionids] The Javascript code that sets up action buttons uses
+   action name as the button's ID.
