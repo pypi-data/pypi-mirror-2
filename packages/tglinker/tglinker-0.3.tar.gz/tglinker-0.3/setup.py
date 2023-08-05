@@ -1,0 +1,19 @@
+# -*- coding: utf-8 -*-
+try:
+    from setuptools import setup, find_packages
+except ImportError:
+    from ez_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup, find_packages
+
+setup(
+    name='tglinker',
+    version='0.3',
+    description='TurboGears EC2 symlink Generation Tool',
+    author='Michael J. Pedersen',
+    author_email='m.pedersen@icelus.org',
+    entry_points="""
+    [console_scripts]
+    tglinker = tglinker:main
+    """,
+)
