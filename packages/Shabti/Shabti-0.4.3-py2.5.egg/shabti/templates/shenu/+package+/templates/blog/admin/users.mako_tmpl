@@ -1,0 +1,211 @@
+<%inherit file="/core/hide-right.mako"/>
+<%def name="header()">
+    % if c.dc.title is not UNDEFINED:
+    <title>${c.dc.title|n}</title>
+    % else:
+    <title>Shenu User Admin</title>
+    % endif
+    <link type="text/css" rel="stylesheet" href="/css/blog.css" media="screen" />
+    <link type="text/css" rel="stylesheet" href="/css/cmxform.css" media="screen" />
+    <script src="/js/editinplace.js" charset="utf-8" type="text/javascript">
+</script>
+    <script src="/js/taginplace.js" charset="utf-8" type="text/javascript">
+</script>
+    <script src="/js/approveinplace.js" charset="utf-8" type="text/javascript">
+</script>
+    <script src="/js/livesearch.js" charset="utf-8" type="text/javascript">
+</script>
+    <script charset="utf-8" type="text/javascript">
+// -- <![CDATA[
+var hideAll = function () {
+    $("#userEditor").toggle();
+    $("#userCreator").toggle();
+    $("#message").toggle();
+};
+function prepareUserQuery(form,k,v){
+    var params = [ 'fullname','email','psw','psw2','groups'];
+    var e = getElement(form);
+    var ps = [];
+    for (pcheck in keys(e.groups))
+    {
+    if (e.groups[pcheck])
+    if (e.groups[pcheck].checked){
+         ps.push(e.groups[pcheck].value);
+        }
+    }
+    var pardata = [ e.fullname.value, e.email.value, e.psw.value, e.psw2.value , ps ];
+    params.push(k);
+    pardata.push(v);
+    var q = queryString(params,pardata);
+    return q;
+}
+addLoadEvent(hideAll);
+function editUser(uid){
+    $("userEditor").toggle();
+    // hideElement("userCreator");
+    // hideElement("message");
+    var d = loadJSONDoc("/blog/admin/user_info/"+uid);
+    d.addCallbacks(function(udata) {
+        data = udata["user"];
+        var sb = INPUT({"type":"submit","value":"Commit changes"});
+        sb.onclick = function () {
+        var qstring = prepareUserQuery("userEditorForm",'uid',data.id);
+            var d = loadJSONDoc("/blog/admin/user_update?"+qstring);
+            d.addCallbacks(function (){
+                hideElement("userEditor");
+                replaceChildNodes("message", "Updated!");
+                showElement("message");
+                },
+                function (){
+                hideElement("userEditor");
+                replaceChildNodes("message", "Updated failed!");
+                showElement("message");
+                });
+            };            
+        var allgroups = udata['allgroup'];
+        opt = []
+        for(group in allgroups){
+        zl = LABEL({"for":group},allgroups[group]['desc']);
+        iparam = {
+                   "value":group,
+                   "type":"checkbox",
+                   "name":"groups"
+        };
+        forEach (data['groups'],function (z){
+            if (z == group){
+                iparam['checked'] = 1;
+            }
+        });
+        z = INPUT(iparam,group);
+        opt.push( TR({}, TD({},z) , TD({},zl))); 
+        }
+        var form = DIV({},FORM({"name":"userEditorForm","id":"userEditorForm"},
+            TABLE({},
+                TR({},TD({},"Edititing user:"),TD({},data["userId"])),
+                TR({},
+                   TD({},LABEL({"for":"fullname"},"Full name:")),
+                   TD({},INPUT({"type":"text","name":"fullname","value":data["displayName"]}))),
+                TR({},
+                   TD({},LABEL({"for":"email"},"Email:")),
+                   TD({},INPUT({"type":"text","name":"email","value":data["emailAddress"]}))),
+                TR({},
+                   TD({},LABEL({"for":"psw"},"Password:")),
+                   TD({},INPUT({"type":"password","name":"psw","value":data["password"]}))),
+                TR({},
+                   TD({},LABEL({"for":"psw2"},"Confirm Password:")),
+                   TD({},INPUT({"type":"password","name":"psw2","value":data["password"]})))
+                ),
+            opt),sb);
+    replaceChildNodes("userEditor",form);
+    });
+
+}
+function addUser(){
+    // $("#userEditor").hide();
+    // $("#message").hide();
+    $("#userCreator").toggle();
+}
+function deleteUser(uid){
+    if (confirm('Are you sure you want to delete?')) {
+        var d = loadJSONDoc("/blog/admin/user_delete?uid="+uid);
+        d.addCallbacks(function (data) {
+            forEach(getElement('usersList').childNodes, 
+                function(e) {
+                if(e.id == 'li_id'+uid){
+                   getElement('usersList').removeChild(e);
+                }
+            });
+            },function(){ alert('Cannot delete!'); }
+        );
+    }
+}
+function addNewUser(){
+    var qstring = prepareUserQuery("newUserForm",'login',getElement('newUserForm').login.value);
+    var d = loadJSONDoc("/blog/admin/user_create?"+qstring);
+    d.addCallbacks(function (data){
+        $("#userCreator").hide();
+        replaceChildNodes("message", "Created!");
+        showElement("message");
+        a = A({'href':'#'},data['displayName']);
+        a.onclick = function () { editUser(data['userId']); };
+        a2 = A({'href':'#'},'[ Delete ]');
+        a2.onclick = function () { deleteUser(data['userId']); };
+        getElement('usersList').appendChild( LI({'id':'li_id'+data['userId']}, a, " ", a2));
+        },
+        function (){
+        $("#userCreator").hide();
+        replaceChildNodes("message", "Create failed!");
+        $("#message").toggle();
+        });
+}
+$(document).ready(function() {
+    $("#userEditor").toggle();
+    $("#message").toggle();
+    $("#userCreator").toggle();
+    });
+
+//-  ]]>
+    </script>
+</%def>
+<%def name="content()">
+                            <h2>User managment</h2>
+                            <h3 style="width:100%;">These are the members of your group weblog, you may do what you wish with them.</h3>
+                            <table border="1" style="width:90%; margin: 1em; border:1px solid #aaa; font-size:80%;">
+                                <tr>
+                                    <td width="30%">
+                                        <ul id='usersList'>
+                                            <li id="addUser"><a onclick="javascript:addUser();" href="javascript:void(0);">Add new user</a></li>
+                                            % for u in c.users:
+                                            <li id="li_id${u.id}">
+                                            <a onclick="editUser(${u.id});" href="#">${u.display_name}</a>  
+                                            <a onclick="deleteUser(${u.id});" href="#">[ Delete ]</a>
+                                            </li>
+                                            % endfor
+                                        </ul>
+                                    </td>
+                                    <td width="70%">
+                                        <div id="userEditor" />
+                                            <div id="userCreator">
+                                                <form id="newUserForm">
+                                                    Create new user:<br/>
+                                                    <table>
+                                                        <tr>
+                                                            <td><label for="login">Login:</label></td>
+                                                            <td><input type="text" name="login" /></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><label for="fullname">Full name:</label></td>
+                                                            <td><input type="text" name="fullname" /></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><label for="psw">Password:</label></td>
+                                                            <td><input type="password" name="psw" /></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><label for="psw2">Confirm Password:</label></td>
+                                                            <td><input type="password" name="psw2" /></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><label for="email">Email:</label></td>
+                                                            <td><input type="text" name="email" /></td>
+                                                        </tr>
+                                                        % for group in c.groups:
+                                                        <tr>
+                                                            <td><label for="p1">${group.name}</label></td>
+                                                            <td><input type="checkbox" name="groups" value="${group.id}" /></td>
+                                                        </tr>
+                                                        % endfor
+                                                    </table>
+                                                </form>
+                                                <div id="submit">
+                                                    <input onClick="addNewUser();" type="submit" value="Create!" />
+                                                </div>
+                                            </div>
+                                        <div id="message" />
+                                    </td>
+                                </tr>
+                            </table>
+</%def>
+<%def name="lhcolumn()">
+    <%include file="blognavarea.mako" />
+</%def>

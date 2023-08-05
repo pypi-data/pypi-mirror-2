@@ -1,0 +1,142 @@
+<%inherit file="/core/hide-right.mako"/>
+<%! from pylons import url %>
+<%def name="header()">
+    % if hasattr(c,'title') and c.title is not UNDEFINED:
+    <title>${c.title|n}</title>
+    % else:
+    <title>TBlog :: User</title>
+    % endif
+    <script>
+
+    var hideAll = function () {
+        hideElement("userEditor");
+        hideElement("userCreator");
+        hideElement("message");
+    };
+function prepareUserQuery(form,k,v){
+            var params = [ 'fullname','email','psw','psw2','groups'];
+            var e = getElement(form);
+            var ps = [];
+            for (pcheck in keys(e.groups))
+            {
+            if (e.groups[pcheck])
+            if (e.groups[pcheck].checked){
+                 ps.push(e.groups[pcheck].value);
+                }
+            }
+            var pardata = [ e.fullname.value, e.email.value, e.psw.value, e.psw2.value , ps ];
+            params.push(k);
+            pardata.push(v);
+            var q = queryString(params,pardata);
+            return q;
+}
+addLoadEvent(hideAll);
+function editUser(uid){
+    showElement("userEditor");
+    hideElement("userCreator");
+    hideElement("message");
+    var d = loadJSONDoc("/admin/user_info/"+uid);
+    d.addCallbacks(function(udata){
+            data = udata["user"];
+            var sb = INPUT({"type":"submit","value":"Commit changes"});
+            sb.onclick = function () {
+            var qstring = prepareUserQuery("userEditorForm",'uid',data.id);
+                var d = loadJSONDoc("/admin/user_update?"+qstring);
+                d.addCallbacks(function (){
+                    hideElement("userEditor");
+                    replaceChildNodes("message", "Updated!");
+                    showElement("message");
+                    },
+                    function (){
+                    hideElement("userEditor");
+                    replaceChildNodes("message", "Updated failed!");
+                    showElement("message");
+                    });
+                };            
+            var allgroups = udata['allgroup'];
+            opt = []
+            for(group in allgroups){
+            zl = LABEL({"for":group},allgroups[group]['desc']);
+            iparam = {
+                       "value":group,
+                       "type":"checkbox",
+                       "name":"groups"
+            };
+            forEach (data['groups'],function (z){
+                if (z == group){
+                    iparam['checked'] = 1;
+                }
+            });
+            z = INPUT(iparam,group);
+            opt.push( TR({}, TD({},z) , TD({},zl))); 
+            }
+            var form = DIV({},FORM({"name":"userEditorForm","id":"userEditorForm"},
+                TABLE({},
+                    TR({},TD({},"Edititing user:"),TD({},data["userId"])),
+                    TR({},
+                       TD({},LABEL({"for":"fullname"},"Full name:")),
+                       TD({},INPUT({"type":"text","name":"fullname","value":data["displayName"]}))),
+                    TR({},
+                       TD({},LABEL({"for":"email"},"Email:")),
+                       TD({},INPUT({"type":"text","name":"email","value":data["emailAddress"]}))),
+                    TR({},
+                       TD({},LABEL({"for":"psw"},"Password:")),
+                       TD({},INPUT({"type":"password","name":"psw","value":data["password"]}))),
+                    TR({},
+                       TD({},LABEL({"for":"psw2"},"Confirm Password:")),
+                       TD({},INPUT({"type":"password","name":"psw2","value":data["password"]})))
+                    ),
+                opt),sb);
+    replaceChildNodes("userEditor",form);
+    });
+
+}
+function addUser(){
+    hideElement("userEditor");
+    hideElement("message");
+    showElement("userCreator");
+}
+function deleteUser(uid){
+    if (confirm('Are you sure you want to delete?')){
+    var d = loadJSONDoc("/admin/user_delete?uid="+uid);
+    d.addCallbacks(function (data){                    
+    forEach(getElement('usersList').childNodes, 
+            function(e) {
+            if(e.id == 'li_id'+uid){
+               getElement('usersList').removeChild(e);
+             }
+            }
+        );
+    },function(){ alert('Cannot delete!'); }
+    );
+    }
+}
+function addNewUser(){
+        var qstring = prepareUserQuery("newUserForm",'login',getElement('newUserForm').login.value);
+        var d = loadJSONDoc("/admin/user_create?"+qstring);
+        d.addCallbacks(function (data){
+                hideElement("userCreator");
+                replaceChildNodes("message", "Created!");
+                showElement("message");
+                a = A({'href':'#'},data['displayName']);
+                a.onclick = function () { editUser(data['userId']); };
+                a2 = A({'href':'#'},'[ Delete ]');
+                a2.onclick = function () { deleteUser(data['userId']); };
+                getElement('usersList').appendChild( LI({'id':'li_id'+data['userId']}, a, " ", a2));
+                },
+                function (){
+                hideElement("userCreator");
+                replaceChildNodes("message", "Create failed!");
+                showElement("message");
+                });
+    }
+
+    </script>
+</%def>
+<%def name="content()">
+    <h2>${c.user.display_name}</h2>
+    <h3>${c.blog.name}
+</%def>
+<%def name="lhcolumn()">
+    <%include file="navarea.mako" />
+</%def>

@@ -1,0 +1,166 @@
+#
+#    Copyright (C) 2003-2005  James Tauber
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+
+
+class Resource:
+    """
+    A resource is content object that can be returned to the client / browser
+    in one or more forms either as the entire response or as a part of the
+    response.
+
+    Typically sublcassed, a resource object wraps a data source (such as a
+    leonardo "file") and may provide format translation (such as from
+    a wiki format to HTML).
+    
+    Examples of resources include wiki pages, blog entries, menus, etc.
+    """
+
+
+    def __init__(self, resource_id):
+        self.resource_id = resource_id
+
+
+    def get_id(self):
+        return self.resource_id
+
+
+    def get_title(self):
+        return self.resource_id
+
+
+    def __repr__(self):
+        return "<%s '%s'>" % (self.__class__, self.resource_id)
+        
+
+
+class PagePart(Resource):
+    """
+    A resource that is part of a page.
+    
+    The key method that PagePart adds is get_html(). If the page part is
+    editable, then get_content() will return the underlying content that
+    can be edited.
+    """
+
+
+    def __init__(self, resource_id, title=None, html=None):
+    
+        Resource.__init__(self, resource_id)
+    
+        self.title = title
+        self.html = html
+
+
+    def get_title(self):
+        return self.title
+        
+        
+    def get_html(self):
+        return self.html
+        
+        
+    def get_lastmod(self):
+        return 0
+       
+       
+    def get_property(self, name):
+        return None # by default page parts don't have properties
+        
+       
+    def exists(self):
+        return True
+        
+       
+    def is_read_only(self):
+        return True # default
+
+
+
+class TopLevelResource(Resource):
+    """
+    A resource that is returned directly to the client / browser rather
+    than as part of an enclosing resource.
+    """
+
+
+    def __init__(self, resource_id, mime_type):
+        Resource.__init__(self, resource_id)
+        self.mime_type = mime_type
+
+    
+    def get_mime_type(self):
+        return self.mime_type
+    
+
+    
+class FileObjectResource:
+    """
+    A mix-in for resources that wrap an LFS file object.
+    """
+
+    def __init__(self, file_object):
+        self.file_object = file_object
+
+    
+    def exists(self):
+        return self.file_object.exists()
+       
+        
+    def get_lastmod(self):
+        return self.file_object.get_lastmod()
+
+
+    def get_content(self):
+        return self.file_object.get_content()
+
+
+    def get_content_type(self):
+        return self.file_object.get_content_type()
+                
+
+    def set_content(self, content, content_type, update_lastmod=True):
+        self.file_object.set_content(content, content_type, update_lastmod)
+
+
+    def delete(self):
+        self.file_object.delete()
+
+
+    def is_read_only(self):
+        return True # default
+
+
+    def get_creation_time(self):
+        return self.file_object.get_creation_time()
+        
+        
+    def get_property(self, name, default=None):
+        return self.file_object.get_property(name, default)
+        
+                
+    def set_property(self, name, value):
+        return self.file_object.set_property(name, value)
+        
+        
+    def enclosures(self, enctype):
+        return self.file_object.enclosures(enctype)
+        
+        
+    def enclosure(self, enctype, index):
+        return self.file_object.enclosure(enctype, index)

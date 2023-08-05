@@ -1,0 +1,52 @@
+# humanoid/tests/functional/test_auth_login
+from pylons import url
+from {{package}}.model import *
+from {{package}}.tests import *
+
+class TestLoginController(TestController):
+    
+    def test_admin_signin(self):
+        """Login (humanoid): ensure that signin is successful"""
+        response = self.app.post(url(controller='login', action='signin'),
+                                     params={'username':u'admin',
+                                             'password':"admin"})
+        
+        assert response.status_int == 302
+        
+        assert response.location == 'http://localhost/demo/privindex'
+    
+    
+    def test_admin_signout(self):
+        """Login (humanoid): ensure that signout is successful."""
+        response = self.app.get(url(controller='login', action='signout'))
+        
+        assert response.status_int == 302
+        
+        assert response.location == 'http://localhost/login/index'
+    
+    
+    def test_unauthorised_model_access_is_prohibited(self):
+        """Login (humanoid): unauthorised GET access is prohibited."""
+        response = self.app.get(url(controller='demo', action='privindex'))
+        
+        assert response.status_int == 302
+        
+        assert response.location == 'http://localhost/login/index'
+    
+    
+    def test_authorised_model_access_is_permitted(self):
+        """Login (humanoid): authorised GET access is permitted."""
+        response = self.app.post(url(controller='login', action='signin'),
+                                     params={'username':u'admin',
+                                             'password':"admin"})
+        
+        assert response.status_int == 302
+        
+        assert response.location == 'http://localhost/demo/privindex'
+        
+        newresponse = response.follow()
+        
+        assert 'Welcome <span style="color:green">admin</span>.' in newresponse
+    
+
+# --- Overridden by Shabti humanoid template
