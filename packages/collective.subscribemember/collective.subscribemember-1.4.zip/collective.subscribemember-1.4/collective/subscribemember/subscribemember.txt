@@ -1,0 +1,362 @@
+Introduction
+============
+
+This is a full-blown functional test. The emphasis here is on testing what
+the user may input and see, and the system is largely tested as a black box.
+We use PloneTestCase to set up this test as well, so we have a full Plone site
+to play with. We *can* inspect the state of the portal, e.g. using 
+self.portal and self.folder, but it is often frowned upon since you are not
+treating the system as a black box. Also, if you, for example, log in or set
+roles using calls like self.setRoles(), these are not reflected in the test
+browser, which runs as a separate session.
+
+Being a doctest, we can tell a story here.
+
+First, we must perform some setup. We use the browser that is shipped
+with Five, as this provides proper Zope 2 integration. Most of the 
+documentation, though, is in the underlying zope.testbrower package.
+
+    >>> from collective.subscribemember import config
+    >>> from Products.Five.testbrowser import Browser
+    >>> portal_url = self.portal.absolute_url()
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+
+The following is useful when writing and debugging testbrowser tests. It lets
+us see all error messages in the error_log.
+
+    >>> self.portal.error_log._ignored_exceptions = ()
+
+We open a browser as Anonymous,
+
+    >>> anon_browser = Browser()
+    >>> anon_browser.handleErrors = False
+
+and also another anonymous browser for our subscribing member.
+
+    >>> subscribemember_browser = Browser()
+    >>> subscribemember_browser.handleErrors = False
+
+We open a browser as a user with the 'Manager' role.
+
+    >>> manager_browser = Browser()
+    >>> manager_browser.handleErrors = False
+    >>> manager_browser.open(portal_url+'/login_form')
+    >>> manager_browser.getControl(name='__ac_name').value = portal_owner
+    >>> manager_browser.getControl(name='__ac_password').value = default_password
+    >>> manager_browser.getControl(name='submit').click()
+    >>> "You are now logged in" in manager_browser.contents
+    True
+
+Setup PloneGetPaid for our tests.
+Testing the setup aspects of GetPaid. Setting required settings. 
+
+    >>> manager_browser.getLink('Site Setup').click()
+    >>> manager_browser.getLink('GetPaid').click()
+    >>> manager_browser.getLink('Site Profile').click()
+    >>> manager_browser.getControl('Contact Email').value = 'info@plonegetpaid.com'
+    >>> manager_browser.getControl( name="form.store_name").value = 'Fake Company'
+    >>> manager_browser.getControl('Apply').click()
+    
+Setting the Payment Processor settings.
+
+    >>> from Products.PloneGetPaid.interfaces import IGetPaidManagementPaymentOptions
+    >>> getpaidoptions = IGetPaidManagementPaymentOptions(self.portal)
+    >>> getpaidoptions.payment_processor = 'Testing Processor'
+    >>> getpaidoptions.accepted_credit_cards = ['Visa']
+
+Provide the processor with the appropriate settings.
+
+    >>> manager_browser.getLink('GetPaid').click()
+    >>> manager_browser.getLink('Payment Processor Settings').click()
+    >>> manager_browser.getControl(name="form.allow_authorization").displayValue = ['allow_authorization']
+    >>> manager_browser.getControl(name="form.allow_capture").displayValue = ['allow_capture']
+    >>> manager_browser.getControl(name="form.allow_refunds").displayValue = ['allow_refund']    
+    >>> manager_browser.getControl('Apply').click()
+
+Testing the Member Subscription Tool
+==========================================
+
+Lets clear out the mail queue first of all.
+
+    >>> mailhost = self.dummyMailHost
+    >>> mailhost.sent = []
+
+A visitor to the site signs up as an 'Individual'.
+
+    >>> username = 'bsmith'
+    >>> subscribemember_browser.open(portal_url+'/join_form')
+    >>> subscribemember_browser.getControl(name="id").value = username
+    >>> subscribemember_browser.getControl(name="fullname").value = 'Bob Smith'
+    >>> subscribemember_browser.getControl('E-mail').value = 'bob@email.com'
+    >>> subscribemember_browser.getControl(name="billFirstLine").value = '123 Ritz Street'
+    >>> subscribemember_browser.getControl(name="billCity").value = 'Hoboville'
+    >>> subscribemember_browser.getControl(name="billState").value = ['NZ-WGN']
+    >>> subscribemember_browser.getControl(name="billCountry").value = ['NZ']
+    >>> subscribemember_browser.getControl(name="billPostalCode").value = '12345'
+    >>> subscribemember_browser.getControl(name="phoneNumber").value = '12345678'
+    >>> subscribemember_browser.getControl(name='memberType').displayOptions
+    ['Student members - $15/Year (No Journal Subscription)', 'Student Members - $30/Year', 'Individual Members - $135/Year', 'Individual Members - $250/2 Years', 'Individual Members - $360/3 Years', 'Associate Members - $30/Year (No Journal Subscription)', 'Corporate Members - $700/Year', 'Corporate Members - $1300/2 Years', 'Corporate Members - $1800/3 Years']    
+    >>> subscribemember_browser.getControl(name='memberType').displayValue = ['Individual Members - $135/Year']
+    >>> subscribemember_browser.getControl('Register').click()
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                 
+    ...                                                                                                                                                         
+        You will receive an e-mail shortly containing a URL that will allow you to                                                                              
+        set your password.                                                                              
+    ...
+
+The user will be sent an email with a link to click to complete the
+registration process.
+
+    >>> '<test@test.com>' in mailhost.sent[0]['From']
+    True
+    
+    >>> mailhost.mto == ['bob@email.com']
+    True
+    
+    >>> 'User_Account_Information_for_Plone_site' in mailhost.sent[0]['Subject']
+    True
+
+    >>> message = mailhost.sent[0].get_payload()
+    >>> reglinkstart = message.find('http://')
+    >>> reglinkfinish = message.find(username)
+    >>> reglink = message[reglinkstart:reglinkfinish+6]
+    
+Lets click on the link in the email now and complete the registration
+process.
+
+    >>> subscribemember_browser.open(reglink)
+    >>> subscribemember_browser.getControl('New password').value = 'secret'
+    >>> subscribemember_browser.getControl(name="password2").value = 'secret'
+    >>> subscribemember_browser.getControl('Set my password').click()
+    >>> 'Password set' in subscribemember_browser.contents
+    True
+
+Now that we've set our password we can login via the login form.
+
+    >>> subscribemember_browser.open(portal_url+'/login_form')
+    >>> subscribemember_browser.getControl(name="__ac_name").value = username
+    >>> subscribemember_browser.getControl(name="__ac_password").value = 'secret'
+    >>> subscribemember_browser.getControl(name="submit").click()
+
+Click on the proceed to payment button.
+
+    >>> subscribemember_browser.getControl('Proceed to Payment').click()
+    >>> subscribemember_browser.getControl('Continue').click()
+
+The member enters their credit card details.
+
+    >>> subscribemember_browser.getControl('Card Holder Name').value = 'Bob Smith'
+    >>> subscribemember_browser.getControl('Phone Number').value = '1234456'
+    >>> subscribemember_browser.getControl(name='form.cc_expiration_month').value = ['12']
+    >>> subscribemember_browser.getControl(name='form.cc_expiration_year').value = ['2014']
+    >>> subscribemember_browser.getControl('Credit Card Number').value = '4111111111111111'
+    >>> subscribemember_browser.getControl(name='form.cc_cvc').value = '133'
+    >>> subscribemember_browser.getControl('Make Payment').click()
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                             
+    ...
+                    Your finance state is                                                                                                                                   
+                </span>                                                                                                                                                     
+                CHARGED                                                                                                                                                     
+    ...
+    >>> orderlink = subscribemember_browser.getLink('here')
+
+Check that the getpaid portlet and tab display.
+TODO:: The portlet should display the updated price, but according to Rob LaRubbio's[1]
+this is due to PloneGetPaid's architecture. As this isn't used by this package, though,
+ignoring it for the moment.
+[1] http://groups.google.com/group/getpaid-dev/msg/6cd39e96740429fe?hl=en 
+
+    <<< subscribemember_browser.getLink('Preferences').click()
+    <<< subscribemember_browser.getLink('Personal Preferences').click()
+    <<< print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                                
+    ...
+        <dl class="portlet" id="portlet-cart">                                                                                                                                 
+    <BLANKLINE>                                                                                                                                                                
+            <dt class="portletHeader">                                                                                                                                         
+                <span class="portletTopLeft"></span>                                                                                                                           
+            <span class="portletTopMiddle">Product Details</span>                                                                                                              
+                <span class="portletTopRight"></span>                                                                                                                          
+            </dt>                                                                                                                                                              
+    <BLANKLINE>                                                                                                                                                                
+            <dd class="portletItem odd">                                                                                                                                       
+              <div>                                                                                                                                                            
+    <BLANKLINE>                                                                                                                                                                
+                <p>Bob Smith</p>                                                                                                                          
+    <BLANKLINE>                                                                                                                                                                
+    <BLANKLINE>                                                                                                                                                                
+    <BLANKLINE>                                                                                                                                                                
+                <p>                                                                                                                                                            
+                     Price: $ <span>135.00</span>                                                                                                                              
+                </p>                                                                                                                                                           
+    <BLANKLINE>                                                                                                                                                                
+              </div>                                                                                                                                                           
+            </dd>
+    ...
+
+    <<< print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                                
+    ...                                                                                                                                         
+                  <li id="contentview-buyable" class="plain">                                                                                                   
+                    <a href="http://nohost/plone/portal_memberdata/bsmith/@@edit-payable">Payable</a>                                                           
+                  </li>
+    ...
+    
+    >>> orderlink.click()
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>
+    ...
+      <tbody>                                                                                                                                           
+      <tr class="odd">                                                                                                                                  
+        <td>                                                                                                                                            
+          1                                                                                                                                             
+        </td>                                                                                                                                           
+        <td>                                                                                                                                            
+          3                                                                                                                                             
+        </td>                                                                                                                                           
+        <td>                                                                                                                                            
+          <a href="http://nohost/plone/portal_memberdata/bsmith">Individual Members - $135/Year</a>                                                     
+        </td>                                                                                                                                           
+        <td>                                                                                                                                            
+          135.00                                                                                                                                        
+        </td>                                                                                                                                           
+        <td>                                                                                                                                            
+          135.00                                                                                                                                        
+        </td>                                                                                                                                           
+        <td>                                                                                                                                            
+          NEW                                                                                                                                          
+        </td>                                                                                                                                           
+      </tr>                                                                                                                                             
+      </tbody>
+    ...
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>
+    ...
+            <li>                                                                                                                                        
+                <span> Finance Status </span> -                                                                                                         
+                <span>CHARGED</span>                                                                                                                    
+            </li>
+    ...
+
+Also, confirm that the join date was set.
+
+    >>> from DateTime import DateTime
+    >>> today = DateTime().Date()
+    >>> username = 'bsmith'
+    >>> memberobj = self.portal.portal_memberdata[username]
+    >>> joindate = memberobj.Schema()['memberJoinedDate'].get(memberobj).Date()
+    >>> joindate == today
+    True
+
+Lets confirm that the getpaid portlet and tab no longer display.
+
+    >>> subscribemember_browser.getLink('Preferences').click()
+    >>> subscribemember_browser.getLink('Personal Preferences').click()
+    >>> not '@@edit-payable' in subscribemember_browser.contents
+    True
+    
+    >>> not 'portlet-cart' in subscribemember_browser.contents
+    True
+
+Now lets see if we can see the member's profile.
+
+    >>> anon_browser.open(portal_url)
+    >>> anon_browser.getControl(name="SearchableText").value = 'bob smith'
+    >>> anon_browser.getControl('Search', index=1).click()
+    >>> print anon_browser.contents
+    <BLANKLINE>
+    ...
+            <span>1 items matching your search terms</span>                                                                                              
+    ...
+            <dl class="searchResults">                                                                                                                   
+    <BLANKLINE>                                                                                                                                          
+    <BLANKLINE>                                                                                                                                          
+                <dt class="contenttype-member">                                                                                                          
+                  <img width="16" height="16" src="http://nohost/plone/user.gif" alt="Member" />                                                         
+                   <a href="http://nohost/plone/portal_memberdata/bsmith/?searchterm=bob smith"                                                          
+                      class="state-public">Bob Smith</a>                                                                                                 
+                </dt>                                                                                                                                    
+    ...
+
+Lets edit our preferences and set our profile to private.
+
+    >>> subscribemember_browser.getControl(name="make_private:boolean").value = True
+    >>> subscribemember_browser.getControl('Save').click()
+    
+Now lets see if we can still find the member in the search results.
+
+    >>> anon_browser.open(portal_url)
+    >>> anon_browser.getControl(name="SearchableText").value = 'bob smith'
+    >>> anon_browser.getControl('Search', index=1).click()
+    >>> '0 items matching your search terms' in anon_browser.contents
+    True
+    
+
+Member renewal
+--------------
+
+The member goes into their personal preferences to renew their membership.
+
+    >>> subscribemember_browser.open(portal_url)
+    >>> subscribemember_browser.getLink('Preferences').click()
+    >>> subscribemember_browser.getLink('Personal Preferences').click()
+    >>> subscribemember_browser.getControl(name='billFirstLine').value = '1 Unhappy Street, Unhappyville'
+    >>> subscribemember_browser.getControl(name='memberType').displayValue = ['Student Members - $30/Year']
+    >>> subscribemember_browser.getControl('Renew Membership').click()
+    
+Confirm that the changes are saved to the member.
+
+    >>> member = self.portal.portal_memberdata[username]
+    >>> member.Schema()['billFirstLine'].get(member) == '1 Unhappy Street, Unhappyville'
+    True
+    
+Confirm that the proceed to payment button displays.
+
+    >>> subscribemember_browser.getControl('Proceed to Payment')
+    <SubmitControl name='submit' type='submit'>
+
+And that the 'Payable' link is displayed,
+
+    >>> subscribemember_browser.open(portal_url+'/portal_memberdata/'+username)
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                                
+    ...                                                                                                                                         
+                  <li id="contentview-buyable" class="plain">                                                                                                              
+                    <a href="http://nohost/plone/portal_memberdata/bsmith/@@edit-payable">Payable</a>                                                                      
+                  </li>                                                                                                                                                    
+    ...
+
+And finally, that the 'Portlet' is displayed,
+TODO:: As per other todo above, portlet is displaying
+incorrect price.
+
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>
+    ...
+        <dl class="portlet" id="portlet-cart">                                                                                                                             
+    <BLANKLINE>                                                                                                                                                            
+            <dt class="portletHeader">                                                                                                                                     
+                <span class="portletTopLeft"></span>                                                                                                                       
+            <span class="portletTopMiddle">Product Details</span>                                                                                                          
+                <span class="portletTopRight"></span>                                                                                                                      
+            </dt>                                                                                                                                                          
+    <BLANKLINE>                                                                                                                                                            
+            <dd class="portletItem odd">                                                                                                                                   
+              <div>                                                                                                                                                        
+    <BLANKLINE>                                                                                                                                                            
+                <p>Bob Smith</p>                                                                                                                                           
+    <BLANKLINE>                                                                                                                                                            
+    <BLANKLINE>                                                                                                                                                            
+    <BLANKLINE>                                                                                                                                                            
+                <p>                                                                                                                                                        
+                     Price: <span>$</span> <span>30.00</span>                                                                                                                          
+                </p>                                                                                           
+    ...
+    
+Lets now check to see if the member has been assigned the applicable
+roles.
+
+    >>> member.getRoles()
+    ('Member', 'Reviewer') 
