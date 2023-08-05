@@ -1,0 +1,69 @@
+whitespace = ?any horizontal whitespace?;
+newline = ?any vertical whitespace?;
+indent = ?current indent level?;
+next indent = ?next indent level?;
+end statement = newline, { [indent ], newline }
+character = ?any character? - newline;
+
+(* Quotes are escaped by doubling. *)
+double quoted literal = '"', { character - '"' | '""' }, '"';
+single quoted literal = "'", { character - "'" | "''" }, "'";
+unquoted literal = character - ( '"' | "'" | whitespace ), { character - whitespace }
+inline literal = double quoted literal | single quoted literal | unquoted literal;
+
+name = { '_' | '-' | '.' | ':' | ?alphanumeric? };
+variable name continuation = indent, '$', name;
+concatenate name continuation = indent, '+', name;
+name continuation = variable name continuation | concatenate name continuation;
+name expression = [ name ], { newline, name continuation };
+named expression = name expression, [ '=', expression ];
+
+literal = { character };
+variable continuation = indent, '$', name;
+concatenate continuation = indent, '+', literal;
+newline continuation = indent, '\', literal;
+continuation = variable continuation | concatenate continuation | newline continuation;
+expression = [ literal ], { newline, continuation };
+
+inline namespace = '#', inline literal | ( name, [ '=', inline literal ] );
+positional attribute = inline literal;
+inline attribute = [ '@' ], inline literal | ( name, [ '=', inline literal ] );
+inline attribute expansion = '@@', name;
+macro inlines = [ inline attribute | inline attribute expansion ], { whitespace, inline attribute | inline attribute expansion };
+element inlines = [ inline attribute | inline attribute expansion | inline namespace ], { whitespace, inline attribute | inline attribute expansion | inline namespace };
+expansion inlines = [ inline attribute | inline attribute expansion | inline namespace | positional attribute ], { whitespace, inline attribute | inline attribute expansion | inline namespace | positional attribute };
+
+doctype = indent, '<!', whitespace, 'DOCTYPE', expression, end statement;
+comment = indent, '!', expression, end statement;
+processing instruction = indent, '<?', named expression, end statement;
+namespace = indent, '#', expression | named expression, end statement;
+attribute = indent, '@', named expression, end statement;
+attribute expansion = indent, '@@', name expression, end statement;
+text = indent, '"', expression, end statement;
+element = indent, ( '<', name expression ) | ( '<', name, element inlines ), end statement, element contents;
+element expansion = indent, name expression | ( name , expansion inlines ), end statement, element contents;
+element contents = [ next indent, { comment | processing instruction | namespace | attribute | attribute expansion | text | reset indentation | restart indentation | default | variable | element | element expansion } ];
+
+start command = indent, '?', [ whitespace ];
+restart indentation = start command, 'restart', end statement;
+resume indentation = start command, 'resume', end statement;
+load = start command, 'load', [ whitespace ], expression, end statement;
+encoding = start command, 'encoding', [ whitespace ], expression, end statement;
+default = start command, 'default', [ whitespace ], expression, end statement;
+variable = start command, 'variable', [ whitespace ], named expression, end statement;
+contents = start command, 'contents', [ { whitespace, ( '!' | '<?' | '@' | '#' | '"' | '<' | '?' ) } ], end statement;
+attribute definition = start command, 'attribute', [ whitespace ], name expression, end statement, [ { namespace, attribute, attribute expansion } ];
+(* Where inline and top level attributes are parameter definitions. *)
+element definition = start command, 'element', name expression | ( name, [ macro inlines ] ), end statement, [ { attribute | attribute expansion | ( element | element expansion ), next indent, { element contents | contents } } ];
+
+document = [ { load | encoding | default | variable | attribute definition | element definition } ], [ doctype ], [ { processing instruction | comment } ], element | element expansion, [ { processing instruction | comment } ];
+
+(* Substitute for XML characters whenever used in a literal.
+& = &amp;
+&& = &
+< = &lt;
+> = &gt;
+
+Have to keep & for literal character references.
+
+indentation indicates nesting *)
