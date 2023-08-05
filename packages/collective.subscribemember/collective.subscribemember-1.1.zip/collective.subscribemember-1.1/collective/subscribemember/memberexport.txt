@@ -1,0 +1,146 @@
+Testing Exporting Subscribemembers To a CSV File
+==================================================
+
+    >>> from collective.subscribemember import config
+    >>> from Products.Five.testbrowser import Browser
+    >>> portal_url = self.portal.absolute_url()
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> self.portal.error_log._ignored_exceptions = ()
+
+    >>> self.deleteTestMember('test_user_1_')
+
+We open a browser as a user with the 'Manager' role.
+
+    >>> manager_browser = Browser()
+    >>> manager_browser.handleErrors = False
+    >>> manager_browser.open(portal_url+'/login_form')
+    >>> manager_browser.getControl(name='__ac_name').value = portal_owner
+    >>> manager_browser.getControl(name='__ac_password').value = default_password
+    >>> manager_browser.getControl(name='submit').click()
+    >>> "You are now logged in" in manager_browser.contents
+    True
+
+We open a browser as Anonymous,
+
+    >>> anon_browser = Browser()
+    >>> anon_browser.handleErrors = False
+
+and also another anonymous browser for our subscribing member.
+
+    >>> subscribemember_browser = Browser()
+    >>> subscribemember_browser.handleErrors = False
+
+Setup PloneGetPaid for our tests.
+
+    >>> manager_browser.getLink('Site Setup').click()
+    >>> manager_browser.getLink('GetPaid').click()
+    >>> manager_browser.getLink('Site Profile').click()
+    >>> manager_browser.getControl('Contact Email').value = 'info@plonegetpaid.com'
+    >>> manager_browser.getControl( name="form.store_name").value = 'Fake Company'
+    >>> manager_browser.getControl('Apply').click()
+    >>> from Products.PloneGetPaid.interfaces import IGetPaidManagementPaymentOptions
+    >>> getpaidoptions = IGetPaidManagementPaymentOptions(self.portal)
+    >>> getpaidoptions.payment_processor = 'Testing Processor'
+    >>> getpaidoptions.accepted_credit_cards = ['Visa']
+
+Provide the processor with the appropriate settings:
+
+    >>> manager_browser.getLink('GetPaid').click()
+    >>> manager_browser.getLink('Payment Processor Settings').click()
+    >>> manager_browser.getControl(name="form.allow_authorization").displayValue = ['allow_authorization']
+    >>> manager_browser.getControl(name="form.allow_capture").displayValue = ['allow_capture']
+    >>> manager_browser.getControl(name="form.allow_refunds").displayValue = ['allow_refund']    
+    >>> manager_browser.getControl('Apply').click()
+
+A visitor to the site signs up as an 'Individual'.
+
+Lets clear out the mail queue first of all.
+
+    >>> mailhost = self.dummyMailHost
+    >>> mailhost.sent = []
+
+A visitor to the site signs up as an 'Individual'.
+
+    >>> username = 'bsmith'
+    >>> subscribemember_browser.open(portal_url+'/join_form')
+    >>> subscribemember_browser.getControl(name="id").value = username
+    >>> subscribemember_browser.getControl(name="fullname").value = 'Bob Smith'
+    >>> subscribemember_browser.getControl('E-mail').value = 'bob@email.com'
+    >>> subscribemember_browser.getControl(name="billFirstLine").value = '123 Ritz Street'
+    >>> subscribemember_browser.getControl(name="billCity").value = 'Hoboville'
+    >>> subscribemember_browser.getControl(name="billState").value = ['NZ-WGN']
+    >>> subscribemember_browser.getControl(name="billCountry").value = ['NZ']
+    >>> subscribemember_browser.getControl(name="billPostalCode").value = '12345'
+    >>> subscribemember_browser.getControl(name="phoneNumber").value = '12345678'
+    >>> subscribemember_browser.getControl(name='memberType').displayOptions
+    ['Student members - $15/Year (No Journal Subscription)', 'Student Members - $30/Year', 'Individual Members - $135/Year', 'Individual Members - $250/2 Years', 'Individual Members - $360/3 Years', 'Associate Members - $30/Year (No Journal Subscription)', 'Corporate Members - $700/Year', 'Corporate Members - $1300/2 Years', 'Corporate Members - $1800/3 Years']    
+    >>> subscribemember_browser.getControl(name='memberType').displayValue = ['Individual Members - $135/Year']
+    >>> subscribemember_browser.getControl('Register').click()
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                 
+    ...                                                                                                                                                         
+        You will receive an e-mail shortly containing a URL that will allow you to                                                                              
+        set your password.                                                                              
+    ...
+
+The user will be sent an email with a link to click to complete the
+registration process.
+
+    >>> '<test@test.com>' in mailhost.sent[0]['From']
+    True
+    
+    >>> mailhost.mto == ['bob@email.com']
+    True
+    
+    >>> 'User_Account_Information_for_Plone_site' in mailhost.sent[0]['Subject']
+    True
+
+    >>> message = mailhost.sent[0].get_payload()
+    >>> reglinkstart = message.find('http://')
+    >>> reglinkfinish = message.find(username)
+    >>> reglink = message[reglinkstart:reglinkfinish+6]
+    
+Lets click on the link in the email now and complete the registration
+process.
+
+    >>> subscribemember_browser.open(reglink)
+    >>> subscribemember_browser.getControl('New password').value = 'secret'
+    >>> subscribemember_browser.getControl(name="password2").value = 'secret'
+    >>> subscribemember_browser.getControl('Set my password').click()
+    >>> 'Password set' in subscribemember_browser.contents
+    True
+
+Now that we've set our password we can login via the login form.
+
+    >>> subscribemember_browser.open(portal_url+'/login_form')
+    >>> subscribemember_browser.getControl(name="__ac_name").value = username
+    >>> subscribemember_browser.getControl(name="__ac_password").value = 'secret'
+    >>> subscribemember_browser.getControl(name="submit").click()
+
+Click on the proceed to payment button.
+
+    >>> subscribemember_browser.getControl('Proceed to Payment').click()
+    >>> subscribemember_browser.getControl('Continue').click()
+
+The member enters their credit card details.
+
+    >>> subscribemember_browser.getControl('Card Holder Name').value = 'Bob Smith'
+    >>> subscribemember_browser.getControl('Phone Number').value = '1234456'
+    >>> subscribemember_browser.getControl(name='form.cc_expiration_month').value = ['12']
+    >>> subscribemember_browser.getControl(name='form.cc_expiration_year').value = ['2014']
+    >>> subscribemember_browser.getControl('Credit Card Number').value = '4111111111111111'
+    >>> subscribemember_browser.getControl(name='form.cc_cvc').value = '133'
+    >>> subscribemember_browser.getControl('Make Payment').click()
+    >>> print subscribemember_browser.contents
+    <BLANKLINE>                                                                                                                                                             
+    ...
+                    Your finance state is                                                                                                                                   
+                </span>                                                                                                                                                     
+                CHARGED                                                                                                                                                     
+    ...
+
+Lets open up the import subscribemembers view.
+    
+    >>> manager_browser.open(portal_url+'/@@export_subscribemembers')
+    >>> manager_browser.headers['Content-Type']
+    'text/x-csv; charset=utf-8'
