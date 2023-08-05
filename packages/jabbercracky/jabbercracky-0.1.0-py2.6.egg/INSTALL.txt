@@ -1,0 +1,109 @@
+This program requires a bit of set-up AFTER you install the egg.
+
+This document should get you up and running...
+
+Requirements:
+- Working GCC build environment
+- Python 2.6 at least
+- MySQL server already configured
+- MySQLdb module for Python must be installed!
+- Apache or similar web server with PHP support
+
+Nice-To-Haves:
+- Cuda-capable NVIDIA card for the second phase cracking
+- Massive collection of rainbow tables compatable with rcracki_mt
+
+______________________________________
+Build & Install Pre-Requisites:
+
+First, you'll have to build and install two shell programs used by Jabbercracky.
+
+The first is rcracki_mt, which does the rainbow table lookups.
+
+You will find the appropriate version (0.6.3) in the thirdparty folder 
+of the jabbercracky egg.  Unzip it and build according to its internal docs.
+
+Once you have built rcracki_mt, copy the binary to /usr/bin (if you put it 
+anywhere else, just change the location in jabbercracky.conf)
+
+Next, patch and prepare the second utility:
+( in the thirdparty dir )
+unzip -x gpu_md5_crack_0.2.3.zip  
+cd GPU_MD5_Crack_0.2.3_LGPL
+patch < ../thirdparty/awgh-gpucrack-1.patch
+
+... then go on and compile it according to its internal docs.
+
+IMPORTANT NOTE:  gpu_md5_crack_0.2.3 CANNOT be built with gcc 4.4, 
+switch back to 4.3 for this one if needed.
+
+Copy gpu_md5_crack_0.2.3 into /usr/bin (or whatever), and we're good to go.
+
+______________________________________
+Database Setup
+
+This program requires a single database table. 
+
+To setup the database, do the following:
+ mysqladmin -u root create crackqueue -p
+ mysql crackqueue -u root -p < db/crackqueue.sql
+ 
+You may also want to create a separate MySQL user and grant them privileges.
+
+Make sure to enter your specific database information into /etc/jabbercracky.conf
+
+______________________________________
+Rainbow Tables Setup
+
+Jabbercracky will look for a directory tree of rainbow tables starting at a directory
+specified in /etc/jabbercracky.conf.
+
+The structure of this directory is 
+/rainbow
+/rainbow/ntlm
+/rainbow/halflm
+/rainbow/lm
+/rainbow/md5
+
+Each of these directories can contain sub-directories of rainbow tables of any type
+compatable with rcracki_mt.  For example: /rainbow/md5/md5_alpha-space#1-9_0/
+
+All you need to do is move them into this directory structure and rcracki_mt will pick 
+them up.
+
+______________________________________
+Web Page Setup
+
+Move the contents of the /www/ directory into your web root or another directory.
+
+Make sure that they are readable and that PHP is enabled with MySQL support.
+
+______________________________________
+Final Installation Steps
+
+Run the post-install script to install the init.d script and jabbercrackyd daemon:
+./postinstall.sh
+
+This also installs the /etc/jabbercracky.conf file.
+
+Edit /etc/jabbercracky.conf to make sure that it has the correct database settings
+and file locations for your environment.
+
+If you like, you can set Jabbercracky to run at boot using the script in:
+/etc/init.d/jabbercracky
+
+On Gentoo, for example:
+rc-update add jabbercracky default
+
+______________________________________
+Running
+
+To start the daemon:
+/etc/init.d/jabbercracky start
+
+To crack a hash, go visit the crackqueue web page!
+
+Happy Cracking!
+
+- awgh
+July 2010
