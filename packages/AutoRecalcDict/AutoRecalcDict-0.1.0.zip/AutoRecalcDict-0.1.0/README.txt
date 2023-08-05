@@ -1,0 +1,29 @@
+==============
+AutoRecalcDict
+==============
+
+An AutoRecalcDict is a subclass of dict that allows the user to create a
+standard python dict, but to also allow specifications for dependency
+lists that are on specific targets. Typical usage would be when
+you want a dict entry to automagically be recomputed if a dependency
+changes.
+
+For example:
+============
+
+ard is an AutoRecalcDict and has keys called 'target', 'dep1', 'dep2' and
+'dep3'. The user wants the value of ard['target'] to be recomputed via
+a user defined function ff.
+
+The calling sequence of function ff is defined as having three
+arguments:
+1. self (ff will be converted to an instance method of ard)
+2. target (the index into ard)
+3. deplist (the list of keys that target depends upon).
+
+Included in autorecalcdict.py is a class called DepDescFunc. This is 
+used to create the instance needed by AutoRecalcDict to know what
+targets are dependent on which dependency lists and the function
+needed to update the target.
+
+See the module for examples of usage.
