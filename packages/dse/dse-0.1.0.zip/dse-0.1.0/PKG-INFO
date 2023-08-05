@@ -1,0 +1,63 @@
+Metadata-Version: 1.0
+Name: dse
+Version: 0.1.0
+Summary: DSE - Delayed SQL Executor
+Home-page: UNKNOWN
+Author: Thomas Weholt
+Author-email: thomas@weholt.org
+License: UNKNOWN
+Description: DSE - Delayed SQL Executor
+        ==========================
+        
+        
+        Version : 0.1.0
+        Author : Thomas Weholt <thomas@weholt.org>
+        License : GPL v3.0
+        Status : Beta
+        
+        Description:
+        ------------
+        
+        dse is a simple and crude way of not executing sql queries in sequence, but caching values until a given max value has been
+        met and then execute them using the executemany-method. The result can be huge speed gains.
+        
+        Only tested on SQLite3 but intended for use in django as well.
+        
+        Example usage:
+        --------------
+        
+        import sqlite3 # for testing purposes
+        
+        from dse import DelayedSqlExecutor
+        
+        conn = sqlite3.connect(':memory:')
+        cursor = conn.cursor()
+        cursor.execute('create table filedata (id INTEGER PRIMARY KEY, filepath TEXT, filename TEXT, filesize INTEGER)')
+        d = DelayedSqlExecutor(cursor, paramtoken= '?') # using the ? paramtoken here for sqlite3. Leave it blank and it`ll use %s as support by Django etc.
+        d.addObject('filedata', ('id', 'filepath', 'filename', 'filesize'))
+        
+        for i in range(0, 999):
+        # adding some dummy data. Notice the absence of the id-field. This will trigger inserts.
+        #Adding the id-field would trigger an update for data not yet in the db
+        d.addItem('filedata', {'filepath': '/tmp/', 'filename': 'test%s.txt' % i, 'filesize': i})
+        # No SQL has been executed yet, the default limit is 1000 items
+        
+        # Adding another item will trigger the execution of SQLs and reset the d-instance
+        d.addItem('filedata', {'filepath': '/tmp/', 'filename': 'test%s.txt' % i, 'filesize': i})
+        
+        # Adding some records to update
+        d.addItem('filedata', {'id': 1, 'filepath': '/tmp/', 'filename': 'testmore%s.txt' % i, 'filesize': 100})
+        
+        # calling close will execute any remaining SQLs
+        d.close()
+        
+        # you might be required to call commit on the cursor to commit the data. Depends on how you set up the cursor/connection.
+        
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Database
