@@ -1,0 +1,119 @@
+Metadata-Version: 1.0
+Name: aino-mutations
+Version: 0.1.0.0
+Summary: Mutating for evolution using Django and Mercurial
+Home-page: http://bitbucket.org/aino/aino-mutations/
+Author: Mikko Hellsing
+Author-email: mikko@aino.se
+License: BSD
+Description: ==============
+        aino-mutations
+        ==============
+        
+        aino-mutations is a tool to call mutation scripts at a certain revision
+        of a mercurial repository. Mutation scripts are typically scripts that perform
+        database refactoring of some sort. aino-convert is not intelligent:
+        
+        - Does not offer introspection
+        
+        - Mutation scripts are intended to use raw sql for schema migration
+          which means you will be locked to a particular database engine, that of
+          your own choice of course.
+        
+        
+        Why?
+        ----
+        aino-mutations solves the problem of running a mutation in the correct
+        environment. Often when you do mutations you want to perform some logic
+        to insert or remove data. To perform this logic we need the environment
+        in which the mutation was written for. aino-convert automatically updates
+        a mercurial repository to the revision where the mutation was added and
+        executes the mutation script.
+        
+        
+        Requirements
+        ------------
+        
+        - Django with Multi DB support, v1.2+, or trunk until released.
+        
+        - Mercurial, only tested with v1.5
+        
+        - Django project managed by a mercurial repository
+        
+        
+        Installation
+        ------------
+        
+        1. Add ``mutations`` to your pythonpath
+        
+        2. Add ``mutations`` to ``INSTALLED_APPS``
+        
+        
+        Configuration
+        -------------
+        Mutation scripts are by default looked for in a ``mutations`` subdirectory of
+        your mercurial repository root, you can change this by setting ``MUTATIONS_ROOT``
+        in your settings file. Note that ``MUTATIONS_ROOT`` should be a relative
+        directory path to your repository root.
+        
+        
+        Usage
+        -----
+        aino-mutations seperates mutations for different databases and therefore
+        you need to specify what database you are affecting with your mutation.
+        To add a mutation:
+        
+        1. Add the python file (mutation) to ``MUTATIONS_ROOT/alias/``
+           where ``alias`` is the alias used in your settings file
+           (the default is called ``default``).
+        
+        2. Add the file to the repository: ``hg add path/to/mutation``
+        
+        3. Commit: ``hg ci -m"my first mutation"``
+        
+        4. Now run the mutation: ``python manage.py mutate``
+        
+        
+        Mutations
+        ---------
+        Mutations are just normal python files that do whatever you like.
+        For convenience there are some local variables passed to the mutation scripts:
+        
+        - ``cursor``: a cursor instance for the current database
+        
+        - ``commit_unless_managed`` is just a shortcut for
+          ``django.db.transaction.commit_unless_managed``
+        
+        - ``dry``: this will be True if ``mutate`` is run with the ``--dry`` option
+          which can be usefull for displaying some info to the user.
+        
+        
+        FAQ
+        ---
+        
+        - *I created a mutation that was wrong, what do I do?*
+        - All you need to do is to remove it from the repository:
+          ``hg rm path/to/mutation; hg ci -m"no more bad code"``
+        
+        
+        - *I want to try a mutation before commiting, how can i do that?*
+        - run: ``python manage.py runmutation path/to/mutation``
+        
+        
+        - *I have my django project in a deployment environment, can I still use
+          aino-mutations?*
+        - The best way to solve this since aino-mutations may update project
+          files to a certain revision while performing the mutations it is best to
+          clone the repository to another location while accessing the same databases.
+        
+        
+Platform: any
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Database
+Classifier: Topic :: Software Development :: Version Control
+Classifier: Framework :: Django
