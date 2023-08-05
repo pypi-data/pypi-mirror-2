@@ -1,0 +1,102 @@
+
+%define ZOPE_PORT {{config.port}}
+%define ZEO_PORT {{config.zeo_port}}
+%define DEBUG_MODE {{if config.debug!='0'}}on{{else}}off{{endif}}
+%define INSTANCE {{config.zope_instance}}
+%define VAR {{env.var}}
+%define OPENCORE_VAR $VAR/opencore
+%define LOGS $VAR/logs/opencore
+
+instancehome $INSTANCE
+clienthome $OPENCORE_VAR
+debug-mode $DEBUG_MODE
+zserver-threads 6
+
+<eventlog>
+  level info
+  <logfile>
+    path $LOGS/event.log
+    level info
+  </logfile>
+</eventlog>
+
+<logger access>
+  level WARN
+  <logfile>
+    path $LOGS/Z2.log
+    format %(message)s
+  </logfile>
+</logger>
+
+# <logger trace>
+#   level WARN
+#   <logfile>
+#     path $LOGS/trace.log
+#     format %(message)s
+#   </logfile>
+# </logger>
+
+<warnfilter>
+   action ignore
+   category exceptions.DeprecationWarning
+</warnfilter>
+
+default-zpublisher-encoding utf-8
+
+<http-server>
+  # valid keys are "address" and "force-connection-close"
+  address $ZOPE_PORT
+  # force-connection-close on
+</http-server>
+
+<zodb_db temporary>
+    # Temporary storage database (for sessions)
+    <temporarystorage>
+      name temporary storage for sessioning
+    </temporarystorage>
+    mount-point /temp_folder
+    container-class Products.TemporaryFolder.TemporaryContainer
+</zodb_db>
+
+<zodb_db main>
+  mount-point /
+  # ZODB cache, in number of objects, per thread
+  cache-size 10000
+  <zeoclient>
+    server localhost:$ZEO_PORT
+    storage 1
+    name zeostorage
+    var $OPENCORE_VAR
+    # ZEO client disk cache, in bytes
+    cache-size 500MB
+    # Uncomment to have a persistent disk cache
+    #client zeo1
+  </zeoclient>
+</zodb_db>
+
+<product-config opencore.nui>
+      email-confirmation {{if asbool(config.email_confirmation)}}True{{else}}False{{endif}}
+      cabochon_messages $VAR/opencore/cabochon-messages
+      cabochon_user_info $VAR/cabochon-password.txt
+      build_ini_path {{env.base_path}}/etc/build.ini
+
+</product-config>
+<product-config opencore.auth>
+  topp_secret_filename  {{env.config.get('general', 'topp_secret_filename')}}
+</product-config>
+
+
+{{#FIXME: needs to be more dynamic}}
+{{if env.config.has_option('uris', 'tasktracker_uri'):}}
+<product-config opencore.tasktracker>
+  uri {{env.config.get('uris', 'tasktracker_uri')}}
+  external_uri tasks
+</product-config>
+{{endif}}
+
+{{if env.config.has_option('uris', 'wordpress_uri'):}}
+<product-config opencore.wordpress>
+  uri {{env.config.get('uris', 'wordpress_uri')}}
+  external_uri blog
+</product-config>
+{{endif}}

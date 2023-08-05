@@ -1,0 +1,340 @@
+# -*- mode: python ;-*-
+from buildbot.changes.pb import PBChangeSource
+from buildbot.changes.svnpoller import SVNPoller
+from buildbot.process import factory
+from buildbot.steps.shell import ShellCommand
+from buildbot.steps.source import SVN
+from buildbot.status import html, mail, words
+from buildbot import scheduler
+from buildbot.buildslave import BuildSlave
+from twisted.python import log
+
+import os
+import subprocess
+
+"""Buildbot master configuration for the Almanac.
+
+{{config.editwarning}}
+"""
+
+
+BASEPORT=int('{{config.child_baseport}}')  # Used for the fassembler builds
+ALMANAC_BASEDIR='{{config.basedir}}'
+
+# All the ports we care about... hacky
+almanac_ports =  range(BASEPORT, BASEPORT + 11)  # for the trunk build.
+
+
+slavenames = ['slave1']
+slaves = [BuildSlave(name, '{{config.buildbot_passwd}}') for name in slavenames]
+
+c = BuildmasterConfig = {}
+# "The BuildmasterConfig name is the only one which matters: all other
+# names defined during the execution of this file are discarded."
+# (from http://buildbot.net/repos/release/docs/buildbot.html#Configuration)
+				   
+c['projectName'] = 'Orton Almanac'
+c['projectURL']  = 'http://projects.opengeo.org/almanac/'
+c['buildbotURL'] = '{{config.buildbot_url}}'
+
+c['slavePortnum'] = int('{{config.buildslave_port}}')
+
+SVNURL = 'https://svn.opengeo.org/almanac/'
+
+c['change_source'] = [
+    SVNPoller(svnurl=SVNURL, pollinterval=180)
+]
+
+# Build slaves that are allowed to attach.
+c['slaves'] = slaves
+
+
+#########################################################################
+# FACTORIES - these configure how to build stuff.
+#########################################################################
+
+class ToppShellCommand(ShellCommand):
+
+    def __init__(self, *args, **kw):
+        # Force colorization off in fassembler child processes.
+        # Do that by forcing these env vars blank.
+        # (actually it's cmdutils, used by fassembler, that checks these).
+        # But on principle, we still allow the user to override this.
+        kw.setdefault('env', {})
+        kw['env'].setdefault('LSCOLORS', '')
+        kw['env'].setdefault('LS_COLORS', '')
+        kw['env'].setdefault('COLORTERM', '')
+        kw['env'].setdefault('CLICOLOR', '')
+        ShellCommand.__init__(self, *args, **kw)
+    
+    # Print something not so stupid as "shell_9" when there are
+    # problems.  It was pretty time-consuming to figure out where
+    # in buildbot this happens.
+    def getText2(self, cmd, results):
+        # XXX maybe report a failure count?
+        # see comments in buildbot/process/buildstep.py around line 1004.
+        return self.describe(done=True)
+
+    @property
+    def descriptionDone(self):
+        # Writing out two separate descriptions is too much work.
+        return self.description
+
+class ToppShellScript(ToppShellCommand):
+
+    """Given source text of a bash script, run it on the build
+    slave."""
+
+    def __init__(self, *args, **kw):
+        """
+        Needs a 'sourcetext' keyword arg, and optionally 'scriptargs'
+        (a single string of all arguments, which should already be
+        quoted as necessary).
+        """
+        commandvars = kw.copy()
+        commandvars.setdefault('scriptargs', '')
+        commandvars['delim'] = '__123_END_OF_SCRIPT_123__'
+        # This works as expected, and seems pretty safe against quote
+        # issues and the like.  Uses a somewhat obscure bash trick: a
+        # here document with disabled param substitution (by
+        # single-quoting the delimiter).
+        command = "cat <<'%(delim)s' | bash -s %(scriptargs)s\n%(sourcetext)s\n%(delim)s\n" % commandvars
+        kw['command'] = command
+        ToppShellCommand.__init__(self, *args, **kw)
+
+
+def make_factory(name, repo,
+                 basedir=ALMANAC_BASEDIR,
+                 ports=[], clean_slate=True):
+    # XXX this function probably doesn't need to exist anymore.
+    fac = factory.BuildFactory()
+    fac.name = name
+    # Accept certificates (for svn).
+    fac.addStep(ToppShellScript,
+                sourcetext='yes p | svn ls %s' % repo,
+                description=['accept svn certs',],
+                )
+
+    # Clean up after previous runs.
+    if ports:
+        baseport = ports[0]
+        # For some reason, portkill seems to always exit 1, so ignore "failures".
+        # And for some reason, it sometimes doesn't really work, so
+        # let's just stupidly bludgeon those ports do death.
+        portstring = ' '.join([str(port) for port in ports])
+        killscript="""
+        KILLER=\"{{os.path.join('..', '..', 'bin', 'portkill')}} -v -s 5 %s\"
+        $KILLER
+        sleep 2
+        $KILLER
+        """ % portstring
+        fac.addStep(ToppShellScript, sourcetext=killscript,
+                    description=['kill any running', 'instances using',
+                                 'the ports'],
+                    haltOnFailure=False, flunkOnFailure=False)
+
+    if clean_slate:
+        fac.addStep(ToppShellCommand, command="time rm -rf %s *bz2 *gz *zip" % basedir,
+                    description='remove old files',
+                    haltOnFailure=False, flunkOnFailure=False
+                    )
+
+    buildout_dir = 'AlmanacStack'
+    # Bootstrap a virtualenv, and bootstrap the buildout within it.
+    venv_script = """
+    uname -m | grep 64
+    if [ $? -eq 0 ]; then PY=python2.4; else PY=python; fi
+    virtualenv --python=$PY %(basedir)s || exit 1
+    cd %(basedir)s || exit 1
+    source bin/activate || exit 1
+    svn co %(repo)s %(buildout_dir)s || exit 1
+    cd %(buildout_dir)s || exit 1
+    python bootstrap.py
+    """ % locals()
+    fac.addStep(ToppShellScript, sourcetext=venv_script,
+                description = ['Bootstrap', 'build', 'environment'],
+                haltOnFailure=True)
+
+    # We have to pass in a name for the zdaemon socket file because we
+    # may be in a deeply nested directory and, as of the year 2009,
+    # unix socket path names still have a 104-character limit! WTF is
+    # up with that?
+    buildout_script = """
+    ZEOSOCKET=`tempfile -d /tmp -s .sock`
+    cd %(basedir)s
+    source bin/activate
+    cd %(buildout_dir)s
+    ./bin/buildout -vvv zeoctl:socket-name=$ZEOSOCKET
+    """ % locals()
+    fac.addStep(ToppShellScript, sourcetext=buildout_script,
+                description = ['Run buildout'],
+                haltOnFailure=True)
+
+    # What got built? Useful for forensics.
+    # XXX except, we're using buildout, so i can't just drop this in here.
+    # this gets installed in the parent *virtualenv* which is not useful...
+    # it doesn't find anythign installed by the buildout.
+#     pipscript = """
+#     cd %(basedir)s
+#     source bin/activate
+#     easy_install pip && pip freeze
+#     """  % locals()
+#     fac.addStep(ToppShellScript, sourcetext=pipscript,
+#                 description=["What got built", "for almanac?"],
+#                 haltOnFailure=False, flunkOnFailure=False)
+
+    # Tests.
+    testscript = """
+    cd %(basedir)s
+    source bin/activate
+    cd %(buildout_dir)s
+    source setenv  # ugh, not portable
+    ./bin/test
+    """ % locals()
+    fac.addStep(ToppShellScript, sourcetext=testscript,
+                description=['Run unit tests'])
+    return fac
+
+
+quick_almanac_factory = make_factory(
+    'Almanac trunk (quick)',
+    repo='%s/build/trunk' % SVNURL,
+    ports=almanac_ports,
+    clean_slate=False,
+    )
+
+full_almanac_factory = make_factory(
+    'Almanac trunk (full)',
+    repo='%s/build/trunk' % SVNURL,
+    ports=[p + 100 for p in almanac_ports],  # XXX yay more port hacks.
+    clean_slate=True,
+    )
+
+
+############################################################################
+# BUILDERS - each tells a slave which build factory to use.
+# Need one per slave per build config.
+############################################################################
+
+quick_builders = [
+    {'name': 'almanac-quick',
+     'slavename': name,
+     'builddir': 'almanac-quick',
+     'factory': quick_almanac_factory}
+    for name in slavenames]
+
+full_builders = [
+    {'name': 'almanac-full',
+     'slavename': name,
+     'builddir': 'almanac-full',
+     'factory': full_almanac_factory}
+    for name in slavenames]
+
+full_on_top_of_quick = [
+    {'name': 'almanac-full-over-quick',
+     'slavename': name,
+     'builddir': 'almanac-quick',
+     'factory': full_almanac_factory}
+    for name in slavenames]
+
+c['builders'] = quick_builders + full_builders + full_on_top_of_quick
+
+###########################################################################
+# SCHEDULERS - control when the master decides to fire off a build.
+###########################################################################
+
+# This might seem a bit odd; what I'm doing is
+# 1. Commits trigger a quick rebuild and (eventually) a full build
+# 2. Nightly builder triggers a full rebuild *on top of the quick build*,
+#    to ensure that it's never more than a day old.
+
+buildOnChange = scheduler.Scheduler(
+    'Post Commit Build (quick)', 
+    branch='trunk',
+    treeStableTimer=5*60, 
+    builderNames=[b['name'] for b in quick_builders]
+    )
+
+buildFullOnChange = scheduler.Scheduler(
+    'Post Commit Build (Full)', 
+    branch='trunk',
+    treeStableTimer=10*60, 
+    builderNames=[b['name'] for b in full_builders]
+    )
+
+buildAlmanacNightly = scheduler.Nightly(
+    'Almanac Nightly Build', 
+    builderNames=[b['name'] for b in full_builders + full_on_top_of_quick],
+    hour=4, minute=15)
+
+c['schedulers'] = [buildOnChange,
+                   buildFullOnChange,
+                   buildAlmanacNightly,
+                   ]
+
+
+############################################################################
+# STATUS NOTIFICATION
+############################################################################
+
+
+# This is the status display that should be presented to the Universe, 
+# hence forcing builds to begin is disabled. 
+publicWebStatus = html.WebStatus(http_port='{{config.buildmaster_public_port}}', allowForce=False)
+
+# This is the status display that should be presented to developers 
+# only, allowing them to manually force builds, stop builds etc. 
+developerWebStatus = html.WebStatus(http_port='{{config.buildmaster_private_port}}', allowForce=True)
+
+
+# Mails only to the status list.
+listMailer = mail.MailNotifier(
+    fromaddr='buildbot@openplans.org',
+    mode='failing',  # People got annoyed by all the successes.
+    subject='%(builder)s FAILURE',
+    relayhost='mail.openplans.org',
+    lookup='openplans.org',
+    sendToInterestedUsers=False,
+    extraRecipients=['almanac-builds@lists.openplans.org'], #XXX addr
+    )
+
+
+# Notify by email anyone who has made changes to a build that
+# breaks.
+breakMailer = mail.MailNotifier(
+    fromaddr='buildbot@openplans.org', 
+    mode='failing',
+    subject='%(builder)s FAILURE, and sadly, you are on the blamelist',
+    relayhost='mail.openplans.org', 
+    lookup='openplans.org',
+    sendToInterestedUsers=True,
+    )
+
+# An IRC status bot. Is there a way to get this to always announce
+# failures?
+# Apparently not, short of giving the bot the 'notify' command in channel.
+ircbot = words.IRC(host='irc.freenode.net',
+                   nick='buildbot-almanac',
+                   channels=['#almanac'],
+                   allowForce=False,
+                   )
+
+c['status'] = [developerWebStatus,
+               publicWebStatus,
+               breakMailer,
+               listMailer,
+               ircbot,
+               ]
+
+
+############################################################################
+# write the configuration to a file for debugging.
+# XXX first monkeypatch buildslave so it doesn't blow up on repr.
+def repr_buildslave(s):
+    return '<BuildSlave(%r)>' % s.slavename
+BuildSlave.__repr__ = repr_buildslave
+
+import pprint
+outfile = file('config.out', 'w')
+outfile.write(pprint.pformat(c))
+outfile.close()
