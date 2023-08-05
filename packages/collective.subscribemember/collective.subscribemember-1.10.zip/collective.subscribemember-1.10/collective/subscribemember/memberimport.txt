@@ -1,0 +1,103 @@
+Testing Importing Subscribemembers From a CSV File
+==================================================
+
+    >>> from collective.subscribemember import config
+    >>> from Products.Five.testbrowser import Browser
+    >>> portal_url = self.portal.absolute_url()
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> self.portal.error_log._ignored_exceptions = ()
+    
+We open a browser as a user with the 'Manager' role.
+
+    >>> manager_browser = Browser()
+    >>> manager_browser.handleErrors = False
+    >>> manager_browser.open(portal_url+'/login_form')
+    >>> manager_browser.getControl(name='__ac_name').value = portal_owner
+    >>> manager_browser.getControl(name='__ac_password').value = default_password
+    >>> manager_browser.getControl(name='submit').click()
+    >>> "You are now logged in" in manager_browser.contents
+    True
+
+Lets clear out the mail queue first of all.
+
+    >>> mailhost = self.dummyMailHost
+    >>> mailhost.sent = []
+
+Lets open up the import subscribemembers view.
+#TODO:: This test should work but doesn't for some
+unknown reason so we suppress the views output. 
+    
+    >>> manager_browser.open(portal_url+'/@@import_subscribemembers')
+
+Created kabe: {'confirm_password': '123456', 'memberPosition': '', 'fax': '81 462 85 7801', 'password': '123456', 'zip': '243-0303', 'firstname': 'Keiko', 'memberDept': 'Institute of Environmental Biology', 'donationAmount': 100.0, 'lastname': 'Abe', 'memberType': 3, 'email': 'abekeiko@kamakuranet.ne.jp', 'phone': '81 46285 7801', 'make_private': 0, 'memberAddress': '4036-1 Nakatsu Aikawa-Cho ', 'memberState': 'Kanagawa', 'memberTitle': 'Dr.', 'org': 'JDC Corporation', 'memberExpiryDate': '', 'city': 'Aikou-gun', 'workPrivateAddress': 'W', 'memberCountry': 'Japan'}
+Created lalbin: {'confirm_password': '123456', 'memberPosition': 'Senior Industrial Hygienist', 'fax': '+1 765-494-7403', 'password': '123456', 'zip': '47907-2051', 'firstname': 'Lila C.', 'memberDept': 'Dept. REM', 'donationAmount': 0.0, 'lastname': 'Albin', 'memberType': 3, 'email': 'lcalbin@purdue.edu', 'phone': '+1 765-494-0204', 'make_private': 0, 'memberAddress': '550 Stadium Mall Drive, Rm B173', 'memberState': 'IN', 'memberTitle': 'Dr.', 'org': 'Purdue University', 'memberExpiryDate': '', 'city': 'West Lafayette', 'workPrivateAddress': 'W', 'memberCountry': 'U.S.A.'}
+Created lalexander: {'confirm_password': '123456', 'memberPosition': '', 'fax': '+1 202 879 4597', 'password': '123456', 'zip': '20001', 'firstname': 'L\xc3\xa1szl\xc3\xb3', 'memberDept': 'AFT Health and Safety', 'donationAmount': 0.0, 'lastname': 'Alexander', 'memberType': 3, 'email': 'dalexand@aft.org', 'phone': '+1 202393 5677', 'make_private': 0, 'memberAddress': '555 New Jersey Ave. N.W.', 'memberState': 'DC', 'memberTitle': 'Ms.', 'org': 'American Federation of Teachers', 'memberExpiryDate': '', 'city': 'Washington', 'workPrivateAddress': 'W', 'memberCountry': 'U.S.A.'}
+Didn't create Keiko Abe: Member already exists
+
+Now lets confirm the system didn't send out any emails.
+
+    >>> len(mailhost.sent) == 0
+    True
+
+Now lets confirm the users were actually created.
+
+    >>> manager_browser.open(portal_url)
+    >>> manager_browser.getControl(name="SearchableText").value = 'Keiko Abe'
+    >>> manager_browser.getControl('Search', index=1).click()
+    >>> print manager_browser.contents
+    <BLANKLINE>
+    ...
+                <dt class="contenttype-member">                                                                                                
+                  <img width="16" height="16" src="http://nohost/plone/user.gif" alt="Member" />                                      
+                   <a href="http://nohost/plone/portal_memberdata/kabe/?searchterm=Keiko Abe"                                                           
+                      class="state-public">Keiko Abe</a>                                                                                                
+                </dt>                                                                                                                                   
+    ...
+    
+Now lets search for our unicode member.
+
+    >>> manager_browser.open(portal_url)
+    >>> manager_browser.getControl(name="SearchableText").value = 'Alexander'
+    >>> manager_browser.getControl('Search', index=1).click()
+    >>> print manager_browser.contents
+    <BLANKLINE>
+    ...
+                <dt class="contenttype-member">                                                                                                
+                  <img width="16" height="16" src="http://nohost/plone/user.gif" alt="Member" />                                      
+                   <a href="http://nohost/plone/portal_memberdata/alaszlo/?searchterm=Alexander"                                                     
+                      class="state-public">Alexander László</a>                                                                                         
+                </dt>                                                                                                                                   
+    ...
+
+Lets now log in as our newly imported user.
+
+    >>> subscribemember_browser = Browser()
+    >>> subscribemember_browser.handleErrors = False
+    >>> subscribemember_browser.open(portal_url+'/login_form')
+    >>> subscribemember_browser.getControl(name='__ac_name').value = 'alaszlo'
+    >>> subscribemember_browser.getControl(name='__ac_password').value = '123456'
+    >>> subscribemember_browser.getControl(name='submit').click()
+    >>> "You are now logged in" in subscribemember_browser.contents
+    True
+    
+Lets confirm that the getpaid portlet and tab no longer display.
+
+    >>> subscribemember_browser.getLink('Preferences').click()
+    >>> subscribemember_browser.getLink('Personal Preferences').click()
+    >>> not '@@edit-payable' in subscribemember_browser.contents
+    True
+    
+    >>> not 'portlet-cart' in subscribemember_browser.contents
+    True
+    
+Now lets confirm that the joined date is set correctly.
+
+    >>> member = self.portal.portal_memberdata['alaszlo']
+    >>> member.Schema()['memberJoinedDate'].get(member).Date()
+    '2006/12/31'
+    
+Lets now check to see if the member has been assigned the applicable
+roles.
+
+    >>> member.getRoles()
+    ('Member', 'Reviewer')
