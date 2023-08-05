@@ -1,0 +1,520 @@
+Metadata-Version: 1.0
+Name: collective.blueprint.base
+Version: 1.0
+Summary: Some core transmogrifier blueprints and base classes
+Home-page: http://pypi.python.org/pypi/collective.blueprint.base
+Author: Ross Patterson
+Author-email: me@rpatterson.net
+License: GPL
+Description: =========================
+        collective.blueprint.base
+        =========================
+        
+        Provides transmogrifier blueprint base classes and several useful
+        blueprints.
+        
+        .. contents:: Table of Contents
+        
+        .. -*-doctest-*-
+        
+        Blueprint Base Classes
+        ======================
+        
+        The collective.blueprint.base package provides base classes for
+        clear and easy transmogrifier blueprints.
+        
+        Changing Keys
+        -------------
+        
+        For blueprints that add or change keys in items, it can be very useful
+        to make the keys used by the blueprint configurable.
+        
+        The getKeys functions translates the keys and values passed as keyword
+        arguments into a dictionary with keys as specified in the options if
+        present.
+        
+        >>> from collective.blueprint.base import keys
+        >>> options = {'foo-key': 'baz'}
+        >>> sorted(keys.getKeys(
+        ...     options, foo='bar', bah='qux').iteritems())
+        [('bah', 'qux'), ('baz', 'bar')]
+        
+        A base class is provided for easily making readable blueprints that
+        add keys to items or change keys obeying any key names in the
+        options.
+        
+        >>> from collective.blueprint.base import blueprint
+        >>> class FooBlueprint(blueprint.KeyChanger):
+        ...     keys = ('foo', 'bah')
+        ...     def processItem(self, item):
+        ...         return dict(foo='bar', bah='qux')
+        
+        >>> from collective.blueprint.base import testing
+        >>> transmogrifier = testing.Transmogrifier()
+        >>> previous = ({'other': 'stuff'},)
+        >>> foo_blueprint = FooBlueprint(
+        ...     transmogrifier, 'foosection', options, previous)
+        >>> item, = foo_blueprint
+        >>> sorted(item.iteritems())
+        [('bah', 'qux'), ('baz', 'bar'), ('other', 'stuff')]
+        
+        Source blueprints are by their very nature key changers.  Intead of
+        adding keys to items from further up the pipeline, they generate
+        items.  The source base class extends the behavior above to this usage
+        pattern.
+        
+        >>> class BarBlueprint(blueprint.Source):
+        ...     keys = ('foo', 'bah')
+        ...     def getItems(self):
+        ...         yield dict(foo='bar', bah='qux')
+        ...         yield dict(foo='bar2', bah='qux2')
+        
+        >>> previous = ({'other': 'stuff'},)
+        >>> bar_blueprint = BarBlueprint(
+        ...     transmogrifier, 'barsection', options, previous)
+        >>> other, first, second = bar_blueprint
+        >>> other
+        {'other': 'stuff'}
+        >>> sorted(first.iteritems())
+        [('bah', 'qux'), ('baz', 'bar')]
+        >>> sorted(second.iteritems())
+        [('bah', 'qux2'), ('baz', 'bar2')]
+        
+        Using Keys
+        ----------
+        
+        For blueprints that access keys in items and process them somehow,
+        transmogrifier provides support for matchers that will access keys
+        on items according to a policy of precedence.
+        
+        The makeMatchers function does this for multiple keys at once.
+        
+        >>> options = {'blueprint': 'foo.blueprint', 'bah-key': 'bar'}
+        >>> matchers = keys.makeMatchers(
+        ...     options, 'barsection', 'baz', 'bah', blah=('qux', 'quux'))
+        >>> sorted(matchers.iteritems())
+        [('bah', <collective.transmogrifier.utils.Matcher object at ...>),
+        ('baz', <collective.transmogrifier.utils.Matcher object at ...>),
+        ('blah', <collective.transmogrifier.utils.Matcher object at ...>)]
+        
+        >>> item = {'_baz': 'baz-value',
+        ...         'bar': 'bah-value',
+        ...         'quux': 'blah-value'}
+        >>> matchers['baz'](*item)
+        ('_baz', True)
+        >>> matchers['bah'](*item)
+        ('bar', True)
+        >>> matchers['blah'](*item)
+        ('quux', True)
+        
+        To make implementing blueprints easier and clearer, a base class is
+        provided that allows the blueprint author to worry only about the keys
+        in the item they require.
+        
+        >>> class BazKeyUser(blueprint.KeyUser):
+        ...     keys = ('baz', 'bah')
+        ...     extras = dict(blah=('qux', 'quux'))
+        ...     def processItem(self, item, baz, bah, blah):
+        ...         print baz, bah, blah
+        
+        >>> previous = (item,)
+        >>> baz_blueprint = BazKeyUser(
+        ...     transmogrifier, 'bazsection', options, previous)
+        >>> only, = baz_blueprint
+        baz-value bah-value blah-value
+        >>> sorted(only.iteritems())
+        [('_baz', 'baz-value'),
+        ('bar', 'bah-value'),
+        ('quux', 'blah-value')]
+        
+        A KeyUser can pass over items that don't have keys for all the
+        matchers if the required option is not True.
+        
+        >>> class QuxKeyUser(blueprint.KeyUser):
+        ...     keys = ('baz', 'bah', 'foo')
+        ...     extras = dict(blah=('qux', 'quux'))
+        ...     def processItem(self, item, baz, bah, blah, foo):
+        ...         print baz, bah, blah
+        
+        >>> options['required'] = 'False'
+        >>> previous = (item,)
+        >>> qux_blueprint = QuxKeyUser(
+        ...     transmogrifier, 'quxsection', options, previous)
+        >>> only, = qux_blueprint
+        >>> sorted(only.iteritems())
+        [('_baz', 'baz-value'),
+        ('bar', 'bah-value'),
+        ('quux', 'blah-value')]
+        
+        .. -*-doctest-*-
+        
+        Delete Blueprint
+        ================
+        
+        The collective.blueprint.base.delete transmogrifier blueprint can be used
+        to make pipleine sections that delete existing objects at the item
+        path.
+        
+        Some objects exist before running the transmogrifier, others don't.
+        
+        >>> hasattr(folder, 'foo')
+        True
+        >>> folder.foo
+        <File at /test_folder_1_/foo>
+        >>> hasattr(folder, 'bar')
+        False
+        
+        Assemble and register a transmogrifier with a deleter section.
+        
+        >>> deleter = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     foosource
+        ...     barsource
+        ...     deleter
+        ...     printer
+        ...
+        ... [foosource]
+        ... blueprint = collective.blueprint.base.configsource
+        ... _path = /foo
+        ...
+        ... [barsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ... _path = /bar
+        ...
+        ... [deleter]
+        ... blueprint = collective.blueprint.base.deleter
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.delete.testing.deleter',
+        ...     deleter)
+        
+        Run the transmogrifier.  The blueprint ignores items with paths that
+        don't point to existing objects.
+        
+        >>> from collective.transmogrifier import transmogrifier
+        >>> transmogrifier.Transmogrifier(folder)(
+        ...     u'collective.blueprint.base.delete.testing.deleter')
+        {'_path': '/foo'}
+        {'_path': '/bar'}
+        
+        The object has been deleted.
+        
+        >>> hasattr(folder, 'foo')
+        False
+        >>> hasattr(folder, 'bar')
+        False
+        
+        .. -*-doctest-*-
+        
+        Section Configuration Source
+        ============================
+        
+        The collective.blueprint.base.configsource transmogrifier blueprint can be used
+        to inject an item into the pipeline with keys and values taken from
+        the section configuration.
+        
+        Assemble and register a transmogrifier with a deleter section.
+        
+        >>> configsource = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     configsource
+        ...     printer
+        ...
+        ... [configsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ... configsource-lists = baz qux
+        ... foo =
+        ...     bar blah
+        ... baz =
+        ...     bah
+        ... qux =
+        ...     quux
+        ...     foo bar
+        ...     baz blah
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.delete.testing.configsource',
+        ...     configsource)
+        
+        Run the transmogrifier.  An item with contents corresponding the
+        section config is injected.  All values are stripped of whitespace.  A
+        variable whose name is listed in the configsource-lists variable will
+        be broken up on newlines into a list.
+        
+        >>> transmogrifier(
+        ...     u'collective.blueprint.base.delete.testing.configsource')
+        {'qux': ['quux', 'foo bar', 'baz blah'],
+        'foo': 'bar blah',
+        'baz': ['bah']}
+        
+        .. -*-doctest-*-
+        
+        Key Splitter
+        ============
+        
+        The collective.blueprint.base.keysplitter transmogrifier blueprint can
+        be used to insert an arbitrary number of items into the pipeline from
+        a key in the original item.  This can be useful, for example, when an
+        arbitrary number of objects must be constricted (or any other pipeline
+        action) based on a key in the upstream item.
+        
+        The values to iterate over and insert new items will be retrieved from
+        (in order)
+        ``_collective.blueprint.base.keysplitter_[sectionname]_keysplitter``,
+        ``_collective.blueprint.base.keysplitter_keysplitter``,
+        ``_[sectionname]_keysplitter``, and ``_keysplitter``, where
+        ``[sectionname]`` is replaced with the name given to the current
+        section. This allows you to target the right section precisely if
+        needed. Alternatively, you can specify what key to use for the
+        keysplitter by specifying the ``keysplitter-key`` option, which should
+        be a list of keys to try (one key per line, use a ``re:`` or
+        ``regexp:`` prefix to specify regular expressions).
+        
+        The 'pipeline' option may be used to specify a list of sections which
+        will be run for new items only.  The original items will not be put
+        through this pipeline.  Unless the 'include' option is set, the new
+        items will not be put through the rest of the originating pipeline.
+        
+        By default the new items are inserted into the pipeline before the
+        original item is yielded.  This is useful when the results of
+        processing the new items are required to finish processing the
+        original item.  For example, several objects may need to be created
+        based on the key values so that the object created for the original
+        item can set references to them.  If, however, the original item must
+        be processed before the new items, then setting the "after" option in
+        the keysplitter section will cause the new items to be inserted after
+        the original item is yielded and processed.
+        
+        Assemble and register a transmogrifier with a key splitter section.
+        
+        >>> keysplitter = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     initsource
+        ...     keysplitter
+        ...     qux
+        ...     printer
+        ...
+        ... [initsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ... configsource-lists = _keysplitter
+        ... _keysplitter =
+        ...     bar
+        ...     baz
+        ...
+        ... [keysplitter]
+        ... blueprint = collective.blueprint.base.keysplitter
+        ... pipeline =
+        ...     foo
+        ...     printer
+        ...
+        ... [foo]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... key = string:foo
+        ... value = item/_keysplitter
+        ...
+        ... [qux]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... key = string:qux
+        ... value = item/_keysplitter
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.keysplitter.testing',
+        ...     keysplitter)
+        
+        Run the transmogrifier.  An item with two values targeted for the
+        keysplitter section is inserted into the pipeline.  When this item
+        reaches the keysplitter section, the values in the '_keysplitter' key
+        are iterated over to insert new items.
+        
+        >>> transmogrifier(
+        ...     u'collective.blueprint.base.keysplitter.testing')
+        {'_keysplitter': 'bar', 'foo': 'bar'}
+        {'_keysplitter': 'baz', 'foo': 'baz'}
+        {'_keysplitter': ['bar', 'baz'], 'qux': ['bar', 'baz']}
+        
+        This transmogrifier uses the after and include options and doesn't
+        include a sub-pipeline.
+        
+        >>> keysplitter = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     initsource
+        ...     keysplitter
+        ...     printer
+        ...
+        ... [initsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ... configsource-lists = _keysplitter
+        ... _keysplitter =
+        ...     bar
+        ...     baz
+        ...
+        ... [keysplitter]
+        ... blueprint = collective.blueprint.base.keysplitter
+        ... after = True
+        ... include = True
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.keysplitter.testing2',
+        ...     keysplitter)
+        
+        >>> transmogrifier(
+        ...     u'collective.blueprint.base.keysplitter.testing2')
+        {'_keysplitter': ['bar', 'baz']}
+        {'_keysplitter': 'bar'}
+        {'_keysplitter': 'baz'}
+        
+        .. -*-doctest-*-
+        
+        Recursive Splitter
+        ==================
+        
+        The collective.blueprint.base.recurser transmogrifier blueprint can be
+        used to add recursion to a pipeline.
+        
+        The values to recurse into will be retrieved from (in order)
+        ``_collective.blueprint.base.recurser_[sectionname]_recurser``,
+        ``_collective.blueprint.base.recurser_recurser``,
+        ``_[sectionname]_recurser``, and ``_recurser``, where
+        ``[sectionname]`` is replaced with the name given to the current
+        section. This allows you to target the right section precisely if
+        needed. Alternatively, you can specify what key to use for the
+        recurser by specifying the ``recurser-key`` option, which should
+        be a list of keys to try (one key per line, use a ``re:`` or
+        ``regexp:`` prefix to specify regular expressions).
+        
+        The 'pipeline' option is used to specify a list of sections which will
+        be run recursively.  By default, recursive items are inserted into the
+        pipeline after the original item is yielded.  If, however, the
+        'before' option is set, the recursive items will be inserted before
+        the original item is yielded and processed.
+        
+        When recursing into a value, the value will be inserted into the item
+        under the key specified in the 'key' option.  The recursive pipeline
+        is responsible for processing the 'key' value and inserting the
+        '_recurser' key if it's a appropriate to recurse.
+        
+        Assemble and register a transmogrifier with a list splitter section.
+        
+        >>> recurser = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     initsource
+        ...     inserter
+        ...     recurser
+        ...     printer
+        ...
+        ... [initsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ...
+        ... [inserter]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... key = string:foo
+        ... value = python:[['bar', 'baz'], ['qux', 'quux']]
+        ...
+        ... [recurser]
+        ... blueprint = collective.blueprint.base.recurser
+        ... key = foo
+        ... pipeline = foo
+        ...
+        ... [foo]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... condition = python:isinstance(item['foo'], list)
+        ... key = string:_recurser
+        ... value = item/foo
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.recurser.testing',
+        ...     recurser)
+        
+        Run the transmogrifier.
+        
+        >>> transmogrifier(
+        ...     u'collective.blueprint.base.recurser.testing')
+        {'_recurser': [['bar', 'baz'], ['qux', 'quux']],
+        'foo': [['bar', 'baz'], ['qux', 'quux']]}
+        {'_recurser': ['bar', 'baz'], 'foo': ['bar', 'baz']}
+        {'foo': 'bar'}
+        {'foo': 'baz'}
+        {'_recurser': ['qux', 'quux'], 'foo': ['qux', 'quux']}
+        {'foo': 'qux'}
+        {'foo': 'quux'}
+        
+        This transmogrifier uses the before option.
+        
+        >>> recurser = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     initsource
+        ...     inserter
+        ...     recurser
+        ...     printer
+        ...
+        ... [initsource]
+        ... blueprint = collective.blueprint.base.configsource
+        ...
+        ... [inserter]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... key = string:foo
+        ... value = python:[['bar', 'baz'], ['qux', 'quux']]
+        ...
+        ... [recurser]
+        ... blueprint = collective.blueprint.base.recurser
+        ... key = foo
+        ... pipeline = foo
+        ... before = True
+        ...
+        ... [foo]
+        ... blueprint = collective.transmogrifier.sections.inserter
+        ... condition = python:isinstance(item['foo'], list)
+        ... key = string:_recurser
+        ... value = item/foo
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(
+        ...     u'collective.blueprint.base.recurser.testing2',
+        ...     recurser)
+        
+        >>> transmogrifier(
+        ...     u'collective.blueprint.base.recurser.testing2')
+        {'foo': 'bar'}
+        {'foo': 'baz'}
+        {'_recurser': ['bar', 'baz'], 'foo': ['bar', 'baz']}
+        {'foo': 'qux'}
+        {'foo': 'quux'}
+        {'_recurser': ['qux', 'quux'], 'foo': ['qux', 'quux']}
+        {'_recurser': [['bar', 'baz'], ['qux', 'quux']],
+        'foo': [['bar', 'baz'], ['qux', 'quux']]}
+        
+        Changelog
+        =========
+        
+        1.0 - 2010-04-23
+        ----------------
+        
+        * Initial release
+        
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
