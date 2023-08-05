@@ -1,0 +1,71 @@
+# -*- coding: utf-8 -*-
+"""Setup the {{project}} application"""
+import logging
+import datetime
+import pylons.test
+from {{package}}.config.environment import load_environment
+from paste.deploy import loadapp
+from pylons import config
+from elixir import *
+from {{package}} import model
+import {{package}}.model.meta as meta
+from {{package}}.model import *
+from {{package}}.model.meta import Session
+
+
+
+log = logging.getLogger(__name__)
+
+# Choose ...
+# ======= Vanilla SQLAlchemy ==================================================
+# the_metadata = meta.metdata
+
+# or
+
+# ======= Declarative base ====================================================
+the_metadata = Base.metadata
+
+def setup_app(command, conf, vars):
+    """Place any commands to setup humanoid here"""
+    # Don't reload the app if it was loaded under the testing environment
+    if not pylons.test.pylonsapp:
+        config = load_environment(conf.global_conf, conf.local_conf)
+    the_metadata.create_all(bind=meta.engine)
+    log.info("Database successfully initialised.")
+    log.info("Populating database with entities")
+    the_metadata.drop_all(bind=meta.engine, checkfirst=True)
+    the_metadata.create_all(bind=meta.engine)
+    perm = Permission()
+    # perm.id = 1
+    perm.name = u"Editors"
+    perm.description = u"Can edit content."
+    meta.Session.add(perm)
+    gadmin = Group()
+    # gadmin.id = 1
+    gadmin.name = u"Administrators"
+    gadmin.description = u"Administration group"
+    gadmin.created = datetime.datetime.utcnow()
+    gadmin.active = True
+    meta.Session.add(gadmin)
+    meta.Session.commit()
+    g = meta.Session.query(Group).filter_by(
+                name=u"Administrators").all()
+    assert len(g) == 1
+    assert g[0] == gadmin
+    admin = User()
+    # admin.id = 1
+    admin.username = u"admin"
+    admin.displayname = u"Administrator account"
+    admin.password="admin"
+    admin.password_check="admin" 
+    admin.email="admin@example.com"
+    admin.created = datetime.datetime.utcnow()
+    admin.active = True
+    gadmin.users.append(admin)
+    gadmin.permissions.append(perm)
+    meta.Session.add(admin)
+    u = meta.Session.query(User).filter_by(username=u"admin").all()
+    assert len(u) == 1
+    assert u[0] == admin
+    meta.Session.commit()
+    log.info("Successfully set up.")

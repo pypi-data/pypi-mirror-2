@@ -1,0 +1,541 @@
+# -*- mode: python; coding: utf-8 -*-
+"""
+==============
+Blog Controller
+==============
+:Copyright: (c) 2007,2009 Higgins and Macfarlane
+:Author: Graham Higgins
+:Contact: gjh@bel-epa.com
+:Date: <2009-03-14 14:32 gjh>
+:Notes: Further adaptations of TurboBlog
+"""
+import random
+import os
+import logging
+from pylons import url, request, tmpl_context as c
+from pylons.controllers.util import abort, redirect, log
+from pylons.decorators import jsonify, validate
+import formencode
+from formencode import validators
+from sqlalchemy import *
+from sqlalchemy.sql import and_
+from {{package}}.lib.base import BaseController, render
+from {{package}}.lib.decorators import authorize
+from {{package}}.lib.auth.permissions import HasPermission
+from {{package}}.lib import antispam
+from {{package}}.lib.helpers import dcmeta, get_object_or_404
+import {{package}}.model as model
+from {{package}}.lib.pager import *
+from {{package}}.lib.feed import *
+
+from pprint import pformat
+
+log = logging.getLogger(__name__)
+
+class Settings(object):
+    def __init__(self, admin=1, default_blog=1):
+        self.admin = admin
+        self.default_blog = default_blog
+    
+
+
+# Fake it for now
+settings = Settings(admin=1, default_blog=1)
+#settings = Settings.get(1)
+
+def _theme(blg,template):
+    # log.debug("_theme with blog:%s tpl: %s" % (blg.slug, template))
+    default_template = template%'default'
+    # For when no blog is selected
+    try:
+        current_template = template%blg.theme
+    except:
+        current_template = default_template
+    current_template_path = os.curdir+"/%s.mako"%current_template
+    default_template_path = "/%s.mako"%"/".join(default_template.split('.'))
+    ret = [default_template_path,current_template][int(os.path.exists(current_template_path))]
+    log.debug("_theme default template: %s" % (default_template))
+    log.debug("Themed template = %s" % ret)
+    return ret
+
+
+def _theme_css(blg):
+    url = "/css/%s/style.css"%blg.theme
+    def_url = "/css/style.css"
+    cp = os.curdir+"/blog"
+    ret = [def_url,url][int(os.path.exists(cp+url))]
+    return ret
+
+
+class BlogsController(BaseController):
+    def __before__(self):
+        c.dcmeta = dcmeta(title="Shenu blog store")
+    
+    
+    def index(self):
+        c.title = c.dcmeta.title = c.dcmeta.title + ' :: Blog Store, Select point'
+        c.blogs = model.Session.query(model.Blog).order_by(model.Blog.created.asc()).all()
+        return render("/blog/selector.mako")
+    
+    
+    def blogindex(self, blogslug):
+        blg = get_object_or_404(model.Blog, slug=blogslug)
+        posts = blg.posts
+        # posts = pq.filter_by(blog = blg).order_by(
+        #        Post.creation_time.desc()).all()
+        # comments = [cq.get(post.id)
+        #       for post in pq.filter_by(blog_id == blog.id]
+        log.debug("Blog has %s posts %s" % (len(posts), posts))
+        for post in posts:
+            log.debug("Doing post %s" % type(post))
+            # Insert number of comments
+            nc = 'No Comments'
+            comments = post.comments
+            # comments = cq.filter(Comment.c.post_id == post.id).order_by(
+            #                                       Comment.c.creation_time)
+            if len(comments) == 1:
+                nc = '1 Comment'
+            elif len(comments) > 1:
+                nc = '%d Comments'%len(comments)
+            # Calculate post_match ????
+            post.post_match = False
+            try:
+                post.post_match = (
+                    post.creation_time.month == int(kwargs['arc_month']) \
+                    and post.creation_time.year == int(kwargs['arc_year']))
+            except:
+                try:
+                    post.a = tag_name
+                    if post.a in post.tags:
+                        post.post_match = True
+                except:
+                    try:
+                        post.a = untagged
+                        post.post_match = not post.tagged()
+                    except:
+                        post.post_match = True
+        # p_link = pager.previous_link(locals())
+        # n_link = pager.next_link(locals())
+        c.blog = blg
+        c.blog_posts = posts
+        c.nc = nc
+        # if 'cloud' in kwargs:
+        #     c.cloud = kwargs['cloud']
+        # if 'untagged' in kwargs:
+        #     c.untagged = 1
+        # if 'tagged' in kwargs:
+        #     tagname = Tag.select(and_(Tag.blog_id==blg.id,
+        #                               Tag.id==kwargs['tagged']))[0]
+        #     c.tag_name = tagname
+        # if ('arc_year' in kwargs) and ('arc_month' in kwargs):
+        #     c.arc_month = int(kwargs['arc_month'])
+        #     c.arc_year = int(kwargs['arc_year'])
+        c.blog_count = model.Session.query(model.Blog).count()
+        c.title = blg.name
+        c.sidebar = self.get_sidebar(blg)
+        #can_edit = has_permission('can_post') and \
+        #       (std.identity.user in blog.posters) or \
+        #       (std.identity.user == blog.owner)
+        c.can_edit = True
+        return render(_theme(c.blog,"blog/%s/index"))
+    
+    
+    def view(self, blogslug):
+        log.debug("Blog-view: %s" % \
+            (pformat(request.environ['wsgiorg.routing_args'][1])))
+        bq = model.Session.query(model.Blog)
+        pq = model.Session.query(model.Post)
+        cq = model.Session.query(model.Comment)
+        blg = get_object_or_404(model.Blog, slug=blogslug)
+        posts = blg.posts
+        # posts = pq.filter_by(blog = blg).order_by(
+        #        model.Post.creation_time.desc()).all()
+        # comments = [cq.get(post.id)
+        #       for post in pq.filter_by(blog_id == blog.id]
+        log.debug("Blog has %s posts %s" % (len(posts), posts))
+        for post in posts:
+            log.debug("Doing post %s" % type(post))
+            # Insert number of comments
+            nc = 'No Comments'
+            comments = post.comments
+            # comments = cq.filter(Comment.c.post_id == post.id).order_by(
+            #                                       Comment.c.creation_time)
+            if len(comments) == 1:
+                nc = '1 Comment'
+            elif len(comments) > 1:
+                nc = '%d Comments'%len(comments)
+            # Calculate post_match ????
+            post.post_match = False
+            try:
+                post.post_match = (
+                    post.creation_time.month == int(kwargs['arc_month']) \
+                    and post.creation_time.year == int(kwargs['arc_year']))
+            except:
+                try:
+                    post.a = tag_name
+                    if post.a in post.tags:
+                        post.post_match = True
+                except:
+                    try:
+                        post.a = untagged
+                        post.post_match = not post.tagged()
+                    except:
+                        post.post_match = True
+        # p_link = pager.previous_link(locals())
+        # n_link = pager.next_link(locals())
+        c.blog = blg
+        c.blog_posts = posts
+        c.nc = nc
+        # if 'cloud' in kwargs:
+        #     c.cloud = kwargs['cloud']
+        # if 'untagged' in kwargs:
+        #     c.untagged = 1
+        # if 'tagged' in kwargs:
+        #     tagname = Tag.select(and_(Tag.blog_id==blg.id,
+        #                               Tag.id==kwargs['tagged']))[0]
+        #     c.tag_name = tagname
+        # if ('arc_year' in kwargs) and ('arc_month' in kwargs):
+        #     c.arc_month = int(kwargs['arc_month'])
+        #     c.arc_year = int(kwargs['arc_year'])
+        c.blog_count = bq.count()
+        c.title = blg.name
+        c.sidebar = self.get_sidebar(blg)
+        #can_edit = has_permission('can_post') and \
+        #       (std.identity.user in blog.posters) or \
+        #       (std.identity.user == blog.owner)
+        c.can_edit = True
+        
+        return render(_theme(c.blog,"blog/%s/index"))
+    
+    
+    @validate(validators={"pid":validators.Int()})
+    def tag_post(self, tagname, pid, blogslug):
+        p = model.Session.query(model.Post).get(pid)
+        blog = model.Session.query(model.Blog).filter_by(slug=blogslug).one()
+        t = model.Tag.select(and_(model.Tag.blog_id==blog.id, model.Tag.name==tagname))[0]
+        p.addTag(t)
+        model.Session.commit()
+        return dict()
+    
+    
+    @validate(validators={"pid":validators.Int()})
+    def trackback(self, pid, blogslug, url,  *args, **kw):
+        title = kw.get('title','')
+        excerpt = kw.get('excerpt','')
+        blog_name = kw.get('blog_name','')
+        session = create_session()
+        p = get_object_or_404(model.Post, id=pid)
+        tb = model.Trackback(url=url,title=title,excerpt=excerpt,blog_name=blog_name,post=p)
+        model.Session.add(tb)
+        model.Session.commit()
+        return """<?xml version="1.0" encoding="utf-8"?><response><error>0</error></response>"""
+    
+    
+    def recent_posts(self, blog):
+        log.debug("RecentPosts called")
+        html = "<div id='recent_posts'><strong>Last 5 Posts</strong><ol>"
+        posts = blog.get_posts(True, 5)
+        log.debug("RecentPosts posts %s" % posts)
+        for p in posts:
+            log.debug("RecentPosts html: %s" % html)
+            html += """<li><a href="%s">%s</li>"""%(p.link(), p.title)
+            log.debug("RecentPosts html: %s" % html)
+        html += "</ol></div>"
+        #ret = ElementTree.XML(html)
+        log.debug("RecentPosts returning %s" % html)
+        return html
+    
+    
+    def calendar_of_recent_posts(
+            self, blog, arrows=None, monthlink=None, yearlink=None):
+        log.debug("CalendarOfRecentPosts called")
+        from {{package}}.lib.blogcalendar import HtmlCalendar
+        from datetime import datetime
+        now = datetime.now()
+        posts = blog.get_posts(True, False, now.month)
+        if posts:
+            log.debug("calendar_of_recent_events %s (%s)" % \
+                    (posts[0].creation_time.day, posts[0].creation_time))
+            links = dict([(p.creation_time.day, p.link()) for p in posts])
+        else:
+            links = {}
+        # from mx.DateTime import RelativeDateTime, now as mxnow
+        from datetime import datetime, timedelta
+        ult = datetime.utcnow()+timedelta(weeks=-4)
+        inst = datetime.utcnow()+timedelta(weeks=+4)
+        res = HtmlCalendar(year=now.year, month=now.month,
+                           links=links, arrows=("/blog/%s/%s" % \
+                           (ult.year, ult.month), "/blog/%s/%s" % \
+                           (inst.year, inst.month)), monthlink=None, yearlink=None)
+        log.debug("CalendarOfRecentPosts returning")
+        return res
+    
+    
+    def get_sidebar(self, blog):
+        log.debug("GetSidebar called")
+        calendar = self.calendar_of_recent_posts(blog)
+        recent_posts = self.recent_posts(blog)
+        log.debug("GetSidebar returning")
+        return '<div id="sidebar"><div id="calendar"><!-- Calendar-generating code courtesy of James Tauber: http://leonardo.pyworks.org/ -->%s</div><h4>Recent posts</h4>%s<h4>BlogRoll</h4><h4>Trackbacks</h4></div>' % (calendar, recent_posts)
+    
+    
+    # @turbogears.expose(format="xhtml", content_type="application/xhtml+xml", template="turboblog.templates.post")
+    # FIXME: @@GJH@@ More work required here
+    def post(self, blogslug, postslug):
+        post = get_object_or_404(model.Post, slug=postslug)
+        blog = get_object_or_404(model.Blog, slug=blogslug)
+        log.debug("Post: blog %s, post %s" % (blog, post))
+        nc = 'No Responses'
+        if post and len(post.comments) == 1:
+            nc = 'One Response'
+        elif post and len(post.comments) > 1:
+            nc = '%d Responses'%len(post.comments)
+        post.tags = []
+        more_tags = []
+        # if blog.tags:
+        #     for tag in blog.tags:
+        #         if not tag in post.tags:
+        #             more_tags += [ tag ]
+        cloud = 0
+        if 'cloud' in kwargs:
+            cloud = kwargs['cloud']
+        log.debug("_theme call in post: blogslug %s postslug %s, blog: %s, post %s" % \
+                (blogslug, postslug, blog, post))
+        # from {{package}}.model import Comment,Tag
+        # registered = has_permission('can_comment')
+        # can_edit = has_permission('can_post')
+        # if registered:
+        #     from turboblog.model import User
+        #     calink = User.get(std.identity.user.id).link()
+        c.beldict = dcmeta(title='Blog Store')
+        ns = dict(
+                dc=c.beldict,
+                blog=blog,
+                post=post,
+                sidebar=self.get_sidebar(blog),
+                comment_link=model.Comment.link_add(blog.id,post.id),
+                cloud=cloud,
+                cat=model.Comment.allowed_tags,
+                nc=nc,
+                can_edit=True,
+                registered=True,
+                more_tags=more_tags)
+        return render(_theme(blog,"turboblog.%s.post"), **ns)
+    
+    
+# class UserController(BaseController):
+    def user_show(self, id):
+        c.user =  get_object_or_404(model.User, id=id)
+        if not c.user.blogs:
+            c.blog = model.Blog.get(1)
+        else:
+            c.blog = c.user.blogs[0] #FIXME!
+        c.dcmeta = dcmeta(title='Blog Store, Blogger')
+        log.debug("_theme call in show: blog %s" % (c.blog))
+        return render(_theme(c.blog,"blog/%s/user"))
+    
+    
+    # @turbogears.expose(content_type='image/jpg')
+    def user_avatar(self, userId):
+        avatar = User.get_by(id = userId).avatar
+        return avatar
+
+
+# class BlogRoot(BaseController):
+#     admin = AdminController()
+#     blog_admin = BlogAdminController()
+#     blog = BlogController()
+#     user = UserController()
+#     RPC = RPCController()
+    
+    
+    def postview(self, blogslug, postslug):
+        log.debug("Req params: %s" % (request.params ))
+        blog = get_object_or_404(model.Blog, slug=blogslug)
+        post = model.Session.query(model.Post).filter(
+                and_(model.Blog.slug==blogslug,
+                     model.Post.slug==postslug)).one()
+        c.recent_posts = model.Session.query(
+                            model.Post).filter(model.Post.published==True).order_by(
+                                model.Post.creation_time.desc())
+        c.title = post.title
+        nc = 'No Comments'
+        comments = post.comments
+        # comments = cq.filter(Comment.c.post_id == post.id).order_by(
+        #                                       Comment.c.creation_time)
+        if len(comments) == 1:
+            nc = '1 Comment'
+        elif len(comments) > 1:
+            nc = '%d Comments'%len(comments)
+        template_context = dict(
+                cat = model.Comment.allowed_tags,
+                add_comment_link = url('post_add_comment', blogslug = blogslug, postslug = postslug),
+                more_tags = 'No [more_tags] value',
+                nc = nc,
+                registered = True if c.user and c.user.id > 0 else False, # is reg'd user/signed in
+                post = post,
+                blog = blog,
+                can_edit = False)
+        return render('blog/default/post.mako', template_context)
+    
+    
+    def get_antispam_image(self):
+        session['number'] = str(random.randrange(1,99999,1))
+        response.headers['Content-Type'] = 'image/png'
+        return antispam.writeImage(session['number'])
+    
+    
+    def create_user( self, *args, **kw ):
+        flash = None
+        try:
+            validators.FieldsMatch('psw', 'psw2').to_python(kw)
+            num = session['number']
+            assert (kw['code'] == num)
+        except formencode.api.Invalid, e:
+            flash = 'Password don\'t match'
+        except Exception,e :
+            flash = 'Code was incorrect'
+        if flash:
+            #turbogears.flash(flash)
+            redirect("/admin/signup")
+        session = create_session()
+        try:
+            avatar = kw['image'].file.read()
+        except:
+            avatar = None
+            if ('usegravatar' in kw) and (kw['usegravatar']=='on'):
+                import gravatar
+                (mime,avatar) = gravatar.get_image(kw['email'])
+        u = User(userId=kw['userid'],
+                 password=kw['psw'],
+                 displayName=kw['fullname'],
+                 emailAddress=kw['email'],
+                 avatar=avatar,
+                 about=kw.get('summary',''))
+        g = TG_Group.get_by(group_id='user')
+        u.addTG_Group(g)
+        session.flush()
+        # turbogears.flash('Please login with your details.')
+        return redirect("/login")
+    
+    
+    def livesearch( self, *args, **kw ):
+        return """<div class="LSRes"><div class="LSRow"><a href="http://reflog.wordpress.com/2005/11/29/conversion-command-for-ipod-video/" rel="bookmark" title="Permanent Link: conversion command for ipod video">conversion command for ipod video</a>
+        </div><div>
+        <div class="LSRes"><a href="/index.php?s=conv">More Results...</a></div>"""
+    
+
+# ----------- Comment handling -----------------------------------------------------
+    
+    # @authorize(HasPermission('can_comment'))
+    def add_comment(self, postslug, **kwargs):
+        bid = get_object_or_404(model.Blog, slug=kwargs['blogslug']).id
+        p = get_object_or_404(model.Post, slug=postslug)
+        cparent_id = validators.Int().to_python(request.params.get('comment_id',u'-1'))
+        content = request.params.get('comment','')
+        cparent = None
+        if model.Comment.check_tags(content):
+            cmnt = model.Comment(content=content,
+                              author=c.user,
+                              approved=False,
+                              post=p,
+                              parent_id=cparent_id)
+            if cparent_id != -1:
+                cparent = model.Comment.get(cparent_id)
+                cparent.subcomments.append(cmnt)
+            model.Session.commit()
+            raise redirect(p.link(bid)+"#comment_%d"%cmnt.id)
+        else:
+            flashData = {"status": "error", "msg": "Tags in the comment are not allowed!"}
+            #turbogears.flash(jsonify.jsonify(flashData))
+        raise redirect(p.link(bid))
+    
+    # Access to comment methods is controlled by the signature of the routes entry
+    
+    @validate(validators={"cid":validators.Int()})
+    # @authorize(HasPermission('can_comment'))
+    def approve_comment(self, cid, blogslug):
+        c.comment = model.Session.query(model.Comment).get(cid)
+        c.approved = True
+        c.flash = flash('Comment approved!')
+        model.Session.commit()
+        return dict()
+        
+        ##### TO-DO Add in Akisment comment protection.
+        # import akismet
+        #
+        # akismet.USERAGENT = "MyApplication/MyVersion"
+        #
+        # my_api_key = "SOMETHING"
+        #
+        # try:
+        #   real_key = akismet.verify_key(my_api_key,"http://www.example.com")
+        #   if real_key:
+        #     is_spam = akismet.comment_check(my_api_key,"http://www.example.com",
+        #       "127.0.0.1", "Mozilla/5.0 (...) Gecko/20051111 Firefox/1.5",
+        #         comment_content="VIAGRA! LOTS OF VIAGRA!")
+        #       if is_spam:
+        #         print "Yup, that's spam alright."
+        #       else:
+        #         print "Hooray, your users aren't scum!"
+        # except akismet.AkismetError, e:
+        #     print e.response, e.statuscode
+        #
+        # # If you're a good person, you can report false positives via
+        # # akismet.submit_ham(), and false negatives via akismet.submit_spam(),
+        # # using exactly the same parameters as akismet.comment_check().
+    
+    
+    # @authorize(HasPermission('can_comment'))
+    @validate(validators={"cid":validators.Int()})
+    def source_comment(self, cid, blogslug):
+        comment = get_object_or_404(model.Comment, id=cid)
+        return dict(content=comment.content)
+    
+    
+    # @authorize(HasPermission('can_edit_comment'))
+    @validate(validators={"commentid":validators.Int()})
+    def edit_comment(self, blogslug ,postslug, commentid):
+        comment = get_object_or_404(model.Comment, id=commentid)
+        content = comment.content
+        if model.Comment.check_tags(content):
+            model.Session.query(model.Comment).get(commentid).content = content
+            model.Session.commit()
+        else:
+            c.flash = {"status": "error", "msg": "Tags in the comment are not allowed!"}
+        return dict()
+    
+    
+    def view_comment(self, cid):
+        pass
+    
+    
+    # @authorize(HasPermission('can_edit_comment'))
+    # def add_comment(self, blogslug, postslug):
+    #     post = model.Session.query(model.Post).get_by(slug=postslug)
+    #     cmnt = model.Comment(content=request.POST.get('comment'), author=c.user, post=post)
+    #     # Session.add(cmnt)
+    #     model.Session.commit()
+    #     return "Okay, done. Comment registered, Ta muchly."
+    
+    
+    # @authorize(HasPermission('can_edit_comment'))
+    def delete_comment(self, cid):
+        pass
+    
+
+# ----------- Trackback handling ---------------------------------------------------
+    def trackback(self, pid, bid):
+        p = model.Session.query(model.Post).get(pid)
+        title = p.title
+        excerpt = p.content[:100]
+        blog_name = p.blog.name
+        urlgen = url('view_post', postslug=p.slug, blogslug=p.blog.slug)
+        tb = model.Trackback(url=urlgen,title=title,excerpt=excerpt,blog_name=blog_name,post=p)
+        model.Session.add(tb)
+        model.Session.commit()
+        return """<?xml version="1.0" encoding="utf-8"?><response><error>0</error></response>"""
+    
+
+
+

@@ -1,0 +1,193 @@
+# -*- coding: utf-8 -*-
+"""Setup the {{package}} application"""
+import logging
+import datetime
+import hashlib
+from {{package}}.config.environment import load_environment
+from paste.deploy import loadapp
+from pylons import config
+from elixir import *
+from {{package}} import model
+
+log = logging.getLogger(__name__)
+
+post_content = """Note that a case of semigrammaticalness of a different sort is unspecified with respect to irrelevant intervening contexts in selectional rules.
+
+On the other hand, the natural general principle that will subsume this case raises serious doubts about an abstract underlying order. Summarizing, then, we assume that the fundamental error of regarding functional notions as categorial is rather different from nondistinctness in the sense of distinctive feature theory.
+
+Summarizing, then, we assume that the earlier discussion of deviance is not quite equivalent to the ultimate standard that determines the accuracy of any proposed grammar. In the discussion of resumptive pronouns following (81), a subset of English sentences interesting on quite independent grounds is not to be considered in determining a descriptive fact. On the other hand, the theory of syntactic features developed earlier is not subject to a general convention regarding the forms of the grammar."""
+
+def setup_app(command, conf, vars):
+    """Place any commands to setup {{package}} here"""
+    load_environment(conf.global_conf, conf.local_conf)
+    model.metadata.create_all()
+    gadmin = model.Group(
+            name = "Administrators",
+            description = u"Administration group",
+            created = datetime.datetime.utcnow(),
+            active = True)
+    model.Session.add(gadmin)
+    # Check the status
+    g = model.Session.query(
+            model.Group).filter_by(
+                name="Administrators").all()
+    print(len(g))
+    assert len(g) == 1
+    assert g[0] == gadmin
+    admin = model.User(
+                username = u"admin",
+                display_name = u"Blog Administrator",
+                password=hashlib.sha1("admin").hexdigest(),
+                password_check=hashlib.sha1("admin").hexdigest(), 
+                email="admin@example.com",
+                created = datetime.datetime.utcnow(),
+                active = True)
+    model.Session.add(admin)
+    gadmin.users.append(admin)
+    model.Session.commit()
+    # Check the status
+    u = model.Session.query(
+            model.User).filter_by(
+                username=u"admin").all()
+    assert len(u) == 1
+    assert u[0] == admin
+    model.Session.commit()
+
+    default = model.User(
+                id = 0,
+                username = u"anonymous",
+                display_name = u"Anonymous",
+                password=hashlib.sha1("an0nym0u5").hexdigest(),
+                password_check=hashlib.sha1("an0nym0u5").hexdigest(), 
+                email="anonymous@example.com",
+                created = datetime.datetime.utcnow(),
+                active = True)
+    model.Session.add(admin)
+
+    print("A")
+    usergp = model.Group(
+                            name='user',
+                            description="Users",
+                            created=datetime.datetime.utcnow(),
+                            active=True)
+    model.Session.commit()
+    print("B")
+    postergp = model.Group(
+                            name='poster',
+                            description="Posters",
+                            created=datetime.datetime.utcnow(),
+                            active=True)
+    model.Session.commit()
+    print("C")
+    blogadmingp = model.Group(
+                            name='blogadmin', 
+                            description="Blog admins",
+                            created=datetime.datetime.utcnow(),
+                            active=True)
+    model.Session.commit()
+    print("D")
+    can_admin = model.Permission(
+                            name="can_admin",
+                            description="Can add/delete blogs/users")
+    model.Session.commit()
+    print("E")
+    can_admin_blog = model.Permission(
+                            name="can_admin_blog", 
+                            description="Can manage one blog")
+    model.Session.commit()
+    print("F")
+    can_post = model.Permission(name="can_post", 
+                            description="Can add posts")
+    model.Session.commit()
+    print("G")
+    can_comment = model.Permission(name="can_comment",
+                            description="Can add comments")
+    model.Session.commit()
+    print("H")
+    can_moderate = model.Permission(name="can_moderate", 
+                            description="Can approve comments")
+    model.Session.commit()
+    # print("I")
+    # for p in [can_admin, can_post, can_comment, can_moderate, can_admin_blog]:
+    #     gadmin.permissions.append(p)
+    # model.Session.commit()
+    # print("J")
+    # for p in [can_comment]:
+    #     usergp.permissions.append(p)
+    # model.Session.commit()
+    # print("K")
+    # for p in [can_comment, can_post, can_moderate]:
+    #     postergp.permissions.append(p)
+    # model.Session.commit()
+    # print("L")
+    # for t in [can_comment, can_post, can_moderate, can_admin_blog]:
+    #     blogadmingp.permissions.append(p)
+    # model.Session.commit()
+    # print("M")
+    dude = admin
+    blog = model.Blog(
+                    name="Default blog",
+                    tagline="default blog!",
+                    slug='default',
+                    owner=dude)
+    model.Session.commit()
+    print("One")
+    blog.posters.append(dude)
+    tag = model.Tag(
+                    name="blog",
+                    blogID=blog)
+    blog.tags.append(tag)
+    model.Session.commit()
+    print("Two")
+    post = model.Post(
+                    title="Welcome!",
+                    content=post_content,
+                    slug="welcome",
+                    author=dude, 
+                    published=True, 
+                    blog=blog)
+    post.tags.append(tag)
+    model.Session.commit()
+    print("Three")
+    comment = model.Comment(
+                    content="how do u like them apples?",
+                    author=dude,
+                    approved=True,
+                    post=post)
+    model.Session.commit()
+    print("Three and a bit")
+    subcomment1 = model.Comment(
+                    content="i like em!",
+                    author=dude,
+                    approved=True,
+                    post=post,
+                    parent=comment)
+    comment.subcomments.append(subcomment1)
+    model.Session.commit()
+    print("Four")
+    print("Four and a bit")
+    subcomment2 = model.Comment(
+                    content="i loves em!",
+                    author=dude,
+                    approved=True,
+                    post=post,
+                    parent=comment)
+    comment.subcomments.append(subcomment2)
+    model.Session.commit()
+    print("Four and a bit more")
+    subcomment3 = model.Comment(
+                    content="i really loves em!",
+                    author=dude,
+                    approved=True,
+                    post=post,
+                    parent=subcomment2)
+    subcomment2.subcomments.append(subcomment3)
+    print("Five")
+    settings = model.Settings(
+                    admin=dude,
+                    default_blog=1)
+    model.Session.commit()
+    print("Six")
+
+
+
