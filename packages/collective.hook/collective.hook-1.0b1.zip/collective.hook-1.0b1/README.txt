@@ -1,0 +1,41 @@
+Introduction
+============
+
+Hook is a system based on zope.event.
+
+To make a method hookable, you first need to define an event that provide at least IHookEvent.
+
+Next you can use collective.hook.decorator.hook(MyEventClassHook) to decorate your method.
+
+Define a handler as usual:
+
+  <subscriber
+    for="my.module.IMyHook"
+    handler="my.module.my_hook" />
+
+Warning: This event is triggered two times. So you need in your hook to check the value
+of before boolean attribute or after boolean attribute. The event store the result
+of the call in the attribute 'returned_value'
+
+There are also hooked_args and hooked_kwargs if you want to play with arguments.
+
+Credits
+=======
+
+Companies
+---------
+
+|makinacom|_
+
+  * `Planet Makina Corpus <http://www.makina-corpus.org>`_
+  * `Contact us <mailto:python@makina-corpus.org>`_
+
+.. |makinacom| image:: http://depot.makina-corpus.org/public/logo.gif
+.. _makinacom:  http://www.makina-corpus.com
+
+Authors
+
+  - JeanMichel FRANCOIS aka toutpt <toutpt@makina-corpus.org>
+
+Contributors
+
