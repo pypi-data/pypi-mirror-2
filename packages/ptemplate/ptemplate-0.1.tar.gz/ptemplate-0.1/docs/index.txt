@@ -1,0 +1,211 @@
+:mod:`ptemplate` --- lightweight, data-driven templating
+========================================================
+
+.. automodule:: ptemplate
+
+Installing :mod:`ptemplate`
+---------------------------
+
+.. highlight:: none
+
+You can install the latest stable version of :mod:`ptemplate` using :command:`pip`::
+    
+    $ pip install ptemplate
+
+Mirrors of the project's repository are hosted at `github.com`_ and `bitbucket.org`_
+-- feel free to clone and issue pull requests at either service. For `git`_
+users::
+
+    $ git clone http://github.com/wcmaier/ptemplate.git
+
+.. _github.com:     http://github.com/wcmaier/ptemplate.git
+.. _bitbucket.org:  http://bitbucket.org/lt_kije/ptemplate/
+.. _git:            http://git-scm.com/
+
+And for `Mercurial`_ users::
+
+    $ hg clone http://bitbucket.org/lt_kije/ptemplate/
+
+.. _Mercurial:  http://mercurial.selenic.com/
+
+Both github and bitbucket provide feeds of changes to the project; for example::
+
+    http://github.com/wcmaier/ptemplate/commits/master.atom
+
+If you'd like to contribute an improvement to :mod:`ptemplate`, please consider using
+either of the above services. Otherwise, send an email to willmaier@ml1.net.
+
+A quick tour of :mod:`ptemplate`'s features
+-------------------------------------------
+
+.. highlight:: python
+
+Simple extension of Python's advanced string formatting API (:pep:`3101`)::
+
+    >>> from ptemplate.formatter import Formatter
+    >>> formatter = Formatter()
+    >>> template = """normal variable substitution: {var}"""
+    >>> formatter.format(template, var="foo")
+    'normal variable substitution: foo'
+
+    >>> template = """{#section}this is {something} {/section}"""
+    >>> data = {"section": [{"something": "fast"}, {"something": "easy"}, {"something": "simple"}]}
+    >>> formatter.format(template, **data)
+    'this is fast this is easy this is simple '
+
+    >>> template = """{%this is a comment}"""
+    >>> formatter.format(template, **{})
+    ''
+
+Content filtering system (eg HTML sanitization)::
+
+    >>> import cgi
+    >>> from ptemplate.template import Template
+    >>> templater = Template()
+    >>> templater.converters["h"] = cgi.escape
+
+    >>> data = {"content": """<p>some HTML from the wild</p>"""}
+    >>> templater.template = """something dangerous: {content!h}"""
+    >>> templater.render(data)
+    'something dangerous: &lt;p&gt;some HTML from the wild&lt;/p&gt;'
+
+    >>> data = {"section": [{"example": "<p>paragraph</p>"},{"example": "no html here"}]}
+    >>> templater.template = """you can sanitize entire sections, too ({#section!h}{example} {/section})"""
+    >>> templater.render(data)
+    'you can sanitize entire sections, too (&lt;p&gt;paragraph&lt;/p&gt; no html here )'
+
+Basic compatibility with Google's _`ctemplate`::
+
+    >>> from ptemplate.ctemplate import CTemplate
+    >>> template = """Google is {{#section}}{{something}}, {{/section}}"""
+    >>> templater = CTemplate(template=template)
+    >>> data = {"section": [{"something": "not evil"},{"something": "a company"}]}
+    >>> templater.render(data)
+    'Google is not evil, a company, '
+
+.. _ctemplate:      http://code.google.com/p/google-ctemplate/
+
+Basic usage
+-----------
+
+Despite its simple syntax, templates processed by :mod:`ptemplate` can still
+produce very complex documents. Unlike most template systems, :mod:`ptemplate`
+encourages you to keep application logic where it belongs -- in your
+application. Expansion of the template is controlled solely by the structure of
+your data. This keeps the templating engine itself simple and fast and makes
+writing and debugging your templates even easier. For more on the philosophy
+behind data-driven templating systems, see "`How To Use the Google Template
+System <http://google-ctemplate.googlecode.com/svn/trunk/doc/howto.html>`_".
+
+All of the :mod:`ptemplate` interfaces take a single data dictionary and use it
+to expand a simple string template. The data dictionary's keys are plain
+strings; its values are either strings or lists of other data dictionaries.
+Other objects may be used as values, but they will be converted to strings
+before being inserted into the template. String values are substituted for
+variables in the template. List values control the number of iterations (and
+scope) of section variables.
+
+Templates are composed of plain text with (optional) variable and section
+markers. :mod:`ptemplate` markers must all be valid field names as described in
+:pep:`3101` and begin and end with '{' and '}', respectively. Special fields
+denoting comments and the beginning and end of sections are marked with a
+single-character indicator ('!', '#', '/'). Comment fields are ignored
+completely. Sections are expanded once for each data dictionary found in evaluation
+scope.
+
+Variable expansion proceeds from the innermost context to the outermost; if no
+match is found, an empty string is substituted instead. Variables defined within
+a section will first attempt to match keys in that section's dictionary. If no
+match is found, the dictionary in which the section is defined will be searched
+for a match. This process continues until all dictionaries (or "scopes") are
+exhausted.
+
+For example, this deeply nested data dictionary produces the following::
+
+    >>> from ptemplate.template import Template
+    >>> templater = Template()
+
+    >>> data = {
+    ...     "outer": [
+    ...         {"foo": "foo",
+    ...         "middle": [
+    ...             {"foo": "bar",
+    ...             "inner": [
+    ...                 {"foo": "baz"},
+    ...             ]},
+    ...         ]},
+    ...     ]}
+    >>> template = """{#outer}outer: {foo} {#middle}middle: {foo} {#inner}inner: {foo} {/inner}{/middle}{/outer}"""
+    >>> templater.template = template
+    >>> templater.render(data)
+    'outer: foo middle: bar inner: baz '
+
+At each level, a new value for "foo" is defined. If the innermost value is
+removed, though, the next-highest value is used::
+
+    >>> data["outer"][0]["middle"][0]["inner"][0].pop("foo")
+    'baz'
+    >>> templater.render(data)
+    'outer: foo middle: bar inner: bar '
+
+ctemplate support
+-----------------
+
+Since :mod:`ptemplate` and Google's ctemplate are so similar internally,
+it's fairly easy to process ctemplate templates with :mod:`ptemplate`.
+In fact, with a very naive preprocessor, :mod:`ptemplate.ctemplate` can
+pass many of Google's ctemplate unittests. To expand ctemplate(-like)
+templates, use :class:`ptemplate.ctemplate.CTemplate` instead of
+:class:`ptemplate.template.Template`.
+
+.. note::
+    
+    :class:`ptemplate.ctemplate.CTemplate` does not provide full ctemplate
+    compatibility. See the class documentation for specific exceptions.
+
+API
+---
+
+You have access to the templating system at three levels. First, you can
+interact directly with :class:`ptemplate.formatter.Formatter`, which
+offers an interface very similar to Python's advanced string formatting
+(:class:`string.Formatter`, :pep:`3101`). Second, you can work with (or
+subclass) :class:`ptemplate.template.Template`, a thin wrapper around
+the formatter that also adds a Buffet-style API. Lastly, you can use
+:class:`ptemplate.ctemplate.CTemplate`. :class:`~ptemplate.ctemplate.CTemplate`
+extends :class:`~ptemplate.template.Template` with a preprocessor that
+supports a subset of Google's ctemplate system. :mod:`~ptemplate.ctemplate`
+also provides a nice example for subclassing and extending the basic
+:mod:`~ptemplate.template`.
+
+For a typical use case, :mod:`ptemplate.template` is probably most useful as it
+provides a familiar API. :mod:`ptemplate.ctemplate` should (with, perhaps, a few
+changes to the preprocessor) support many simple templates written for Google's
+ctemplate system. For smaller projects (or doing things like formatting error
+messages), :mod:`ptemplate.formatter` may be sufficient on its own.
+
+.. automodule:: ptemplate.formatter
+    :members:
+    :show-inheritance:
+
+.. automodule:: ptemplate.template
+    :members:
+    :show-inheritance:
+
+.. automodule:: ptemplate.ctemplate
+    :members:
+    :show-inheritance:
+
+Testing :mod:`ptemplate`
+------------------------
+
+:mod:`ptemplate` ships with a number of unit tests that help ensure that the
+code runs correctly. The tests live in the :mod:`tests` package and can be run
+by ``setup.py``::
+    
+    $ python setup.py test
+
+All new code in :mod:`ptemplate` should be accompanied by unit and/or functional
+tests. Note that many of the unit tests included here are ported from Google's
+ctemplate (and run against the :mod:`ptemplate.ctemplate` interface). Ideally,
+:mod:`ptemplate` should pass as many of ctemplate's tests as possible.
