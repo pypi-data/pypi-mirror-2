@@ -1,0 +1,4 @@
+class AlreadyLocked(Exception):
+    pass
+
+
