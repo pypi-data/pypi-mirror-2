@@ -1,0 +1,221 @@
+from datetime import datetime
+import logging
+
+from pylons import url, request, response, session, tmpl_context as c
+from pylons.controllers.util import abort, redirect
+from pylons.decorators import rest, secure, jsonify
+from tw.mods.pylonshf import validate
+
+from {{package}}.lib.base import BaseController, render
+from {{package}}.lib.helpers import failure_flash, success_flash
+from {{package}}.lib.mail import EmailMessage
+from {{package}}.model import meta
+from {{package}}.model import *
+from {{package}}.forms import identity
+
+log = logging.getLogger(__name__)
+
+
+class AccountsController(BaseController):
+    def __before__(self):
+        c.active_tab = True
+        c.active_sub = True
+        c.openid = False
+    
+    
+    @rest.dispatch_on(POST='_forgot_password')
+    def forgot_password(self):
+        return render('/accounts/forgot_password.mako')
+    
+    
+    def verify_email(self, token):
+        # users = list(User.by_email_token(self.db)[token])
+        users = meta.Session.query(User).filter_by(email_token=token).all()
+        if users:
+            user = users[0]
+            
+            # If there's a email token issue (change email address), verify
+            # its still valid
+            if user.email_token_issue:
+                diff = datetime.utcnow() - user.email_token_issue
+                if diff.days > 1 or diff.seconds > 3600:
+                    failure_flash('This e-mail verification token has expired.')
+                    redirect(url('home'))
+            user.active = True
+            # Valid e-mail token, remove it and log the user in
+            user.email_token = user.email_token_issue = None
+            user.process_login()
+            success_flash('Your email has been verified, and you have been'
+                          ' logged into PylonsHQ')
+            redirect(url('home'))
+        else:
+            # No valid e-mail token
+            failure_flash('Invalid e-mail token')
+            redirect(url('home'))
+    
+    
+    @validate(form=identity.forgot_password_form, error_handler='forgot_password')
+    @secure.authenticate_form
+    def _forgot_password(self):
+        # user = list(User.by_email(self.db)[self.form_result['email_address']])[0]
+        user = meta.Session.query(User).by_email(self.form_result['email_address']).all()[0]
+        user.password_token = user.generate_token()
+        c.password_token = user.password_token
+        user.password_token_issue = datetime.utcnow()
+        # user.store(self.db)
+        meta.Session.commit()
+        message = EmailMessage(subject="PylonsHQ - Lost Password", 
+                               body=render('/email/lost_password.mako'),
+                               from_email="PylonsHQ <pylonshq@groovie.org>",
+                               to=[self.form_result['email_address']])
+        message.send(fail_silently=True)
+        success_flash('An e-mail has been sent to your account to verify the password reset request.')
+        redirect(url('account_login'))
+    
+    
+    @rest.dispatch_on(POST='_change_password')
+    def change_password(self, token):
+        # users = list(User.by_password_token(self.db)[token])
+        users = meta.Session.query(User).by_email_token(token).all()
+        if not users:
+            failure_flash('That password token is no longer valid.')
+            redirect(url('account_login'))
+        
+        user = users[0]
+        diff = datetime.utcnow() - user.password_token_issue
+        if diff.days > 1 or diff.seconds > 3600:
+            failure_flash('Password token is no longer valid, please make a new password reset request.')
+            redirect(url('forgot_password'))
+        return render('/accounts/change_password.mako')
+    
+    
+    @validate(form=identity.change_password_form, error_handler='change_password')
+    @secure.authenticate_form
+    def _change_password(self, token):
+        users = meta.Session.query(User).by_password_token(token).all() or abort(401)
+        # users = list(User.by_password_token(self.db)[token]) or abort(401)
+        user = users[0]
+        diff = datetime.utcnow() - user.password_token_issue
+        if diff.days > 1 or diff.seconds > 3600:
+            failure_flash('Password token is no longer valid, please make a new password reset request.')
+            redirect(url('forgot_password'))
+        user.password_token = user.password_token_issue = None
+        user.password = user.hash_password(self.form_result['password'])
+        # user.store(self.db)
+        meta.Session.commit()
+        success_flash('Your password has been reset successfully')
+        redirect(url('account_login'))
+    
+    
+    def logout(self):
+        if hasattr(c, 'user') and c.user:
+            c.user.session_id = None
+        # c.user.store(self.db)
+        meta.Session.commit()
+        session.clear()
+        session.save()
+        success_flash('You have logged out of your session')
+        redirect(url('home'))
+    
+    
+    @rest.dispatch_on(POST='_process_login')
+    def login(self):
+        redir = request.GET.get('redir')
+        if redir and redir.startswith('/'):
+            session['redirect'] = str(redir)
+            session.save()
+        return render('/accounts/login.mako')
+    
+    
+    @validate(form=identity.login_form, error_handler='login')
+    @secure.authenticate_form
+    def _process_login(self):
+        user = self.form_result['user']
+        user.process_login()        
+        success_flash('You have logged into PylonsHQ')
+        if session.get('redirect'):
+            redir_url = session.pop('redirect')
+            session.save()
+            redirect(url(**redir_url))
+        redirect(url('home'))
+    
+    
+    @rest.dispatch_on(POST='_process_openid_associate')
+    def openid_associate(self):
+        openid_url = session.get('openid_identity')
+        if not openid_url:
+            redirect(url('account_register'))
+        c.openid = openid_url
+        return render('/accounts/associate.mako')
+    
+    
+    @validate(form=identity.login_form, error_handler='login')
+    def _process_openid_associate(self):
+        openid_url = session.get('openid_identity')
+        user = self.form_result['user']
+        if user.openids:
+            user.openids.append(openid_url)
+        else:
+            user.openids = [openid_url]
+        user.process_login()
+        success_flash('You have associated your OpenID to your account, and signed in')
+        if session.get('redirect'):
+            redir_url = session.pop('redirect')
+            session.save()
+            redirect(url(**redir_url))
+        redirect(url('home'))
+    
+    
+    @rest.dispatch_on(POST='_process_openid_registration')
+    def openid_register(self):
+        openid_url = session.get('openid_identity')
+        if not openid_url:
+            redirect(url('account_register'))
+        c.openid = session.get('openid_identity')
+        c.defaults = {}
+        return render('/accounts/register.mako')
+    
+    
+    @validate(form=identity.openid_registration_form, error_handler='openid_register')
+    def _process_openid_registration(self):
+        new_user = User(displayname=self.form_result['displayname'],
+                         timezone = self.form_result['timezone'],
+                         email=self.form_result['email_address'])
+        new_openid = OpenID(text=session['openid_identity'])
+        new_user.openids.append(new_openid)
+        return self._finish_registration(new_user)
+    
+    
+    @rest.dispatch_on(POST='_process_registration')
+    def register(self):
+        return render('/accounts/register.mako')
+    
+    
+    @validate(form=identity.registration_form, error_handler='register')
+    @secure.authenticate_form
+    def _process_registration(self):
+        new_user = User(displayname=self.form_result['displayname'],
+                         timezone = self.form_result['timezone'],
+                         email=self.form_result['email_address'])
+        new_user.password = User.hash_password(self.form_result['password'])
+        return self._finish_registration(new_user)
+    
+    
+    def _finish_registration(self, user):
+        user.email_token = c.email_token = user.generate_token()
+        user.email_token_issue = datetime.utcnow()
+        # user.store(self.db)
+        meta.Session.commit()
+        
+        # Send out the welcome email with the reg token
+        message = EmailMessage(subject="PylonsHQ - Registration Confirmation",
+                               body=render('/email/register.mako'),
+                               from_email="PylonsHQ <pylonshq@groovie.org>",
+                               to=[self.form_result['email_address']])
+        message.send(fail_silently=True)
+        
+        success_flash("User account '%s' created successfully. An e-mail has"
+                      " been sent to activate your account." % user.displayname)
+        redirect(url('home'))
+    
+

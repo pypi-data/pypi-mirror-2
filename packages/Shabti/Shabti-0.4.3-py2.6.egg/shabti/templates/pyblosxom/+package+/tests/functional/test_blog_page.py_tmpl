@@ -1,0 +1,157 @@
+from {{package}}.tests import *
+from {{package}}.tests import TestController
+
+class TestBlogPage(TestController):
+    
+    def test_blog_page(self):
+        """Blog index page"""
+        
+        response = self.app.get(url('blogindex'))
+        assert 'Another pyblosxom blog' in response
+        # metadata.__doc__
+    
+    
+    def test_blog_RSS20(self):
+        """RSS2.0 feed response"""
+        
+        response = self.app.get(url('/blog/index.rss20'))
+        assert '<rss version="2.0"' in response
+    
+    
+    def test_blog_atom(self):
+        """Atom feed response"""
+        
+        response = self.app.get(url('/blog/index.atom'))
+        assert '<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">' in response
+    
+    
+    def test_blog_xmlrpc_blogger_getUserInfo(self):
+        """blogger.getUserInfo"""
+        
+        data = """<?xml version="1.0" encoding="UTF-8" ?><methodCall><methodName>blogger.getUserInfo</methodName><params><param><value><string/></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>01</string></value>' in response
+    
+    
+    def test_blog_xmlrpc_blogger_getUsersBlogs(self):
+        """blogger.getUsersBlogs"""
+        
+        data = """<?xml version="1.0" encoding="UTF-8" ?><methodCall><methodName>blogger.getUsersBlogs</methodName><params><param><value><string/></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>/general/</string></value>' in response
+    
+    
+    def test_blog_xmlrpc_blogger_getRecentPosts(self):
+        """blogger.getRecentPosts"""
+        
+        data = """<?xml version="1.0" encoding="UTF-8" ?><methodCall><methodName>metaWeblog.getRecentPosts</methodName><params><param><value><string>/</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><int>20</int></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>Initial post</string></value>' in response
+    
+    
+    def test_blog_xmlrpc_blogger_newPost(self):
+        """blogger.newPost - expected to fail"""
+        
+        data = """<?xml version="1.0"?><methodCall><methodName>blogger.newPost</methodName><params><param><value><string/></value></param><param><value><string>/general/</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><string>Testing, testing, testing</string></value></param><param><value><boolean>1</boolean></value></param></params></methodCall>"""
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>/general/Testing__testing__testing.txt</string></value>' in response
+        # print(response)
+    
+    
+    # def test_blog_xmlrpc_blogger_editPost(self):
+    #     """blogger.editPost"""
+    #     
+    #     data = """<?xml version="1.0"?><methodCall><methodName>blogger.editPost</methodName><params><param><value><string></string></value></param><param><value><string>/general/Testing__testing__testing</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><string>Testing yet again.</string></value></param><param><value><boolean>0</boolean></value></param></params></methodCall>"""
+    #     
+    #     response = self.app.post('http://localhost:5000/blog/RPC', data)
+    #     assert response.status_int == 200
+    #     print(response)
+    
+    
+    # def test_blog_xmlrpc_blogger_deletePost(self):
+    #     """blogger.deletePost"""
+    #     
+    #     data = """<methodCall><methodName>blogger.deletePost</methodName><params><param><value><string/></value></param><param><value><string>/general/Testing__testing__testing</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><boolean>1</boolean></value></param></params></methodCall>"""
+    #     
+    #     response = self.app.post('http://localhost:5000/blog/RPC', data)
+    #     assert response.status_int == 200
+    #     print(response)
+    
+    
+
+    def test_blog_xmlrpc_metaWeblog_getRecentPosts(self):
+        """metaWeblog.getRecentPosts"""
+        
+        data = """<?xml version="1.0" encoding="UTF-8" ?><methodCall><methodName>metaWeblog.getRecentPosts</methodName><params><param><value><string>/</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><int>20</int></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>Initial post</string></value>' in response
+        # print(response)
+    
+    
+    def test_blog_xmlrpc_metaWeblog_getCategories(self):
+        """metaWeblog.getCategories"""
+        
+        data = """<?xml version="1.0" encoding="UTF-8" ?><methodCall><methodName>metaWeblog.getCategories</methodName><params><param><value><string>/general/</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>/blog/general</string></value>' in response
+        # print(response)
+    
+    
+    def test_blog_xmlrpc_metaWeblog_getPost(self):
+        """metaWeblog.getPost"""
+        
+        data = """<methodCall><methodName>metaWeblog.getPost</methodName><params><param><value><string>general/initialpost</string></value></param><param><value>admin</value></param><param><value><string>admin</string></value></param></params></methodCall>"""
+        
+        response = self.app.post('http://localhost:5000/blog/RPC', data)
+        assert response.status_int == 200
+        assert '<value><string>Initial post</string></value>' in response
+        # print(response)
+    
+    
+    # def test_blog_xmlrpc_metaWeblog_newMediaObject(self):
+    #     """metaWeblog.newMediaObject"""
+    #     
+    #     data = """<?xml version="1.0" encoding="UTF-8" ?>"""
+    #     
+    #     response = self.app.post('http://localhost:5000/blog/RPC', data)
+    #     assert response.status_int == 200
+    #     assert '<?xml' in response
+    
+    
+    # def test_blog_xmlrpc_metaWeblog_newPost(self):
+    #     """metaWeblog.newPost"""
+    #     
+    #     from datetime import datetime
+    #     data = """<methodCall><methodName>metaWeblog.newPost</methodName><params><param><value><string>/general</string></value></param><param><value>admin</value></param><param><value><string>admin</string></value></param><param><struct><member><name>categories</name><value><array><data><value>Test2</value></data></array></value></member><member><name>description</name><value>Yet more testing </value></member><member><name>title</name><value>More testing</value></member><member><name>dateCreated</name><value><dateTime.iso8601>""" + \
+    #            datetime.utcnow().strftime("%Y%m%dT%H:%M:%S") + \
+    #            """</dateTime.iso8601></value></member></struct></param><param><value><boolean>1</boolean></value></param></params></methodCall>"""
+    #     
+    #     response = self.app.post('http://localhost:5000/blog/RPC', data)
+    #     assert response.status_int == 200
+    #     # assert '<value><string>/Testing__testing.txt-</string></value>' in response
+    #     print(response)
+    
+    # def test_blog_xmlrpc_metaWeblog_editPost(self):
+    #     """metaWeblog.editPost"""
+    #     
+    #     data = """<?xml version="1.0"?><methodCall><methodName>metaWeblog.editPost</methodName><params><param><value><string/></value></param><param><value><string>/general/Testing__testing__testing</string></value></param><param><value><string>admin</string></value></param><param><value><string>admin</string></value></param><param><value><string>Testing, yet again</string></value></param><param><value><boolean>0</boolean></value></param></params></methodCall>"""
+    #     
+    #     response = self.app.post('http://localhost:5000/blog/RPC', data)
+    #     assert response.status_int == 200
+    #     assert '<?xml' in response
+    #     print(response)
+    
+    
+
+
