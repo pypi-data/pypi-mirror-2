@@ -1,0 +1,151 @@
+===========
+ Searching
+===========
+
+It is possible to search for persons. There are some different search
+types.
+
+Set up
+======
+
+We need an address book, some keywords and some persons:
+
+>>> from icemac.addressbook.testing import (create_addressbook, create_person,
+...     create_keyword)
+>>> addressbook = create_addressbook()
+>>> friends = create_keyword(addressbook, u'friends')
+>>> family = create_keyword(addressbook, u'family')
+>>> church = create_keyword(addressbook, u'church')
+>>> work = create_keyword(addressbook, u'work')
+>>> anyone_else = create_keyword(addressbook, u'anyone else')
+>>> hohmuth = create_person(addressbook, addressbook, u'Hohmuth',
+...                         keywords=set([friends]))
+>>> koch = create_person(addressbook, addressbook, u'Koch',
+...                      keywords=set([family, church]))
+>>> velleuer = create_person(addressbook, addressbook, u'Velleuer',
+...                          keywords=set([family, church]))
+>>> liebig = create_person(addressbook, addressbook, u'Liebig',
+...                        keywords=set([church]))
+
+>>> from zope.testbrowser.testing import Browser
+>>> browser = Browser()
+
+Visitors are allowed to search, so we log in as a visitor:
+
+>>> browser.addHeader('Authorization', 'Basic visitor:visitor')
+>>> browser.open('http://localhost/++skin++AddressBook/ab')
+
+There is a link in the global navigation which leads to the searches
+overview providing links to the offered search types:
+
+>>> browser.getLink('Search').click()
+>>> print browser.contents
+<!DOCTYPE ...
+<ul><li>
+    <a href="http://localhost/++skin++AddressBook/ab/@@multi_keyword.html"><span>Keyword search</span></a>
+  </li>
+</ul>...
+
+Keyword search
+==============
+
+This search type allows to search for persons who have specified
+keywords assigned to:
+
+>>> browser.getLink('Keyword search').click()
+
+
+When no entry in the keywords field is selected no persons are found:
+
+>>> browser.getControl('Search').click()
+>>> print browser.contents
+<...No person found...
+
+When no person is found the same message is displayed:
+
+>>> browser.getControl('work').click()
+>>> browser.getControl('Search').click()
+>>> print browser.contents
+<...No person found...
+
+When selecting a keyword which leads to results they are displayed as
+a table with links to the edit forms of the found persons:
+
+
+>>> browser.getControl('work').click() # deselect keyword
+>>> browser.getControl('church').click()
+>>> browser.getControl('Search').click()
+>>> print browser.contents
+<!DOCTYPE ...
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-2" checked="checked" /></td>
+      <td><a href="http://localhost/++skin++AddressBook/ab/Person-2">Koch</a></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-4" checked="checked" /></td>
+      <td><a href="http://localhost/++skin++AddressBook/ab/Person-4">Liebig</a></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-3" checked="checked" /></td>
+      <td><a href="http://localhost/++skin++AddressBook/ab/Person-3">Velleuer</a></td>
+    </tr>
+ </tbody>
+</table>...
+
+
+The form is displayed on the result page, too. The previously selected
+keyword is still selected:
+
+>>> browser.getControl('church').selected
+True
+
+The default serch term concatenator is `and`. When selecting multiple
+keywords only persons having all keywords are found:
+
+>>> browser.getControl('search term concatenation').displayValue
+['and']
+>>> browser.getControl('family').click()
+>>> browser.getControl('Search').click()
+>>> print browser.contents
+<!DOCTYPE ...
+  <tbody>
+    <tr>
+      <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-2" checked="checked" /></td>
+      <td><a href="http://localhost/++skin++AddressBook/ab/Person-2">Koch</a></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-3" checked="checked" /></td>
+      <td><a href="http://localhost/++skin++AddressBook/ab/Person-3">Velleuer</a></td>
+    </tr>
+  </tbody>...
+
+By selecting `or` as search term concatenation all keyword having one
+of the selected keywords are found:
+
+>>> browser.getControl('or').click()
+>>> browser.getControl('keywords').displayValue = ['friends', 'family']
+>>> browser.getControl('Search').click()
+>>> print browser.contents
+<!DOCTYPE ...
+   <tbody>
+     <tr>
+       <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person" checked="checked" /></td>
+       <td><a href="http://localhost/++skin++AddressBook/ab/Person">Hohmuth</a></td>
+     </tr>
+     <tr>
+       <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-2" checked="checked" /></td>
+       <td><a href="http://localhost/++skin++AddressBook/ab/Person-2">Koch</a></td>
+     </tr>
+     <tr>
+       <td><input type="checkbox" class="checkbox-widget" name="persons:list" value="Person-3" checked="checked" /></td>
+       <td><a href="http://localhost/++skin++AddressBook/ab/Person-3">Velleuer</a></td>
+     </tr>
+   </tbody>...
