@@ -1,0 +1,15 @@
+DOPEN is a module to open a file by looking at it extension/shebang and select the right program.
+
+functions:
+from dopen import DOPEN
+d = DOPEN()
+#there are two ways, passing a file or passing an extension
+#extensions
+d.get_values("mp3") # ["vlc",2,0]
+d.get_program("mp3") # vlc
+d.set_program("mp3","vlc")
+#file
+d.get_extension("test.mp3") # mp3
+d.get_val("test.mp3") # ["vlc",2,0]
+d.get_prog("test.mp3") # vlc
+d.set_prog("test.mp3","vlc")
