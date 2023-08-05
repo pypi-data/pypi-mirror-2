@@ -1,0 +1,111 @@
+*********************
+Cluster documentation
+*********************
+
+A distributed function or an optimisation can be executed over a cluster of computers connected over
+IP or a Windows network. If your computers have an IP address and can accept
+incoming connections (i.e. they are not behind a NAT firewall) then the simplest
+way is to use IP. Otherwise, you have to use the 'Named pipes' feature of
+Windows networks.
+
+The way it works is that you have a central machine (the manager) and several
+worker machines. Each machine must have an identical copy of the code available
+on it. The central machine runs a script which defines the function to distribute or to
+optimize, and the workers run a much simpler script, essentially just calling the
+``funworker`` or ``optworker`` function to set up the machine to listen for data
+sent over the network and then run code when it receives the data. The manager
+just calls the distributed function or launches the optimization 
+as with a single machine, but including an extra keyword
+``machines`` with the list of connection details to the worker machines
+(described in the next two sections).
+
+IP
+==
+
+To connect several machines via IP, pass a list of host names or IP addresses
+as strings to the ``machines`` keyword of the ``distribute`` or the ``optimize`` function.
+To specify a specific port, use the ``port`` keyword. The worker machines should
+run a script like (for a distributed function)::
+
+    # The original function to be distributed must be imported at the beginning
+    # of the script
+    from myfun import fun
+    
+    if __name__ == '__main__':
+        from playdoh import funworker
+        funworker()
+
+or (for an optimization)::
+
+    # The original function to be distributed must be imported at the beginning
+    # of the script
+    from myfun import fun
+    
+    if __name__ == '__main__':
+        from playdoh import optworker
+        optworker()
+
+Named pipes
+===========
+
+Using named pipes on Windows is slightly more complicated. First of all, each
+computer has to be visible on the local Windows network. Secondly, the user of
+the manager machine has to have a log on using the same ID and password on each
+of the worker machines. With that specified, just pass a list of the computer
+names of each of the worker machines as the ``machines`` keyword of the
+``distribute`` or the ``optimize`` function.
+You also need to specify ``named_pipe=True``.
+In fact, you can specify ``named_pipe`` as a string to use a specific name for
+the named pipe, but this is usually not necessary. The worker machines should
+run a script like (for a distributed function)::
+
+    # The original function to be distributed must be imported at the beginning
+    # of the script
+    from myfun import fun
+    
+    if __name__ == '__main__':
+        from playdoh import funworker
+        funworker(named_pipe=True)
+
+or (for an optimization)::
+
+    # The original function to be distributed must be imported at the beginning
+    # of the script
+    from myfun import fun
+    
+    if __name__ == '__main__':
+        from playdoh import optworker
+        optworker(named_pipe=True)
+
+If ``named_pipe`` is set to a particular name, the worker functions should be
+given the same name. The ``funworker`` and ``optworker`` functions have some other 
+options described below.
+
+Cluster keyword arguments
+=========================
+
+The ``distribute`` and the ``optimize`` functions have the following 
+keyword arguments relevant to running over a cluster:
+
+``use_gpu=True``
+    Used to specify whether or not GPUs should be used if present.
+``machines=[]``
+    A list of worker machines, either hostname/IP addresses as strings, or
+    computer names if using Windows named pipes.
+
+The ``distribute`` and the ``optimize`` functions,
+and the ``funworker`` and ``optworker`` functions all have
+the following keyword arguments:
+
+``max_cpu=None``
+    If specified, ensures that this machine will use at most that number of
+    CPUs, otherwise it will use the maximum number.
+``max_gpu=None``
+    If specified, ensures that this machine will use at most that number of
+    GPUs, otherwise it will use the maximum number.
+``port=None``
+    The port number to communicate with if using IP, should be the same on
+    all machines.
+``named_pipe=None``
+    Set to ``True`` if using Windows named pipes, or a string to choose a
+    particular pipe name. Should be the same on all machines.

@@ -1,0 +1,183 @@
+**********************************
+Distributed function documentation
+**********************************
+
+A distributed function is defined from any function and allows to execute it 
+transparently in parallel over several workers (multiple CPUs on a single machine
+or several machines connected in a network).
+
+Examples
+========
+
+Example 1
+---------------
+
+The simplest way of using ``distribute`` is by defining a function which
+accepts a single object (a number, a Numpy array or any other object) as an argument 
+and returns a result. Using ``distribute`` allows to call this function in 
+parallel over multiple CPUs/machines with several objects as arguments, and retrieving 
+the result for each argument. By default, ``DistributedFunction`` uses all available CPUs
+in the system.
+
+In the following example which computes the inverse of two matrices, we assume that there 
+are at least two CPUs in the system. Each CPU computes the inverse of a single matrix::
+    
+    # For Windows users, it is required that any code using this library is placed after
+    # this line, otherwise the system will crash !
+    if __name__ == '__main__':
+        
+        from numpy import eye
+        from numpy.linalg import inv
+        
+        # Import the library to have access to the ``distribute`` function
+        from playdoh import *
+        
+        # We define the two matrices that are going to be inversed in parallel.
+        A = 2*eye(3,3)
+        B = 3*eye(3,3)
+        
+        # The first argument of ``distribute`` is the name of the function
+        # that is being parallelized. This function must accept a single argument and returns a
+        # single object. The optional argument ``max_cpu=n`` allows to limit the number
+        # of CPUs that are going to be used by the parallelized function. Of course,
+        # this has no effect if there are less than n CPUs available in the system.
+        distinv = distribute(inv, max_cpu=2)
+        
+        # ``distinv`` is the parallelized version of ``inv`` : it is called by passing
+        # a list of arguments. The list can be of any size. If there are more arguments
+        # than workers, then each worker will process several arguments in series.
+        # Here, if there are two available CPUs in the system, the first CPU inverses
+        # A, the second inverses B. ``invA`` and ``invB`` contain the inverses of A and B.
+        invA, invB = distinv([A,B])
+        
+Example 2
+---------
+
+In this second example, we want to parallelize a function ``f`` that accepts any
+D-long vector and returns a number. Very often, it is possible to vectorize
+this function using Numpy matrices operations, in such a way that the vectorized function 
+``fun`` takes a DxN matrix ``x`` as an argument, and returns a N-long vector. 
+We have ``fun(x)[i] == f(x[:,i])``.
+In this case, it becomes easy to parallelize this function over multiple 
+CPUs/machines. The argument ``x`` is divided into D*K submatrices of approximate
+equal size. Each worker calls ``fun`` with the corresponding submatrix,
+and the manager pastes back the results of the workers in a transparent way.
+The parallelization is then totally transparent to the user.
+
+In the following example, the function ``f`` computes the sum of the components
+of a D-long vector. The Numpy function ``sum`` can do this in a vectorized way :
+if ``x`` is a DxN matrix, ``sum(x, axis=0)`` is an N-long vector containg 
+the sum of the components of each column of ``x``. Therefore, this function
+can be parallelized like this::
+
+    from numpy import sum
+    def fun(x):
+        return sum(x, axis=0)
+    
+    if __name__ == '__main__':
+        from numpy import ones
+        from distfun import *
+        
+        dfun = distribute(fun)
+        x = ones((5,4))
+        y = dfun(x)
+        print y
+
+Here, if there are two CPUs in the system, each one will execute ``fun(subx)`` 
+with ``subx`` being the left half of ``x`` for CPU 1, and the right half for 
+CPU 2. ``y`` is therefore a N-long vector, and is stricly equivalent to
+the result that would have been obtained with ``y=fun(x)``.
+
+More on ``distribute``
+======================
+
+Usage
+-----
+
+You use the ``distribute`` object like this::
+
+    dfun = distribute(fun, ...)
+    y = dfun(x)
+
+Arguments
+---------
+
+The complete list of arguments to the ``distribute`` function follows.
+
+``fun``
+    The Python function to parallelize. There are two different ways of 
+    parallelizing a function.
+    * If ``fun`` accepts a single argument and returns a single object,
+      then the distributed function can be called with a list of arguments
+      that are transparently spread among the workers.
+    * If ``fun`` accepts any D*N matrix and returns a N-long vector,
+      in such a way that the computation is performed column-wise
+      (that is, there exists a function f : R^d -> R such that
+      ``fun(x)[i] == f(x[:,i])``), then the distributed function can be 
+      called exactly like the original function ``fun`` : each worker 
+      will call ``fun`` with a view on ``x``. The results are then 
+      automatically concatenated, so that using the distributed
+      function is strictly equivalent to using the original function.
+``shared_data = None``
+    Shared data is read-only. It should be a dictionary, whose values
+    are picklable. If the values are numpy arrays, and the data is being
+    shared to processes on a given computer, the memory will not be
+    copied, but a pointer passed to the child processes, saving memory.
+    Large read-only data to be shared should be put in here.
+``max_cpu = None``
+    An integer giving the maximum number of CPUs in the current machine that
+    the package can use. Set to None to use all CPUs available.
+``max_gpu = None``
+    An integer giving the maximum number of GPUs in the current machine that
+    the package can use. Set to None to use all GPUs available. By default,
+    the GPU is not used, so this argument is used only in conjunction with 
+    ``gpu_policy``.
+``gpu_policy = no_gpu``
+    The policies are 'prefer_gpu' which will use only GPUs if
+    any are available on any of the computers, 'require_all' which will
+    only use GPUs if all computers have them, or 'no_gpu' (default) which will
+    never use GPUs even if available.
+``machines=[]``
+    A list of machine names to use in parallel.
+``named_pipe``
+    Set to ``True`` to use Windows named pipes for networking, or a string
+    to use a particular name for the pipe.
+``port``
+    The port number for IP networking, you only need to specify this if the
+    default value of 2718 is blocked.
+``accept_lists = False``
+     Set to True if the provided function handles a list of any size as a parameter.
+``endaftercall = True``
+    Set to True to cleans up memory at the end of the first call to the 
+    distributed function. Set to False if you plan to make several
+    successive calls to the distributed function.
+``verbose = False``
+    Set to True to display information about the function evaluation.
+
+Cleaning up memory
+------------------
+
+The variable ``dfun`` is a ``DistributedFunction`` object. By default, it cleans up
+memory at the end of the first call to ``dfun(x)``. That means that you can't make
+two successive calls to ``dfun``. If you want to do so, pass the keyword 
+``endaftercall=False`` to the ``distribute`` function. Memory won't be cleaned up 
+automatically, so you'll have to do it yourself by calling ``finished(dfun)`` at 
+the end of your script.
+
+The call to ``finished(dfun)`` cleans up memory on the current machine, but not on 
+the other machines were workers may be running. This allows you to run as many scripts 
+as you want without restarting the workers on the other machines by hand.
+However, if you want to stop all workers without killing them manually on each machine,
+you can call ``shutdown(dfun)`` on the manager, which will clean up memory of all the machines.
+
+Using ``shared_data``
+---------------------
+
+Your function may depend on some large data. If every worker should see the same data,
+you can store in in the ``shared_data`` dictionary. When using multiple CPUs, it will be
+stored in global memory. Your function to be distributed should then look like this::
+
+    def fun(x, shared_data):
+        data1 = shared_data['key1']
+        ...
+        return y

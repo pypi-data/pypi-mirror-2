@@ -1,0 +1,306 @@
+**************************************
+Distributed optimization documentation
+**************************************
+
+The optimization feature of Playdoh allows you to find the parameters
+that maximize any function you provide in a distributed fashion.
+We assume that you already have such a function, which works in
+a vectorized way thanks to Numpy matrices operations.
+ 
+To use the optimization feature, you should follow these three steps :
+
+1.  Your fitness function depends probably on a lot of different parameters.
+    You should start by defining which ones you want to optimize and which ones
+    are constant.
+2.  Write the fitness function using the signature imposed by Playdoh.
+3.  Call ``optimize`` to launch the optimization over several CPUs, GPUs
+    or machines and retrieve the results !
+
+Example 1
+=========
+
+Let's start with a quick example. It consists in maximizing a simple fitness function
+which is a bidimensional centered Gaussian function.
+
+The first thing to do is to write the fitness function::
+
+    from numpy import exp
+    def fun(args, shared_data, local_data, use_gpu):
+        x = args['x']
+        y = args['y']
+        return exp(-(x**2+y**2))
+
+The signature of the function must always be like this. For now, we're just using
+the ``args`` keyword, which contains the parameter values. Here, ``x`` and ``y`` are
+Numpy vectors containing the values of each particle. The function returns the fitness
+values of all particles (note that we're using vectorized matrices operations with ``+``
+and ``**``).
+
+Now we define some information about the parameters to optimize::
+
+    if __name__ == '__main__':
+        optparams = dict(x = [-10.,10.], y = [-10.,10.])
+    
+``optparams`` is a dictionary : each key is a parameter name, each value is a list
+containing the initial minimum and maximum values to use at the beginning of the
+optimization algorithm. The initial positions of the particles are uniformly sampled
+in these intervals.
+
+Finally, we're launching the optimization on all CPUs available on the machine::
+
+        from playdoh import *
+        results = optimize(fun, optparams)
+        print_results(results)
+    
+The variable ``results`` is a dictionary containing the best value for each parameter
+found by the optimization algorithm. This last statement should give you values very close
+to 0 for both ``x`` and ``y``, along with a corresponding fitness value very close to 1.
+
+Example 2
+=========
+
+This example shows more options of the optimization features.
+There are two main differences compared to the first example :
+- The variance of the Gaussian function is now a global (static) parameter
+  stored in global memory,
+- The center of the Gaussian is a local parameter, and we optimize independently
+  two groups of particles that have different centers.
+
+We define our fitness function. This time, we use ``shared_data`` to store
+``sigma``, and ``local_data`` to store the center of the Gaussian::
+
+    from numpy import exp
+    def fun(args, shared_data, local_data, use_gpu):
+        a = args['a']
+        b = args['b']
+        try:
+            a0 = local_data['a0']
+            b0 = local_data['b0']
+        except:
+            a0 = b0 = 0
+        sigma = shared_data['sigma']
+        return exp(-((a-a0)**2+(b-b0)**2)/(2*sigma*2))
+
+We define the parameters to optimize as in the first example::
+
+    if __name__ == '__main__':
+        optparams = dict(a = [-10.,10.], b = [-10.,10.])
+    
+We define the ``shared_data`` object, containing a single value for ``sigma``::*
+
+        shared_data = dict(sigma = 1.0)
+
+
+The optimization algorithm uses a given number of particles to find the global 
+maximum of the fitness function. This number is set with the ``group_size`` keyword.
+If several groups of particles are optimized simultaneously and independently, the 
+total number of particles is then ``group_size * group_count``::
+
+        group_size = 500
+    
+``local_data`` contains the value of the local data for each group. Each
+value is a list with as many values as there are groups::
+    
+        local_data = dict(a0 = [1.0, 2.0], b0 = [3.0, 4.0])
+    
+We now call the ``optimize`` function. We first pass the ``shared_data``
+and ``local_data`` dictionaries. The ``max_cpu`` keyword allows to limit
+the number of CPUs used on this machine for the optimization.
+The ``group_count`` argument gives the number of independent groups to
+optimize. If it is not set (or set to None), this number will be automatically
+infered from ``local_data``.
+The number of iterations of the optimization algorithm is set to 10 here.
+Finally, the ``verbose`` keyword allows to display information about the optimization
+in real time::
+
+        from playdoh import *
+        results = optimize(fun, optparams, shared_data, local_data,
+                           max_cpu = 2,
+                           group_size = group_size, group_count = 2,
+                           iterations = 10, verbose = True)
+    
+Finally, we print the results. There is one column per optimized group.
+Here, the optimization should find both (a=1,b=3) for the first group,
+and (a=2,b=4) for the second group::
+
+        print_results(results)
+
+More on ``optimize``
+====================
+
+To use the optimization feature of Playdoh, you basically provide a fitness 
+function which evaluates the fitness value over a set of independent particles.
+By definition, a particle is a set of parameter values : one number for each 
+parameter to optimize.
+
+Then, you call the ``optimize`` function to run a particle-based optimization
+algorithm to find the parameter values that maximize the fitness function.
+The algorithm is run in parallel over several CPUs, GPUs or several machines
+connected over a network.
+
+The signature of the fitness function must be exactly the following::
+
+    def fun(args, shared_data, local_data, use_gpu):
+        ...
+        return result
+
+* ``args`` is a dictionary containing the values of the parameters to 
+  optimize. Each key is the parameter name as a string, each value is
+  a Numpy vector containing the values of all the particles for this 
+  parameter.
+  
+* ``shared_data`` is a dictionary containing any data the function needs
+  to evaluate the fitness function. This data must be shared by all the particles
+  and can be stored in global memory for worker running on the same machine.
+  The keys must be strings, and the values any picklable data (typically Numpy arrays).
+  
+* ``local_data`` is only used when optimizing independently several groups of particles.
+  The fitness function should be the same for each group, except that some parameters 
+  (that are not optimized) change between the groups. These parameters are passed to
+  the fitness function with the ``local_data`` argument. It is a dictionary which
+  keys are parameter names, and values are lists containing the parameter values for each
+  group. The lists must have the same length as the number of groups. 
+  
+* ``use_gpu`` is a Boolean value indicating whether to use the GPU for the fitness
+  evaluation. The manager decides whether to use the GPU or not, depending on if the GPU
+  is present on this machine and/or the other machines. See the documentation about
+  ``gpu_policy`` to know more.
+
+Finally, the fitness function must return a Numpy vector containing the fitness value
+for each particle. Its length must be the same as the length of any parameter value
+passed in args.
+
+Then, you define the information about the parameters to be optimized::
+
+    optparams = dict(   param1 = [initmin, initmax],
+                        param2 = [min, initmin, initmax, max])
+
+``optparams`` is a dictionary : the keys are the parameter names, the values are 
+lists with two or four elements. If you don't want to set boundaries to the parameter,
+you just give two elements : the initial minimum and maximum values for the parameter.
+If you want to set boundaries, you give them in addition to the initial minimum and 
+maximum values.
+
+Now you can actually run the optimization with the following command::
+
+    results = optimize(fun, optparams)
+  
+At the end of the optimization, the ``results`` variable is a dictionary
+containing the best parameters found by the optimization algorithm, along
+with the best fitness value. You can print the results in a nice way with the
+following command::
+  
+    print_results(results)
+
+    
+Arguments of the ``optimize`` function
+--------------------------------------
+
+``fun``
+    The fitness function. Its signature must be exactly the following::
+    
+        def fun(args, shared_data, local_data, use_gpu):
+            ...
+            return result
+    
+    * ``args`` is a dictionary containing the values of the parameters to 
+      optimize. Each key is the parameter name as a string, each value is
+      a Numpy vector containing the values of all the particles for this 
+      parameter.
+      
+    * ``shared_data`` is a dictionary containing any data the function needs
+      to evaluate the fitness function. This data must be shared by all the particles
+      and can be stored in global memory for worker running on the same machine.
+      The keys must be strings, and the values any picklable data (typically Numpy arrays).
+      
+    * ``local_data`` is only used when optimizing independently several groups of particles.
+      The fitness function should be the same for each group, except that some parameters 
+      (that are not optimized) change between the groups. These parameters are passed to
+      the fitness function with the ``local_data`` argument. It is a dictionary which
+      keys are parameter names, and values are lists containing the parameter values for each
+      group. The lists must have the same length as the number of groups. 
+      
+    * ``use_gpu`` is a Boolean value indicating whether to use the GPU for the fitness
+      evaluation. The manager decides whether to use the GPU or not, depending on if the GPU
+      is present on this machine and/or the other machines. See the documentation about
+      ``gpu_policy`` to know more.
+
+``optparams``
+    a dictionary : the keys are the parameter names, the values are 
+    lists with two or four elements. If you don't want to set boundaries to the parameter,
+    you just give two elements : the initial minimum and maximum values for the parameter.
+    If you want to set boundaries, you give them in addition to the initial minimum and 
+    maximum values.
+
+``shared_data = None``
+    Shared data is read-only. It should be a dictionary, whose values
+    are picklable. If the values are numpy arrays, and the data is being
+    shared to processes on a given computer, the memory will not be
+    copied, but a pointer passed to the child processes, saving memory.
+    Large read-only data to be shared should be put in here.
+    Shared data is static over iterations.
+
+``local_data = None``
+    ``local_data`` is only used when optimizing independently several groups of particles.
+    The fitness function should be the same for each group, except that some parameters 
+    (that are not optimized) change between the groups. These parameters are passed to
+    the fitness function with the ``local_data`` argument. It is a dictionary which
+    keys are parameter names, and values are lists containing the parameter values for each
+    group. The lists must have the same length as the number of groups. 
+
+``group_size = None``
+    The number of particles for each group.
+
+``group_count = None``
+    The number of independent groups to optimize in parallel.
+
+``iterations = None``
+    Number of iterations in the optimization algorithm.
+
+``optinfo = None``
+    A dictionary containing values about the optimization algorithm. It is specific
+    to the optimization algorithm.
+    
+``max_cpu = None``
+    An integer giving the maximum number of CPUs in the current machine that
+    the package can use. Set to None to use all CPUs available.
+    
+``max_gpu = None``
+    An integer giving the maximum number of GPUs in the current machine that
+    the package can use. Set to None to use all GPUs available. By default,
+    the GPU is not used, so this argument is used only in conjunction with 
+    ``gpu_policy``.
+    
+``gpu_policy = no_gpu``
+    The policies are 'prefer_gpu' which will use only GPUs if
+    any are available on any of the computers, 'require_all' which will
+    only use GPUs if all computers have them, or 'no_gpu' (default) which will
+    never use GPUs even if available.
+    
+``machines=[]``
+    A list of machine names to use in parallel.
+    
+``named_pipe``
+    Set to ``True`` to use Windows named pipes for networking, or a string
+    to use a particular name for the pipe.
+    
+``port``
+    The port number for IP networking, you only need to specify this if the
+    default value of 2718 is blocked.
+
+``returninfo = False``
+     Set to True if you want to retrieve information about the optimization at the end.
+     In this case, call ``results, info = optimize(...)``.
+
+``verbose = False``
+    Set to True to display information about the optimization in real time.
+
+**Returns**
+
+``results``
+    A dictionary containing the best parameters found, and the corresponding fitness values.
+    If there are several groups optimized independently, each value of the dictionary
+    is a Numpy vector with the best parameters for each group.
+
+``info``
+    If ``returninfo = True``, it is a dictionary with information about the optimization.
