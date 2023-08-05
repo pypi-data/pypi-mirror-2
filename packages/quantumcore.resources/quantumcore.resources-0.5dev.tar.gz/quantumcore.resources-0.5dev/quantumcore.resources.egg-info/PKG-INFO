@@ -1,0 +1,217 @@
+Metadata-Version: 1.0
+Name: quantumcore.resources
+Version: 0.5dev
+Summary: A resource manager for CSS and JS
+Home-page: http://quantumcore.org
+Author: Christian Scholz
+Author-email: cs@comlounge.net
+License: MIT
+Description: =========================
+        Introduction and Tutorial
+        =========================
+        
+        Setting up resources
+        ====================
+        
+        Here is an example on how to use it with CSS resources.
+        
+        First we setup some resources::
+        
+        from quantumcore.resources import CSSResourceManager, css_from_pkg_stream
+        from quantumcore.resources import JSResourceManager, js_from_pkg_stream, jst_from_pkg_stream
+        
+        r1 = css_from_pkg_stream(__name__,
+        'static/css/screen.css',
+        merge=True,
+        auto_reload=True)
+        r2 = css_from_pkg_stream(__name__,
+        'static/css/addons.css',
+        merge=True,
+        auto_reload=True)
+        r3 = css_from_pkg_stream(__name__,
+        'static/css/print.css',
+        merge=True,
+        name="print",
+        auto_reload=True)
+        css_manager = CSSResourceManager([r1,r2,r3],
+        prefix_url="/css",
+        auto_reload=True)
+        
+        # JS
+        js_manager = JSResourceManager([
+        js_from_pkg_stream(__name__,
+        'static/js/jquery.json-2.2.min.js',
+        merge=True, prio=2),
+        js_from_pkg_stream(__name__,
+        'static/js/jquery.cookie.js',
+        merge=True,
+        minimize_method="jsmin",
+        prio=3),
+        ], prefix_url="/js", auto_reload=True)
+        
+        This defines two CSS and two JS resources.
+        
+        Instantiating resources
+        ***********************
+        
+        A resource corresponds to one file on the filesystem. Here we use a shortcut called ``js_from_pkg_stream`` and ``css_from_pkg_stream`` to load a file from a package.
+        
+        Mandatory common parameters for those functions are:
+        
+        * The ``__name__`` is being used for identifying the filename inside a package.
+        * The path is the path inside the package the ``__name__`` belongs to.
+        
+        Optional arguments are:
+        
+        * ``merge`` defines if the resource is allowed to be merged with other similar resources. Default is ``True``.
+        * With ``prio`` you can define the order of the resources inside a resource manager. Resources with lower numbers are loaded first. Default is ``1``.
+        * ``name`` is an optional name under which resources can be clustered together. Resources with the same name can be retrieved together then. It defaults to ``""``. In the example the first two CSS resources will be retrieved together because they both have the same empty name.
+        * ``processors`` define an optional list of processor functions which take the resource contents as input and output another (e.g. compressed) version.
+        * ``auto_reload`` defines whether the resource can be reloaded or not. Note that this must be set in the Resource and the Resource Manager.
+        
+        CSS specific parameters
+        -----------------------
+        
+        * ``media`` fdefines the media type to be used for this stylesheet, e.g. ``print`` or ``screen``. It can be a string or a list of strings. Default is ``['screen', 'projection']``.
+        
+        JS specific parameters
+        ----------------------
+        
+        * ``minimize_method`` is either ``"jsmin"`` or ``None`` and if the first is given then the JavaScript code will also be minified, meaning the removal of whitespaces and shortening of variables.
+        
+        Instantiating the Resource Classes
+        ----------------------------------
+        
+        In case you have a string you can also directly instantiating the ``CSSResource`` or
+        ``JSResource`` class::
+        
+        r = CSSResource(
+        source = u'my CSS',
+        minimize_method = None,
+        media = ['projection', 'screen'],
+        type_ = u'text/css',
+        ...
+        )
+        
+        r = JSResource(
+        source = u'my JS',
+        minimize_method = None,
+        type_ = u'text/css',
+        ...
+        )
+        
+        Except ``__name__`` and ``filename`` all the above mentioned parameters apply.
+        
+        
+        Resource Managers
+        *****************
+        
+        In the example above we have seen resource managers like this::
+        
+        css_manager = CSSResourceManager([r1,r2,r3],
+        prefix_url="/css",
+        auto_reload=True)
+        
+        js_manager = JSResourceManager([.....],
+        prefix_url="/js",
+        auto_reload=True)
+        
+        They handle all the CSS and JS files used in a project eventually grouped into clusters.
+        
+        Both versions take a ``prefix_url`` under which they are served later on. This defines which URLs will be computed by the manager instance.
+        
+        Optional parameters are:
+        
+        * ``no_merge`` can be ``True`` or ``False`` and defines whether the resources are merged into clusters or not.
+        * ``auto_reload`` defines whether the manager should test if resources have been changed and should be reloaded. This only works if the resources have ``auto_reload`` set to ``True`` as well.
+        
+        We can also add resources later::
+        
+        css_manager.append(resource3)
+        js_manager.append(resource4)
+        
+        Now we can pass this resource object to a template, e.g. to a Chameleon template::
+        
+        template.render(js_manager = js_manager, css_manager = css_manager)
+        
+        The template code then looks like this::
+        
+        <tal:block replace="structure css_resources()" />
+        <tal:block replace="structure js_resources()" />
+        
+        This will render links to all the unnamed clusters (means resources with no ``name`` parameter
+        given). You can also render links to all resources with a certain name like this::
+        
+        <!--[if lt IE 8]>
+        <tal:block replace="structure css_resources('ie')" />
+        <![endif]-->
+        
+        will render all resources with ``name='ie'``.
+        
+        In the resulting HTML this will look similar to this::
+        
+        <link href="/css/style.css?h=0140632a9c7bdfec7a2a73829e37d18a" media="projection, screen" rel="stylesheet" type="text/css" />
+        <link href="/css/ie.css?h=4e743c01195a9352f5b3763f8dcffd69" media="projection, screen" rel="stylesheet" type="text/css" />
+        
+        <script src="/js/script.js?h=15b10405313c16a428bce63782ed86c7" type="text/javascript"></script>
+        
+        As you can see the resources are clustered together into files if possible. Moreover a cache key is given to each resource link which will change if the contents change.
+        
+        
+        Serving resources
+        *****************
+        
+        To serve those files we have to pass the URL to the resource registry. Inside a WSGI app this might look like this::
+        
+        
+        def __call__(self, environ, start_response):
+        path = environ['PATH_INFO'].split("/")
+        
+        if path[1]=="css":
+        css_manager.render_wsgi(environ, start_response)
+        elif path[1]=="js":
+        js_manager.render_wsgi(environ, start_response)
+        
+        
+        This will take the path inside the WSGI environment and check if it matches one of the generated URLs.
+        
+        Without WSGI it might look like this::
+        
+        code, data, headers = resources.render(url)
+        
+        
+        ``data`` is an iterator with the merged and minimized CSS file, ``code`` is the return code, usually ``200 Ok``.
+        ``headers`` is a list of ``(key, value)`` tuples.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        Change history
+        **************
+        
+        0.5 - (2010/04/06)
+        ******************
+        
+        initial release
+        
+        
+        Download
+        ********
+        
+Keywords: resources web manager registry css js javascript templates quantumcore
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Utilities
