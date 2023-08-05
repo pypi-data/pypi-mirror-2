@@ -1,0 +1,163 @@
+import multiprocessing, subprocess, time, threading, os, errno, sys, signal
+try:
+    import win32api
+except:
+    win32api = None
+
+PIPE = subprocess.PIPE
+
+if subprocess.mswindows:
+    from win32file import ReadFile, WriteFile
+    from win32pipe import PeekNamedPipe
+    import msvcrt
+else:
+    import select
+    import fcntl
+
+class Popen(subprocess.Popen):
+    def recv(self, maxsize=None):
+        return self._recv('stdout', maxsize)
+    
+    def recv_err(self, maxsize=None):
+        return self._recv('stderr', maxsize)
+
+    def send_recv(self, input='', maxsize=None):
+        return self.send(input), self.recv(maxsize), self.recv_err(maxsize)
+
+    def get_conn_maxsize(self, which, maxsize):
+        if maxsize is None:
+            maxsize = 1024
+        elif maxsize < 1:
+            maxsize = 1
+        return getattr(self, which), maxsize
+    
+    def _close(self, which):
+        getattr(self, which).close()
+        setattr(self, which, None)
+    
+    if subprocess.mswindows:
+        def send(self, input):
+            if not self.stdin:
+                return None
+
+            try:
+                x = msvcrt.get_osfhandle(self.stdin.fileno())
+                (errCode, written) = WriteFile(x, input)
+            except ValueError:
+                return self._close('stdin')
+            except (subprocess.pywintypes.error, Exception), why:
+                if why[0] in (109, errno.ESHUTDOWN):
+                    return self._close('stdin')
+                raise
+
+            return written
+
+        def _recv(self, which, maxsize):
+            conn, maxsize = self.get_conn_maxsize(which, maxsize)
+            if conn is None:
+                return None
+            
+            try:
+                x = msvcrt.get_osfhandle(conn.fileno())
+                (read, nAvail, nMessage) = PeekNamedPipe(x, 0)
+                if maxsize < nAvail:
+                    nAvail = maxsize
+                if nAvail > 0:
+                    (errCode, read) = ReadFile(x, nAvail, None)
+            except ValueError:
+                return self._close(which)
+            except (subprocess.pywintypes.error, Exception), why:
+                if why[0] in (109, errno.ESHUTDOWN):
+                    return self._close(which)
+                raise
+            
+            if self.universal_newlines:
+                read = self._translate_newlines(read)
+            return read
+
+    else:
+        def send(self, input):
+            if not self.stdin:
+                return None
+
+            if not select.select([], [self.stdin], [], 0)[1]:
+                return 0
+
+            try:
+                written = os.write(self.stdin.fileno(), input)
+            except OSError, why:
+                if why[0] == errno.EPIPE: #broken pipe
+                    return self._close('stdin')
+                raise
+
+            return written
+
+        def _recv(self, which, maxsize):
+            conn, maxsize = self.get_conn_maxsize(which, maxsize)
+            if conn is None:
+                return None
+            
+            flags = fcntl.fcntl(conn, fcntl.F_GETFL)
+            if not conn.closed:
+                fcntl.fcntl(conn, fcntl.F_SETFL, flags| os.O_NONBLOCK)
+            
+            try:
+                if not select.select([conn], [], [], 0)[0]:
+                    return ''
+                
+                r = conn.read(maxsize)
+                if not r:
+                    return self._close(which)
+    
+                if self.universal_newlines:
+                    r = self._translate_newlines(r)
+                return r
+            finally:
+                if not conn.closed:
+                    fcntl.fcntl(conn, fcntl.F_SETFL, flags)
+
+def recv_some(p, t=.1, tr=5, stderr=0):
+    if tr < 1:
+        tr = 1
+    x = time.time()+t
+    y = []
+    r = ''
+    pr = p.recv
+    if stderr:
+        pr = p.recv_err
+    while time.time() < x or r:
+        r = pr()
+        if r is None:
+            break
+        elif r:
+            y.append(r)
+        else:
+            time.sleep(max((x-time.time())/tr, 0))
+    return ''.join(y)
+    
+def send_all(p, data):
+    while len(data):
+        sent = p.send(data)
+        if sent is None:
+            raise Exception(message)
+        data = buffer(data, sent)
+
+class MyTimer:
+    def __init__(self, tempo, target, args= [], kwargs={}):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs
+        self._tempo = tempo
+
+    def _run(self):
+        self._timer = threading.Timer(self._tempo, self._run)
+        self._timer.start()
+        self._target(*self._args, **self._kwargs)
+        
+    def start(self):
+        self._timer = threading.Timer(self._tempo, self._run)
+        self._timer.start()
+
+    def stop(self):
+        self._timer.cancel()
+
