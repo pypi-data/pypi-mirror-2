@@ -1,0 +1,131 @@
+====================
+ztfy.monitor package
+====================
+
+.. contents::
+
+What is ztfy.monitor ?
+======================
+
+ztfy.monitor is a small monitor for Zope 3, using zc.z3monitor as base package.
+It adds a "threads" command to monitoring console, to see what the Zope server is
+actually doing, even when all threads are busy and the server can't respond to any request.
+
+It's actually useful when your server is not performing as well as you would like, is eating
+all your CPU time or is waiting in a deadlock loop.
+
+It's main code is based on DeadlockDebugger, developed by Nuxeo for the Zope2 application
+server.
+
+
+How to use ztfy.monitor ?
+=========================
+
+This package can be used via the zc.monitor NGI server ; read the configuration of this package to see how it is configured.
+
+Go on by including ztfy.monitor package into your application configuration : ::
+
+	<include package="ztfy.monitor" />
+
+After that and as soon as the monitoring server is launched, you can connect and
+use the "threads" command to see threads activity ; for example, by using the "netcat"
+application on a monitor running on port 8081 : ::
+
+	$ echo "threads" | nc localhost 8081
+	Threads traceback dump at 2008-11-03 21:50:46
+
+	Thread -1210468160:
+	  File "./bin/paster", line 151, in ?
+	    paste.script.command.run()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteScript-1.6.2-py2.4.egg/paste/script/command.py", line 79, in run
+	    invoke(command, command_name, options, args[1:])
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteScript-1.6.2-py2.4.egg/paste/script/command.py", line 118, in invoke
+	    exit_code = runner.run(args)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteScript-1.6.2-py2.4.egg/paste/script/command.py", line 213, in run
+	    result = self.command()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteScript-1.6.2-py2.4.egg/paste/script/serve.py", line 257, in command
+	    server(app)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteDeploy-1.3.1-py2.4.egg/paste/deploy/loadwsgi.py", line 139, in server_wrapper
+	    wsgi_app, context.global_conf,
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/PasteDeploy-1.3.1-py2.4.egg/paste/deploy/util/fixtypeerror.py", line 57, in fix_call
+	    val = callable(*args, **kw)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1314, in server_runner
+	    serve(wsgi_app, **kwargs)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1282, in serve
+	    server.serve_forever()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1066, in serve_forever
+	    self.handle_request()
+	  File "/usr/lib/python2.4/SocketServer.py", line 217, in handle_request
+	    request, client_address = self.get_request()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1100, in get_request
+	    (conn,info) = SecureHTTPServer.get_request(self)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 378, in get_request
+	    (conn, info) = self.socket.accept()
+	  File "/usr/lib/python2.4/socket.py", line 161, in accept
+	    sock, addr = self._sock.accept()
+	
+	Thread -1303708784:
+	  File "/usr/lib/python2.4/threading.py", line 442, in __bootstrap
+	    self.run()
+	  File "/usr/lib/python2.4/threading.py", line 422, in run
+	    self.__target(*self.__args, **self.__kwargs)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 851, in worker_thread_callback
+	    runnable = self.queue.get()
+	  File "/usr/lib/python2.4/Queue.py", line 119, in get
+	    self.not_empty.wait()
+	  File "/usr/lib/python2.4/threading.py", line 203, in wait
+	    waiter.acquire()
+
+	Thread -1295316080:
+	  ...
+
+When a thread is actually handling a web request, it's URL is written in the first line : ::
+
+	Thread -1303708784 (GET /++apidoc++/Interface/ztfy.app.test.test.IDocument/index.html):
+	  File "/usr/lib/python2.4/threading.py", line 442, in __bootstrap
+	    self.run()
+	  File "/usr/lib/python2.4/threading.py", line 422, in run
+	    self.__target(*self.__args, **self.__kwargs)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 863, in worker_thread_callback
+	    runnable()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1037, in <lambda>
+	    lambda: self.process_request_in_thread(request, client_address))
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 1053, in process_request_in_thread
+	    self.finish_request(request, client_address)
+	  File "/usr/lib/python2.4/SocketServer.py", line 254, in finish_request
+	    self.RequestHandlerClass(request, client_address, self)
+	  File "/usr/lib/python2.4/SocketServer.py", line 521, in __init__
+	    self.handle()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 432, in handle
+	    BaseHTTPRequestHandler.handle(self)
+	  File "/usr/lib/python2.4/BaseHTTPServer.py", line 316, in handle
+	    self.handle_one_request()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 427, in handle_one_request
+	    self.wsgi_execute()
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/httpserver.py", line 287, in wsgi_execute
+	    self.wsgi_start_response)
+	  File "build/bdist.darwin-8.10.1-i386/egg/z3c/evalexception.py", line 10, in __call__
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/evalexception/middleware.py", line 186, in __call__
+	    return self.respond(environ, start_response)
+	  File "/var/local/src/ztfy/lib/python2.4/site-packages/Paste-1.6-py2.4.egg/paste/evalexception/middleware.py", line 306, in respond
+	    app_iter = self.application(environ, detect_start_response)
+	  File "/var/local/src/ztfy/eggs/zope.app.wsgi-3.4.0-py2.4.egg/zope/app/wsgi/__init__.py", line 54, in __call__
+	    request = publish(request, handle_errors=handle_errors)
+	  File "/var/local/src/ztfy/eggs/tmp4szHYV/zope.publisher-3.5.0a1.dev_r78838-py2.4.egg/zope/publisher/publish.py", line 133, in publish
+	  File "/var/local/src/ztfy/eggs/tmpUIaR4E/zope.app.publication-3.4.3-py2.4.egg/zope/app/publication/zopepublication.py", line 167, in callObject
+	  File "/var/local/src/ztfy/eggs/tmp4szHYV/zope.publisher-3.5.0a1.dev_r78838-py2.4.egg/zope/publisher/publish.py", line 108, in mapply
+	  File "/var/local/src/ztfy/eggs/tmp4szHYV/zope.publisher-3.5.0a1.dev_r78838-py2.4.egg/zope/publisher/publish.py", line 114, in debug_call
+	  File "/var/local/src/ztfy/eggs/zope.app.pagetemplate-3.4.0-py2.4.egg/zope/app/pagetemplate/simpleviewclass.py", line 44, in __call__
+	    return self.index(*args, **kw)
+	  File "/var/local/src/ztfy/eggs/zope.app.pagetemplate-3.4.0-py2.4.egg/zope/app/pagetemplate/viewpagetemplatefile.py", line 83, in __call__
+	    return self.im_func(im_self, *args, **kw)
+	  File "/var/local/src/ztfy/eggs/zope.app.pagetemplate-3.4.0-py2.4.egg/zope/app/pagetemplate/viewpagetemplatefile.py", line 51, in __call__
+	    sourceAnnotations=getattr(debug_flags, 'sourceAnnotations', 0),
+	  File "/var/local/src/ztfy/eggs/tmpvYYhPw/zope.pagetemplate-3.4.0-py2.4.egg/zope/pagetemplate/pagetemplate.py", line 115, in pt_render
+	  File "/var/local/src/ztfy/eggs/tmpUxe0uv/zope.tal-3.4.1-py2.4.egg/zope/tal/talinterpreter.py", line 271, in __call__
+	  File "/var/local/src/ztfy/eggs/tmpUxe0uv/zope.tal-3.4.1-py2.4.egg/zope/tal/talinterpreter.py", line 346, in interpret
+	  File "/var/local/src/ztfy/eggs/tmpUxe0uv/zope.tal-3.4.1-py2.4.egg/zope/tal/talinterpreter.py", line 891, in do_useMacro
+	...
+
+Of course, the service is available even when each server's thread is currently busy and when
+the server can't serve any web request.
