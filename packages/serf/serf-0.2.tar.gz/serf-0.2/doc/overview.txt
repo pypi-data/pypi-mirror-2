@@ -1,0 +1,159 @@
+========
+Overview
+========
+
+Introduction
+============
+
+Serf is a simple web server. It's a development tool to be used during
+the development of rich internet applications: it's not intended for
+deployment.
+
+A rich internet application is a web application in which most of the
+user interface is handled by Javascript in the browser, in a
+single-web page that provides interactivity. Typically this is done by
+building on existing Javascript libraries or frameworks. The
+application interacts with the server using Ajax. Ideally the server
+implements a restful web service so that client and server are
+decoupled.
+
+Serf offers a number of features:
+
+* serve up static files, both Javascript and CSS, but also files that
+  can be used during testing such as ``*.json`` files.
+
+* URLs to these static files are unique as they contain a hash. this
+  means that whenever you change the contents of a static file, the
+  URL to that file changes automatically. This makes it possible to
+  easily defeat browser caches during development, while still
+  allowing infinite caching.
+
+* serf supports `hurry.resource`_, a system for distributing
+  Javascript libraries as Python libraries. This makes it easy
+  to create Javascript code that relies on other javascript code.
+
+  .. _hurry.resource: http://pypi.python.org/pypi/hurry.resource
+
+How to run Serf
+===============
+
+Serf installs itself as a command-line executable called ``serf``. It
+takes as an argument the dotted name of a Python package. This package
+should contain serf configuration. With the ``-p`` option the port
+number can also be indicated; it defaults to ``8080``.
+
+To serve up the Python package ``foo.bar``, write::
+ 
+  $ bin/serf foo.bar
+
+To serve up the Python package ``qux`` under port ``7000``, write::
+
+  $ bin/serf -p 7000 qux
+
+Configuring Serf
+================
+
+The primary way to configure Serf is to use ``hurry.resource``. To publish
+any static resources (javascript, CSS, images, HTML, etc) we need to
+declare a library::
+
+  import serf
+ 
+  mylibrary = serf.Library('mylibrary', 'resources')
+
+In this example, `mylibrary`` is the name of the library, and
+``resources`` is a path to a directory that contains the static
+resources involved. Note that these paths are relative from the same
+package that the module itself is defined in.
+
+When pointed to a package that contains this code, Serf will start to
+serve up the static resource ``/mylibrary``. Any actual resources
+however will be in hashed URLs, so that URLs to resources will look
+like this::
+
+  /mylibrary/618ab5135353a/foo.js
+
+Note that you *have* to use ``serf.Library`` for Serf to pick up the
+library automatically. Serf can also pick up ``resource.Library``
+instances, but only when they're exposed using the special
+``hurry.resource.libraries`` entry point as described in the
+`hurry.resource documentation
+<http://pypi.python.org/pypi/hurry.resource>`_. When preparing a
+library for general distribution you should get rid of the dependency
+on ``serf.Library`` and start using the entry point instead.
+
+Special defaulting rules
+========================
+
+A single-page rich client application is driven by a single HTML page,
+and typically the page we pick for this we name ``index.html``. When
+you go to ``/mylibrary`` by itself Serf will redirect you to
+``/mylibrary/<hash>/index.html`` automatically.
+
+To make the root URL work (``/``), create a library named ``index``,
+with a file ``index.html``. The root URL will automatically redirect
+to this file.
+
+Creating a resource inclusion
+=============================
+
+We can now use ``hurry.resource`` to create a resource inclusion that
+we want to be included on a web page. Let's define a simple one
+for ``foo.js`` in ``mylibrary``::
+
+  from hurry import resource
+
+  foo = resource.ResourceInclusion(mylibrary, 'foo.js')
+
+This defines that in the library ``mylibrary`` there is a file called
+``foo.js`` that can now be automatically included. Resource inclusions
+can be more involved and mark dependencies themselves. For more
+information about that, see the `hurry.resource documentation
+<http://pypi.python.org/pypi/hurry.resource>`_.
+
+Making a HTML page include a resource inclusion
+===============================================
+
+Now we need to express that a particular HTML page actually depends on
+this resource inclusion to work::
+
+  import serf
+
+  dep = serf.Dependency(mylibrary, 'index.html', [foo])
+
+Serf will now automatically include a reference to ``foo.js`` in the
+``index.html`` web page in the ``mylibrary`` resource. So, when
+``index.html`` is requested, the right resource (and all its
+dependencies) should be present.
+
+Pre-wrapped resource inclusions
+===============================
+
+A number of Javascript libraries have been pre-packaged with
+``hurry.resource``, so to use them all you have to do is make your
+package depend on them in ``setup.py`` and then you can import the
+resource inclusions from them and depend on them. Here is an
+incomplete listing::
+
+* `hurry.jquery <http://pypi.python.org/pypi/hurry.jquery>`_
+
+* `hurry.jqueryui <http://pypi.python.org/pypi/hurry.jqueryui>`_
+
+* `hurry.yui <http://pypi.python.org/pypi/hurry.yui>`_
+
+* `hurry.tinymce <http://pypi.python.org/pypi/hurry.tinymce>`_
+
+Recognizing resource extensions
+===============================
+
+By default Serf recognizes a number of file extensions (``.html``,
+``.js``, ``.css``, `.json``, ``.png``, ``.jpg``, ``.gif``) and will
+serve them with the appropriate content type. Other extensions are
+served as ``text/plain`` by default. If you want to configure what
+content type should be served for a file extension, you can use
+``Extension``::
+
+  foo = serf.Extension('foo', 'text/foo')
+
+Now all files with the extension ``.foo`` will be served with the
+``text/foo`` content type.
