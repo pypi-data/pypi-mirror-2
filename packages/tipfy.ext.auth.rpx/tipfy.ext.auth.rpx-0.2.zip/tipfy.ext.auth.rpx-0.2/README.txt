@@ -1,0 +1,1 @@
+Implements Tipfy authentication using RPX/JanRain Engage.
