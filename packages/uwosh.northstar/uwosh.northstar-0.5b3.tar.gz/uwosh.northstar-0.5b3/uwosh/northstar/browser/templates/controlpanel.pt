@@ -1,0 +1,119 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="context/main_template/macros/master"
+      i18n:domain="uwosh.northstar">
+
+  <metal:override fill-slot="column_one_slot" />
+  <metal:override fill-slot="column_two_slot" />
+  <metal:block fill-slot="top_slot" tal:define="dummy python:request.set('disable_border',1)" />
+      
+  <metal:css fill-slot="style_slot">
+    <link rel="stylesheet" type="text/css" href="++resource++northstar.css" media="screen" />
+  </metal:css>
+  <metal:javascript fill-slot="javascript_head_slot">
+    <script type="text/javascript" src="++resource++northstar-jquery-1.4.2.js" 
+      tal:condition="not: view/has_newish_jquery_installed"></script>
+    <script type="text/javascript" src="++resource++plone.app.jquerytools.js" 
+      tal:condition="not: view/has_newish_jquery_installed"></script>
+    <script type="text/javascript" src="++resource++northstar.js"></script>
+  </metal:javascript>
+    
+  <body>
+    <div metal:fill-slot="main"
+         tal:define="selected_workflow view/selected_workflow;
+                     show python: selected_workflow is not None;">
+  	  <div id="overlay"><div id="contentWrap"></div></div>
+	
+      <h1 class="documentFirstHeading" i18n:translate="title_manage_contentrules">Workflow Manager</h1>
+    
+      <p class="documentDescription" tal:condition="show">
+          You are currently working on the "<tal:replace tal:replace="view/selected_workflow/title" />" workflow.
+      </p>
+    
+      <div id="status-messages"></div>
+
+      <a href=""
+         class="link-parent"
+         tal:attributes="href string:$portal_url/plone_control_panel"
+         i18n:translate="label_up_to_plone_setup">
+      Up to Site Setup
+      </a>
+    
+      <div id="northstar-container">
+        <div id="top-panel" tal:condition="show">
+          <form class="inline">
+            <input type="submit" id="save-all-button" class="inline context allowMultiSubmit" value="Save all" style="display:none"/>
+          </form>
+        
+          <form class="inline" tal:attributes="action string:${context/absolute_url}/@@uwosh-northstar" method="POST">
+            Selected Workflow: 
+            <select id="selected-workflow" name="selected-workflow" onchange="form.submit()">
+              <tal:workflows tal:repeat="workflow view/available_workflows">
+                <option tal:attributes="value workflow/id; selected python: workflow.id == selected_workflow.id and 'yes' or ''" 
+                        tal:content="workflow/title"></option>
+              </tal:workflows>
+            </select>
+            <noscript>
+              <span class="formControls">
+                <input type="Submit" class="context" value="Open up selected workflow" name="form.actions.gotoworkflow" class="form.actions.go" />
+              </span>
+            </noscript>
+          </form>
+          <form class="inline" tal:attributes="action string:${context/absolute_url}/@@northstar-delete-workflow" method="POST">
+            <input type="hidden" name="selected-workflow" tal:attributes="value view/selected_workflow/id" />
+            <a class="dialog-box" rel="#overlay"
+               tal:attributes="href python: view.get_url('@@northstar-delete-workflow')">
+               <input type="submit" class="standalone allowMultiSubmit" name="delete-workflow-button" value="Delete Workflow" />
+            </a>
+          </form>
+          <form class="inline" tal:attributes="action string:${context/absolute_url}/@@northstar-add-new-workflow" method="POST">
+            <a class="dialog-box" rel="#overlay"
+              tal:attributes="href string:@@northstar-add-new-workflow">
+              <input type="submit" class="context allowMultiSubmit" name="add-new-workflow-button" value="Add new workflow" />
+            </a>
+          </form>
+          <form class="inline" tal:attributes="action python: view.get_url('@@northstar-sanity-check')" method="POST">
+            <a class="dialog-box" rel="#overlay"
+               tal:attributes="href python: view.get_url('@@northstar-sanity-check')">
+              <input type="submit" class="context allowMultiSubmit" name="sanity-check-button" value="Sanity Check" />
+            </a>
+          </form>
+          <form class="inline" tal:attributes="action python: view.get_url('@@northstar-assign')" method="POST">
+            <a class="dialog-box" rel="#overlay"
+               tal:attributes="href python: view.get_url('@@northstar-assign')">
+              <input type="submit" class="context allowMultiSubmit" name="assign-workflow" value="Assign" />
+            </a>
+          </form>
+          <p class="discreet inline" style="display:none" id="unsaved-warning">| <b>you have unsaved information</b></p>
+        </div>
+	      
+        <ul class="formTabs" tal:condition="python: view.selected_workflow is not None">
+          <li class="formTab firstFormTab">
+            <a id="fieldsetlegend-states" href="@@uwosh-northstar#fieldsetlegend-states-anchor" class="selected">
+              <span>States</span>
+            </a>
+          </li>
+          <li class="formTab lastFormTab">
+            <a id="fieldsetlegend-transitions" href="@@uwosh-northstar#fieldsetlegend-transitions-anchor" class="">
+              <span>Transitions</span>
+            </a>
+          </li>
+        </ul>
+
+        <tal:replace tal:replace="structure view/render_content_template" tal:condition="python: len(view.available_workflows) > 0"/>
+        <div id="no-workflows" tal:condition="python: len(view.available_workflows) == 0">
+          <p>You have no custom workflows. Why don't you 
+            <a class="dialog-box" rel="#overlay"
+               tal:attributes="href string:@@northstar-add-new-workflow">
+               create a new workflow
+            </a>?
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
