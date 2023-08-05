@@ -1,0 +1,141 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# kvigall: A customizable calendar program meant for use in terminals
+# Copyright (C) 2010  Niels Serup.
+# This file based on "naghni" from Naghni
+# <http://metanohi.org/projects/naghni/>.
+
+# This file is part of kvigall.
+#
+# kvigall is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# kvigall is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with kvigall.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## kvigall
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Starts the kvigall system
+##[ Start date  ]## 2010 August 18
+
+
+import sys
+from optparse import OptionParser
+
+try:
+    import kvigall.various
+except ImportError:
+    # kvigall is not installed, trying an ugly fix. Considering that
+    # this executable is in the scripts/ directory, appending the
+    # directory one level up to sys.path should make importing possible.
+    import os.path
+    sys.path.append(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0])
+
+import kvigall.various as various
+from kvigall.system import System
+import kvigall.generalinformation as ginfo
+
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = various.nothing
+
+class NewOptionParser(OptionParser):
+    def error(self, msg, cont=True):
+        various.error(msg, cont, self.prog + ': error')
+
+parser = NewOptionParser(
+    prog=ginfo.program_name,
+    usage='Usage: %prog [OPTION]... SCRIPT[:arg1[:arg2[:...]]]...',
+    description='A customizable calendar program meant for use in terminals',
+    version=ginfo.version_text,
+    epilog='kvigall is used to display calendar content. Using \
+scripts, you can fetch information from wherever you want to and make \
+kvigall show it. SCRIPT should be the name(s) of the \
+calendar-content-fetching program(s) which you want to run. \
+Scripts can have arguments, but they don\'t have to. You can set \
+one or more scripts to be the default choice(s) by creating a config file \
+(preferably named "kvigall.config") inside your scripts path and writing \
+"default scripts = YOURSCRIPT1[:args][, YOURSCRIPT2[:args][...]]" to it. As stated \
+above, this config file can also be used to preconfigure other \
+settings. These other settings use the same syntax.')
+parser.add_option('-u', '--update-after', dest='update_after', metavar='TIME',
+                  help='fetch a new version from the given \
+calendar script after this period of time (if in seconds: <number>, if \
+in minutes: <number>m, if in hours: <number>h, if in days: <number>d, \
+if in weeks (7 days): <number>w, \
+defaults to one hour, named "update after" in your config file)')
+parser.add_option('-p', '--scripts-path', dest='scripts_path', metavar='PATH',
+                  help='set the directory containing your calendar \
+scripts (defaults to $HOME/.kvigall/)')
+parser.add_option('-c', '--config-file', dest='config_file_path', metavar='PATH',
+                  help='set the path to your config file relative to \
+your scripts path (defaults to "kvigall.config")', default='kvigall.config')
+parser.add_option('-f', '--frontend', dest='frontend_name', metavar='NAME[:arg1[:arg2[...]]]',
+                  help='set the frontend to either curses (default) or \
+text. Some frontends accept options in the form of colon-separated \
+strings ("curses" accept both "command", "scroll" and "navigate" as \
+arguments, all changing the starting mode, while "text" accept none, \
+named "frontend" in your config file)')
+parser.add_option('-s', '--start-date', dest='start_date',
+                  metavar='DATE',
+                  help='start at this date, using the syntax \
+"[[YYYY]MM]DD|today|tomorrow|yesterday|[[*]x]x[n]", where x is "+" (plus) \
+or "-" (minus), and n is a number. YYYY defaults to the current year, \
+and MM defaults to the current month. \
+"+n" and "-n" means "<n> days away" and "<n> days ago", respectively \
+(n defaults to 1). "++n" and "--n" have the same \
+function, except that they don\'t count days with no events, and that \
+specifying either ++0 or --0 will only search for other days if today \
+is not counted. "*++n" and "*--n" do the opposite, so that the target \
+is a date with no events \
+(defaults to today, named "start date" in your config file)')
+parser.add_option('-E', '--start-empty', dest='start_empty',
+                  action='store_true',
+                  help='do not fetch the start date\'s events when you start \
+(named "start empty" in your config file)')
+parser.add_option('-F', '--date-format', dest='date_format', metavar='STRING',
+                  help='set the date format codes according to the C \
+strftime() function (defaults to "%A, %x", named "date format" in your \
+config file)')
+parser.add_option('-a', '--only-cache', dest='use_cache_only',
+                  action='store_true', default=False, help='use the \
+cache exclusively')
+parser.add_option('-S', '--no-styling', dest='use_styling',
+                  action='store_false', help='do not attempt to style \
+the text (named "styling" in your config file)')
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false',
+                  help='don\'t print error messages (named "verbose" in \
+your config file)')
+parser.add_option('-C', '--no-color-errors', dest='term_color_errors',
+                  action='store_false',
+                  help='do not attempt to print error messages in the \
+terminal in a red color (named "color errors" in your config file)')
+
+options, args = parser.parse_args()
+options = eval(str(options))
+options['scripts_names'] = args
+options['error'] = parser.error
+
+setproctitle(parser.prog)
+
+# Create and run
+s = System(**options)
+try:
+    s.start()
+except (EOFError, KeyboardInterrupt):
+    pass
+except Exception:
+    import traceback
+    traceback.print_exc()
+finally:
+    s.end()
