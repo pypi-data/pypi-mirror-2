@@ -1,0 +1,158 @@
+test_isbn.doctest - more detailed doctests for stdnum.isbn module
+
+Copyright (C) 2010 Arthur de Jong
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+02110-1301 USA
+
+
+This file contains more detailed doctests for the stdnum.isbn module. It
+tries to test more corner cases and detailed functionality that is not
+really useful as module documentation.
+
+>>> from stdnum import isbn
+
+
+These are normal variations that should just work.
+
+>>> isbn.is_valid('978-9024538270')
+True
+>>> isbn.is_valid(u'1857982185')
+True
+>>> isbn.is_valid('85152-629-2') # 9-digit SBN (silently converted to ISBN10)
+True
+
+
+These are tests to check what happes when a wrong type is passed.
+
+>>> isbn.is_valid(1857982185) # integer, not string
+False
+>>> isbn.is_valid(None)
+False
+>>> isbn.is_valid('')
+False
+
+
+Tests for mangling and incorect check digits.
+
+>>> isbn.is_valid('08515x-629-2') # added X in the middle
+False
+>>> isbn.is_valid('85152-629-1') # incorrect check digit
+False
+>>> isbn.is_valid('978-902453827X') # ISBN with X check digit
+False
+
+
+See if ISBN10 to 13 conversion works.
+
+>>> isbn.to_isbn13('978-9024538270') # ISBN13 should stay ISBN13
+'978-9024538270'
+>>> isbn.to_isbn13('1 85798218 5')
+'978 1 85798218 3'
+>>> isbn.to_isbn13('1857982185')
+'9781857982183'
+>>> isbn.to_isbn13('1-85798-218-5')
+'978-1-85798-218-3'
+>>> isbn.is_valid(isbn.to_isbn13('1 85798218 5'))
+True
+
+
+Regrouping tests.
+
+>>> isbn.split('9024538270') # normal ISBN10
+('', '90', '245', '3827', '0')
+>>> isbn.split('9999678270') # ISBN10, unknown publisher in group
+('', '99996', '', '7827', '0')
+>>> isbn.split('979-20-1234567-8')
+('979', '', '', '201234567', '8')
+
+
+Some tests for the ranges module. This is more an internal module so
+tests here are not very critical.
+
+>>> from stdnum.isbn import ranges
+>>> list(ranges._wrap(2 * 'abc def ghijklmn opqr stuvwx yz', 40))[0]
+'abc def ghijklmn opqr stuvwx yzabc def'
+
+
+Test output function. Bit of a limited test but we see if the serialised
+form of the prefix/ranges list contains at least the same prefixes as the
+current _prefixes list.
+
+>>> import StringIO
+>>> output = StringIO.StringIO()
+>>> ranges.output(output)
+>>> k = set( x.split(' ')[0] for x in StringIO.StringIO(output.getvalue()).readlines() )
+>>> k == set(ranges._prefixes.keys())
+True
+
+
+Make an XML file with somre prefix definitions and load that into the
+ranges module.
+
+First save the current ranges so we can restore later.
+
+>>> save_prefixes = ranges._prefixes
+
+Write the XML to a file.
+
+>>> import tempfile
+>>> xmlfile = tempfile.NamedTemporaryFile(delete=False)
+>>> xmlfile.write("""<?xml version='1.0' encoding='utf-8'?>
+... <ISBNRangeMessage>
+... <MessageSerialNumber>0aad2b046ddd9b30e080cb2b24afc868</MessageSerialNumber>
+... <MessageDate>Thu, 20 May 2010 18:36:55 GMT</MessageDate>
+...  <EAN.UCCPrefixes><EAN.UCC>
+...   <Prefix>978</Prefix>
+...   <Rules>
+...    <Rule><Range>0000000-5999999</Range><Length>1</Length></Rule>
+...    <Rule><Range>6000000-6499999</Range><Length>3</Length></Rule>
+...    <Rule><Range>6500000-6999999</Range><Length>0</Length></Rule>
+...   </Rules>
+...  </EAN.UCC></EAN.UCCPrefixes>
+...  <RegistrationGroups>
+...   <Group>
+...    <Prefix>978-0</Prefix>
+...    <Rules>
+...     <Rule><Range>0000000-1999999</Range><Length>2</Length></Rule>
+...     <Rule><Range>2000000-6999999</Range><Length>3</Length></Rule>
+...    </Rules>
+...   </Group>
+...  </RegistrationGroups>
+... </ISBNRangeMessage>
+... """)
+>>> xmlfile.close()
+
+Load the XML file by URL and output it to another string. Check if the
+content of the XML has been
+
+>>> import urllib
+>>> ranges.download('file://' + urllib.pathname2url(xmlfile.name))
+>>> import sys
+>>> ranges.output()
+# generated from RangeMessage.xml, downloaded from
+# http://www.isbn-international.org/agency?rmxml=1
+# serial 0aad2b046ddd9b30e080cb2b24afc868
+# date Thu, 20 May 2010 18:36:55 GMT
+_prefixes = """
+978 0-5 600-649
+978-0 00-19 200-699
+"""
+
+Restore the original ranges and clean up.
+
+>>> ranges._prefixes = save_prefixes
+>>> import os
+>>> os.unlink(xmlfile.name)
