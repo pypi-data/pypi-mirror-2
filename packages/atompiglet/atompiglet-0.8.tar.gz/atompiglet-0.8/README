@@ -1,0 +1,68 @@
+Despite the fact that atompubbase was written by an AtomPub luminary,
+I can't deal with the fact that it doesn't have:
+* versioned releases
+* passing tests (in our fork)
+* a non-toxic interface
+
+Here's a sketch of what I want (FCurl- and lxml 2.1.2-backed):
+  >>> import atompiglet.server, atompiglet.auth, atompiglet.entry
+  >>> test_kurt_un = atompiglet.server.Server(atompiglet.server.Server.TEST_KURT)
+  A Server instance...
+
+  >> test_kurt = atompiglet.server.Server(atompiglet.server.Server.TEST_KURT, auth=atompiglet.auth.BasicAuth('orm', '123456789'))
+  An authenticated Server instance...
+
+  >>> test_kurt.service_doc()
+  I need to go looking for some OpenSearch stuff in the etree directly
+
+  >>> orm_wksp    = test_kurt.workspaces["O'Reilly"]
+  A Workspace with that atom:title
+
+  >>> pdf_cols = orm_wksp.collections_for_mimetype('application/pdf')
+  A list of all Collections that accept application/pdf documents.
+
+  >>> webpdfs_col = orm_wksp.collections["Web PDFs"]
+  A Collection with that atom:title
+
+  >>> new_entry   = webpdfs_col.add_from_file("tests/files/a_test.pdf", "application/pdf")
+  An Entry that we just created from a file 
+
+  >>> new_entry.etree
+  I'm a big boy, I can handle the XML
+
+  >>> import atompiglet.rdf
+  >>> atompiglet.rdf.set_is_format_of(new_entry, "urn:x-domain:oreilly.com:test:1")
+  Add/Update an RDF block with a dc:isFormatOf
+
+  >>> new_entry.title = "A Test Entry"
+  >>> new_entry.commit_updates()
+  Update the atom:title our copy of an Entry and then tell the server.
+
+  >>> new_entry.edited 
+  2009-01-16T00:22:30.407Z
+
+  >>> atompiglet.rdf.rdf_from_entry(new_entry)
+  An etree containing the entry's metadata in RDF form.
+
+  >>> new_entry.delete()
+  Bye, bye
+
+  >>> for entry in webpdfs_col.entries:
+  ...     print entry.location
+  A screen-full of the locations of every entry in the webpdfs collection.
+
+  >>> from __future__ import with_statement
+  >>> with new_entry:
+  ...     new_entry.title = "A New Title"
+  new_entry.commit_updates is run at the end of the with block.
+
+  >>> with new_entry:
+  ...     new_entry.title = int('Raises an Exception')
+  new_entry.commit_updates is not run. new_entry is in an inconsistent state
+  and should not be used; the exception will propagate.
+
+  >>> old_entry = atompiglet.entry.Entry.from_url(some_saved_url)
+  Some entry we knew about before, sans auth.
+
+  >>> old_entry = atompiglet.entry.Entry.from_url(some_saved_url, auth_source=test_kurt)
+  Some entry we knew about before, with auth from test_kurt.
