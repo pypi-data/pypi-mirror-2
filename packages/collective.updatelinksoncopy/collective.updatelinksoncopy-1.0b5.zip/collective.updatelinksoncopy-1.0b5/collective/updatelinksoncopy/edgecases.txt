@@ -1,0 +1,86 @@
+    >>> import transaction
+    >>> self.loginAsPortalOwner()
+
+    case 1 : an object in the copy tree points to an object outside of
+    the copy tree but which is contained in a folder that contains the
+    copy tree root path in its path
+
+    e.g. f1/f2/f3/d1
+         f1/f2/f3b/d2
+         d1 has a link to d2
+         copy f3 into f3b
+
+    >>> structure = """
+    ... <cs:contentstructure
+    ...   xmlns:cs="http://www.elyt.com/cs"
+    ...   xmlns:z="http://www.zope.org/">
+    ...   <cs:container z:portal_type="Folder" z:id="folder_1" z:title="Folder 1">
+    ...     <cs:container z:portal_type="Folder" z:id="folder_2" z:title="Folder 2">
+    ...       <cs:container z:portal_type="Folder" z:id="folder_3" z:title="Folder 3">
+    ...         <cs:leaf z:portal_type="Document" z:id="document_1" z:title="Document 1"/>
+    ...       </cs:container>
+    ...       <cs:container z:portal_type="Folder" z:id="folder_3b" z:title="Folder 3b">
+    ...         <cs:leaf z:portal_type="Document" z:id="document_2" z:title="Document 2"/>
+    ...       </cs:container>
+    ...     </cs:container>
+    ...   </cs:container>
+    ... </cs:contentstructure>"""
+
+    >>> from ely.contentgenerator import PloneContentGenerator, PloneContentSniffer
+    >>> generator = PloneContentGenerator(structure,
+    ...                                   self.portal)
+    >>> generator.generate()
+    >>> sniffer = PloneContentSniffer(self.portal.folder_1)
+    >>> from pprint import pprint
+    >>> pprint(sniffer.tree)
+    [<ATFolder at /plone/folder_1>,
+     [<ATFolder at /plone/folder_1/folder_2>,
+      [<ATFolder at /plone/folder_1/folder_2/folder_3>,
+       [<ATDocument at /plone/folder_1/folder_2/folder_3/document_1>]],
+      [<ATFolder at /plone/folder_1/folder_2/folder_3b>,
+       [<ATDocument at /plone/folder_1/folder_2/folder_3b/document_2>]]]]
+
+    make document 1 point to document 2
+
+    >>> document_1 = self.portal.folder_1.folder_2.folder_3.document_1
+    >>> document_2 = self.portal.folder_1.folder_2.folder_3b.document_2
+    >>> txt = u"""<p>this is <a href="resolveuid/%s">document 2</a>
+    ... <p>this is <a href="%s">document 2</a>""" %(document_2.UID(),'/'.join(document_2.getPhysicalPath()))
+    >>> text_field = document_1.getField('text')
+    >>> mutator = text_field.getMutator(document_1)
+    >>> mutator(txt.encode('utf8'), mimetype='text/html')
+    >>> print text_field.getAccessor(document_1)()
+    <p>this is <a href="/plone/folder_1/folder_2/folder_3b/document_2">document 2</a>
+    <p>this is <a href="/plone/folder_1/folder_2/folder_3b/document_2">document 2</a>
+
+    also do this to relatedItems
+
+    >>> document_1.setRelatedItems([document_2.UID()])
+    >>> print document_1.getRelatedItems()
+    [<ATDocument at /plone/folder_1/folder_2/folder_3b/document_2>]
+
+    make the copy
+
+    >>> transaction.savepoint(optimistic=True)
+    <transaction._transaction.Savepoint instance at ...>
+    >>> self.portal.folder_1.folder_2.folder_3b.manage_pasteObjects(self.portal.folder_1.folder_2.manage_copyObjects(['folder_3']))
+    [{'new_id': 'folder_3', 'id': 'folder_3'}]
+
+    >>> pprint(sniffer.tree)
+    [<ATFolder at /plone/folder_1>,
+     [<ATFolder at /plone/folder_1/folder_2>,
+      [<ATFolder at /plone/folder_1/folder_2/folder_3>,
+       [<ATDocument at /plone/folder_1/folder_2/folder_3/document_1>]],
+      [<ATFolder at /plone/folder_1/folder_2/folder_3b>,
+       [<ATDocument at /plone/folder_1/folder_2/folder_3b/document_2>],
+       [<ATFolder at /plone/folder_1/folder_2/folder_3b/folder_3>,
+        [<ATDocument at /plone/folder_1/folder_2/folder_3b/folder_3/document_1>]]]]]
+
+    >>> document_1_copy = self.portal.folder_1.folder_2.folder_3b.folder_3.document_1
+    >>> text_field = document_1_copy.Schema()['text']
+    >>> print text_field.get(document_1_copy, mimetype='text/x-html-safe')
+    <p>this is <a href="/plone/folder_1/folder_2/folder_3b/document_2">document 2</a>
+    <p>this is <a href="/plone/folder_1/folder_2/folder_3b/document_2">document 2</a>
+
+    >>> print document_1_copy.getRelatedItems()
+    [<ATDocument at /plone/folder_1/folder_2/folder_3b/document_2>]
