@@ -1,0 +1,76 @@
+GoogleAuthentication
+====================
+
+
+About GoogleAuthentication
+--------------------------
+
+GA takes care of the user authentication upon Google Docs service, so that the Plone 
+application can access the documents stored on Google servers. 
+
+To let the Plone application access the documents stored on Google servers, it is necessary
+to complete the authentication procedure for Web applications provided by Google Docs. The
+procedure allows Web applications to authenticate users through their Google accounts. For
+security reasons, the application acquires an authentication token which will later be used
+to dowload or upload documents from Google servers without explicitly providing the user's
+credentials. The Plone user is redirected to a Google page that invites him to insert his
+credentials. Once he logs in with his Google account, the user is asked to authorize the
+Plone application to access his documents. Then, if the user grants access, he is pointed
+again to the Plone site. The URL of the last redirection embeds the authentication token
+which, as mentioned above, allows the Plone application to access the user's documents on
+Google servers for the following requests.
+
+GA inititates the authentication procedure upon Google Docs immediately after the user has
+logged into the Plone application. The procedure will be executed just once, as when the
+Plone application obtains the authentication token, it will store as an attribute, 
+google_token, in the user profile.
+
+
+Copyright and license
+---------------------
+
+Copyright (c) 2009 Federica D'Elia
+
+This software is subject to the provisions of the GNU General Public License,
+Version 2.0 (GPL).  A copy of the GPL should accompany this distribution.
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
+WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
+FOR A PARTICULAR PURPOSE
+
+See the `LICENSE` file that comes with this product.
+
+
+Requirements
+------------
+
+gdata-1.3.0 must be correctly installed.
+
+
+Installation
+------------
+
+With buildout
+-------------
+
+This example speaks of itself::
+
+  [buildout]
+  ...
+  eggs =
+      ...
+      collective.googleauthentication
+      ...
+  ...
+  zcml =
+      ...
+      collective.googleauthentication
+      ...
+  ...
+
+
+Credits
+-------
+
+Main developer: D'Elia Federica <federica.delia@redturtle.it>
+
