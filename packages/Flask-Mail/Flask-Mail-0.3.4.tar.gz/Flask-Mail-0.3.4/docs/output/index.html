@@ -1,0 +1,335 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>flask-mail &mdash; Flask-Mail v0.3 documentation</title>
+    <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Flask-Mail v0.3 documentation" href="#" /> 
+  </head>
+  <body>
+  
+  
+  <div class=indexwrapper>
+  
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-flask-mail">
+<span id="flask-mail"></span><h1>flask-mail<a class="headerlink" href="#module-flask-mail" title="Permalink to this headline">¶</a></h1>
+<p>One of the most basic functions in a web application is the ability to send
+emails to your users.</p>
+<p>The <strong>Flask-Mail</strong> extension provides a simple interface to set up SMTP with your
+<a class="reference external" href="http://flask.pocoo.org">Flask</a> application and to send messages from your views and scripts.</p>
+<p>Source code and issue tracking at <a class="reference external" href="http://bitbucket.org/danjac/flask-mail">Bitbucket</a>.</p>
+<div class="section" id="installing-flask-mail">
+<h2>Installing Flask-Mail<a class="headerlink" href="#installing-flask-mail" title="Permalink to this headline">¶</a></h2>
+<p>Install with <strong>pip</strong> and <strong>easy_install</strong>:</p>
+<div class="highlight-python"><pre>pip install Flask-Mail</pre>
+</div>
+<p>or download the latest version from Bitbucket:</p>
+<div class="highlight-python"><pre>hg clone http://bitbucket.org/danjac/flask-mail
+
+cd flask-mail
+
+python setup.py install</pre>
+</div>
+<p>If you are using <strong>virtualenv</strong>, it is assumed that you are installing flask-mail
+in the same virtualenv as your Flask application(s).</p>
+</div>
+<div class="section" id="configuring-flask-mail">
+<h2>Configuring Flask-Mail<a class="headerlink" href="#configuring-flask-mail" title="Permalink to this headline">¶</a></h2>
+<p><strong>Flask-Mail</strong> is configured through the standard Flask config API. These are the available
+options (each is explained later in the documentation):</p>
+<ul class="simple">
+<li><strong>MAIL_SERVER</strong> : default <strong>&#8216;localhost&#8217;</strong></li>
+<li><strong>MAIL_PORT</strong> : default <strong>25</strong></li>
+<li><strong>MAIL_USE_TLS</strong> : default <strong>False</strong></li>
+<li><strong>MAIL_USE_SSL</strong> : default <strong>False</strong></li>
+<li><strong>MAIL_DEBUG</strong> : default <strong>app.debug</strong></li>
+<li><strong>MAIL_USERNAME</strong> : default <strong>None</strong></li>
+<li><strong>MAIL_PASSWORD</strong> : default <strong>None</strong></li>
+<li><strong>DEFAULT_MAIL_SENDER</strong> : default <strong>None</strong></li>
+</ul>
+<p>In addition the standard Flask <tt class="docutils literal"><span class="pre">TESTING</span></tt> configuration option is used by <strong>Flask-Nail</strong>
+in unit tests (see below).</p>
+<p>Emails are managed through a <tt class="docutils literal"><span class="pre">Mail</span></tt> instance:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">flaskext.mail</span> <span class="kn">import</span> <span class="n">Mail</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">mail</span> <span class="o">=</span> <span class="n">Mail</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Alternatively you can set up your <tt class="docutils literal"><span class="pre">Mail</span></tt> instance later at configuration time, using the
+<strong>init_app</strong> method:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">mail</span> <span class="o">=</span> <span class="n">Mail</span><span class="p">()</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">mail</span><span class="o">.</span><span class="n">init_app</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="sending-messages">
+<h2>Sending messages<a class="headerlink" href="#sending-messages" title="Permalink to this headline">¶</a></h2>
+<p>To send a message first create a <tt class="docutils literal"><span class="pre">Message</span></tt> instance:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">flaskext.mail</span> <span class="kn">import</span> <span class="n">Message</span>
+
+<span class="nd">@app.route</span><span class="p">(</span><span class="s">&quot;/&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">():</span>
+
+    <span class="n">msg</span> <span class="o">=</span> <span class="n">Message</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">,</span>
+                  <span class="n">sender</span><span class="o">=</span><span class="s">&quot;from@example.com&quot;</span><span class="p">,</span>
+                  <span class="n">recipients</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;to@example.com&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>You can set the recipient emails immediately, or individually:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msg</span><span class="o">.</span><span class="n">recipients</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;you@example.com&quot;</span><span class="p">]</span>
+<span class="n">msg</span><span class="o">.</span><span class="n">add_recipient</span><span class="p">(</span><span class="s">&quot;somebodyelse@example.com&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If you have set <tt class="docutils literal"><span class="pre">DEFAULT_MAIL_SENDER</span></tt> you don&#8217;t need to set the message
+sender explicity, as it will use this configuration value by default:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msg</span> <span class="o">=</span> <span class="n">Message</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">,</span>
+              <span class="n">recipients</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;to@example.com&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>If the <tt class="docutils literal"><span class="pre">sender</span></tt> is a two-element tuple, this will be split into name
+and address:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msg</span> <span class="o">=</span> <span class="n">Message</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">,</span>
+              <span class="n">sender</span><span class="o">=</span><span class="p">(</span><span class="s">&quot;Me&quot;</span><span class="p">,</span> <span class="s">&quot;me@example.com&quot;</span><span class="p">))</span>
+
+<span class="k">assert</span> <span class="n">msg</span><span class="o">.</span><span class="n">sender</span> <span class="o">==</span> <span class="s">&quot;Me &lt;me@example.com&gt;&quot;</span>
+</pre></div>
+</div>
+<p>The message can contain a body and/or HTML:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msg</span><span class="o">.</span><span class="n">body</span> <span class="o">=</span> <span class="s">&quot;testing&quot;</span>
+<span class="n">msg</span><span class="o">.</span><span class="n">html</span> <span class="o">=</span> <span class="s">&quot;&lt;b&gt;testing&lt;/b&gt;&quot;</span>
+</pre></div>
+</div>
+<p>Finally, to send the message, you use the <tt class="docutils literal"><span class="pre">Mail</span></tt> instance configured with your Flask application:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">mail</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="bulk-emails">
+<h2>Bulk emails<a class="headerlink" href="#bulk-emails" title="Permalink to this headline">¶</a></h2>
+<p>Usually in a web application you will be sending one or two emails per request. In certain situations
+you might want to be able to send perhaps dozens or hundreds of emails in a single batch - probably in
+an external process such as a command-line script or cronjob.</p>
+<p>In that case you do things slightly differently:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">with</span> <span class="n">mail</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">users</span><span class="p">:</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="s">&#39;...&#39;</span>
+        <span class="n">subject</span> <span class="o">=</span> <span class="s">&quot;hello, </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">user</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Message</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="p">[</span><span class="n">user</span><span class="o">.</span><span class="n">email</span><span class="p">],</span>
+                      <span class="n">body</span><span class="o">=</span><span class="n">message</span><span class="p">,</span>
+                      <span class="n">subject</span><span class="o">=</span><span class="n">subject</span><span class="p">)</span>
+
+        <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The connection to your email host is kept alive and closed automatically once all the messages have been sent.</p>
+</div>
+<div class="section" id="attachments">
+<h2>Attachments<a class="headerlink" href="#attachments" title="Permalink to this headline">¶</a></h2>
+<p>Adding attachments is straightforward:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">with</span> <span class="n">app</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="s">&quot;image.png&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+    <span class="n">msg</span><span class="o">.</span><span class="n">attach</span><span class="p">(</span><span class="s">&quot;image.png&quot;</span><span class="p">,</span> <span class="s">&quot;image/png&quot;</span><span class="p">,</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>See the <a class="reference external" href="#api">API</a> for details.</p>
+</div>
+<div class="section" id="unit-tests">
+<h2>Unit tests<a class="headerlink" href="#unit-tests" title="Permalink to this headline">¶</a></h2>
+<p>When you are sending messages inside of unit tests, or in a development
+environment, it&#8217;s useful to be able to suppress email sending.</p>
+<p>If the setting <tt class="docutils literal"><span class="pre">TESTING</span></tt> is set to <tt class="xref docutils literal"><span class="pre">True</span></tt>, emails will be
+suppressed. Calling <tt class="docutils literal"><span class="pre">send()</span></tt> on your messages will not result in
+any messages being sent.</p>
+<p>However, it&#8217;s still useful to track in  your unit tests which
+emails have been sent.</p>
+<p>When <tt class="docutils literal"><span class="pre">TESTING</span></tt> is on, an <tt class="docutils literal"><span class="pre">outbox</span></tt> list is attached to the
+thread local <tt class="docutils literal"><span class="pre">g</span></tt> object, so you can then inspect what emails are sent
+(or would be sent in production mode):</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">assert</span> <span class="n">g</span><span class="o">.</span><span class="n">outbox</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">subject</span> <span class="o">==</span> <span class="s">&quot;testing&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="header-injection">
+<h2>Header injection<a class="headerlink" href="#header-injection" title="Permalink to this headline">¶</a></h2>
+<p>To prevent <a class="reference external" href="http://www.nyphp.org/PHundamentals/8_Preventing-Email-Header-Injection">header injection</a> attempts to send
+a message with newlines in the subject, sender or recipient addresses will result in a <tt class="docutils literal"><span class="pre">BadHeaderError</span></tt>.</p>
+</div>
+<div class="section" id="module-flaskext.mail">
+<span id="api"></span><h2>API<a class="headerlink" href="#module-flaskext.mail" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="flaskext.mail.Mail">
+<em class="property">class </em><tt class="descclassname">flaskext.mail.</tt><tt class="descname">Mail</tt><big>(</big><em>app=None</em><big>)</big><a class="headerlink" href="#flaskext.mail.Mail" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages email messaging</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>app</strong> &#8211; Flask instance</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="flaskext.mail.Mail.send">
+<tt class="descname">send</tt><big>(</big><em>message</em><big>)</big><a class="headerlink" href="#flaskext.mail.Mail.send" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a single message instance. If TESTING then
+will add the message to <strong>g.outbox</strong>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>message</strong> &#8211; a Message instance.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="flaskext.mail.Mail.connect">
+<tt class="descname">connect</tt><big>(</big><em>send_many=True</em><big>)</big><a class="headerlink" href="#flaskext.mail.Mail.connect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Opens a connection to the mail host.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>send_many</strong> &#8211; keep connection alive</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="flaskext.mail.Connection">
+<em class="property">class </em><tt class="descclassname">flaskext.mail.</tt><tt class="descname">Connection</tt><big>(</big><em>mail</em>, <em>testing=False</em>, <em>send_many=False</em><big>)</big><a class="headerlink" href="#flaskext.mail.Connection" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles connection to host.</p>
+<dl class="method">
+<dt id="flaskext.mail.Connection.send">
+<tt class="descname">send</tt><big>(</big><em>message</em><big>)</big><a class="headerlink" href="#flaskext.mail.Connection.send" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends message.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>message</strong> &#8211; Message instance.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="flaskext.mail.Message">
+<em class="property">class </em><tt class="descclassname">flaskext.mail.</tt><tt class="descname">Message</tt><big>(</big><em>subject</em>, <em>recipients=None</em>, <em>body=None</em>, <em>html=None</em>, <em>sender=None</em><big>)</big><a class="headerlink" href="#flaskext.mail.Message" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encapsulates an email message.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>subject</strong> &#8211; email subject header</li>
+<li><strong>recipients</strong> &#8211; list of email addresses</li>
+<li><strong>body</strong> &#8211; plain text message</li>
+<li><strong>html</strong> &#8211; HTML message</li>
+<li><strong>sender</strong> &#8211; email sender address, or <strong>DEFAULT_MAIL_SENDER</strong> by default</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="flaskext.mail.Message.attach">
+<tt class="descname">attach</tt><big>(</big><em>filename=None</em>, <em>content_type=None</em>, <em>data=None</em>, <em>disposition=None</em><big>)</big><a class="headerlink" href="#flaskext.mail.Message.attach" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds an attachment to the message.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>filename</strong> &#8211; filename of attachment</li>
+<li><strong>content_type</strong> &#8211; file mimetype</li>
+<li><strong>data</strong> &#8211; the raw file data</li>
+<li><strong>disposition</strong> &#8211; content-disposition (if any)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="flaskext.mail.Message.add_recipient">
+<tt class="descname">add_recipient</tt><big>(</big><em>recipient</em><big>)</big><a class="headerlink" href="#flaskext.mail.Message.add_recipient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds another recipient to the message.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>recipient</strong> &#8211; email address of recipient.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+
+  
+  </div>
+  
+
+  </body>
+</html>
