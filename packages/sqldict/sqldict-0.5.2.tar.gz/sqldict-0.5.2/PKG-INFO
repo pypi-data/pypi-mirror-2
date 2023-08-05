@@ -1,0 +1,89 @@
+Metadata-Version: 1.0
+Name: sqldict
+Version: 0.5.2
+Summary: sqldict - You have a dict of unlimited capacity providing transparent object serialization, its up to you now.
+Home-page: UNKNOWN
+Author: Krister Hedfors
+Author-email: krister.hedfors+sqldict@gmail.com
+License: UNKNOWN
+Description: 
+        Welcome, please read through this brief documentation.
+        
+        All the sqldict examples below will use an sqlalchemy engine e.
+        Certain database engines will need certain back-end modules
+        which in most cases are available as packages in your *nix
+        distribution or as .exe installers, see INSTALLATION* below.
+        
+        Lets create the engine object:
+        
+        >>> from sqlalchemy import *
+        >>> dburi = 'mysql://user:pass@localhost/sqldict'
+        >>> e = create_engine(dburi)
+        
+        Create database tables, t1 and t2, to hold dicts d1 and d2:
+        
+        >>> d1 = sqldict(e, "t1", create=1)
+        >>> d2 = sqldict(e, "t2", create=1, keytype=String(50), valtype=Integer)
+        
+        An sqldict() support all or most common dict operations depending on
+        which sqldict extensions are chosen.
+        
+        This is a selection of some useful sqldict instantiation args:
+        
+        echo          - print all executed sql queries to stdout (bool)
+        create        - create database table (bool)
+        sort          - 0=no sort, 1=keys, 2=values
+        serialize     - transparent pickling for non-String type values
+        assigned to String-type columns (bool)
+        getrow        - get entire row instead of just val (bool)
+        keycol        - name of key column
+        valcol        - name of val column
+        keytype       - sqlalchemy column type for key
+        valtype       - sqlalchemy column type for val
+        
+        Actions taken such as setting/getting items result in logically
+        corresponding SQL statements. Some examples are:
+        
+        __getitem__() - SELECT keycol FROM tablename WHERE valcol=%(val)s
+        iter*()       - iterate over result-set from a select statement
+        keys|values() - returns list(iter*())
+        __del__()     - DELETE FROM..
+        __setitem__() - UPDATE.., INSERT..
+        
+        
+        
+        >>> contents = {"asd":123}
+        >>> d1.update(contents)
+        >>> d2.update(contents)
+        >>> assert d1["asd"] == "123"
+        >>> assert d2["asd"] == 123
+        >>> d1.drop()
+        >>> d2.drop()
+        
+        >>> assert e.execute("create table asd (i integer, s varchar(50))")
+        >>> assert e.execute("insert into asd values (42, 'gubbe')")
+        >>> assert e.execute("insert into asd values (99, 'hatt')")
+        >>> d3 = sqldict(e, "asd", keycol="s", valcol="i")
+        >>> d4 = sqldict(e, "asd", keycol="i", valcol="s")
+        >>> #d5 = sqldict(e, "asd", keycol="s", valgetter=lambda r:r)
+        >>> assert d3["gubbe"] == 42
+        >>> assert d4[42] == "gubbe"
+        >>> assert e.execute("drop table asd")
+        >>>
+        >>> #assert d5["gubbe"]["i"] == 42
+        
+        broken (at least mysql) when combining keytype and serialize,
+        it tries to serialize 42.
+        FIXME: d[int] = Integer or d[Integer]
+        >>> from sqlalchemy import *
+        >>> d = sqldict(e, "laarge", create=1, serialize=1, keytype=Integer)
+        >>> d[42] = "galning"
+        
+        INSTALLATION INSTRUCTIONS
+        
+        I use debian, so I do the following:
+        $ sudo apt-get install python-setuptools python-mysqldb
+        $ easy_install sqlalchemy
+        $ easy_install sqldict
+        
+Platform: UNKNOWN
