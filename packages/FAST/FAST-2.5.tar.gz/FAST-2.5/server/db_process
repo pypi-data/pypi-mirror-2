@@ -1,0 +1,88 @@
+#!/usr/bin/perl
+#
+# This generates a summary file that is emailed to appropriate users.
+#
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+#
+
+#
+# Get the DB Server configuration
+#
+unshift @INC, ".";
+require db_config;
+#
+# generic setup
+# 
+$ENV{PATH} = "/bin:/usr/bin:" . $ENV{PATH};
+umask 002;
+
+#sub update_datadirectory {
+#  my $project = shift;
+#  if (-d "data") {
+#  } else {
+#      `mkdir data`;
+#  }
+#  if (!(-d data)) {
+#     die "cvs failed: $_" if ($_ = `$cvs_checkout`);
+#  } else {
+#     die "cvs failed: $_" if ($_ = `$cvs_update`);
+#  }
+#  opendir DATADIR, "data/$project" or die ("opendir failed");
+#  @dirlist = grep /(\.xml|\.out)$/, readdir DATADIR;
+#  closedir DATADIR;
+#  return @dirlist;
+#}
+
+##
+## MAIN
+##
+@projects = ();
+$mail=0;
+if ($ARGV[0] eq "--mail") {
+   $mail=1;
+   shift @ARGV;
+}
+if ($ARGV[0] eq "all") {
+  @projects = keys %db_config;
+} else {
+  @projects = @ARGV;
+}
+#
+# Iterate through the software projects
+#
+foreach $project (@projects) {
+  print "  Analyzing data for project $project build ...\n";
+  mkdir $project;
+  #
+  # Summarizing build
+  #
+  `(./db_summary --html --install $project $db_config{$project}{'name'}) > $project/db_mail.out 2>&1`;
+  #`(mv summary.txt db_mail.summary.$project) > /dev/null 2>&1`;
+  #`(mv db_summary.txt db_summary.txt.$project) > /dev/null 2>&1`;
+  if (-e "$project/db_summary.txt") {
+     $summary = `cat $project/db_summary.txt`;
+  } else {
+     $summary = "ERROR";
+  }
+  #
+  # Summarizing code checks
+  #
+  `(./db_code_checks --install $project ) > $project/db_code_checks.out 2>&1`;
+  `(mv $project/code_checks.txt $project/db_mail.code_checks) > /dev/null 2>&1`;
+  #
+  # Send EMAIL
+  #
+  $summary = "$db_config{$project}{'name'} SQA Report: $summary";
+  if ($mail == 1) {
+     `cat $project/summary.txt | Mail -s "$summary" $db_config{$project}{'maillist'}`;
+     }
+  }
+

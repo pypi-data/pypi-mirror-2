@@ -1,0 +1,79 @@
+#! /usr/bin/perl
+##
+## A code check script that uses SLOCCOUNT to count lines of
+## code.
+##
+
+##
+## Strip out bad xml characters in error messages
+## call with a string reference
+##
+sub scrub {
+  my $unsafe='<>&"';
+  my $uri="use URI::Escape;";   # someone already wrote this package!
+  my $lineref = shift;
+
+  eval $uri;                    # but it might not be installed
+  if ($@) {
+    eval "\$\$lineref =~ tr /$unsafe/+/;";      # not installed
+  } else {
+    $$lineref = uri_escape($$lineref, $unsafe);
+  }
+}
+
+
+if (! @ARGV) {
+   print "lc <logfile> <target-dirs> [<ignore-subdirs> ...]\n";
+   exit(1);
+}
+
+open(LOGFILE,">$ARGV[0]") || die "Error opening $ARGV[0]";
+#
+# Find the packages that are source directories
+#
+my @dirs = glob($ARGV[1]);
+my @ignore = ();
+my $dir = '';
+
+while ($dir = $ARGV[2]) {
+  push @ignore, glob($dir);
+  shift;
+}
+#
+# For each source directory, collect the source lines info.
+#
+foreach $dir (@dirs) {
+  $ignore=0;
+  foreach $d (@ignore) {
+    if ($dir eq $d) {
+      $ignore=1;
+      next;
+    }
+  }
+  if ($ignore == 1) {
+     next;
+  }
+  if (-d "$dir") {
+     $tmp = `sloccount $dir`;
+     print LOGFILE "\n";
+     print LOGFILE "SLOCCOUNT SUMMARY: $dir\n";
+     print LOGFILE "\n";
+     print LOGFILE "$tmp\n";
+     print LOGFILE "\n";
+     $ttmp = $tmp;
+     if ($ttmp =~ m/SLOC total is zero/) {
+        $ttmp="0";
+     } else {
+       $ttmp =~ s/(.+)Code \(SLOC\)([ ]*)= (.*)Development(.+)/\3/s;
+       chomp($ttmp);
+       $ttmp =~ s/,//g;
+       scrub(\$ttmp);
+     }
+     print "    <Measurement>\n";
+     print "      <Name>$dir</Name>\n";
+     print "      <Value>$ttmp</Value>\n";
+     print "    </Measurement>\n";
+   }
+}
+
+close(LOGFILE);

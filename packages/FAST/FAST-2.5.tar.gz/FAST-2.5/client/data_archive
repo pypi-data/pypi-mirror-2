@@ -1,0 +1,89 @@
+#!/bin/sh
+##
+## Process files in the 'data' directory that is used to commit testing
+## result files that can be exacted by the FAST server.
+##
+## data_archive update
+##	Updates the data archive
+## data_archive commit
+##	Commits files in the data archive
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+
+##
+
+username=${user}
+if [ "$username" = "" ] ; then
+  username=${USER}
+  if [ "$username" = "" ] ; then
+   echo "Can not obtain user name"
+   exit 1
+  fi
+fi
+
+myhost=`hostname`
+if [ "$myhost" = "$FAST_SERVER_MACHINE" ]; then
+  cvs="cvs -d $FAST_SERVER_CVSROOT"
+else
+  cvs="cvs -d :ext:${username}@$FAST_SERVER_MACHINE:$FAST_SERVER_CVSROOT"
+fi
+
+CVSROOT=
+CVS_RSH=`pwd`/fast/client/ssh.cvs
+export CVS_RSH
+
+if [ "$1" = "update" ]; then
+   if test -d data ; then 
+      echo "";
+   else
+      $cvs -Q checkout -d data data/$FAST_PROJECT > /dev/null 2>&1;
+      if [ $? != 0 ]; then
+         $cvs -Q checkout data ;
+         if [ $? != 0 ]; then
+           echo $cvs -Q checkout data ;
+           echo "failed"
+           exit 1
+         fi
+         cd data ;
+	 mkdir $FAST_PROJECT ;
+         $cvs -Q add $FAST_PROJECT ;
+         if [ $? != 0 ]; then
+           echo $cvs -Q add $FAST_PROJECT ;
+           echo "failed"
+           exit 1
+         fi
+	 cd ..
+	 \rm -Rf data
+         $cvs -Q checkout -d data data/$FAST_PROJECT ;
+         if [ $? != 0 ]; then
+           echo $cvs -Q checkout -d data data/$FAST_PROJECT ;
+           echo "failed"
+           exit 1
+         fi
+      fi
+   fi
+fi
+
+if [ "$1" = "commit" ]; then
+   cd data
+   (find . -name '*.tgz' -print | xargs -n100 $cvs add -kb) > ../data.out 2>&1
+   $cvs update >> ../data.out 2>&1
+   if [ $? != 0 ]; then
+     echo "cvs update of test data failed"
+     exit 1
+   fi
+   ($cvs -z 3 commit -m NightlyBuild && (find . -name '*.tgz' -print | xargs -n100 /bin/rm)) >> ../data.out 2>&1
+   if [ $? != 0 ]; then
+     echo "cvs commit of new test data failed"
+     exit 1
+   fi
+   cd ..
+   \rm -Rf data
+fi

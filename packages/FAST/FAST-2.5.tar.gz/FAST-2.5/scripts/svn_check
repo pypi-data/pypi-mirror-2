@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+#
+# svn_summary
+# Summarize the state of SVN repositories
+#
+
+import sys
+import os
+import commands
+from optparse import OptionParser
+import fast.sqa.svn
+
+##
+## MAIN
+##
+parser = OptionParser()
+parser.usage = "svn_summary [options] <svn-repository> [...]"
+parser.description="A utility to check one or more subversion repositories for (a) valid external links and (b) up-to-date externals"
+parser.add_option("-d","--debug",
+        help="Print debugging information",
+        action="store_true",
+        dest="debug",
+        default=False)
+parser.add_option("-v","--validate",
+        help="Validate externals",
+        action="store_true",
+        dest="validate",
+        default=False)
+parser.add_option("--aux",
+        help="Define auxiliary subversion repositories that are used to check externals",
+        action="append",
+        dest="auxsvn",
+        default=[])
+parser.add_option("--format",
+        help="Define the format of the output: text, xml, alerts",
+        action="store",
+        dest="format",
+        default=None)
+
+(options,args) = parser.parse_args(args=sys.argv)
+if len(args) == 1:
+    parser.print_help()
+    sys.exit(1)
+if options.validate:
+    if options.format=="text":
+        print "Must use the XML format when validating"
+        sys.exit(1)
+    elif options.format is None:
+        options.format="xml"
+if options.format is None:
+    options.format = "text"
+
+#
+# Create a dictionary of Subversion projects and their corresponding release directories
+#
+svn_projects = {}
+dirs = args[1:] + options.auxsvn
+for repos in dirs:
+  if repos[-1] == "/":
+     repos=repos[0:-1]
+  if options.format=="xml":
+     print "<Repository>"
+     print "  <Name>"+repos+"</Name>"
+     tmp = repos in options.auxsvn or repos+"/" in options.auxsvn
+     print "  <Auxiliary>"+`tmp`+"</Auxiliary>"
+  elif options.format=="text":
+     print "REPOSITORY",repos
+  dir = commands.getoutput("svn ls " + repos)
+  dirs = dir.split("\n")
+  has_trunk = "trunk/" in dirs
+  if has_trunk:
+     proj = fast.sqa.svn.SVNProject(repos,None)
+     key = repos
+     if proj.name is not None:
+        key = key+"/"+proj.name
+     svn_projects[ key ] = proj
+     proj.write(options.format)
+  else:
+     for file in dir.split("\n"):
+       file = file.strip()
+       if file[-1] == "/":
+          proj = fast.sqa.svn.SVNProject(repos,file[:-1])
+          svn_projects[ proj.proj_root ] = proj
+          proj.write(options.format)
+  if options.format=="xml":
+     print "</Repository>"
+  elif options.format == "text":
+     print ""
+
+if not options.validate:
+   sys.exit(0)
+
+#
+# Scan for externals, and verify whether they are for the latest releases
+#
+referenced_projects = {}
+for repos_dir in args[1:]:
+    fast.sqa.svn.validate_dir(repos_dir, svn_projects, referenced_projects, debug=options.debug)
+
+#
+# Summarized referenced Projects
+#
+for projroot in referenced_projects.keys():
+  print "<Reference>" + projroot + "</Reference>"

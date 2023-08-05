@@ -1,0 +1,139 @@
+#! /usr/bin/env python
+
+import signal
+import sys
+import re
+import os
+import random
+import math
+pathname = os.path.dirname(sys.argv[0])
+fullpath = os.path.abspath(pathname)
+os.sys.path = os.sys.path + [fullpath + "/../../.."] + [fullpath+"/../../../../pyutilib"]
+import pyutilib.subprocess
+from fast import exact
+
+#
+# Process the output log
+#
+def process_log(OUTPUT,logfile):
+	INPUT = open(logfile,"r")
+	i=0
+	status = 1
+        leak_flag=False
+	valgrind_errors=""
+	valgrind_leaks=""
+	niter="-1"
+	maxmem="-1"
+	for line in INPUT.xreadlines():
+	  words = re.split('[ \t]+',line.strip())
+	  #print `i` + " " + line + `words`
+	  if len(words) < 2:
+	     continue
+	  if words[0] == "Seed:":
+	     print >>OUTPUT, "Seed numeric/integer " + words[1]
+	     status = 0
+	  elif words[0] == "Niter:":
+	     niter = words[1]
+	  elif words[0] == "Mapping:":
+	     print >>OUTPUT, "Mapping text/string " + words[1]
+	  elif words[1] == "Maximum" and words[2] == "memory":
+	     maxmem = words[4]
+	  elif len(words) == 2:
+	     print >>OUTPUT, words[0][:-1] + " numeric/double " + words[1]
+	  elif words[0] == "TIMING:":
+	     systime=eval(words[6])
+	     usertime=eval(words[4])
+	     total = systime+usertime
+	     if total > eval(words[2]):
+		total=eval(words[2])
+	     print >>OUTPUT, "\"CPU TotalTime\" numeric/double " + `total`
+	     print >>OUTPUT, "\"WallClock TotalTime\" numeric/double " + words[2]
+          elif words[1] == "ERROR" and words[2] == "SUMMARY:":
+             valgrind_errors = words[3]
+          elif leak_flag==True and words[1] == "definitely":
+             valgrind_leaks = words[3]
+             leak_flag=False
+          elif words[1] == "LEAK" and words[2] == "SUMMARY:":
+             leak_flag=True
+
+          print words
+	  i=i+1
+        #
+        # Remove commas from valgrind #'s
+        #
+	if valgrind_errors != "":
+           p = re.compile( ',' )
+           valgrind_errors = p.sub( "", valgrind_errors)
+           valgrind_leaks = p.sub( "", valgrind_leaks)
+        else:
+	   #
+	   # On machines without Valgrind, we simply print the expected
+	   # statistics.  This is fine for a test code ... but these defaults
+	   # are inappropriate for real testing.  Instead, use a value like "-1"
+	   #
+           valgrind_errors = "0"
+           valgrind_leaks = "8"
+	print >>OUTPUT, "MaxMemory numeric/integer " + maxmem
+	print >>OUTPUT, "Niter numeric/integer " + niter
+        print >>OUTPUT, "\"Valgrind Errors\" numeric/integer " + valgrind_errors
+        print >>OUTPUT, "\"Valgrind Leaks\" numeric/integer " + valgrind_leaks
+
+	print >>OUTPUT, "NumLines numeric/integer \"\"\""
+	print >>OUTPUT, i
+	print >>OUTPUT, "\"\"\""
+	print >>OUTPUT, "exit_status numeric/integer " + `status`;
+
+
+
+##
+## MAIN
+##
+#
+# Setup signal handler
+#
+signal.signal(signal.SIGTERM, pyutilib.subprocess.signal_handler)
+signal.signal(signal.SIGINT, pyutilib.subprocess.signal_handler)
+#
+# Process factors
+#
+# NOTE: the 'option' variable may not be necessary in general.  It's handy
+# here, but frankly it was hard to figure out how to initialize this properly
+# for all of the exact test experiments.
+#
+(factor,option) = exact.process_input_file(sys.argv[1])
+option.set("seed", int(option["seed"]))
+#
+# Generate log file
+#
+#
+# Compute a simple randomized scalar, and evaluate it with (x-1)^2
+#
+if "EXACT_DRIVER" in os.environ.keys():
+   driver = os.environ["EXACT_DRIVER"]
+else:
+   driver = ""
+if 'iters' in factor.keys():
+   niters=factor['iters']
+else:
+   niters=1
+if 'sleep' in factor.keys():
+   sleep=factor['sleep']
+else:
+   sleep=0
+try:
+   tmp = eval(option["seed"])
+except:
+   tmp = option["seed"]
+if 'proby' in option.keys():
+   cmd = driver + " ./testfn " + `option["seed"]` + " " + factor['mapping'] + " " + `factor['scale']` + " " + `option['proby']` + " " + `niters` + " " + `sleep`
+else:
+   cmd = driver + " ./testfn " + `option["seed"]` + " " + factor['mapping'] + " " + `factor['scale']` + " " + `factor['proby']` + " " + `niters`  + " " + `sleep`
+print "Command Line: " + cmd
+[rc, output] = pyutilib.subprocess.run(cmd,sys.argv[3])
+print output
+#
+# Generate a measurements file (*.out)
+#
+OUTPUT = open(sys.argv[2],"w")
+process_log(OUTPUT,sys.argv[3])
+OUTPUT.close()

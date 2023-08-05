@@ -1,0 +1,80 @@
+#!/bin/csh -f
+#
+# This is a simple script that invokes the test daemon in the user's
+# default shell
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+
+#
+
+echo "cron_script:  Building fast configuration...."
+if (-e data.out) then
+   \rm data.out
+endif
+
+set mypwd = `pwd`
+set fast = $mypwd/fast/client
+set path = ($path $mypwd)
+
+if (! -e config) then
+   echo "ERROR: missing FAST configuration!"
+   exit 1
+endif
+
+#
+# Process configuration information
+#
+cat config | awk -f $fast/config.awk >! config.csh
+source config.csh
+\rm config.csh
+
+echo "cron_script:  Done."
+
+#
+# Create the 'data' directory and prepare the data archive for data
+#
+echo "cron_script:  Preparing data archive...."
+$fast/data_archive update
+if ($status != 0) then
+  exit 1
+endif
+echo "cron_script:  Done."
+#
+# Launch the fast client daemon
+#
+echo "cron_script:  Launching test_daemon...."
+if ("$1" == "update") then
+   $fast/test_daemon --I=$fast --archive --config=config --update
+else
+   $fast/test_daemon --I=$fast --archive --config=config
+endif
+if ($status != 0) then
+  echo "Test deamon failed."
+  exit 1
+endif
+echo "cron_script:  Done."
+
+#
+# Commit the data archive
+#
+echo "cron_script:  Commiting data archive...."
+if ("$1" != "test") then
+   $fast/data_archive commit
+   if ($status != 0) then
+     exit 1
+   endif
+endif
+echo "cron_script:  Done."
+#
+# Perform local installations if desired
+#
+if (-e scripts/install_script) then
+   scripts/install_script
+endif

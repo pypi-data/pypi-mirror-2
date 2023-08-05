@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+#
+# NOTE: this command has been depricated because of the 'gcovr' command, but it is 
+# left here for backward compatibility in FAST.
+#
+# lcov_summary - Summarize the output of lcov directories
+#
+# Revision History
+#   12/21/2006 WEH
+#	Initial revision
+#
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+#
+
+import os
+import sys
+import glob
+import re
+import commands
+
+##
+## MAIN
+##
+if len(sys.argv) < 2:
+   print "\n\
+lcov_summary <logfile> <dirlist> [ <dirlist> ... ]\n\
+\n\
+This script summarizes information from one or more lcov HTML directories."
+   sys.exit(1)
+#
+# Parse parameters
+#
+ofile=sys.argv[1]
+i=2
+dirs = []
+while i<len(sys.argv):
+  dirs = dirs + glob.glob(sys.argv[i])
+  i=i+1
+#
+# Process LCOV output directories
+#
+for dir in dirs:
+  #
+  # Ignore regular files
+  #
+  if not os.path.isdir(dir):
+     continue
+  print "<LCOVDirectory>"
+  tmp=dir
+  if tmp[-1] == "/":
+     tmp=tmp[0:-1]
+  tmp=tmp.split("/")[-1]
+  print "  <Name>"+tmp+"</Name>"
+  print "  <Directory>"+dir+"</Directory>"
+  if not os.path.exists(dir+"/index.html"):
+     print "  <Status>Empty</Status>"
+  else:
+     print "  <Status>OK</Status>"
+     daysold=commands.getoutput("daysold " + dir + "/index.html")
+     coverage="0"
+     total_lines="0"
+     executed_lines="0"
+     FILE=open(dir+"/index.html","r")
+     state=0
+     for line in FILE:
+       token = re.split('[><]',line.strip())
+       #print token
+       #print line,
+       #print state,len(token)
+       if state==1:
+       	  total_lines=token[2]
+	  state=0
+       elif state==2:
+       	  coverage=token[2]
+	  state=0
+       elif state==3:
+       	  executed_lines=token[2]
+	  break
+       elif state==0 and len(token) > 1:
+          if token[2] == "Instrumented&nbsp;lines:":
+	     state=1
+	  elif token[2] == "Code&nbsp;covered:":
+	     state=2
+	  elif token[2] == "Executed&nbsp;lines:":
+	     state=3
+     print "  <TotalLines>" + total_lines + "</TotalLines>"
+     print "  <ExecutedLines>" + executed_lines + "</ExecutedLines>"
+     print "  <Coverage>" + coverage + "</Coverage>"
+     print "  <DaysOld>" + daysold + "</DaysOld>"
+  print "</LCOVDirectory>"
+

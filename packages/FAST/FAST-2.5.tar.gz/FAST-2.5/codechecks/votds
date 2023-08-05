@@ -1,0 +1,54 @@
+#! /usr/bin/perl
+##
+## A script that summarizes the success of the nightly VOTD creation.
+##
+## The "modules" list must be kept in sync with the modules listed in the 
+## acro/admin/scripts/acro_votd_tarballs script (which creates the VOTDs).
+##
+## Note: If the votd script encountered an error, an explanation can
+## be found in /var/www/html/Acro/releases/votd/acro_votd_tarballs.out.
+## The string "failed" appears, with an explanation.  Can we supply
+## a link to this file when there is an error?
+##
+
+
+if (! @ARGV) {
+   print "votds <logfile>\n";
+   exit(1);
+}
+
+open(LOGFILE,">$ARGV[0]") || die "Error opening $ARGV[0]";
+
+##@modules = (acro, acro_appspack, acro_coliny, acro_pebbl, acro_optpp, acro_utilib, acro_pico);
+@modules = (acro, acro_coliny, acro_pebbl, acro_optpp, acro_utilib, acro_pico);
+
+$suffix = '_nightly.tar.gz';
+$votdpath = '/var/www/html/Acro/releases/votd/tarballs';
+
+print LOGFILE "\n";
+print LOGFILE "VOTD file path: $votdpath\n";
+#
+# For each nightly tar file, determine how old it is.  Zero means
+# it's up-to-date, and the VOTD process succeeded.
+#
+foreach $tarmodule (@modules) {
+
+  $tarfile = $tarmodule.$suffix;
+
+  $age = `daysold $votdpath/$tarfile`;
+  chomp $age;
+
+  if ( $age == -1 ) {
+    print LOGFILE "VOTD file: $tarfile, not found\n";
+  }
+  else{
+    print LOGFILE "VOTD file: $tarfile, $age days old\n";
+  }
+  
+  print "      <Measurement>\n";
+  print "        <Name>$tarmodule</Name>\n";
+  print "        <Value>$age</Value>\n";
+  print "      </Measurement>\n";
+}
+
+close(LOGFILE);

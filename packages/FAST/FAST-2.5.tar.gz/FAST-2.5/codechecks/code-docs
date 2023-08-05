@@ -1,0 +1,76 @@
+#! /usr/bin/perl
+##
+## A code check script that assesses the number of source
+## files that are not adequately documented with doxygen
+##
+## NOTE: the command-line syntax for this is a bit limited.  It could easily
+## be generalized to provide a more robust/general interface (e.g. using
+## regular expressions)
+##
+
+if (! @ARGV) {
+   print "code-docs <logfile> <target-dirs> [<ignore-subdirs ...]\n";
+   exit(1);
+}
+
+#
+# Find the packages that are source directories
+#
+my @dirs = glob($ARGV[1]);
+my @ignore = ();
+my $dir = '';
+
+while ($dir = $ARGV[2]) {
+  push @ignore, glob($dir);
+  shift;
+}
+#
+# For each source directory, collect the source lines info.
+#
+foreach $dir (@dirs) {
+  $ignore=0;
+  foreach $d (@ignore) {
+    if ($dir eq $d) {
+       $ignore=1;
+       next;
+    }
+  }
+  if ($ignore == 1) {
+     next;
+  }
+  if (-d "$dir") {
+     $cmd="find $dir -regex \".*\\.h[p]*\"";
+     $codefiles=`$cmd`;
+     @files=split(/\n/,$codefiles);
+     #foreach $file (@files) {
+       #print "X $file\n";
+     #}
+     @badfiles=();
+     foreach $file (@files) {
+       $good=0;
+       open(INFILE,$file);
+       while (<INFILE>) {
+         next unless /\\file/o;
+         $good=1;
+	 last;
+       }
+       close(INFILE);
+       if ($good == 0) {
+          push(@badfiles,$file);
+       }
+     }
+
+     #$ttmp = $tmp;
+     #$ttmp =~ s/(.+)Code \(SLOC\)([ ]*)= (.*)Development(.+)/\3/s;
+     #chomp($ttmp);
+     #$ttmp =~ s/,//g;
+
+     print "    <Measurement>\n";
+     print "      <Name>$dir</Name>\n";
+     print "      <Value>" . ($#badfiles + 1) . "</Value>\n";
+     foreach $file (@badfiles) {
+       print "      <File>$file</File>\n";
+     }
+     print "    </Measurement>\n";
+     }
+  }

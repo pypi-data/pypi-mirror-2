@@ -1,0 +1,185 @@
+#!/usr/bin/env python
+#
+# svnem
+# Manage externals in subversion repositories
+#
+
+import sys
+import os
+import os.path
+from fast.sqa.externals import ExternalsDB
+
+currdir = os.getcwd()
+
+def print_cmd_help(cmd):
+    #
+    if cmd == 'print':
+        print "print: Print information about the externals in the repository."
+        print "usage:  svnem print"
+        print ""
+        print "  More details here."
+        print ""
+    #
+    elif cmd == "db":
+        print "db: Manage the externals database"
+        print "usage:  svnem db"
+        print ""
+        print "options:"
+        print "  --clear    Reset the externals database"
+        print "  --update   Perform a fast update of the database of externals, using revision"
+        print "             values to truncate the search (which may miss externals added with"
+        print "             'svn cp' opertions"
+        print "  --refresh  Refresh the database of externals, ignoring prior revision values"
+        print "  --reset    Reset the database of externals, using the history "
+        print "             of repositories that have been added."
+        print ""
+    #
+    elif cmd == "add":
+        print "add: Add a subversion repository."
+        print "usage:  svnem add [options] <url>"
+        print ""
+        print "options:"
+        print "  --aux       This is an auxiliary repository used to validate externals"
+        print ""
+    #
+    elif cmd == "update":
+        print "update: Update the externals in a repository."
+        print "usage:  svnem update [options] <url>"
+        print ""
+        print "options:"
+        print "  --trunk        Update links to 'trunk' branches"
+        print "  --stable       Update links to 'stable' branches"
+        print "  --release      Update links to 'release' branches"
+        print "  --tag          Update links to 'tag' branches"
+        print "  --rev          Update links to latest revision"
+        print ""
+    #
+    elif cmd == "validate":
+        print "validate: Confirm that all externals are valid."
+        print "usage:  svnem validate [<url>]"
+    #
+    elif cmd == "status":
+        print "status: Summarize the status of the database."
+        print "usage:  svnem status [<url>]"
+    #
+    sys.exit(1)
+
+
+def print_help():
+    print "usage: svnem <subcommand> [options] [args]"
+    print "Type 'svnem help <subcommand>' for help on a specific subcommand."
+    print ""
+    print "Available subcommands:"
+    print "   add"
+    print "   db"
+    print "   print"
+    print "   status"
+    print "   update"
+    print "   validate"
+    print ""
+    print "The svnem command-line tool manages externals in a subversion repository."
+    print "The svnem command stores a database with the repository information in"
+    print "the user's $HOME/.svnemrc directory.  The initial update of a repository"
+    print "can take a while, but subsequent operations will run much faster."
+    print ""
+    print "For additional information, see http://software.sandia.gov/svn/public/fast"
+    print ""
+    sys.exit(1)
+
+if len(sys.argv) == 1 or len(sys.argv) == 2 and sys.argv[1] in ('-h','--help', 'help'):
+    print_help()
+
+command = sys.argv[1]
+if command == 'help':
+    cmd = sys.argv[2]
+    print_cmd_help(cmd)
+
+
+#
+# Create the $HOME/.svnemrc directory
+#
+path = os.environ["HOME"]+os.sep+".svnemrc"
+db = ExternalsDB()
+if not os.path.exists( path ):
+    os.mkdir( path )
+#
+# Read the default database
+#
+path = os.environ["HOME"]+os.sep+".svnemrc"+os.sep+"current.yaml"
+if command == 'db' and sys.argv[2] == '--clear':
+    if os.path.exists( path ):
+        os.remove(path)
+    db.write( path )
+    sys.exit(0)
+else:
+    if os.path.exists( path ):
+        db.read( path )
+
+#
+# Process commands
+#
+if command == 'add':
+    if sys.argv[2] == '--aux':
+        db.add(sys.argv[3], True)
+    else:
+        db.add(sys.argv[2])
+    db.update()
+    db.write(path)
+
+elif command == 'print':
+    if '--projects' in sys.argv[2:]:
+        db.print_projects()
+    elif '--aux' in sys.argv[2:]:
+        db.print_projects(aux=True)
+    else:
+        tmp = db.repository.keys()
+        tmp.sort()
+        print "Repositories:"
+        for item in tmp:
+            print "  ",item
+            print "    aux=",db.repository[item]
+            print ""
+
+elif command == 'db':
+    if sys.argv[2] == '--update':
+        if len(sys.argv) == 4:
+            db.update(truncate=False, filter=sys.argv[3])
+        else:
+            db.update(truncate=True)
+        db.write(path)
+    elif sys.argv[2] == '--refresh':
+        db.update(truncate=False)
+        db.write(path)
+    elif sys.argv[2] == '--reset':
+        db.reset()
+        db.write(path)
+    else:
+        print_cmd_help(command)
+
+elif command == 'update':
+    if len(sys.argv) < 3:
+        print_cmd_help(command)
+    latest_rev='--rev' in sys.argv
+    trunk='--trunk' in sys.argv
+    stable='--stable' in sys.argv
+    tags='--tag' in sys.argv
+    releases='--release' in sys.argv
+    db.update_externals(sys.argv[-1], trunk=trunk, stable=stable, tags=tags, releases=releases, latest_rev=latest_rev, dest=currdir+os.sep+"svnem_update")
+
+elif command == 'validate':
+    if len(sys.argv) == 3:
+        db.validate(filter=sys.argv[2])
+    else:
+        db.validate()
+
+elif command == 'status':
+    if len(sys.argv) == 3:
+        db.status(filter=sys.argv[2])
+    else:
+        db.status()
+
+else:
+    print "ERROR: unknown command '%s'" % ("svnem "+" ".join(sys.argv))
+    print ""
+    print_help()
+

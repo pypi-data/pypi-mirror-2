@@ -1,0 +1,1128 @@
+#!/usr/bin/python
+#
+# Stefan Chakerian (schake@sandia.gov)
+# Sandia National Labs
+# Jan, 2005
+#
+# William Hart (wehart@sandia.gov)
+# Revised Oct, 2006 to use Python exact classes.
+#
+# This summarizes xml and output files from the webspace.
+#
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+#
+
+# a note for the weak:
+# /usr/bin/python is the RHN version, and has mysql module installed
+# /usr/local/bin/python is a higher version, but does not have mysql
+# database functions will require /usr/bin/python, so I hope this runs
+# in version 2.3.  Exact might squawk, but job control should not be needed.
+# --schake
+
+
+import xml
+import commands
+import shutil
+import re
+import math
+import os
+import sys
+import glob
+import string
+os.sys.path = os.sys.path + ['../pyacro'] + ['..']
+from fast import exact
+import time
+import fast_utils
+import datetime
+# import MySQLdb
+
+def cmp_scenario_machine(a,b):
+  atuple = (a.key.scenario, a.key.hostname)
+  btuple = (b.key.scenario, b.key.hostname)
+  if atuple < btuple:
+     return -1
+  if atuple == btuple:
+     return 0
+  return 1
+
+def analysis_cmp(a,b):
+  atuple = (a._studyname, a._name, a._key.scenario, a._key.hostname)
+  btuple = (b._studyname, b._name, b._key.scenario, b._key.hostname)
+  if atuple < btuple:
+     return -1
+  if atuple == btuple:
+     return 0
+  return 1
+
+class Stats:
+    def __init__(self,key=None):
+      self.nconfigs=0
+      self.nconfig_fail=0
+      self.nconfig_pass=0
+      self.nbuilds=0
+      self.nbuild_fail=0
+      self.nbuild_pass=0
+      self.ntests=0
+      self.ntest_fail=0
+      self.ntest_pass=0
+      self.key=key
+      self.analyses=[]
+
+    def update(self):
+      for analysis in self.analyses:
+        tmp = analysis.num_tests()
+        self.ntests = self.ntests + tmp
+        if tmp > 0:
+           self.ntest_fail = self.ntest_fail + analysis.num_tests(False)
+           self.ntest_pass = self.ntest_pass + analysis.num_tests(True)
+
+def dbadd(object, file, ftype):
+    """loads database"""
+#   global mydb
+#   db = mydb.cursor()
+
+#   print ftype, object
+
+    if ftype == "scenario":
+	pass
+#	db.execute("show tables")
+#	line = db.fetchone()
+#	while line is not None:
+#	  print "TABLE:", line
+#	  line = db.fetchone()
+    elif ftype == "config":
+        pass
+    elif ftype == "build":
+        pass
+    elif ftype == "results":
+        pass
+    elif ftype == "test":
+        pass
+    elif ftype == "check":
+        pass
+
+
+def print_text(filename):
+    summary = weburl + todaystr + "/" + summaryfile + ".html"
+    SUMMARY=open(framework + "/" + filename,"w")
+    print >>SUMMARY, "***************************** SQA REPORT LINKS *****************************"
+    print >>SUMMARY, "****************************************************************************"
+    print >>SUMMARY, " %-52.52s  %20.20s" % (fname + " " + testsummary, datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print " %-52.52s  %20.20s" % (fname + " " + testsummary, datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print >>SUMMARY, "****************************************************************************"
+    print >>SUMMARY, "****************************************************************************"
+    if days > 1:
+      print >>SUMMARY, ""
+      print >>SUMMARY, " Summary of past", days, "days"
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Web Link: ",summary
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Config/Build/Test Results by Machine"
+    print >>SUMMARY, "      %% Failures (Config,Build,Test) = (%3d%%, %3d%%, %3d%%)" % (config_fail_percent, build_fail_percent, test_fail_percent)
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Config/Build/Test Results by Test Package"
+    print >>SUMMARY, "      %% Failures (Config,Build,Test) = (%3d%%, %3d%%, %3d%%)" % (proj_config_fail_percent, proj_build_fail_percent, proj_test_fail_percent)
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Scenario Config/Build Failures"
+    print >>SUMMARY, "      Total Failures =", n_scenario_cb_failures
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Analysis Results by Category"
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Analysis Failures per Category:"
+    group_keys = analysis_group.keys()
+    group_keys.sort()
+    for category in group_keys:
+      print >>SUMMARY, " %20.20s  " % (category), "(",analysis_group[category].ntest_fail,"/",(analysis_group[category].ntest_fail+analysis_group[category].ntest_pass),")"
+    print >>SUMMARY, ""
+    print >>SUMMARY, " CodeChecks Link: ",weburl + todaystr + "/code_checks.txt"
+    print >>SUMMARY, ""
+    print >>SUMMARY, " Code Coverage Reports:"
+    if os.path.exists(webroot + "../../lcov/" + framework):
+       coverage_reports = glob.glob(webroot + "../../lcov/" + framework + "/*")
+    else:
+       coverage_reports = []
+    if len(coverage_reports) == 0:
+       print >>SUMMARY, "   None"
+    else:
+       coverage_reports.sort()
+       lcov = weburl.split("/")[0:-3]
+       lcov = "/".join(lcov)
+       for report in coverage_reports:
+         print >>SUMMARY, " %20.20s   %s" % (report.split("/")[-1], lcov + "/lcov/" + framework + "/" + report.split("/")[-1])
+         print report," %20.20s   %s" % (report.split("/")[-1], lcov + "/lcov/" + framework + "/" + report.split("/")[-1])
+    print >>SUMMARY, ""
+    print >>SUMMARY, "***************************** SQA REPORT LINKS *****************************"
+    SUMMARY.close()
+
+
+def print_text_old(filename):
+    SUMMARY=open(framework + "/" + filename,"w")
+    #
+    # PRINT REPORT
+    #
+    print >>SUMMARY, "******************************** SQA REPORT ********************************"
+    print >>SUMMARY, "****************************************************************************"
+    foo = fname + " " + testsummary
+    print >>SUMMARY, " %-41.41s   %30.30s" % (fname + " " + testsummary, datetime.date.today())
+    print >>SUMMARY, "****************************************************************************"
+    print >>SUMMARY, "****************************************************************************"
+    #
+    # Print summary statistics
+    #
+    print >>SUMMARY, "\nSUMMARY: Config/Build/Test Results by Test Machine             (NFail/Total)"
+    print >>SUMMARY, "----------------------------------------------------------------------------"
+    print >>SUMMARY, "Machine                        OS                Config    Build      Test"
+    print >>SUMMARY, "----------------------------------------------------------------------------"
+    for site in site_stat.keys():
+      print >>SUMMARY, "%-30.30s %-15.15s" % (site, site_stat[site].key.kernel_name),
+      if site_stat[site].nconfig_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (site_stat[site].nconfigs),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (site_stat[site].nconfig_fail, site_stat[site].nconfigs),
+      if site_stat[site].nbuild_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (site_stat[site].nbuilds),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (site_stat[site].nbuild_fail, site_stat[site].nbuilds),
+      if site_stat[site].ntest_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (site_stat[site].ntests),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (site_stat[site].ntest_fail, site_stat[site].ntests),
+      print >>SUMMARY, ""
+    #
+    # Print scenario statistics
+    #
+    print >>SUMMARY, "\n\nSUMMARY: Config/Build/Test Results by Test Package             (NFail/Total)"
+    print >>SUMMARY, "----------------------------------------------------------------------------"
+    print >>SUMMARY, "Package                        Coverage          Config    Build      Test"
+    print >>SUMMARY, "----------------------------------------------------------------------------"
+    scenario_keys = scenario_stat.keys()
+    scenario_keyss.sort()
+    for scenario in scenarios_keys:
+      print >>SUMMARY, "%-30.30s %-15.15s" % (scenario, "NA"),
+      if scenario_stat[scenario].nconfig_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (scenario_stat[scenario].nconfigs),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (scenario_stat[scenario].nconfig_fail, scenario_stat[scenario].nconfigs),
+      if scenario_stat[scenario].nbuild_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (scenario_stat[scenario].nbuilds),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (scenario_stat[scenario].nbuild_fail, scenario_stat[scenario].nbuilds),
+      if scenario_stat[scenario].ntest_fail == 0:
+         print >>SUMMARY, "   ./%-4d" % (scenario_stat[scenario].ntests),
+      else:
+         print >>SUMMARY, "%4d/%-4d" % (scenario_stat[scenario].ntest_fail, scenario_stat[scenario].ntests),
+      print >>SUMMARY, ""
+    SUMMARY.close()
+
+
+foo="\
+        border-collapse: collapse;\n\
+        border: 1px solid black;\n\
+        border: 1px solid black;\n\
+"
+csstext="<style type=\"text/css\">\n\
+      table{\n\
+      }\n\
+      th, td{\n\
+        padding: 3px;\n\
+      }\n\
+      th{\n\
+        background-color: Aliceblue;\n\
+      }\n\
+      tr{\n\
+        background-color: white;\n\
+      }\n\
+      tr.highlight{ \n\
+        background-color: #B8CDDC;\n\
+        cursor: pointer;\n\
+      }\n\
+      a.fail {\n\
+        color: #ff2222;\n\
+	font-weight: bold;\n\
+      }\n\
+      a.pass {color: #22bb22}\n\
+      a.nofile {color: #FF0000}\n\
+    </style>\n"
+javatext="<script type=\"text/javascript\">\n\
+      window.onload = function(){\n\
+        ConvertRowsToLinks(\"table1\");\n\
+      }\n\
+      \n\
+      function ConvertRowsToLinks(xTableId){\n\
+\n\
+        var rows = document.getElementById(xTableId).getElementsByTagName(\"tr\");\n\
+   \n\
+        for(i=0;i<rows.length;i++){\n\
+          var link = rows[i].getElementsByTagName(\"a\")\n\
+          if(link.length == 1){\n\
+            rows[i].onclick = new Function(\"document.location.href='\" + link[0].href + \"'\");\n\
+            rows[i].onmouseover = new Function(\"this.className='highlight'\");\n\
+            rows[i].onmouseout = new Function(\"this.className=''\");\n\
+          }\n\
+        }\n\
+\n\
+      }\n\
+\n\
+    </script>\n"
+
+def webfile(name,scenario):
+    tmp = "%23".join(os.path.basename(name).split("#"))
+    (base,suffix) = os.path.splitext(tmp)
+    return scenario.webdir + base + ".out"
+
+
+def print_html(filename):
+    summary = weburl + todaystr + "/" + summaryfile + ".html"
+    SUMMARY=open(framework + "/" + filename,"w")
+    #
+    # PRINT REPORT
+    #
+    print >>SUMMARY, "<html>"
+    print >>SUMMARY, "<head>"
+    print >>SUMMARY, "<title>SQA Report " + summaryfile + "</title>"
+    print >>SUMMARY, csstext
+    print >>SUMMARY, "</head>"
+    print >>SUMMARY, "<body>"
+    print >>SUMMARY, "<hr>"
+    print >>SUMMARY, "<hr>"
+    print >>SUMMARY, "<table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"1\" bgcolor=\"Dodgerblue\">"
+    print >>SUMMARY, "<tr>"
+    print >>SUMMARY, "<th align=\"center\"><b>SQA REPORT</b></th>"
+    print >>SUMMARY, "</tr>"
+    print >>SUMMARY, "</table>"
+    print >>SUMMARY, "<hr>"
+    print >>SUMMARY, "<hr>"
+    foo = fname + " " + testsummary
+    print >>SUMMARY, "<table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"1\" >"
+    print >>SUMMARY, "<tr>"
+    print >>SUMMARY, "<td><b>%s</b></td>" % fname
+    print >>SUMMARY, "<td align=\"left\"><b>%s</b></td>" % testsummary
+    if days > 1:
+      print >>SUMMARY, "<td><b>(last %d days)</b></td>" % days
+    print >>SUMMARY, "<td align=\"right\"><b>%s</b></td>" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    print >>SUMMARY, "</tr>"
+    print >>SUMMARY, "</table>"
+    print >>SUMMARY, "<hr>"
+    print >>SUMMARY, "<hr>"
+    #
+    # Table of Contents
+    #
+    print >>SUMMARY, "<h3>Table of Contents</h3>"
+    if days > 1:
+      print >>SUMMARY, "<h4>%d days</h4>" % days
+    print >>SUMMARY, "<ul>"
+    print >>SUMMARY, "<li><a href=\"" + summary + "#table-sites\">Config/Build/Test Results by Machine</a>"
+    print >>SUMMARY, "<ul><li>%% Failures (Config,Build,Test) = (%3d%%, %3d%%, %3d%%)</li></ul>" % (config_fail_percent, build_fail_percent, test_fail_percent)
+    print >>SUMMARY, "<li><a href=\"" + summary + "#table-packages\">Config/Build/Test Results by Test Package</a>"
+    print >>SUMMARY, "<ul><li>%% Failures (Config,Build,Test) = (%3d%%, %3d%%, %3d%%)</li></ul>" % (proj_config_fail_percent, proj_build_fail_percent, proj_test_fail_percent)
+    print >>SUMMARY, "<li><a href=\"" + summary + "#table-build-failures\">Scenario Config/Build Failures</a>"
+    print >>SUMMARY, "<ul><li>Total Failures = ", n_scenario_cb_failures, "</li></ul>"
+    print >>SUMMARY, "<li><a href=\"" + summary + "#table-analysis-categories\">Analysis Results by Category</a>"
+    print >>SUMMARY, "<li>Analysis Failures per Category:"
+    print >>SUMMARY, "<ul>"
+    group_keys = analysis_group.keys()
+    group_keys.sort()
+    for category in group_keys:
+      if analysis_group[category].ntest_fail > 0:
+         print >>SUMMARY, "<li><a href=\"%s#table-analysis-%s-failures\">%s</a>" % (summary,category,category),
+      else:
+         print >>SUMMARY, "<li>%s" % (category),
+      print >>SUMMARY, "(",analysis_group[category].ntest_fail,"/",(analysis_group[category].ntest_fail+analysis_group[category].ntest_pass),")"
+    print >>SUMMARY, "</ul>"
+    print >>SUMMARY, "</ul>"
+    print >>SUMMARY, "<hr><hr><br>"
+    #
+    # Print site summary statistics
+    #
+    print >>SUMMARY, "<a name=\"table-sites\"></a>"
+    print >>SUMMARY, "<table frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"2\" >"
+    print >>SUMMARY, "<caption><b>SUMMARY: Config/Build/Test Results by Test Machine</b></caption>"
+    print >>SUMMARY, "<colgroup align=\"left\">"
+    print >>SUMMARY, "<col align=\"left\">"
+    print >>SUMMARY, "<col align=\"center\">"
+    print >>SUMMARY, "</colgroup>"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th scope=\"colgroup\" width='30%'>Machine</th><th scope=\"colgroup\" width='25%'>OS</th><th colspan=\"2\" width='15%'>Config</th><th colspan=\"2\" width='15%'>Build</th><th colspan=\"2\" width='15%'>Test</th></tr>"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th></th><th></th><th>Fail</th><th>Total</th><th>Fail</th><th>Total</th><th>Fail</th><th>Total</th></tr><tbody>"
+    sites = site_stat.keys()
+    sites.sort()
+    for key in sites:
+      print >>SUMMARY, "<tr>"
+      print >>SUMMARY, "<td align=\"left\">%s</td><td align=\"center\">%s</td>" % (key, site_stat[key].key.kernel_name),
+      if site_stat[key].nconfig_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (site_stat[key].nconfigs),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (site_stat[key].nconfig_fail, site_stat[key].nconfigs),
+      if site_stat[key].nbuild_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (site_stat[key].nbuilds),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (site_stat[key].nbuild_fail, site_stat[key].nbuilds),
+      if site_stat[key].ntest_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (site_stat[key].ntests),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (site_stat[key].ntest_fail, site_stat[key].ntests),
+      print >>SUMMARY, "</tr>"
+    print >>SUMMARY, "</table><br>"
+    #
+    # Print package summary statistics
+    #
+    print >>SUMMARY, "<a name=\"table-packages\"></a>"
+    print >>SUMMARY, "<table frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"3\" >"
+    print >>SUMMARY, "<caption><b>SUMMARY: Config/Build/Test Results by Test Package</b></caption>"
+    print >>SUMMARY, "<colgroup align=\"left\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th scope=\"colgroup\" width='55%'>Package</th><th colspan=\"2\" width='15%'>Config</th><th colspan=\"2\" width='15%'>Build</th><th colspan=\"2\" width='15%'>Test</th></tr>"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th></th><th>Fail</th><th>Total</th><th>Fail</th><th>Total</th><th>Fail</th><th>Total</th></tr><tbody>"
+    scenario_keys = scenario_stat.keys()
+    scenario_keys.sort()
+    for key in scenario_keys:
+      print >>SUMMARY, "<tr>"
+      print >>SUMMARY, "<td align=\"left\">%s</td>" % (key),
+      if scenario_stat[key].nconfig_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (scenario_stat[key].nconfigs),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (scenario_stat[key].nconfig_fail, scenario_stat[key].nconfigs),
+      if scenario_stat[key].nbuild_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (scenario_stat[key].nbuilds),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (scenario_stat[key].nbuild_fail, scenario_stat[key].nbuilds),
+      if scenario_stat[key].ntest_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (scenario_stat[key].ntests),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (scenario_stat[key].ntest_fail, scenario_stat[key].ntests),
+      print >>SUMMARY, "</tr>"
+    print >>SUMMARY, "</table><br>"
+    #
+    # Print scenario failure summary
+    #
+    print >>SUMMARY, "<a name=\"table-build-failures\"></a>"
+    print >>SUMMARY, "<table frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"3\" >"
+    print >>SUMMARY, "<caption><b>SUMMARY: Scenario Config/Build/Test Results</b></caption>"
+    print >>SUMMARY, "<colgroup></colgroup>"
+    print >>SUMMARY, "<colgroup></colgroup>"
+    print >>SUMMARY, "<colgroup span=\"3\"></colgroup>"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th scope=\"colgroup\" width='30%'>Scenario</th><th width='30%' scope=\"colgroup\">Machine</th><th colspan=\"3\" width='40%' scope=\"colgroup\">Output</th></tr>"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th></th><th></th><th>Config</th><th>Build</th><th>Test</th></tr><tbody>"
+    scenarios.sort(cmp_scenario_machine)
+    flag=True
+    for scenario in scenarios:
+#      if (scenario.config_info is None or scenario.build_info is None):
+#         continue
+#      if not ((not (scenario.config_info.execution_status == "Pass" and scenario.config_info.integrity_status == "Pass")) or\
+#              (not (scenario.build_info.execution_status == "Pass" and scenario.build_info.integrity_status == "Pass"))):
+#         continue
+
+#      scenario.pprint()
+#      continue
+
+      flag=False
+      print >>SUMMARY, "<tr>"
+      print >>SUMMARY, "<td align=\"left\">%s</td>" % (scenario.key.scenario),
+      print >>SUMMARY, "<td align=\"left\">%s</td>" % (scenario.key.hostname),
+# print test output here
+#      print >>SUMMARY, "<td align=\"left\">%s</td>" % (scenario.key.hostname),
+#      print >>SUMMARY, "<td></td>",
+      if scenario.config_info is not None:
+         tmp = "%23".join(os.path.basename(scenario.config_info.filename).split("#"))
+         (base,suffix) = os.path.splitext(tmp)
+         if scenario.config_info.execution_status == "Pass" and scenario.config_info.integrity_status == "Pass":
+            status="<a class='pass' href=\"" + scenario.webdir + base + ".out\">Pass</a>"
+         else:
+            status="<a class='fail' href=\"" + scenario.webdir + base + ".out\">Fail</a>"
+         print >>SUMMARY, "<td align=\"center\">" + status + "</td>",
+      else:
+         print >>SUMMARY, "<td align=\"center\">None</td>",
+      if scenario.build_info is not None:
+         tmp = "%23".join(os.path.basename(scenario.build_info.filename).split("#"))
+         (base,suffix) = os.path.splitext(tmp)
+         if scenario.build_info.execution_status == "Pass" and scenario.build_info.integrity_status == "Pass":
+            status="<a class='pass' href=\"" + scenario.webdir + base + ".out\">Pass</a>"
+         else:
+            status="<a class='fail' href=\"" + scenario.webdir + base + ".out\">Fail</a>"
+         print >>SUMMARY, "<td align=\"center\">" + status + "</td>",
+      else:
+         print >>SUMMARY, "<td align=\"center\">None</td>",
+      print >>SUMMARY, "</tr>"
+    if flag:
+       print >>SUMMARY, "<tr><td>None</td></tr>"
+    print >>SUMMARY, "</table><br>"
+    #
+    # Print test category summary statistics
+    #
+    print >>SUMMARY, "<a name=\"table-analysis-categories\"></a>"
+    print >>SUMMARY, "<table frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"3\" >"
+    print >>SUMMARY, "<caption><b>SUMMARY: Analysis Results by Category</b></caption>"
+    print >>SUMMARY, "<colgroup align=\"left\">"
+    print >>SUMMARY, "<colgroup align=\"right\">"
+    print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th scope=\"colgroup\" width='70%'>Test Category</th><th  width='15%' scope=\"colgroup\">Num Analyses</th><th width='15%' colspan=\"2\" scope=\"colgroup\">Analysis Results</th></tr>"
+    print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th></th><th>Performed</th><th>Fail</th><th>Total</th></tr><tbody>"
+    groups = analysis_group.keys()
+    groups.sort()
+    for key in groups:
+      print >>SUMMARY, "<tr>"
+      print >>SUMMARY, "<td align=\"left\">%s</td>" % (key),
+      print >>SUMMARY, "<td align=\"right\">%d</td>" % (len(analysis_group[key].analyses)),
+      if analysis_group[key].ntest_fail == 0:
+         print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (analysis_group[key].ntests),
+      else:
+         print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (analysis_group[key].ntest_fail, analysis_group[key].ntests),
+      print >>SUMMARY, "</tr>"
+    print >>SUMMARY, "</table><br>"
+
+
+    group_keys = analysis_group.keys()
+    group_keys.sort()
+    for category in group_keys:
+      print "Processing category=" + category
+#      if analysis_group[category].ntest_fail == 0:
+#          continue
+      #
+      # Print test category summary statistics
+      #
+      print >>SUMMARY, "<a name=\"table-analysis-%s-failures\"></a>" % (category)
+      print >>SUMMARY, "<table id=\"table1\" frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"3\" >"
+      print >>SUMMARY, "<caption><b>SUMMARY: Analysis Results for Category \"" + category + "\"</b></caption>"
+      print >>SUMMARY, "<colgroup align=\"left\">"
+      print >>SUMMARY, "<colgroup align=\"left\">"
+      print >>SUMMARY, "<colgroup align=\"left\">"
+      print >>SUMMARY, "<colgroup align=\"left\">"
+      print >>SUMMARY, "<colgroup span=\"2\" align=\"center\">"
+      print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th scope=\"colgroup\" width='20%'>Study</th><th scope=\"colgroup\" width='20%'>Analysis</th><th  scope=\"colgroup\" width='20%'>Scenario</th><th scope=\"colgroup\" width='25%'>Machine</th><th colspan=\"2\" scope=\"colgroup\" width='20%'>Analysis Results</th></tr>"
+      print >>SUMMARY, "<tr bgcolor=\"Aliceblue\"><th></th><th></th><th></th><th></th><th>Fail</th><th>Total</th></tr><tbody>"
+      analyses = analysis_group[category].analyses
+      analyses.sort(analysis_cmp)
+      for analysis in analysis_group[category].analyses:
+        nfail = analysis.num_tests(False)
+	# KDDKDD Print results for all analyses.
+        # KDDKDD if nfail == 0:
+        # KDDKDD   continue
+        print >>SUMMARY, "<tr>"
+        ntotal = analysis.num_tests()
+	# print "ntotal=%d" % ntotal #XXX
+	#KDDKDD  Added ntotal == 0 test; assignment to tmp below fails when
+	#KDDKDD  ntotal == 0.  We should eventually figure out why the 
+	#KDDKDD  assignment fails and fix the problem so that we can print
+	#KDDKDD  the study with zero failures and zero runs.  Or we can
+	#KDDKDD  figure out why the checksum files weren't created for some
+	#KDDKDD  studies and avoid this problem.
+	if ntotal == 0:
+	  #KDDKDD  Analysis file doesn't exist; list the analysis without links
+	  #KDDKDD  and with fail and total = 0.  Color = RED!
+          print >>SUMMARY, "<td align=\"left\"><a class='nofile'>%s</a></td>" % (analysis._studyname),
+          print >>SUMMARY, "<td align=\"left\"><a class='nofile'>%s</a></td>" % (analysis._name),
+          print >>SUMMARY, "<td align=\"left\"><a class='nofile'>%s</a></td>" % (analysis._key.scenario),
+          print >>SUMMARY, "<td align=\"left\"><a class='nofile'>%s</a></td>" % (analysis._key.hostname),
+          print >>SUMMARY, "<td align=\"right\"><a class='nofile'>.</a></td><td align=\"right\"><a class='nofile'>.</a></td>",
+          print >>SUMMARY, "</tr>"
+	  continue
+        tmp = "%23".join(os.path.basename(analysis._filename).split("#"))
+        #tmp = "%23".join(os.path.basename(scenario.build_info.filename).split("#"))
+        (base,suffix) = os.path.splitext(tmp)
+        tmp = analysis.webdir + base + suffix
+        print >>SUMMARY, "<a href=\"" + tmp + "\">",
+        print >>SUMMARY, "<td align=\"left\"><a href=\"%s\">%s</a></td>" % (tmp,analysis._studyname),
+        print >>SUMMARY, "<td align=\"left\">%s</td>" % (analysis._name),
+        print >>SUMMARY, "<td align=\"left\">%s</td>" % (analysis._key.scenario),
+        print >>SUMMARY, "<td align=\"left\">%s</td>" % (analysis._key.hostname),
+        if nfail==0:
+           print >>SUMMARY, "<td align=\"right\">.</td><td align=\"right\">%d</td>" % (ntotal),
+        else:
+           print >>SUMMARY, "<td align=\"right\">%d</td><td align=\"right\">%d</td>" % (nfail,ntotal),
+        print >>SUMMARY, "</a>"
+        print >>SUMMARY, "</tr>"
+        # KDDKDD if nfail > 0: removed; print results for all analyses.
+        for data in analysis._data:
+	  # syc: There (was) a bug here!
+	  # the issue is that analysis._data.experiment is NOT correctly read from the results file,
+	  # and is using the default of "exp1".  This only manifests when the experiment
+	  # names are explicitly set.  It should use the experiments, not the analyses
+	  # syc: bug might be fixed now.
+	  #print "STUDIES:", scenario.studies
+	  #print "EXPERIMENTS:", scenario.studies["study_1"].experiment_keys
+	  tmp_exp = []				# get all the experiment names
+	  for sname in scenario.studies:	# syc: [ "study_1", "study_2", ...]
+	    for expname in scenario.studies[sname].experiment_keys:	# [actual names of experiments]
+	      if not tmp_exp.count(expname):
+	        tmp_exp.append(expname)
+	  for expname in tmp_exp:
+	    tmp_items = tmp.split("%23")
+	    tmp_prefix = "%23".join(tmp_items[:-1])
+	    tmp_fname=tmp_prefix + "%23" + analysis._studyname + "." + expname + ".results.xml"
+	    tmp_fname_link=analysis._studyname + "." + expname + ".results.xml"
+	    print >>SUMMARY, "<tr> <td></td><td> <a href=\"%s\">%s</a></td><td></td><td></td><td></td><td></td></tr>" % (tmp_fname,tmp_fname_link)
+        # KDDKDD  Moved nfail > 0 test here; print details only for failures.
+        if nfail > 0:
+           if isinstance(analysis,exact.ValidationAnalysis):
+              for tstatus_key in analysis.test_status.keys():
+                for value_key in analysis.test_status[tstatus_key].keys():
+                  if analysis.test_status[tstatus_key][value_key] == False:
+                     print "HERE",webroot + os.path.basename(os.path.dirname(analysis.webdir)) +"/"+os.path.basename("#".join(tmp_items[:-1])) + "#" + analysis._studyname + "." + tstatus_key + "_" + value_key + ".*.log.xml"
+                     tmp_files = glob.glob(webroot + os.path.basename(os.path.dirname(analysis.webdir)) +"/"+os.path.basename("#".join(tmp_items[:-1])) + "#" + analysis._studyname + "." + tstatus_key + "_" + value_key + ".*.log.xml")
+                     #print "HERE",tstatus_key,value_key
+                     for tmp_file in tmp_files:
+                       tmp_list = tmp_file.split("#")
+                       #print "HERE",tmp_prefix
+                       print "HERE",tmp_file
+                       tmp_fname = os.path.dirname(tmp_prefix) + "/" + os.path.basename("%23".join(tmp_list))
+                       #print "HERE",tmp_fname
+                       #print >>SUMMARY, "<tr> <td></td><td> <a href=\"%s\">%s</a></td></tr>" % (tmp_fname_link)
+                       print >>SUMMARY, "<tr> <td></td><td> <a href=\"%s\">%s</a></td> <td></td><td></td><td></td><td></td></tr>" % (tmp_fname,(os.path.basename(tmp_fname).split("%23"))[-1])
+                       #print "XXX",tmp_fname
+                     
+      print >>SUMMARY, "</table><br>"
+    #
+    # Print XML Error Info
+    #
+    print >>SUMMARY, "<a name=\"table-xmlerrors\"></a>"
+    print >>SUMMARY, "<table frame=\"hsides\" rules=\"groups\" width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"3\" >"
+    print >>SUMMARY, "<caption><b>SUMMARY: Errors Processing XML Files</b></caption>"
+    print >>SUMMARY, "<colgroup align=\"left\">"
+    print >>SUMMARY, "<tr><th>Error Message</th></tr><tbody>"
+    for err in errors:
+      print >>SUMMARY, "<tr><td align=\"left\">",err[0],
+      if err[1].__str__() != "":
+         print >>SUMMARY, "<br><pre>",err[1],"</pre>",
+      print >>SUMMARY, "</td></tr>"
+    print >>SUMMARY, "</table><br>"
+
+    print >>SUMMARY, "</body>"
+    print >>SUMMARY, "</html>"
+
+
+
+def print_help():
+  print ""
+  print "db_summary [--help] [--html] [--install] [--dir=<dir>] [--days=N] <project-id> <project-name> [<*.xml>]"
+  print "\thtml\tcreates <project-id>/summary.html"
+  print "\tinstall\tinstalls summaries in webspace"
+  print "\tdir\tsearches dir for xml files"
+  print "\tdays\tsummary includes previous N days from webspace (default 1)"
+
+
+def get_scenario(key):
+  if key.scenario == "":
+     tmp="unknown-unknown"
+  else:
+     tmp=key.scenario
+  items = tmp.split('-')
+  if len(items)>2 and items[2] == "app":
+     scenario="app-" + items[3]
+  else:
+     scenario = items[0] + "-" + items[1]
+  return scenario
+
+##
+## MAIN
+##
+#
+# Commandline args:
+#       use arguments as data files, or else read framework/date/*.xml
+#
+if len(sys.argv) == 1:
+   print_help()
+   sys.exit(1)
+#
+# Process the command line
+#
+install=False
+installdir=None
+installdb=False
+html=False
+txt=True
+dirname=None
+days=1
+
+cwd=os.getcwd()
+
+i=1
+while (i < len(sys.argv)):
+  if (sys.argv[i]).startswith("--") == False:
+     break
+  tmp = (sys.argv[i].replace("--","")).split("=")
+  #
+  # Process options
+  #
+  if tmp[0] == "help":
+     print_help()
+     sys.exit(1)
+
+  elif tmp[0] == "html":
+     html=True
+
+  elif tmp[0] == "install":
+     if not dirname is None:
+       raise RuntimeError, "--install and --dir are mutually exclusive"
+     install=True
+
+#  elif tmp[0] == "installdb":
+#     installdb=True
+#     mydb = MySQLdb.connect(user="acrodbadmin", passwd="amnotamnot", db="acro")
+
+  elif tmp[0] == "days":        # number of days to summarize (default 1)
+     days=int(tmp[1])
+     if days < 1 or days > 1000:        # 1000 is arbitrary
+       raise ValueError, "days (" + "%d"%days + ") out of range"
+
+  elif tmp[0] == "dir":
+     if install:
+       raise RuntimeError, "--install and --dir are mutually exclusive"
+     dirname=tmp[1]
+
+  i = i + 1
+if (i+1) >= len(sys.argv):
+   print_help()
+   sys.exit(1)
+framework = sys.argv[i]
+fname = sys.argv[i+1]
+i = i+2
+
+
+xmlfiles=[]
+
+# remaining files are xml files on command line
+# assume cwd on command line arguments
+if i < len(sys.argv):
+  xmlfiles = [ {"dir":cwd, "xml":argv[i:]} ]
+
+#
+# Set up vars for webspace directory
+# 
+# webroot => local path to base project testdata + /
+# installdir => local path for final testdata files
+# weburl  => url to base project testdata + /
+# todaystr => numeric directory name (e.g. 20071018) used by installdir
+
+t = time.time()
+ts = time.localtime(t)
+todaystr = "%4d%02d%02d" % (ts.tm_year, ts.tm_mon, ts.tm_mday)
+webroot="/home/sqe/public_html/testdata/" + framework + "/"
+weburl="http://software.sandia.gov/~sqe/testdata/" + framework + "/"
+if days > 1:
+  summaryfile = "summary-" + "%d"%days
+else:
+  summaryfile = "summary"
+
+
+##
+## PARSE XML FILES
+##
+#
+# Create the list of scenario XML files if not given previously as args
+#
+if len(xmlfiles) == 0:
+
+  if install:
+    installdir = webroot + todaystr
+    if not os.path.exists(installdir):
+       os.makedirs(installdir, 0755)
+#   was: raise OSError, "Missing directory " + installdir
+
+# searchdirs: list of directories to search for *.xml files
+# normally, just 1 day back, so only the "recent" and numerical "today" dir
+# (first iteration of while loop adds installdir, from ts above)
+# if directory specified on CLI, use that directory only
+
+  searchdirs=[]
+  if dirname:
+    if not os.path.exists(dirname):
+      raise OSError, "Missing directory " + dirname
+    searchdirs.append(dirname)
+  else:
+    i = days
+    while (i > 0):
+      newdir = "%s%4d%02d%02d" % (webroot, ts.tm_year, ts.tm_mon, ts.tm_mday)
+      if os.path.exists(newdir):
+        searchdirs.append(newdir)
+      t = t - 86400                     # previous day
+      ts = time.localtime(t)
+      i = i - 1
+    #
+    # Add XML files from this "last day", as long as the time is >= the current
+    # time.
+    #
+    newdir = "%s%4d%02d%02d" % (webroot, ts.tm_year, ts.tm_mon, ts.tm_mday)
+    if os.path.exists(newdir):
+       chours = ts.tm_hour*10000 + ts.tm_min*100 + ts.tm_sec
+       scenario_files = glob.glob(newdir+"/*scenario.xml")
+       tmp = []
+       for file in scenario_files:
+         tmp_hours = int( file.split('#')[1] )
+         #print tmp_hours,chours,file
+         if tmp_hours >= chours:
+            tmp.append(file)
+       if len(tmp) > 0:
+          xmlfiles.append({"dir":newdir, "xml":tmp})
+
+
+  # add to list of xml files found in searchdirs[]
+  for d in searchdirs:
+    print "Examining", d
+    # for dd in glob.glob(d + "/*scenario.xml"):
+    #   xmlfiles.append(dd)
+    xmlfiles.append({"dir":d, "xml":glob.glob(d+"/*scenario.xml")})
+
+else:
+  if install:
+    print "WARNING: --install ignored (xml files on command line)"
+    install = False
+
+# xmlfiles should contain full pathnames of all xml files found
+# in searched directories + any args given
+
+if len(xmlfiles) == 0:
+  raise RuntimeError, "No XML files or directories specified or found"
+
+#
+# Read in the XML Scenario files
+#
+
+errors=[]
+scenarios=[]
+site_stat={}
+scenario_stat={}
+
+for xmlfile in xmlfiles:
+  dir = xmlfile["dir"]
+  print "Processing in", dir
+  os.chdir(dir)
+  for file in xmlfile["xml"]:
+    #
+    # Split the filenames into convenient pieces
+    #
+    #print "processing " + file + " ..."
+    if '#' in file:
+       try:
+          (fdate,ftime,cdate,ctime,cwho,chost,ccat,cfile) = file.split('#')
+       except:
+          print "WARNING: old filename format -",file
+          (cdate,ctime,cwho,chost,ccat,cfile) = file.split('#')
+    else:
+       cfile = file
+       fdate='date'
+       ftime='now'
+       cdate='date'
+       ctime='now'
+       cwho='me'
+       chost='local'
+       ccat='huh'
+    #
+    # Figure out the type of the file
+    #
+    if re.search('config.xml',cfile):
+      ftype = "config"
+    elif re.search('build.xml',cfile):
+      ftype = "build"
+    elif re.search('results.xml',cfile):
+      ftype = "results"
+    elif re.search('test.xml',cfile):
+      ftype = "test"
+    elif re.search('scenario.xml',cfile):
+      ftype = "scenario"
+    elif re.search('check.xml',cfile):
+      ftype = "check"
+    else:
+      print "  WARNING: \"" + cfile + "\" does not contain [config|build|test|scenario|check] - skipping"
+      continue
+
+
+    object = None
+
+    if installdb:
+      try:
+	object = fast_utils.FASTInterface(weburl+(dir.split('/'))[-1]+"/",file)
+      except xml.parsers.expat.ExpatError, msg:
+	note= "  WARNING: dbread skipping " + file + "... (Bad XML format)"
+	errors.append( (note,msg) )
+	print note
+	continue
+      except IOError, msg:
+	note= "  WARNING: dbread io skipping " + file + "... (Bad XML format)"
+	errors.append( (note,msg) )
+	print note
+	continue
+      dbadd(object, file, ftype)
+      
+    #
+    # Load scenarios only for printing
+    #
+    if ftype!="scenario":
+       print "  IGNORING",ftype
+       continue
+    #
+    # Parse the XML file
+    #
+    try:
+      # might have already loaded object, above, so don't load it twice
+      if object is None:
+	object = fast_utils.FASTInterface(weburl+(dir.split('/'))[-1]+"/",file)
+    except xml.parsers.expat.ExpatError, msg:
+      note= "  WARNING: skipping " + file + "... (Bad XML format)"
+      errors.append( (note,msg) )
+      print note
+      continue
+    except IOError, msg:
+      note= "  WARNING: skipping " + file + "... (Bad XML format)"
+      errors.append( (note,msg) )
+      print note
+      continue
+    if object is None:
+      note= "  WARNING: skipping " + file + "... (Unrecognized XML object)"
+      errors.append( (note,) )
+      print note
+      continue
+    # print "obj:", object.studies["study_1"].experiment_keys
+    # object.pprint()
+    #
+    # Get the Scenario Key from the XML data structure
+    #
+    if object.key is not None:
+      site = object.key.hostname
+    else:
+      note= "  WARNING: skipping " + file + "... (no <Key> found, check xml)"
+      errors.append( (note,) )
+      print note
+      continue
+    if site == "":
+      note= "  WARNING: skipping " + file + "... (empty Scenario name, check xml)"
+      errors.append( (note,) )
+      print note
+      continue
+    #
+    # Get the scenario name
+    #
+    scenario = get_scenario(object.key)
+    if isinstance(object,exact.Scenario):
+       # check for the "recent" dir, and change to appropriate url
+       # before adding to the scenarios processed, since the install
+       # will make the url invalid
+       datedir = (os.path.dirname(file).split("/"))[-1]
+       object.webdir = weburl + datedir + "/"
+       scenarios.append(object)
+       site_stat[object.key.hostname] = Stats(object.key)
+       scenario_stat[scenario] = Stats(object.key)
+
+  os.chdir(cwd)         # get back to where we once belonged
+
+#if len(scenario_stat) == 0:
+   #print "ERROR: no scenarios processed"
+   #sys.exit(1)
+#
+#if len(site_stat) == 0:
+   #print "ERROR: no sites processed"
+   #sys.exit(1)
+
+##
+## Group analyses by category
+##
+analysis_group = {}
+for scenario in scenarios:
+  for study in scenario.studies.values():
+    for analysis in study.analyses.values():
+      analysis.webdir=scenario.webdir
+      site_stat[scenario.key.hostname].analyses.append(analysis)
+      scenario_stat[get_scenario(scenario.key)].analyses.append(analysis)
+      for category in analysis._categories:
+        if category not in analysis_group.keys():
+           analysis_group[category] = Stats() 
+        analysis_group[category].analyses.append(analysis)
+
+##
+## COLLECT STATISTICS
+##
+#
+#       gather config and build summaries
+#       move failure output files to webspace
+#       unlink success output files, except when interactive
+#
+# TODO: remove *.out files if there are no errors in corresponding files
+#
+
+#
+# Process failure statistics
+#
+for group in analysis_group.values():
+  group.update()
+for scenario in scenario_stat.keys():
+  scenario_stat[scenario].update()
+for site in site_stat.keys():
+  site_stat[site].update()
+
+
+#
+# Collect scenario statistics
+#
+for scenario in scenarios:
+  #
+  # Config stats
+  #
+  if scenario.config_info is not None:
+     #
+     # Site
+     #
+     config = scenario.config_info
+     hostname = config.key.hostname
+     site_stat[hostname].nconfigs = site_stat[hostname].nconfigs + 1
+     if config.execution_status == "Pass" and config.integrity_status == "Pass":
+        site_stat[hostname].nconfig_pass = site_stat[hostname].nconfig_pass + 1
+     else:
+        site_stat[hostname].nconfig_fail = site_stat[hostname].nconfig_fail + 1
+     #
+     # Scenario
+     #
+     key = get_scenario(config.key)
+# syc: there is an error here if the config file doesn't have a scenario name
+# (i.e. key == unknown-unknown or nil), I added a try/except, but not certain of
+# the proper behavior
+     try: 
+       scenario_stat[key].nconfigs = scenario_stat[key].nconfigs + 1
+       if config.execution_status == "Pass" and config.integrity_status == "Pass":
+	  scenario_stat[key].nconfig_pass = scenario_stat[key].nconfig_pass + 1
+       else:
+	  scenario_stat[key].nconfig_fail = scenario_stat[key].nconfig_fail + 1
+     except:
+       pass
+  else:
+     #
+     # TODO: should this be an error?
+     #
+     print "WARNING: scenario without configuration information:",scenario.filename
+  #
+  # Build stats
+  #
+  if scenario.build_info is not None:
+     #
+     # Site
+     #
+     build = scenario.build_info
+     hostname = build.key.hostname
+     site_stat[hostname].nbuilds = site_stat[hostname].nbuilds + 1
+     if build.execution_status == "Pass" and build.integrity_status == "Pass":
+        site_stat[hostname].nbuild_pass = site_stat[hostname].nbuild_pass + 1
+     else:
+        site_stat[hostname].nbuild_fail = site_stat[hostname].nbuild_fail + 1
+     #
+     # Scenario
+     #
+     key = get_scenario(build.key)
+     scenario_stat[key].nbuilds = scenario_stat[key].nbuilds + 1
+     if build.execution_status == "Pass" and build.integrity_status == "Pass":
+        scenario_stat[key].nbuild_pass = scenario_stat[key].nbuild_pass + 1
+     else:
+        scenario_stat[key].nbuild_fail = scenario_stat[key].nbuild_fail + 1
+  #
+  # Experimental results
+  #
+  for study in scenario.studies:
+    #
+    # TODO
+    #
+    pass
+
+#
+# Generate the test summary output file
+#
+nconfigs = 0
+nconfig_f = 0
+nconfig_p = 0
+nbuilds = 0
+nbuild_f = 0
+nbuild_p = 0
+ntests = 0
+ntest_f = 0
+ntest_p = 0
+for key in scenario_stat.keys():
+  nconfigs = nconfigs + scenario_stat[key].nconfigs
+  nbuilds = nbuilds + scenario_stat[key].nbuilds
+  ntests = ntests + scenario_stat[key].ntests
+  if scenario_stat[key].nconfig_fail > 0:
+     nconfig_f = nconfig_f + scenario_stat[key].nconfig_fail
+     nconfig_p = nconfig_p + 1
+  if scenario_stat[key].nbuild_fail > 0:
+     nbuild_f = nbuild_f + scenario_stat[key].nbuild_fail
+     nbuild_p = nbuild_p + 1
+  if scenario_stat[key].nconfig_fail == 0 and\
+     scenario_stat[key].nbuild_fail == 0 and\
+     scenario_stat[key].ntest_fail > 0:
+     ntest_f = ntest_f + scenario_stat[key].ntest_fail
+     ntest_p = ntest_p + 1
+
+if nconfigs==0:
+   config_fail_percent=0
+else:
+   config_fail_percent=math.ceil(100*nconfig_f/nconfigs)
+if nbuilds==0:
+   build_fail_percent=0
+else:
+   build_fail_percent=math.ceil(100*nbuild_f/nbuilds)
+if ntests==0:
+   test_fail_percent=0
+else:
+   test_fail_percent=math.ceil(100*ntest_f/ntests)
+
+if nconfigs==0:
+   proj_config_fail_percent=0
+else:
+   proj_config_fail_percent = math.ceil(100*nconfig_p/len(scenario_stat))
+if nbuilds==0:
+   proj_build_fail_percent=0
+else:
+   proj_build_fail_percent=math.ceil(100*nbuild_p/len(scenario_stat))
+if ntests==0:
+   proj_test_fail_percent=0
+else:
+   proj_test_fail_percent=math.ceil(100*ntest_p/len(scenario_stat))
+
+testsummary = "(%3d%%, %3d%%, %3d%%)  [%3d%%, %3d%%, %3d%%] <%d>" % (config_fail_percent, build_fail_percent, test_fail_percent, proj_config_fail_percent, proj_build_fail_percent, proj_test_fail_percent, len(errors))
+TESTSUMMARY = open(framework + "/db_summary.txt","w")
+print >>TESTSUMMARY, testsummary
+TESTSUMMARY.close()
+
+
+#
+# Collect analysis statistics
+#
+n_scenario_cb_failures=0
+for scenario in scenarios:
+  if (((scenario.config_info is not None) and not (scenario.config_info.execution_status == "Pass" and scenario.config_info.integrity_status == "Pass")) or\
+              ((scenario.build_info is not None) and not (scenario.build_info.execution_status == "Pass" and scenario.build_info.integrity_status == "Pass"))):
+     n_scenario_cb_failures=n_scenario_cb_failures + 1
+
+
+#####
+# finish up
+#####
+  
+if html:
+   print_html(summaryfile + ".html")
+if txt:
+   print_text(summaryfile + ".txt")
+
+
+
+# If everything went right, install can only be set when
+# it makes sense.  So move all the files processed to webspace.
+# TODO: don't move if interactive?
+if install:
+  #for f in glob.glob(webdir + '/*'):   # race condition :(
+    #shutil.move(f, installdir)
+  if html:
+    shutil.copy(framework + "/" + summaryfile + ".html",installdir)
+  if txt:
+    shutil.copy(framework + "/" + summaryfile + ".txt",installdir)
+  if os.path.exists(webroot + "today"):
+    os.unlink(webroot + "today")
+  commands.getoutput("ln -s " + installdir + " " + webroot + "today")
+

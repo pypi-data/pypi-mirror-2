@@ -1,0 +1,134 @@
+#! /usr/bin/perl
+##
+## A code check script that summarizes the status of closed bugs.
+##
+
+use Text::ParseWords;
+use Date::Parse qw(str2time);
+use POSIX qw(ceil);
+
+$ctime = time();
+
+sub parse_csv {
+    return parse_line(",",1, $_[0]);
+}
+
+sub DiffDays {
+  my ($startdatestr) = shift @_;
+  my ($enddatestr) = shift @_;
+  $startval = str2time(eval($startdatestr));
+  $endval = str2time(eval($enddatestr));
+  $age = $endval - $startval;
+  #print "START $startdatestr $startval END $enddatestr $endval\n";
+  #my ($s,$m,$h,$d,$mo,$y,$wd)= localtime $date;
+  #print "$datestr:$val:$ctime:$age\n";
+  return $age/(60*60*24.0);
+}
+
+if (! @ARGV) {
+   print "closedbugs <logfile> <bugzilla-user> <bugzilla-password> <project> [<project> ....]\n";
+   exit(1);
+}
+
+open(LOGFILE,">$ARGV[0]") || die "Error opening $ARGV[0]";
+$bug_user = $ARGV[1];
+$bug_passwd = $ARGV[2];
+@projects = ();
+$i = 3;
+while ($i <= $#ARGV) {
+  push @projects, $ARGV[$i];
+  $i = $i + 1;
+  }
+@levels = (blocker, critical, major, normal, minor, trivial, enhancement);
+#
+# For each source directory, collect the source lines info.
+#
+%developer = ();
+%developer_ct = ();
+foreach $project (@projects) {
+  %ht = ();
+  %days = ();
+  foreach $level (@levels) {
+    $ht{$level} = 0;
+    $days{$level} = 0;
+  }
+  #
+  # Get a comma-separated list of bugs
+  #
+  $tmp = `getbugs $project CLOSED Bugzilla_login=$bug_user Bugzilla_password=$bug_passwd`;
+  print LOGFILE "\n";
+  print LOGFILE "CLOSED BUG SUMMARY: project $project\n";
+  print LOGFILE "\n";
+  print LOGFILE "$tmp\n";
+  print LOGFILE "\n";
+  #
+  # Process the bugs, finding all bugs
+  #
+  @lines = split(/\n/,$tmp);
+  $start=0;
+  foreach $line (@lines) {
+    @words = parse_csv($line);
+    if ($start == 1) {
+       $level = eval($words[6]);
+       #print "$project " . eval($words[1]) . "\n";
+       $ht{$level} = $ht{$level} + 1;
+       $ndays = DiffDays($words[$openndx],$words[$changendx]);
+       $days{$level} = $days{$level} + $ndays;
+       if (!(exists $developer{$words[4]})) {
+          $developer{$words[4]} = ();
+          $developer_ct{$words[4]} = ();
+       }
+       $developer{$words[4]}{$level} = $developer{$words[4]}{$level} + $ndays;
+       $developer_ct{$words[4]}{$level} = $developer_ct{$words[4]}{$level} + 1;
+    }
+    if ($words[0] eq "bug_id") {
+       $i=0;
+       while ($i <= $#words) {
+	 if (eval($words[$i]) eq "changeddate") {
+	    $changendx = $i;
+	 } elsif (eval($words[$i]) eq "opendate") {
+            $openndx = $i;
+         }
+         $i = $i + 1;
+       }
+       $start=1;
+    }
+  }
+  print "    <Project>\n";
+  print "      <Name>$project</Name>\n";
+  foreach $level (@levels) {
+    print "      <Measurement>\n";
+    print "        <Name>$level</Name>\n";
+    print "        <Value>$ht{$level}</Value>\n";
+    if ($ht{$level} == 0) {
+       $mean = 0;
+    } else {
+       $mean = ceil($days{$level}/$ht{$level});
+    }
+    print "        <MeanDays>$mean</MeanDays>\n";
+    print "      </Measurement>\n";
+  }
+  print "    </Project>\n";
+}
+
+foreach $key (keys %developer) {
+  print "    <Developer>\n";
+  $name = (split(/\"/,$key))[1];
+  $name = (split(/@/,$name))[0];
+  print "      <Name>$name</Name>\n";
+  foreach $level (@levels) {
+    print "      <Measurement>\n";
+    print "        <Name>$level</Name>\n";
+    print "        <Value>$developer_ct{$key}{$level}</Value>\n";
+    if ($developer_ct{$key}{$level} == 0) {
+       $mean = 0;
+    } else {
+       $mean = ceil($developer{$key}{$level}/$developer_ct{$key}{$level});
+    }
+    print "        <MeanDays>$mean</MeanDays>\n";
+    print "      </Measurement>\n";
+  }
+  print "    </Developer>\n";
+}
+
+close(LOGFILE);

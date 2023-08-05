@@ -1,0 +1,169 @@
+#!/usr/bin/perl
+#
+# Stefan Chakerian (schake@sandia.gov)
+# Sandia National Labs
+# Jan, 2005
+#
+# This extracts xml and output files from the data directory,
+# moves the pertinent ones to webspace, and
+# removes them from cvs repository.
+#
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+#
+
+# create db_lockfile, which is also checked by cron line
+# (if run interactively, will print contents and exit)
+#
+if (! -e "db_lockfile") {	# slight race condition shouldn't matter
+  open LF, ">db_lockfile";
+  print LF scalar localtime, "\n";
+  close LF;
+} else {
+  print "$0: Lockfile exists:\n";
+  open LF, "db_lockfile" or die "which is unreadable";
+  while (<LF>) {
+    print;
+  }
+  close LF;
+  exit;
+}
+
+#
+# Get the DB Server configuration
+#
+unshift @INC, ".";
+require db_config;
+#
+# generic setup
+# 
+$ENV{CVSROOT} = $cvs_root;
+$ENV{PATH} = "/bin:/usr/bin:" . $ENV{PATH};
+umask 002;
+my $webroot="/home/sqe/public_html/testdata";
+#t = time.time()
+#ts = time.localtime(t)
+#todaystr = "%4d%02d%02d" % (ts.tm_year, ts.tm_mon, ts.tm_mday)
+
+#my ($sec,$min,$hr,$mday,$mon,$year,$dts,$foo);
+#($sec,$min,$hr,$mday,$mon,$year,$foo,$foo,$foo) = localtime(time);
+#my $today=sprintf("%04d%02d%02d",
+                                        #$year, $mon, $mday);
+#my $today_prefix=sprintf("%04d%02d%02d#%02d%02d%02d",
+                                        #$year, $mon, $mday, $hr, $min, $sec);
+
+
+sub update_datadirectory {
+  my $project = shift;
+  if (-d "data") {
+      die "cvs failed: $_" if ($_ = `$cvs_update`);
+  } else {
+      die "cvs failed: $_" if ($_ = `$cvs_checkout`);
+  }
+  if (opendir DATADIR, "data/$project") {
+     @dirlist = grep /\.(xml|out|tgz)$/, readdir DATADIR;
+     closedir DATADIR;
+     print " found\n";
+     return @dirlist;
+  }
+  print " not found\n";
+  return ();
+}
+
+sub delete_file {
+  my $curname = shift;
+  my $project = shift;
+  my $explanation = shift;
+  unlink("data/$project/$curname");
+  die "cvs remove $curname failed\n$result"
+		  if ($result = `$cvs_remove data/$project/$curname > /dev/null 2>&1`);
+  if ($explanation ne "OK") {
+     printf "Bad filename: $curname\n";
+     die "Explanation:  $explanation\n";
+  }
+}
+
+##
+## MAIN
+##
+#
+# Iterate through the software projects
+#
+foreach $project (keys %db_config) {
+  print "  Processing project $project ...";
+  #
+  # Update the data directory
+  #
+  @files = update_datadirectory($project);
+  foreach $file (@files) {
+    print "FILE $file\n";
+  }
+  #
+  # Move everything to a the subdirectory that is specified by
+  # the current date in $webroot.  The "recent files" subdirectory
+  # WAS specified, but now the date is the day in which this
+  # file was completed.  db_summary will do the moves to
+  # today's directory.
+  #
+  $i = 0;
+  foreach $curname (@files) {
+    #
+    # Split the filename into various pieces
+    #
+    @tmp = split /#/, $curname;
+    if ($#tmp < 5) {
+      delete_file($curname,$project,"Bad filename format");
+    }
+    ($fdate,$ftime,$cdate,$ctime,$cwho,$chost,$ccat,$cfile) = split /#/, $curname;
+    $framework = (split(/-/,$ccat))[0];
+    if ($framework ne $project) {
+      delete_file($curname,$project,"Project configuration error: "
+      			. $framework . " is not equal to " . $project);
+    }
+    #
+    # Create the "current" directory in webroot if it doesn't exist
+    #
+    unless (-d "$webroot/$project/$fdate" && -w "$webroot/$project/$fdate" ) {
+      die $_ if ($_ = `mkdir -p $webroot/$project/$fdate`);
+    }
+    #
+    # Move files
+    #
+    if ($curname =~ /tgz$/) {
+	die "tar $curname extraction failed\n$result"
+	    if ($result = `tar xzf data/$project/$curname -C $webroot/$project/$fdate`);
+    } else {	# .out or .xml (old style)
+	die "mv $curname failed\n$result"
+	    if ($result = `mv  data/$project/$curname $webroot/$project/$fdate`);
+    }
+    delete_file($curname,$project,"OK");
+    if ($i++ > 1000) {
+       #
+       # Commit 'remove' events if many ready
+       #
+       die "commit result\n-------\n$result"
+         if ($result = `$cvs_commit > /dev/null 2>&1`);
+       $i = 0;
+       }
+    }
+  #
+  # Commit remaining 'remove' events
+  #
+  die "commit result\n-------\n$result"
+    if ($result = `$cvs_commit > /dev/null 2>&1`);
+  #
+  # Remove archived elements that were removed
+  #
+  if (-d "$cvs_root/data/$project/Attic") {
+     `rm -Rf $cvs_root/data/$project/Attic > /dev/null 2>&1`;
+     }
+  }
+
+unlink 'db_lockfile';

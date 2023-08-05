@@ -1,0 +1,1005 @@
+#!/usr/bin/perl
+#
+# William Hart (wehart@sandia.gov)
+# Sandia National Labs
+# May, 2006
+#
+# This summarizes check-*xml files from the webspace.
+#
+# TODO: what does it mean to evaluate multiple sets of code check files????
+# IDEA: just take the latest version.
+#
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+#
+
+use POSIX;
+use Data::Dumper;
+use XML::Simple;
+use URI::Escape;
+use File::Copy;
+require db_config;
+
+#
+# generic setup
+# 
+$ENV{PATH} = "/bin:/usr/bin:" . $ENV{PATH};
+umask 002;
+
+
+sub do_print {
+  my $OUT = shift;
+  my $val = shift;
+  my $size = shift;
+  my $ws = shift;
+  for my $i (0 .. ($ws-1)) {
+      printf $OUT " ";
+  }
+  $str = "%" . $size . "." . $size . "s";
+  if (eval($val) > 0) {
+     printf $OUT  $str, $val;
+  } else {
+     printf $OUT  $str, ".";
+  }
+  
+}
+
+
+sub print_help {
+  print "\n";
+  print "db_code_checks [--help] [--install] <project-id> [<*.xml>]\n";
+  print "\n";
+}
+
+##
+## MAIN
+##
+#
+# Commandline args:
+#	use arguments as data files, or else read $webdir/$framework/$date/*.xml
+#
+$install=0;
+if (scalar(@ARGV) == 0) {
+   print_help();
+   exit(1);
+} else {
+  $tmp = shift @ARGV;
+  if ($tmp eq "--help") {
+     print_help();
+     exit(1);
+     }
+  elsif ($tmp eq "--install") {
+     $install=1;
+     $tmp = shift @ARGV;
+     }
+  $framework=$tmp;
+  #$fname = shift @ARGV;
+}
+$interactive = scalar(@ARGV);
+$fname = $db_config{$framework}{name};
+#
+# Figure out the webspace directory
+#
+my $webroot="/home/sqe/public_html/testdata/$framework";
+my $weburl="http://software.sandia.gov/~sqe/testdata/$framework";
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)= localtime(time);
+$webdir = sprintf "%4d%02d%02d", $year+1900, $mon + 1, $mday;
+if (!(-d "$webroot/$webdir" && -w "$webroot/$webdir" )) {
+   die "Missing directory $webroot/$webdir\n";
+}
+
+##
+## PARSE XML FILES
+##
+#
+# Get the list of XML files
+#
+$dirname = "$webroot/$webdir";
+if ($interactive > 0) {
+  @dirlist = grep /.*#check.*\.xml$/, @ARGV;
+  $dirname = '';
+} else {
+  opendir DATADIR, ($dirname) or die "opendir $dirname failed";
+  @dirlist = grep /.*#check.*\.xml$/, readdir DATADIR;
+  closedir DATADIR;
+}
+#
+# Filter out duplicates
+#
+%xml_files = ();
+foreach $curname (@dirlist) {
+  @tokens = split /#/, $curname;  
+  $fname = $tokens[$#tokens];
+  if (exists $xml_files{ $fname }) {
+     if ($curname gt $xml_files{ $fname }) {
+        $xml_files{ $fname } = $curname;
+     }
+  } else {
+     $xml_files{ $fname } = $curname;
+  }
+}
+#
+# Read in the XML files
+#
+%projects_ht = ();
+%component_projects_ht = ();
+%core_packages_ht = ();
+%all_packages = ();
+%people_ht = ();
+%bug_ht = ();
+%component_bug_ht = ();
+%bug_dev_ht = ();
+%bugtime_ht = ();
+%component_bugtime_ht = ();
+%bugclosed_proj_ht = ();
+%commits_ht = ();
+%changes_ht = ();
+%coin_ht = ();
+%votd_ht = ();
+%copyright_ht = ();
+%codedocs_ht = ();
+%docs_ht = ();
+%lc_ht = ();
+%alertN = ();
+@alerts = ();
+
+%proj_ref = ();
+%pkg_tag_diffs = ();
+%pkg_release_diffs = ();
+%pkg_stable_diffs = ();
+%pkg_tag_version = ();
+%pkg_release_version = ();
+%pkg_stable_version = ();
+
+%lcov_coverage = ();
+%lcov_total = ();
+%lcov_executed = ();
+%lcov_status = ();
+%lcov_daysold = ();
+
+my $votd_failure=0;
+
+foreach $key (keys %xml_files) {
+  $curname = $xml_files{$key};
+  print "Processing $curname\n";
+  #
+  # Split the filenames into convenient pieces
+  #
+  ($cdate,$ctime,$cwho,$chost,$ccat,$cfile) = split /#/, $curname;
+  #
+  # Figure out the type of the file
+  #
+  $_ = $curname;
+  if (/config/) {
+    $type = "config";
+  } elsif (/build/) {
+    $type = "build";
+  } elsif (/results/) {
+    $type = "results";
+  } elsif (/test/) {
+    $type = "tests";
+  } elsif (/scenario/) {
+    $type = "scenario";
+  } elsif (/check/) {
+    $type = "check";
+  } else {
+    push @errors, "\"$curname\" does not contain [config|build|test|scenario|check] - skipping\n";
+    next;
+  }
+  #
+  # $xmlfile contains the complete pathname of the file
+  #
+  #print "processing $curname...\n";
+  if ($interactive) {
+    $xmlfile = $curname;
+  } else {
+    $xmlfile = $dirname . "/" . $curname;
+  }
+  #
+  # Parse the XML file
+  #
+  eval {
+    $xml = XMLin("$xmlfile", KeyAttr => [], ForceArray => [ qw(CodeCheck SVNCommitSummary Commits Changes Project LCOVDirectory Measurement Developer) ] );
+    };
+  #print Dumper($xml);
+  if ($@) {
+    chomp $@;
+    push @errors, "skipping $curname... (Bad XML format) $@\n";
+    next;
+    }
+  #
+  # Get the Scenario Key from the XML data structure
+  #
+  if (defined($xml->{name})) {
+    $name = $xml->{name};
+  }
+  if ($name eq "") {
+     push @errors, "skipping $curname... (empty CodeCheck name, check xml)\n";
+     next;
+  }
+  #
+  # Parse the data differently for different types of code checks
+  #
+  if ($name eq "openbugs") {
+     #
+     # Bugs data
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Project}} ) {
+       $projects_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} } = 1;
+       for $j (0 .. $#{$xml->{CheckInfo}{Project}[$i]->{Measurement}} ) {
+         $bug_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Value};
+         $bugtime_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{MeanDays};
+         #print "$xml->{CheckInfo}{Project}[$i]->{Name} $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name} $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Value} $bug_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} $projects_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }\n";
+       }
+     }
+     for $i (0 .. $#{$xml->{CheckInfo}{Developer}} ) {
+       for $j (0 .. $#{$xml->{CheckInfo}{Developer}[$i]->{Measurement}} ) {
+         $bug_dev_ht{ $xml->{CheckInfo}{Developer}[$i]->{Name} }{$xml->{CheckInfo}{Developer}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Developer}[$i]->{Measurement}[$j]->{Value};
+         }
+       }
+
+  } elsif ($name eq "openbugsbycomponent") {
+     #
+     # Bugs data
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Project}} ) {
+       $component_projects_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} } = 1;
+       for $j (0 .. $#{$xml->{CheckInfo}{Project}[$i]->{Measurement}} ) {
+         $component_bug_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Value};
+         $component_bugtime_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{MeanDays};
+         #print "$xml->{CheckInfo}{Project}[$i]->{Name} $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name} $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Value} $bug_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} $projects_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }\n";
+       }
+     }
+
+  } elsif ($name eq "closedbugs") {
+     #
+     # Closed Bugs data
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Project}} ) {
+       $projects_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} } = 1;
+       for $j (0 .. $#{$xml->{CheckInfo}{Project}[$i]->{Measurement}} ) {
+         $bugclosed_proj_ht{ $xml->{CheckInfo}{Project}[$i]->{Name} }{$xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{Name}} = $xml->{CheckInfo}{Project}[$i]->{Measurement}[$j]->{MeanDays};
+       }
+     }
+     
+  } elsif ($name eq "code-docs") {
+     #
+     # Doxygen info in code
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       $core_packages_ht{ $xml->{CheckInfo}{Measurement}[$i]->{Name} } = 1;
+       #print "Code DOCS $xml->{CheckInfo}{Measurement}[$i]->{Name} $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $codedocs_ht{$xml->{CheckInfo}{Measurement}[$i]->{Name}} = $xml->{CheckInfo}{Measurement}[$i]->{Value};
+     }
+
+  } elsif ($name eq "coin") {
+     #
+     # COIN diff tests
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       #print "COIN $xml->{CheckInfo}{Measurement}[$i]->{Name} $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $coin_ht{$xml->{CheckInfo}{Measurement}[$i]->{Name}} = $xml->{CheckInfo}{Measurement}[$i]->{Value};
+     }
+
+  } elsif ($name eq "votds") {
+     #
+     # Version-of-the-day nightly tar files
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       #print "VOTD $xml->{CheckInfo}{Measurement}[$i]->{Name} $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $votd_ht{$xml->{CheckInfo}{Measurement}[$i]->{Name}} = $xml->{CheckInfo}{Measurement}[$i]->{Value};
+
+       if ( $xml->{CheckInfo}{Measurement}[$i]->{Value} != 0 ) {
+         $votd_failure = 1;
+       }
+     }
+
+  } elsif ($name eq "copyright") {
+     #
+     # Copyright compilance
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       $core_packages_ht{ $xml->{CheckInfo}{Measurement}[$i]->{Name} } = 1;
+       #print "COPYRIGHT $xml->{CheckInfo}{Measurement}[$i]->{Name} $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $copyright_ht{$xml->{CheckInfo}{Measurement}[$i]->{Name}} = $xml->{CheckInfo}{Measurement}[$i]->{Value};
+     }
+
+  } elsif ($name eq "external_summary") {
+     #
+     # Loop through commit summaries
+     #
+     for $j (0 .. $#{$xml->{CheckInfo}{Alert}} ) {
+       $alert = $xml->{CheckInfo}{Alert}[$j];
+       #print "TYPE $alert->{Type}\n";
+       if (!(exists $alertN{$alert->{Type}})) {
+	  my %tmphash = ();
+	  push @alerts, $tmphash;
+       	  $alertN{$alert->{Type}} = $#alerts;
+       }
+       $alerts[ $alertN{$alert->{Type}} ]->{$alert->{File}} = $alert->{Summary};
+       #print "THERE $alerts[ $alertN{$alert->{Type}} ]->{$alert->{File}}\n";
+     }
+     for $j (0 .. $#{$xml->{CheckInfo}{Reference}} ) {
+	 $proj_ref{ $xml->{CheckInfo}{Reference}[$j] } = 1;
+     }
+     for $j (0 .. $#{$xml->{CheckInfo}{Repository}} ) {
+       $name = $xml->{CheckInfo}{Repository}[$j]->{Name};
+       $aux = $xml->{CheckInfo}{Repository}[$j]->{Auxiliary};
+       $repos = $xml->{CheckInfo}{Repository}[$j];
+       for $k (0 .. $#{$repos->{Project}} ) {
+         $proj = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{Root};
+	 if ($aux eq "False") {
+	    $proj_ref{ $proj } = 1;
+	 }
+	 $pkg_tag_diffs{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{TagDiffs};
+	 $pkg_release_diffs{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{ReleaseDiffs};
+	 $pkg_stable_diffs{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{StableDiffs};
+	 $pkg_tag_version{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{LatestTag};
+	 $pkg_release_version{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{LatestRelease};
+	 $pkg_stable_version{$proj} = $xml->{CheckInfo}{Repository}[$j]->{Project}[$k]->{LatestStable};
+       }
+     }
+
+  } elsif ($name eq "commit_summary") {
+     #
+     # Loop through commit summaries
+     #
+     for $j (0 .. $#{$xml->{CheckInfo}{SVNCommitSummary}} ) {
+       $summary = $xml->{CheckInfo}{SVNCommitSummary}[$j]; 
+       $package = $summary->{Repository};
+       if (exists $all_packages_ht{ $package }) {
+          print "WARNING: duplicate commit statistics for package $package are being ignored!\n";
+	  next;
+       }
+       $all_packages_ht{ $package } = 1;
+       #
+       # Daily commits
+       #
+       for $i (0 .. $#{$summary->{DailyStatistics}{Period}{Commits}} ) {
+         $author = $summary->{DailyStatistics}{Period}{Commits}[$i]->{author};
+         $people_ht{ $author } = 1;
+         #print "AUTHOR $author $summary->{DailyStatistics}{Period}{Commits}[$i]->{content}\n";
+         $commits_ht{Developers}{ $author }{daily} = $commits_ht{Developers}{ $author }{daily} + $summary->{DailyStatistics}{Period}{Commits}[$i]->{content};
+       }
+       #
+       # Weekly commits
+       #
+       for $i (0 .. $#{$summary->{WeeklyStatistics}{Period}{Commits}} ) {
+         $author = $summary->{WeeklyStatistics}{Period}{Commits}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $commits_ht{Developers}{ $author }{weekly} = $commits_ht{Developers}{ $author }{weekly} + $summary->{WeeklyStatistics}{Period}{Commits}[$i]->{content};
+       }
+       #
+       # Monthly commits
+       #
+       for $i (0 .. $#{$summary->{MonthlyStatistics}{Period}{Commits}} ) {
+         $author = $summary->{MonthlyStatistics}{Period}{Commits}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $commits_ht{Developers}{ $author }{monthly} = $commits_ht{Developers}{ $author }{monthly} + $summary->{MonthlyStatistics}{Period}{Commits}[$i]->{content};
+       }
+       #
+       # Quarterly commits
+       #
+       for $i (0 .. $#{$summary->{QuarterlyStatistics}{Period}{Commits}} ) {
+         $author = $summary->{QuarterlyStatistics}{Period}{Commits}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $commits_ht{Developers}{ $author }{quarterly} = $commits_ht{Developers}{ $author }{quarterly} + $summary->{QuarterlyStatistics}{Period}{Commits}[$i]->{content};
+       }
+       #
+       # Daily changes
+       #
+       for $i (0 .. $#{$summary->{DailyStatistics}{Period}{Changes}} ) {
+         $author = $summary->{DailyStatistics}{Period}{Changes}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $changes_ht{Developers}{ $author }{daily} = $changes_ht{Developers}{ $author }{daily} + $summary->{DailyStatistics}{Period}{Changes}[$i]->{content};
+       }
+       #
+       # Weekly changes
+       #
+       for $i (0 .. $#{$summary->{WeeklyStatistics}{Period}{Changes}} ) {
+         $author = $summary->{WeeklyStatistics}{Period}{Changes}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $changes_ht{Developers}{ $author }{weekly} = $changes_ht{Developers}{ $author }{weekly} + $summary->{WeeklyStatistics}{Period}{Changes}[$i]->{content};
+       }
+       #
+       # Monthly changes
+       #
+       for $i (0 .. $#{$summary->{MonthlyStatistics}{Period}{Changes}} ) {
+         $author = $summary->{MonthlyStatistics}{Period}{Changes}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $changes_ht{Developers}{ $author }{monthly} = $changes_ht{Developers}{ $author }{monthly} + $summary->{MonthlyStatistics}{Period}{Changes}[$i]->{content};
+       }
+       #
+       # Quarterly changes
+       #
+       for $i (0 .. $#{$summary->{QuarterlyStatistics}{Period}{Changes}} ) {
+         $author = $summary->{QuarterlyStatistics}{Period}{Changes}[$i]->{author};
+         $people_ht{ $author } = 1;
+         $changes_ht{Developers}{ $author }{quarterly} = $changes_ht{Developers}{ $author }{quarterly} + $summary->{QuarterlyStatistics}{Period}{Changes}[$i]->{content};
+       }
+       #
+       # Package Summaries
+       #
+       $commits_ht{Packages}{$package}{daily} = $summary->{DailyStatistics}{Period}{NumCommits};
+       $commits_ht{Packages}{$package}{weekly} = $summary->{WeeklyStatistics}{Period}{NumCommits};
+       $commits_ht{Packages}{$package}{monthly} = $summary->{MonthlyStatistics}{Period}{NumCommits};
+       $commits_ht{Packages}{$package}{quarterly} = $summary->{QuarterlyStatistics}{Period}{NumCommits};
+       $changes_ht{$package}{daily} = $summary->{DailyStatistics}{Period}{NumChanges};
+       $changes_ht{$package}{weekly} = $summary->{WeeklyStatistics}{Period}{NumChanges};
+       $changes_ht{$package}{monthly} = $summary->{MonthlyStatistics}{Period}{NumChanges};
+       $changes_ht{$package}{quarterly} = $summary->{QuarterlyStatistics}{Period}{NumChanges};
+     }
+
+  } elsif ($name eq "lcov_summary") {
+
+     for $i (0 .. $#{$xml->{CheckInfo}{LCOVDirectory}} ) {
+       $name = $xml->{CheckInfo}{LCOVDirectory}[$i]->{Name};
+       $lcov_coverage{$name} = $xml->{CheckInfo}{LCOVDirectory}[$i]->{Coverage};
+       $lcov_total{$name} = $xml->{CheckInfo}{LCOVDirectory}[$i]->{TotalLines};
+       $lcov_executed{$name} = $xml->{CheckInfo}{LCOVDirectory}[$i]->{ExecutedLines};
+       $lcov_status{$name} = $xml->{CheckInfo}{LCOVDirectory}[$i]->{Status};
+       $lcov_daysold{$name} = $xml->{CheckInfo}{LCOVDirectory}[$i]->{DaysOld};
+     }
+
+  } elsif ($name eq "docs") {
+     #
+     # Doxygen warnings
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       #print "FOO $xml->{CheckInfo}{Measurement}[$i]->{Name}\n";
+       if ((split(/\//,$xml->{CheckInfo}{Measurement}[$i]->{Name}) )[1] eq "doc") {
+          $package="acro";
+       } else {
+          $package=(split(/\//,$xml->{CheckInfo}{Measurement}[$i]->{Name}) )[2];
+       }
+       $core_packages_ht{ $package } = 1;
+       #print "DOCS $package $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $docs_ht{$package} = $docs_ht{$package} + 
+       				$xml->{CheckInfo}{Measurement}[$i]->{Value};
+     }
+
+  } elsif ($name eq "lc") {
+     #
+     # Line counts
+     #
+     for $i (0 .. $#{$xml->{CheckInfo}{Measurement}} ) {
+       $core_packages_ht{ $xml->{CheckInfo}{Measurement}[$i]->{Name} } = 1;
+       #print "LC $xml->{CheckInfo}{Measurement}[$i]->{Name} $xml->{CheckInfo}{Measurement}[$i]->{Value}\n";
+       $lc_ht{$xml->{CheckInfo}{Measurement}[$i]->{Name}} = $xml->{CheckInfo}{Measurement}[$i]->{Value};
+     }
+  }
+}
+#
+# Sort order of presentation
+#
+@projects = ();
+for my $val (keys %projects_ht) {
+  push(@projects,$val);
+}
+@projects = sort(@projects);
+#
+@core_packages = ();
+for my $val (keys %core_packages_ht) {
+  push(@core_packages,$val);
+}
+@core_packages = sort(@core_packages);
+#
+@coin_dirs = ();
+for my $val (keys %coin_ht) {
+  push(@coin_dirs,$val);
+}
+@coin_dirs = sort(@coin_dirs);
+#
+@votd_tarfiles = ();
+for my $val (keys %votd_ht) {
+  push(@votd_tarfiles,$val);
+}
+@votd_tarfiles = sort(@votd_tarfiles);
+#
+@all_packages = ();
+for my $val (keys %all_packages_ht) {
+  push(@all_packages,$val);
+}
+@all_packages = sort(@all_packages);
+#
+@people = ();
+for my $val (keys %people_ht) {
+  push(@people,$val);
+}
+@people = sort(@people);
+
+open SUMMARY, ">$framework/code_checks.txt" || die "ERROR: cannot open $framework/code_checks.txt";
+##
+## PRINT REPORT
+##
+$status = 0;
+$mydate = `date`;
+chomp $mydate;
+       #0123456789012345678901234567890123456789012345678901234567890123456789012345
+printf SUMMARY "**************************** CODE CHECKS REPORT ****************************\n";
+printf SUMMARY "****************************************************************************\n";
+printf SUMMARY " %-41.41s   %30.30s\n", $fname, $mydate;
+printf SUMMARY "****************************************************************************\n";
+printf SUMMARY "****************************************************************************\n";
+#
+# Bugs - # Opened
+#
+if (scalar %bug_ht) {
+$status = 1;
+printf SUMMARY "\nOpen Bugs in Bugzilla - Total Number Open by Project\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Project            Blockr Crtcal  Major Normal  Minor Trvial Enhanc  TOTAL\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+for my $project (@projects) {
+  my $total = $bug_ht{$project}{blocker} + 
+  		$bug_ht{$project}{critical} +
+		$bug_ht{$project}{major} +
+		$bug_ht{$project}{normal} +
+		$bug_ht{$project}{minor} +
+		$bug_ht{$project}{trivial} +
+		$bug_ht{$project}{enhancement};
+  printf SUMMARY " %-17.17s ", $project;
+  do_print(\*SUMMARY, $bug_ht{$project}{blocker},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{critical},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{major},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{normal},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{minor},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{trivial},6,1);
+  do_print(\*SUMMARY, $bug_ht{$project}{enhancement},6,1);
+  do_print(\*SUMMARY, $total,6,1);
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#projects > 1) {
+printf SUMMARY " %-17.17s ", "TOTAL";
+for $val (blocker, critical, major, normal, minor, trivial, enhancement) {
+  $total=0;
+  for my $project (@projects) {
+    $total = $total + $bug_ht{$project}{$val};
+  }
+  do_print(\*SUMMARY, $total,6,1);
+}
+printf SUMMARY "\n";
+}
+}
+#
+# Bugs - # Opened
+#
+if (scalar %bug_dev_ht) {
+$status = 1;
+printf SUMMARY "\n\nOpen Bugs in Bugzilla - Total Number Open by Developer\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Developer          Blockr Crtcal  Major Normal  Minor Trvial Enhanc  TOTAL\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+@developers = keys %bug_dev_ht;
+@developers = sort(@developers);
+for my $developer (@developers) {
+  my $total = $bug_dev_ht{$developer}{blocker} + 
+  		$bug_dev_ht{$developer}{critical} +
+		$bug_dev_ht{$developer}{major} +
+		$bug_dev_ht{$developer}{normal} +
+		$bug_dev_ht{$developer}{minor} +
+		$bug_dev_ht{$developer}{trivial} +
+		$bug_dev_ht{$developer}{enhancement};
+  printf SUMMARY " %-17.17s ", $developer;
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{blocker},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{critical},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{major},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{normal},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{minor},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{trivial},6,1);
+  do_print(\*SUMMARY, $bug_dev_ht{$developer}{enhancement},6,1);
+  do_print(\*SUMMARY, $total,6,1);
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#developers > 1) {
+printf SUMMARY " %-17.17s ", "TOTAL";
+for $val (blocker, critical, major, normal, minor, trivial, enhancement) {
+  $total=0;
+  for my $developer (@developers) {
+    $total = $total + $bug_dev_ht{$developer}{$val};
+  }
+  do_print(\*SUMMARY, $total,6,1);
+}
+printf SUMMARY "\n";
+}
+}
+#
+# Bugs - Mean Days
+#
+if (scalar %bugtime_ht) {
+$status = 1;
+printf SUMMARY "\n\nOpen Bugs in Bugzilla - Mean Days Since Last Change\n";
+printf SUMMARY "---------------------------------------------------------------------\n";
+printf SUMMARY " Project            Blockr Crtcal  Major Normal  Minor Trvial Enhanc \n";
+printf SUMMARY "---------------------------------------------------------------------\n";
+for my $project (@projects) {
+  my $total = $bugtime_ht{$project}{blocker} + 
+  		$bugtime_ht{$project}{critical} +
+		$bugtime_ht{$project}{major} +
+		$bugtime_ht{$project}{normal} +
+		$bugtime_ht{$project}{minor} +
+		$bugtime_ht{$project}{trivial} +
+		$bugtime_ht{$project}{enhancement};
+  printf SUMMARY " %-17.17s ", $project;
+  do_print(\*SUMMARY, $bugtime_ht{$project}{blocker},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{critical},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{major},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{normal},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{minor},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{trivial},6,1);
+  do_print(\*SUMMARY, $bugtime_ht{$project}{enhancement},6,1);
+  #do_print(\*SUMMARY, $total,6,1);
+  printf SUMMARY "\n";
+}
+printf SUMMARY "---------------------------------------------------------------------\n";
+}
+#
+# Bugs - Mean Days Until Resolved by Project
+#
+if (scalar %bugclosed_proj_ht) {
+$status = 1;
+printf SUMMARY "\n\nClosed Bugs in Bugzilla - Mean Days Until Resolved by Project\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Project            Blockr Crtcal  Major Normal  Minor Trvial Enhanc  TOTAL\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+for my $project (@projects) {
+  my $total = $bugclosed_proj_ht{$project}{blocker} + 
+  		$bugclosed_proj_ht{$project}{critical} +
+		$bugclosed_proj_ht{$project}{major} +
+		$bugclosed_proj_ht{$project}{normal} +
+		$bugclosed_proj_ht{$project}{minor} +
+		$bugclosed_proj_ht{$project}{trivial} +
+		$bugclosed_proj_ht{$project}{enhancement};
+  printf SUMMARY " %-17.17s ", $project;
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{blocker},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{critical},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{major},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{normal},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{minor},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{trivial},6,1);
+  do_print(\*SUMMARY, $bugclosed_proj_ht{$project}{enhancement},6,1);
+  do_print(\*SUMMARY, $total,6,1);
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#projects > 1) {
+printf SUMMARY " %-17.17s ", "TOTAL";
+for $val (blocker, critical, major, normal, minor, trivial, enhancement) {
+  $total=0;
+  for my $project (@projects) {
+    $total = $total + $bugclosed_proj_ht{$project}{$val};
+  }
+  do_print(\*SUMMARY, $total,6,1);
+}
+printf SUMMARY "\n";
+}
+}
+#
+# Bugs - # Opened by component
+#
+if (scalar %component_bug_ht) {
+$status = 1;
+printf SUMMARY "\n\nOpen Bugs in Bugzilla - Total Number Open by Component\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Project            Component                                        Number \n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+for my $project (@projects) {
+  $projval = $project;
+  for my $component (sort keys %{$component_bug_ht{$project}}) {
+    #print "HERE ",$component,"\n";
+    printf SUMMARY " %-17.17s ", $projval;
+    printf SUMMARY " %-47.47s ", $component;
+    do_print(\*SUMMARY, $component_bug_ht{$project}{$component},6,1);
+    printf SUMMARY "\n";
+    $projval = " ";
+    }
+  printf SUMMARY "----------------------------------------------------------------------------\n";
+}
+
+}
+#
+# LCOV Statistics
+#
+if (scalar %lcov_status) {
+$status = 1;
+printf SUMMARY "\n\nCode Coverage Summary (lcov)\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Build Name                Coverage Executed    Total     Days\n";
+printf SUMMARY "                                       Lines    Lines      Old\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+@lcov_names = keys %lcov_status;
+@lcov_names = sort(@lcov_names);
+for my $name (@lcov_names) {
+  printf SUMMARY " %-25.25s ", $name;
+
+  if ($lcov_status{$name} != "OK") {
+     printf SUMMARY "%s\n", $lcov_status{$name};
+  } else {
+     printf SUMMARY "%8.8s %8.8s %8.8s %8.8s\n", $lcov_coverage{$name}, $lcov_executed{$name}, $lcov_total{$name}, $lcov_daysold{$name};
+  }
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+}
+#
+# Package Statistics
+#
+if (scalar %copyright_ht) {
+$status = 1;
+printf SUMMARY "\n\nFiles with Issues/File Stats\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Package                      Missing    Doxygen    Missing       Line\n";
+printf SUMMARY "                            CopyRight    Warning    DocInfo      Count\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+$dc_total=0;
+$lc_total=0;
+$copyright_total=0;
+$doc_total=0;
+for my $package (@core_packages) {
+  printf SUMMARY " %-24.24s ", $package;
+
+  do_print(\*SUMMARY, $copyright_ht{$package},10,1);
+  $copyright_total = $copyright_total + $copyright_ht{$package};
+
+  do_print(\*SUMMARY, $docs_ht{$package},10,1);
+  $doc_total = $doc_total + $docs_ht{$package};
+
+  do_print(\*SUMMARY, $codedocs_ht{$package},10,1);
+  $dc_total = $dc_total + $codedocs_ht{$package};
+
+  do_print(\*SUMMARY, $lc_ht{$package},10,1);
+  $lc_total = $lc_total + $lc_ht{$package};
+
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#core_packages > 1) {
+printf SUMMARY " %-24.24s ", "TOTAL";
+do_print(\*SUMMARY, $copyright_total,10,1);
+do_print(\*SUMMARY, $doc_total,10,1);
+do_print(\*SUMMARY, $dc_total,10,1);
+do_print(\*SUMMARY, $lc_total,10,1);
+printf SUMMARY "\n";
+}
+}
+#
+# Package Statistics
+#
+if (scalar %changes_ht) {
+$status = 1;
+printf SUMMARY "\n\nChanges/Commits by Subversion Repository\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Package                      Day         Week         Month       Quarter\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+$daily_change_total=0;
+$weekly_change_total=0;
+$monthly_change_total=0;
+$daily_commits_total=0;
+$weekly_commits_total=0;
+$monthly_commits_total=0;
+for my $package (@all_packages) {
+  printf SUMMARY " %-24.24s ", $package;
+
+  do_print(\*SUMMARY, $changes_ht{$package}{daily},5,0);
+  $daily_change_total = $daily_change_total + $changes_ht{$package}{daily};
+  printf SUMMARY "/";
+  do_print(\*SUMMARY, $commits_ht{Packages}{$package}{daily},5,0);
+  $daily_commits_total = $daily_commits_total + $commits_ht{Packages}{$package}{daily};
+
+  do_print(\*SUMMARY, $changes_ht{$package}{weekly},5,2);
+  $weekly_change_total = $weekly_change_total + $changes_ht{$package}{weekly};
+  printf SUMMARY "/";
+  do_print(\*SUMMARY, $commits_ht{Packages}{$package}{weekly},5,0);
+  $weekly_commits_total = $weekly_commits_total + $commits_ht{Packages}{$package}{weekly};
+
+  do_print(\*SUMMARY, $changes_ht{$package}{monthly},5,2);
+  $monthly_change_total = $monthly_change_total + $changes_ht{$package}{monthly};
+  printf SUMMARY "/";
+  do_print(\*SUMMARY, $commits_ht{Packages}{$package}{monthly},5,0);
+  $monthly_commits_total = $monthly_commits_total + $commits_ht{Packages}{$package}{monthly};
+
+  do_print(\*SUMMARY, $changes_ht{$package}{quarter},5,2);
+  $quarterly_change_total = $quarterly_change_total + $changes_ht{$package}{quarterly};
+  printf SUMMARY "/";
+  do_print(\*SUMMARY, $commits_ht{Packages}{$package}{quarterly},5,0);
+  $quarterly_commits_total = $quarterly_commits_total + $commits_ht{Packages}{$package}{quarterly};
+
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#all_packages > 1) {
+printf SUMMARY " %-24.24s ", "TOTAL";
+do_print(\*SUMMARY, $daily_change_total,5,0);
+printf SUMMARY "/";
+do_print(\*SUMMARY, $daily_commits_total,5,0);
+
+do_print(\*SUMMARY, $weekly_change_total,5,2);
+printf SUMMARY "/";
+do_print(\*SUMMARY, $weekly_commits_total,5,0);
+
+do_print(\*SUMMARY, $monthly_change_total,5,2);
+printf SUMMARY "/";
+do_print(\*SUMMARY, $monthly_commits_total,5,0);
+
+do_print(\*SUMMARY, $quarterly_change_total,5,2);
+printf SUMMARY "/";
+do_print(\*SUMMARY, $quarterly_commits_total,5,0);
+printf SUMMARY "\n";
+}
+}
+#
+# Developer Activity
+#
+if (scalar %commits_ht) {
+$status = 1;
+printf SUMMARY "\n\nCommit Activity\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Developer                  Day  Week Month Quarter\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+$daily_commits_total=0;
+$weekly_commits_total=0;
+$monthly_commits_total=0;
+$quarterly_commits_total=0;
+for my $person (@people) {
+  printf SUMMARY " %-24.24s ", $person;
+
+  do_print(\*SUMMARY, $commits_ht{Developers}{$person}{daily},5,0);
+  $daily_commits_total = $daily_commits_total + $commits_ht{Developers}{$person}{daily};
+
+  do_print(\*SUMMARY, $commits_ht{Developers}{$person}{weekly},5,1);
+  $weekly_commits_total = $weekly_commits_total + $commits_ht{Developers}{$person}{weekly};
+
+  do_print(\*SUMMARY, $commits_ht{Developers}{$person}{monthly},5,1);
+  $monthly_commits_total = $monthly_commits_total + $commits_ht{Developers}{$person}{monthly};
+
+  do_print(\*SUMMARY, $commits_ht{Developers}{$person}{quarterly},7,1);
+  $quarterly_commits_total = $quarterly_commits_total + $commits_ht{Developers}{$person}{quarterly};
+
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+if ($#people > 1) {
+printf SUMMARY " %-24.24s ", "TOTAL";
+do_print(\*SUMMARY, $daily_commits_total,5,0);
+
+do_print(\*SUMMARY, $weekly_commits_total,5,1);
+
+do_print(\*SUMMARY, $monthly_commits_total,5,1);
+
+do_print(\*SUMMARY, $quarterly_commits_total,7,1);
+printf SUMMARY "\n";
+}
+}
+#
+# COIN Diffs
+#
+if (scalar %coin_ht) {
+$status = 1;
+printf SUMMARY "\n\nCOIN Differences with VOTD\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Directory                 Number\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+$total=0;
+for my $dir (@coin_dirs) {
+  printf SUMMARY " %-24.24s ", $dir;
+  do_print(\*SUMMARY, $coin_ht{$dir},6,1);
+  $total = $total + $coin_ht{$dir};
+  printf SUMMARY "\n";
+}
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " %-24.24s ", "TOTAL";
+do_print(\*SUMMARY, $total,6,1);
+printf SUMMARY "\n";
+}
+#
+# Alerts 
+#
+if (scalar %alertN) {
+$status = 1;
+printf SUMMARY "\n\nSubversion External Alerts\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Alert Type / External File / Description\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+@alert_types = keys %alertN;
+@alert_types = sort(@alert_types);
+for my $atype (@alert_types) {
+  print SUMMARY "$atype\n";
+  $tmp = $alerts[ $alertN{$atype} ];
+  @files = keys %$tmp;
+  @files = sort(@files);
+  #print "FILES " . keys(%tmp) . "@files\n";
+  for $file (@files) {
+    printf SUMMARY "   $file\n";
+    printf SUMMARY "   $tmp->{$file}\n";
+    printf SUMMARY "\n";
+    $i = $i + 1;
+    }
+  }
+}
+#
+# Project Branch Differences
+#
+if (scalar %pkg_tag_diffs) {
+$status = 1;
+printf SUMMARY "\n\nNumber of Files Different From Trunk - Latest Stable/Release/Tag\n";
+printf SUMMARY "--------------------------------------------------------------------------------------------------\n";
+printf SUMMARY " SVN Project Directory                                                        Tag  Stable Release \n";
+printf SUMMARY "--------------------------------------------------------------------------------------------------\n";
+@svn_dirs = keys %pkg_tag_diffs;
+@svn_dirs = sort(@svn_dirs);
+for my $dir (@svn_dirs) {
+  if ($proj_ref{$dir} == 1) {
+     printf SUMMARY " %-70.70s ", $dir;
+     if ($pkg_tag_diffs{$dir} == "None") {
+        printf SUMMARY " %8.8s ", "-";
+     } else {
+        printf SUMMARY " %8.8s ", $pkg_tag_diffs{$dir};
+     }
+     if ($pkg_stable_diffs{$dir} == "None") {
+        printf SUMMARY " %6.6s ", "-";
+     } else {
+        printf SUMMARY " %6.6s ", $pkg_stable_diffs{$dir};
+     }
+     if ($pkg_release_diffs{$dir} == "None") {
+        printf SUMMARY " %6.6s ", "-";
+     } else {
+        printf SUMMARY " %6.6s ", $pkg_release_diffs{$dir};
+     }
+     printf SUMMARY "\n";
+  }
+}
+}
+#
+# VOTD creation
+#
+if (scalar %votd_ht) {
+$status = 1;
+printf SUMMARY "\n\nNightly Creation of Software Version of the Day (VOTD)\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+printf SUMMARY " Project                   Age in Days of VOTD tar file\n";
+printf SUMMARY "----------------------------------------------------------------------------\n";
+for my $project (@votd_tarfiles) {
+  printf SUMMARY " %-24.24s ", $project;
+  if ($votd_ht{$project} == -1) {
+    printf SUMMARY "no VOTD file found";
+  }
+  else{
+    printf SUMMARY "%6.6s", $votd_ht{$project};
+  }
+  printf SUMMARY "\n";
+}
+}
+#
+# If this was an html file, we could link to the build log.  Or we could
+# also print every line from the build log that contains the word
+# "failed".
+#
+#if ( $votd_failure == 1 ) {
+#  print SUMMARY "\nOne or more VOTDs are out-of-date: ";
+#  print SUMMARY "<a href=\"http://software.sandia.gov/Acro/releases/votd/acro_votd_tarballs.out\">VOTD build log</a>";
+#  print SUMMARY "\n";
+#}
+if ($status == 0) {
+   printf SUMMARY "\nNo summary information to report.\n";
+}
+
+printf SUMMARY "\n****************************************************************************\n";
+printf SUMMARY "****************************************************************************\n";
+
+close(SUMMARY);
+
+if ($install == 1) {
+   copy("$framework/code_checks.txt","$webroot/$webdir");
+   if (-e "$webroot\/today") {
+      unlink "$webroot\/today";
+      }
+   symlink("$webroot\/$webdir", "$webroot\/today");
+   }

@@ -1,0 +1,160 @@
+#!/usr/bin/env python
+#
+# svn_summary
+# Summarize the state of SVN repositories
+#
+
+import sys
+import os
+import os.path
+import commands
+from optparse import OptionParser
+import fast.sqa.svn
+import pyutilib.misc
+import glob
+
+def checkout_project(proj,options):
+    #
+    # Create the name of the target rev directory
+    #
+    if proj.trunk_dir is None or proj.stable_name is None or proj.release_dir is None:
+        return
+    if options.rev != "":
+        rev="."+options.rev
+    else:
+        rev=""
+    reldir = os.path.dirname(proj.trunk_dir)+"/releases/"+proj.stable_name+rev
+    #print "HERE stable ",proj.stable_dir
+    #print "HERE release",reldir
+    #if fast.sqa.svn.svn_ls(reldir) is None:
+        #print "HERE NONE"
+    #else:
+        #print "HERE",fast.sqa.svn.svn_ls(reldir)
+    #
+    # If this directory does not exist, create it
+    #
+    if fast.sqa.svn.svn_ls(reldir) is None:
+        print "Creating Release Project: "+reldir
+        fast.sqa.svn.svn_copy(proj.stable_dir,reldir,message="Creating release branch with update_externals")
+    #
+    # Checkout the release directory in the working directory
+    #
+    print "Release Project\n\t"+reldir+"\n"
+    return (proj.name,proj.name+"/releases/"+proj.stable_name+rev)
+    #fast.sqa.svn.svn_checkout(checkouts,options.dir+"/"+proj.name+"-"+proj.stable_name+reldir,"--ignore-externals")
+    #fast.sqa.svn.svn_checkout(reldir,options.dir,"--ignore-externals")
+    #if options.release and not proj.release_dir is None:
+        #print "Release Project\n\t"+proj.release_dir+"\n\trelease_"+proj.name
+        #fast.sqa.svn.svn_checkout(proj.release_dir,"release_"+proj.name,"--ignore-externals")
+    
+        
+##
+## MAIN
+##
+parser = OptionParser()
+parser.usage = "update_externals [options] <svn-repository-dir> [...]"
+parser.description="A utility to recursively walk through one or more subversion repositories to update external links."
+parser.add_option("-d","--debug",
+        help="Print debugging information",
+        action="store_true",
+        dest="debug",
+        default=False)
+parser.add_option("--aux",
+        help="Define auxiliary subversion repositories that are used to check externals",
+        action="append",
+        dest="auxsvn",
+        default=[])
+parser.add_option("--rev",
+        help="Update release branches with this revision",
+        action="store",
+        dest="rev",
+        default="")
+parser.add_option("-r","--remove",
+        help="Delete the the working directory, if it exists",
+        action="store_true",
+        dest="remove",
+        default=False)
+parser.add_option("--dir",
+        help="The working directory.  (default=/tmp/update_externals)",
+        action="store",
+        dest="dir",
+        default="/tmp/update_externals")
+
+(options,args) = parser.parse_args(args=sys.argv)
+if len(args) == 1:
+    parser.print_help()
+    sys.exit(1)
+
+if os.path.exists(options.dir):
+    if options.remove:
+        pyutilib.misc.recursive_delete(options.dir,True)
+    else:
+        print "Working directory '"+options.dir+"' already exists!"
+        sys.exit(1)
+os.mkdir(options.dir)
+os.chdir(options.dir)
+print ""
+print "Working Directory: "+options.dir
+print ""
+
+#
+# Create a dictionary of Subversion projects and their corresponding release directories
+#
+svn_projects = {}
+checkouts=[]
+dirs = args[1:] + options.auxsvn
+for repos in dirs:
+  if repos[-1] == "/":
+     repos=repos[0:-1]
+  dir = commands.getoutput("svn ls " + repos)
+  dirs = dir.split("\n")
+  has_trunk = "trunk/" in dirs
+  if has_trunk:
+     proj = fast.sqa.svn.SVNProject(repos,None)
+     key = repos
+     if proj.name is not None:
+        key = key+"/"+proj.name
+     svn_projects[ key ] = proj
+     #
+     # TODO: should we print an error here?
+     #
+     #if repos not in options.auxsvn:
+        #print "HERE",proj.stable_dir,proj.name, proj.repos
+  else:
+     for file in dir.split("\n"):
+       file = file.strip()
+       if file[-1] == "/":
+          proj = fast.sqa.svn.SVNProject(repos,file[:-1])
+          svn_projects[ proj.proj_root ] = proj
+          if repos not in options.auxsvn:
+             dirinfo = checkout_project(proj,options)
+             if not dirinfo is None:
+                checkouts.append(dirinfo)
+
+
+print "Checking out Acro..."
+print "Done."
+#print "HERE",options.dir
+#fast.sqa.svn.svn_checkout("https://software.sandia.gov/svn/public/acro/acro/",options.dir,"--ignore-externals")
+for (proj,dir) in checkouts:
+    #print "HERE","https://software.sandia.gov/svn/public/acro/"+proj,options.dir
+    print "HERE",proj,dir
+    fast.sqa.svn.svn_checkout("https://software.sandia.gov/svn/public/acro/"+dir,proj,"--ignore-externals")
+    #fast.sqa.svn.svn_checkout("https://software.sandia.gov/svn/public/acro/"+proj,proj,"--ignore-externals")
+#os.chdir(options.dir)
+
+print ""
+OUTPUT = open("svn_externals_update.txt","w")
+print >>OUTPUT, "Updates to external revisions, generated by the FAST update_externals script."
+OUTPUT.close()
+
+#
+# Process each directory
+#
+files = glob.glob("*")
+files.sort()
+for dir in files:
+    etype = "release"
+    print "Updating externals in "+dir
+    fast.sqa.svn.update_externals(dir, svn_projects, options, etype)
+

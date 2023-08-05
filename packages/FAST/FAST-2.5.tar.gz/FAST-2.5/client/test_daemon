@@ -1,0 +1,436 @@
+#!/usr/bin/perl
+#
+#  This perl opens the config.tests file and launches the jobs that 
+#  are indicated for the current platform
+#
+#  William E. Hart
+#  September, 2004
+#
+################################################################
+#  _________________________________________________________________________
+#
+#  FAST: Python tools for software testing.
+#  Copyright (c) 2008 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+
+
+use File::Copy;
+use autouse TIME::Local;
+
+sub my_signal_catcher {
+    $saw_signal = 1;
+}
+
+$SIG{'INT'} = 'my_signal_catcher';
+$SIG{'HUP'} = 'my_signal_catcher';
+$SIG{'QUIT'} = 'my_signal_catcher';
+$SIG{'TERM'} = 'my_signal_catcher';
+
+##
+## GLOBAL DATA
+##
+#
+# Create global experiment key
+#
+$pwd = `pwd`;
+chomp($pwd);
+$host = `hostname`;
+chomp($host);
+$runtests = 1;
+$saw_signal = 0;
+$print_scenario_xml = 0;
+$archive_tests = 0;
+
+##
+## Get name of experimental study
+##
+sub extract_name {
+  $filename = shift @_;
+  open(INPUT,$filename);
+  @lines=<INPUT>;
+  close(INPUT);
+  @tmp = grep(/<experimental-study/,@lines);
+  foreach $tmpf (@tmp) {
+    $tmpf =~ s/(.*)name="(.*)".*/\2/;
+    chomp($tmpf);
+    #print "HERE :$tmpf:\n";
+    return $tmpf;
+    }
+  return $tmpf;
+  }
+
+##
+## get tokens from a string
+##
+sub get_tokens {
+  my $__tmp = shift @_;
+  local @__words = split(/\s+/, $__tmp, length($__tmp));
+  local $__lower = 0;
+  local $__upper = $#__words;
+  #print "TMP $__tmp\n";
+  #print "WORDS @__words\n";
+  #print "LOWER $__lower  UPPER $__upper\n";
+  #foreach $i (@__words) { print ":$i:\n"; }
+  if ($__words[0] eq "") {
+     $__lower = 1;
+     }
+  if ($__words[$__upper] eq "") {
+     $__upper = $__upper-1;
+     }
+  #print "LOWER $__lower  UPPER $__upper\n";
+  #print "WORDS @__words[$__lower .. $__upper]\n";
+  #foreach $i (@__words[$__lower .. $__upper]) { print ":$i:\n"; }
+  return @__words[$__lower .. $__upper];
+}
+
+
+#
+# Generage the prefix used for output files
+#
+#sub generate_prefix {
+   #local $prefix = `date '+%y%m%d#%H%M%S'`;
+   #chop($prefix);
+   #$prefix = $prefix . "#" . `whoami`;
+   #chop($prefix);
+   #$prefix = $prefix . "#" . `hostname`;
+   #chop($prefix);
+   #return $prefix;
+#}
+
+
+##
+## List-of-strings membership test
+##
+sub is_string_member {
+  my $value = shift(@_);
+  my $set = shift(@_);
+  local $item;
+  foreach $item (@$set) {
+    #print "$value $item\n";
+    if ($value eq $item) { return 1; }
+    }
+  return 0;
+  }
+
+##
+## Run a named test
+##
+sub run_test {
+  my $tname = shift @_;
+  my $cmd = shift @_;
+  my $odir = "$pwd/builds/$tname/test";
+  my $testdriver = "$pwd/utilib/src/doe/testdriver --I=$pwd/utilib/src/doe";
+  print "  Building test $tname on host $host.\n";
+  if (!(-d "builds/$tname")) { system("(mkdir builds/$tname) > /dev/null 2>&1"); }
+  system("(rm -Rf builds/$tname/* ; mkdir builds/$tname/test) 2>&1");
+  require TestLib;
+  TestLib::set_name($tname);
+  TestLib::setup_key("builds/$tname/test/scenario_key.txt",$starttimestamp,$prefix);
+  #print "HERE $starttimestamp $prefix\n";
+  #print "KEY $TestLib::scenario_key\n";
+  #exit(1);
+  $lcmd = "\$status = 0xffff & system(\"(cd builds/$tname; $cmd; cd ..) > builds/$tname/test_daemon.out 2>&1\")";
+
+  if ($archive_tests) {		# save output from run
+    use File::Copy;
+    copy("builds/$tname/test_daemon.out", "$odir/testd.out");
+  }
+  #print "$lcmd\n";
+  $starttime = time;
+  eval($lcmd);
+  $endtimestamp = TestLib::get_timestamp();
+  $elapsed = time() - $starttime;
+  #
+  # Augment the prefix to include the termination time of this job
+  #
+  my ($sec,$min,$hour,$mday,$mon,$yr,$wday,$yday,$isdst) = localtime(time);
+  $mon++;                       # 1-12 instead of 0-11
+  $yr+= 1900;  
+  #print "HERE $sec $min $hour $mday $mon $yr $wday $yday $prefix\n";
+  $prefix = sprintf("%04d%02d%02d#%02d%02d%02d#",
+            $yr, $mon, $mday, $hour, $min, $sec) . $prefix;
+  #print "HERE $yr $mon $mday $prefix\n";
+  #
+  #
+  #
+  if ($print_scenario_xml == 1) {
+     open SCENARIOOUTPUT, ">builds/$tname/test/scenario.xml" || die "Failed to open the file builds/$tname/test/scenario.xml"; 
+     print SCENARIOOUTPUT "<Scenario>\n";
+     TestLib::set_name($tname);
+     TestLib::print_key(\*SCENARIOOUTPUT);
+     #TestLib::print_date(\*SCENARIOOUTPUT);
+     print SCENARIOOUTPUT "  <Description>$cmd</Description>\n";
+     #($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($starttime);
+     #$starthours = sprintf "%05.2f", $hour + ($min + $sec/60.0)/60.0;
+     print SCENARIOOUTPUT "  <StartTime>$starttimestamp</StartTime>\n";
+     #($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($endtime);
+     #$starthours = sprintf "%05.2f", $hour + ($min + $sec/60.0)/60.0;
+     print SCENARIOOUTPUT "  <EndTime>$endtimestamp</EndTime>\n";
+     print SCENARIOOUTPUT "  <RunTime unit=\"seconds\">$elapsed</RunTime>\n";
+     #
+     # Print associated output files
+     #
+     print SCENARIOOUTPUT "  <Files>\n";
+     @files=glob("builds/$tname/test/*.xml");
+     @files2=glob("builds/$tname/test/*.out");
+     push(@files,@files2);
+     foreach $file (@files) {
+       if ($file ne "/tmp") {
+          @dirs = split("/",$file);
+          if (@dirs[$#dirs] ne "scenario.xml") {
+             print SCENARIOOUTPUT "    <Name>" .  $prefix . "#" . @dirs[$#dirs-2] . "#" . @dirs[$#dirs] . "</Name>\n";
+             }
+          }
+       }
+     print SCENARIOOUTPUT "  </Files>\n";
+     print SCENARIOOUTPUT "</Scenario>\n";
+     close SCENARIOOUTPUT;
+     }
+  #
+  # Rename files if we are archiving them
+  #
+  if ($archive_tests) {
+     @files=glob("$odir/*\.*");
+     foreach $file (@files) {
+       if ($file ne "/tmp") {
+          @dirs = split("/",$file);
+          $newname = "$odir/" . $prefix . "#" . @dirs[$#dirs-2] . "#" . @dirs[$#dirs];
+          #print "mv $file $newname\n";
+          rename $file, $newname;
+       }
+     }
+     $tarname = "data/" . $prefix . "#" . @dirs[$#dirs-2] . "#scenario.tgz";
+     #print "HERE $tarname\n";
+     #$foo=`pwd`;
+     #print "PWD $pwd\n";
+     eval '$_ = `which gtar 2>&1`; if (/^\//) { die }';
+     if ("$@") {  # does gtar exist?
+       $tar = "gtar vcf - .";
+     } else {
+       $tar = "tar vcf - .";    # might have problems with 100 char filenames
+     }
+
+     `(cd builds/$tname/test; $tar | gzip - > ../../../$tarname)`;
+     #print "HERE $tarname\n";
+  }
+
+  chdir $pwd;
+  if ($status) { die "ERROR: build failed (system call error).\n"; }
+}
+
+##
+## Summarize test outputs
+##
+sub summarize_test {
+  my $name = shift @_;
+
+  chdir "builds/$name/test";
+
+  @results = glob("*.xml");
+  if ($#results != -1) {
+     #
+     # Fill a hashtable with the results file types
+     #
+     %ftypes = ();
+     foreach $file (@results) {
+       @tokens = split(/#/,$file);
+       $ftype = @tokens[$#tokens];
+       chomp $ftype;
+       chomp $file;
+       #print ":$ftype:$file:\n";
+       $ftypes{"$ftype"} = $file;
+     }
+     #while (($key,$value) = each(%ftypes)) {
+       #print "KEY :$key: $value $ftypes{$key}\n";
+     #}
+     #
+     # Verify the status of configuration
+     #
+     if (not exists $ftypes{"config.xml"}) {
+        print "    Configuration failed\n";
+     } else {
+        $cmd = "grep \">Fail\" " . $ftypes{'config.xml'};
+        #print "COMMAND $cmd\n";
+        $tmp = (get_tokens(`$cmd | wc`))[0];
+        if ($tmp eq "0") {
+           print "    Configuration passed\n";
+        } else {
+           print "    Configuration failed\n";
+        }
+     }
+     #
+     # Verify the status of the build
+     #
+     if (not exists $ftypes{"build.xml"}) {
+        print "    Build failed\n";
+     } else {
+        $cmd = "grep \">Fail\" " . $ftypes{"build.xml"};
+        $tmp = (get_tokens(`$cmd | wc`))[0];
+        if ($tmp eq "0") {
+           print "    Build passed\n";
+        } else {
+           print "    Build failed\n";
+        }
+     }
+     #
+     # Check for test results
+     #
+     foreach $file (@results) {
+       @tokens = split(/#/,$file);
+       $ftype = @tokens[$#tokens];
+       #print "HERE $ftype " . substr($ftype,$#ftype-7,8) . "\n";
+       if ( substr($ftype,$#ftype-7,8) eq "test.xml") {
+          #print "HERE\n";
+          $file =~ s/^\.\/(.*)/$1/;
+          #print "\"$file\" \"$1\"\n";
+          $tmp = (get_tokens(`grep ">Fail" $file | wc`))[0];
+          $testname = substr($ftype,0,$#ftype-8);
+          #print "$testname\n";
+          if ($tmp eq "0") {
+             print "    $testname tests passed\n";
+          } else {
+             print "    $testname tests failed: $tmp errors\n";
+          }
+       }
+     }
+  }
+
+  chdir $pwd;
+}
+
+###
+### MAIN ROUTINE
+###
+if ((@ARGV) && (substr($ARGV[0],0,6) eq "--help")) {
+   print "test_daemon [--sum] <test1> <test2> ...\n";
+   print "test_daemon\n";
+   exit;
+}
+
+#
+# Process tests provided by the user
+#
+$tmp = shift @ARGV;
+$configfile="config.tests";
+$update=0;
+while (substr($tmp,0,2) eq "--") {
+  if (substr($tmp,0,5) eq "--sum") {
+    $runtests = 0;
+  } elsif (substr($tmp,0,4) eq "--I=") {
+    $print_scenario_xml = 1;
+    $dir=substr($tmp,4,length($tmp)-4);
+    if (substr($dir,0,1) ne "/") {
+       $pwd = `pwd`;
+       chomp($pwd);
+       $foo = $pwd . "/" . $dir;
+       $dir = $foo;
+    }
+    $ENV{PATH} = $ENV{PATH} . ":.:" . $dir;
+    $ENV{TESTLIBDIR} = $dir;
+    unshift @INC, $dir;
+  } elsif (substr($tmp,0,8) eq "--update") {
+    $update = 1;
+  } elsif (substr($tmp,0,9) eq "--archive") {
+    $archive_tests = 1;
+  } elsif (substr($tmp,0,9) eq "--config=") {
+    $configfile = substr($tmp,9,length($tmp)-9);
+  }
+  $tmp = shift @ARGV;
+  }
+if ($update == 0) {
+   #
+   # Delete the 'test' directory where the test output is stored.
+   #
+   system("(rm -Rf builds; mkdir builds) > /dev/null 2>&1");
+}
+
+#if (@ARGV) {
+   #if ($runtests) {
+      #print "Running test: $test\n";
+      #run_test($test);
+      #}
+   #summarize_test($test);
+   #exit(0);
+   #}
+#
+# No tests given, so process configuration file.
+#
+open (TESTFILE, $configfile) || die "ERROR: cannot open file \"$configfile\"!\n";
+$lineno = 0;
+$state = 0;
+while (<TESTFILE>) {
+    $lineno = $lineno + 1;
+    #
+    # Ignore comment lines
+    #
+    if (/^[\t ]*#.*/) { next; }
+    #
+    # Ignore blank lines
+    #
+    if (/^[\t ]+/) { next; }
+    $line = $_;
+    #print $line;
+    chomp($line);
+    if ($line eq "") { next; }
+    @words = get_tokens($line);
+    if (($state == 0) && ($words[0] eq "Test")) {
+       $name = $words[1];
+       $state = 1;
+    }
+
+    elsif ($state == 1) {
+       $machines = shift @words;
+       @mlist = split /,/, $machines, $#machines;
+       if (is_string_member($host,\@mlist)) {
+          $state = 2;
+       }
+       else {
+          $state = 0;
+       }
+    }
+
+    elsif ($state == 2) {
+       $state = 0;
+       if (($update==0) || (($update==1) && !(-d "$pwd/builds/$name"))) {
+	  #print "RUN $name $update $pwd/builds/$name\n";
+          if ($runtests) {
+             run_test($name,$line);
+          }
+          summarize_test($name);
+          if ($saw_signal) { die "ERROR: terminating due to signal!\n"; }
+       }
+       else {
+	  print "  Skipping $name build during this update\n";
+       }
+    }
+}
+#
+# Commit data files
+#
+if ($archive_tests == 0) {
+   #
+   # BUG: this directory should already be here, and calling 'mkdir' may
+   # screw it up...
+   #
+   #system("mkdir -p $pwd/data");
+
+   #
+   # Copy files into the 'data' directory
+   #
+   #@results = glob("tests/*/test/*.xml");
+   #push(@results,glob("tests/*/test/*.out"));
+   #foreach $file (@results) {
+     #if ($file ne "/tmp") {
+        #@dirs = split("/",$file);
+        #$newname = "data/" . @dirs[$#dirs];
+        #copy($file,$newname);
+     #}
+   #}
+
+   $status = 0xffff & system("(cd data; find . -name '*.tgz' -print | xargs -n100 /bin/rm) > ../tmp.out 2>&1");
+   }
+

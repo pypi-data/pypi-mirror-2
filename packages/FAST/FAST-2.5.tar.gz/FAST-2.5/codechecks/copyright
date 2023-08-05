@@ -1,0 +1,56 @@
+#! /usr/bin/perl
+##
+## A code check script that uses acro/bin/checkCopyright to count 
+## the files that need their copyright information updated.
+##
+
+if (! @ARGV) {
+   print "copyright <logfile> <executable> <target-dirs> <ignore-dirs>\n";
+   exit(1);
+}
+
+open(LOGFILE,">$ARGV[0]") || die "Error opening $ARGV[0]";
+my $executable=$ARGV[1];
+#
+# Find the packages that are source directories
+#
+my @dirs = glob($ARGV[2]);
+my @ignore = ();
+my $dir = '';
+
+while ($dir = $ARGV[3]) {
+  push @ignore, glob($dir);
+  shift;
+}
+#
+# For each source directory, collect the source lines info.
+#
+foreach $dir (@dirs) {
+  $ignore=0;
+  foreach $d (@ignore) {
+    if ($dir eq $d) {
+       $ignore=1;
+       next;
+    }
+  }
+  if ($ignore == 1) {
+     next;
+  }
+  if (-d "$dir") {
+     $tmp = `$executable $dir`;
+     print LOGFILE "\n";
+     print LOGFILE "COPYRIGHT SUMMARY: $dir\n";
+     print LOGFILE "\n";
+     print LOGFILE "$tmp\n";
+     print LOGFILE "\n";
+     $ttmp = $tmp;
+     $ttmp =~ s/(.+)copyright: (.+)/\2/s;
+     chomp($ttmp);
+     print "    <Measurement>\n";
+     print "      <Name>$dir</Name>\n";
+     print "      <Value>$ttmp</Value>\n";
+     print "    </Measurement>\n";
+     }
+  }
+
+close(LOGFILE);

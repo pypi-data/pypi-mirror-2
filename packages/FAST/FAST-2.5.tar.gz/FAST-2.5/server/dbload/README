@@ -1,0 +1,60 @@
+Stefan Chakerian
+
+Notes on tables.sql
+
+
+
+tables.sql has the table structures.
+
+The fields are fairly self-explanatory.  If the field names
+of different tables are the same, chances are good that one
+table (e.g. scenario_id in the study table) is designed to
+reference the other table with joins.
+
+You should run mysql to figure out the select queries.
+
+e.g.
+
+$ mysql -u acrodbadmin -p acro
+
+select * from package;
+select * from artifact where status is not null order by status;
+select * from tstatus where analysis_id=20;
+select * from tstatus where analysis_id=709 order by comb+0;
+
+
+
+
+Exact uses special nodes for configs and builds, which include
+things like the output file and status of the run.  The problem
+is that if you want to store any other information, you have to
+mess with the exact datastructures and add a new node class.
+
+Instead of duplicating this, which is limited to just config and build
+files, I created a table called "artifact".  If Exact is rewritten to
+allow arbitrary artifacts from tests (which needs to be done), it will 
+be easy to convert it to this database.
+
+The artifact table is for storing "extra" information.  In this case,
+it's the build and config output.  You can describe this with the ENUM
+in the artifact table:
+ type          ENUM("Error", "Config","Build","File") NOT NULL,
+If it's config information, type should be set to "config", etc.
+If you want to add more types, always add to the END of the ENUM,
+never the middle... I don't know what'll happen to the database if
+you try to ALTER TABLE and add anything to the middle of an enum.
+
+"File" is for arbitrary files you want associated with this artifact.
+Currently, all the logs and xml files are associated with an artifact,
+which is associated with a scenario_id.  So, you can find out all the
+files of a particular scenario by joining scenario_id with artifact
+to get the artifact_id, and joining that to file.
+
+There are also arbitrary notes you can associate with the artifact.
+There can be multiple notes, so you'd select on artnotes
+based on the artifact_id.  (Currently, artnote is used to store
+flags and warning messages stored by the config and build artifacts,
+but it can associate any text to an artifact.  It, too, has a type
+field which can be updated.)
+
+
