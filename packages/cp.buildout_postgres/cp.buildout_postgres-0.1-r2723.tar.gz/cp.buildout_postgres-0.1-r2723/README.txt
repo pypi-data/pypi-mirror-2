@@ -1,0 +1,20 @@
+the config options (with their defaults):
+
+::
+
+  version = 8.3.1
+    url =
+    http://ftp9.us.postgresql.org/pub/mirrors/postgresql/source/v%(version)s/postgresql-%(version)s.tar.gz
+      md5link =
+      http://ftp9.us.postgresql.org/pub/mirrors/postgresql/source/v%(version)s/postgresql-%(version)s.tar.gz.md5
+
+        extra-options = --with-python --with-openssl --with-thread-safety
+          user = daemon
+            group = daemon
+              ulimit = ulimit -S -n `ulimit -H -n`
+                sysconf-dir = /etc
+                  log-dir = log
+                    data-dir = data
+                      pg-hba-extra =
+                        pg-ident-extra =
+                          pg-conf-extra =
