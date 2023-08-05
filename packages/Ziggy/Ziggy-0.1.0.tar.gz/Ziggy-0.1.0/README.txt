@@ -1,0 +1,25 @@
+===========
+Ziggy
+===========
+
+Ziggy provides a collection of python methods for Hadoop Streaming. Ziggy is
+useful for building complex MapReduce programs, using Hadoop for batch processing
+of many files, Monte Carlo processes, graph algorithms, and common utility tasks (e.g. sort, search).
+Typical usage
+often looks like this::
+
+    #!/usr/bin/env python
+
+    import ziggy.hdmc as hdmc
+	from glob import glob
+	
+	files_to_process = glob("/some/path/*")
+	results = hdmc.submit_checkpoint_inline(script_to_run, output_filename, files_to_process, argument_string)
+    
+To install run::
+
+	python setup.py hadoop
+	python setup.py install
+
+Ziggy was authored by Dan McClary, Ph.D. and originates in the
+ `Amaral Lab at Northwestern University <http://amaral.northwestern.edu>`_.
