@@ -1,0 +1,92 @@
+==================================
+SQLAlchemy integration of Signed Decimal Strings
+==================================
+
+The package also provides a class that work as SDecStr data types for
+SQLAlchemy. It's called SDecVarchar and stores the data as a varchar.
+Moreover, it provides two classes that stores a Decimal as a string,
+namely "StrDecimal" and "PStrDecimal" which pads the decimal with
+zeros.
+
+ >>> from sdecstr.sa import (SDecVarchar, StrDecimal, 
+ ...                         InvStrDecimal, PStrDecimal)
+
+Let's now setup a basic table in a sample database
+
+ >>> from sqlalchemy import create_engine
+ >>> engine = create_engine('sqlite:///:memory:')
+ >>> from sqlalchemy import Table, Column, Integer, MetaData
+ >>> metadata = MetaData()
+ >>> sdv_table = Table('sdv_table', metadata,
+ ...   Column('id', Integer, primary_key = True),
+ ...   Column('money1', SDecVarchar(16,3)),
+ ...   Column('money2', StrDecimal(8,2)),
+ ...   Column('money2a', InvStrDecimal(8,2)),
+ ...   Column('money3', PStrDecimal(9,4)))
+
+ >>> metadata.create_all(engine)
+
+Now we can insert data
+ 
+ >>> from decimal import Decimal
+ >>> conn = engine.connect()
+ >>> ins = sdv_table.insert(values={'money1':Decimal('12.20'),
+ ...                                'money2':Decimal('12.20'),
+ ...                                'money2a':Decimal('12.20'),
+ ...                                'money3':Decimal('12.20')})
+ >>> result = conn.execute(ins)
+
+In the database itself, we should be able to see the converted
+decimal:
+
+ >>> result = conn.execute("select * from sdv_table")
+ >>> list(result)
+ [(1, u'100000000012.200', u'12.20', u'-12.20', u'0012.2000')]
+
+
+Of course, we should also be able to read it back:
+
+ >>> from sqlalchemy.sql import select
+ >>> query = sdv_table.select()
+ >>> result = conn.execute(query)
+ >>> l = list(result)
+ >>> l
+ [(1, Decimal("12.200"), Decimal("12.20"), Decimal("12.20"), Decimal("12.2000"))]
+
+Ordering should now also work for SDecVarchar:
+
+ >>> ins = sdv_table.insert(values={'money1':Decimal('12.325'),
+ ...                                'money2':Decimal('100'),
+ ...                                'money3':Decimal('99')})
+ >>> result = conn.execute(ins)
+ >>> ins = sdv_table.insert(values={'money1':Decimal('-1')})
+ >>> result = conn.execute(ins)
+ >>> ins = sdv_table.insert(values={'money1':Decimal('120'),
+ ...                                'money2':Decimal('0.01'),
+ ...                                'money3':Decimal('0.01')})
+ >>> result = conn.execute(ins)
+ >>> query = sdv_table.select()
+ >>> query = query.order_by(sdv_table.c.money1.desc())
+ >>> result = conn.execute(query)
+ >>> for row in result: print row
+ (4, Decimal("120.000"), Decimal("0.01"), None, Decimal("0.0100"))
+ (2, Decimal("12.325"), Decimal("100"), None, Decimal("99.0000"))
+ (1, Decimal("12.200"), Decimal("12.20"), Decimal("12.20"), Decimal("12.2000"))
+ (3, Decimal("-1.000"), None, None, None)
+
+
+Comparisons should also work for SDecVarchar:
+ 
+ >>> from sdecstr import SDecStr
+ >>> query = sdv_table.select()
+ >>> query = query.where(sdv_table.c.money1 > Decimal("100"))
+ >>> result = conn.execute(query)
+ >>> for row in result: print row
+ (4, Decimal("120.000"), Decimal("0.01"), None, Decimal("0.0100"))
+
+Inserts should not work if the data would be truncated
+
+ >>> ins = sdv_table.insert(values={'money1':Decimal('12.20232')})
+ >>> result = conn.execute(ins)
+ Traceback (most recent call last):
+ ValueError: Invalid precision: Decimal digits truncated!

@@ -1,0 +1,159 @@
+==================================
+Signed Decimal String Test environment
+==================================
+
+A Signed Decimal String is a simple, numeric string representation of
+a fixed point number. The problem with a normal string representation
+of decimal is its sign, e.g. "-12.2" as it hinders comparison operations.
+Such comparison operations are often necessary in databases that do not
+support fixed point datatypes. Signed Decimal Strings can be stored
+as characters/varchars and still allow rich comparison and ordering.
+
+The following technique is chosen:
+
+- The string is always of a fixed length. Missing digits are filled 
+  with zeros.
+- The places after the comma (=precision) are also fixed, missing digits
+  may be filled with zeros.
+- The comma is always part of the string
+- For positive numbers, the digit '1' is prepended to the string, e.g.
+  100012.20
+- The number '0' is represented by a string starting with '1' and 
+  zeros, e.g. '100000.00'
+- Negative numbers are built by subtracting the number of the representation
+  of '0' as shown above. For instance, '3' is represented by '099997.00'
+
+It can be seen that the first digit acts like a sign bit, therefore
+negative and positive numbers can easily be differentiated.
+
+Positive numbers are thus human readable, while, unfortunately, negative
+numbers are not.
+
+The SDecStr class can be initialized via either a decimal type...
+
+ >>> from sdecstr import SDecStr
+ >>> from decimal import Decimal
+
+
+
+ >>> from sdecstr import decexpand
+ >>> decexpand(Decimal("12.2"))
+ Decimal("12.2")
+ >>> decexpand(Decimal("12.2E6"))
+ Decimal("12200000")
+ >>> decexpand(Decimal("1000000000000000").normalize())
+ Decimal("1000000000000000")
+ >>> decexpand(Decimal("-14.234E26"))
+ Decimal("-1423400000000000000000000000")
+ >>> decexpand(Decimal("0.000001"))
+ Decimal("0.000001")
+
+
+
+
+ >>> SDecStr(Decimal("12.2"))
+ SDecStr("112.2")
+
+...and also by a signed decimal string:
+
+ >>> Decimal(SDecStr("0999901.00"))
+ Decimal("-99.00")
+ >>> Decimal(SDecStr("1012.20"))
+ Decimal("12.20")
+
+The length and precision can be given during creation time and will
+be used for the resulting Signed Decimal String:
+
+ >>> SDecStr(Decimal("12.2"), 8, 3)
+ SDecStr("1012.200")
+ >>> SDecStr("10012.30", 10, 1)
+ SDecStr("10000012.3")
+
+If the length and precision would lead to dataloss, an error will
+be raised:
+
+ >>> SDecStr(Decimal("12345"), 2, 0)
+ Traceback (most recent call last):
+ ValueError: Invalid length: Number too big for given length!
+ >>> SDecStr(Decimal("12.23"), 8, 1)
+ Traceback (most recent call last):
+ ValueError: Invalid precision: Decimal digits truncated!
+
+Internally, the value is always stored as a Decimal. To show
+the string as decimal, simply cast it: 
+
+ >>> Decimal(SDecStr(Decimal("23.30")))
+ Decimal("23.30")
+
+The sdstr() function can be used to alter the format of the
+Signed Decimal String, however dataloss during conversion will raise
+errors:
+
+ >>> SDecStr(Decimal("12.2")).sdstr(length = 8, precision = 3)
+ '1012.200'
+ >>> SDecStr("0999901.00").sdstr(length = 9, precision = 1)
+ '0999901.0'
+
+If the requested length/precision would mean data loss (e.g. truncation),
+a ValueError is raised:
+
+ >>> d4 = SDecStr(Decimal("13432.234234"))
+ >>> d4.sdstr(length=12, precision=5)
+ Traceback (most recent call last):
+ ValueError: Invalid precision: Decimal digits truncated!
+ >>> d4.sdstr(length=12, precision=6)
+ Traceback (most recent call last):
+ ValueError: Invalid length: Number too big for given length!
+ >>> d4.sdstr(length=13, precision=6)
+ '113432.234234'
+
+If another precision is needed, the Decimal.quantize() function has to
+be used before calling sdstr():
+
+ >>> d4.quantize(Decimal(".01")).sdstr(10,2)
+ '1013432.23'
+ 
+The module also provides various function that can be used
+to convert Signed Decimal String <-> Decimal <-> String
+
+ >>> from sdecstr import sdstr2dec, dec2sdstr
+ >>> dec2sdstr(Decimal("12"), 5, 1)
+ '112.0'
+ >>> dec2sdstr(Decimal("12.2"), 5, 1)
+ '112.2'
+ >>> dec2sdstr(Decimal("-12.2"), 5, 1)
+ '087.8'
+ >>> dec2sdstr(Decimal("12.23234"), 12, 6)
+ '10012.232340'
+ >>> dec2sdstr(Decimal("12"), 3, 0)
+ '112'
+ >>> dec2sdstr(Decimal(".2"), 4, 2)
+ '1.20'
+ >>> dec2sdstr(Decimal("-.2"), 5, 3)
+ '0.800'
+
+If length/precision would lead to truncation, an error is raised
+
+ >>> dec2sdstr(Decimal("12.2"), 5, 2)
+ Traceback (most recent call last):
+ ValueError: Invalid length: Number too big for given length!
+ >>> dec2sdstr(Decimal("12.20"), 6, 1)
+ Traceback (most recent call last):
+ ValueError: Invalid precision: Decimal digits truncated!
+ >>> dec2sdstr(Decimal("12"), 2, 0)
+ Traceback (most recent call last):
+ ValueError: Invalid length: Number too big for given length!
+ >>> dec2sdstr(Decimal(".2"), 3, 2)
+ Traceback (most recent call last):
+ ValueError: Invalid length: Number too big for given length!
+ 
+Conversion from Signed Decimal String to Decimal is also possible
+
+ >>> sdstr2dec('112.20')
+ Decimal("12.20")
+ >>> sdstr2dec('112.200')
+ Decimal("12.200")
+
+There is another simple function that expands all decimals to 
+a non exponential form:
+
