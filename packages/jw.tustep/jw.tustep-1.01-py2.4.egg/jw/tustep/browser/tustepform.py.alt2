@@ -1,0 +1,118 @@
+from zope import interface, schema
+from zope.formlib import form
+from Products.Five.formlib import formbase
+from zope.schema.vocabulary import SimpleTerm, SimpleVocabulary
+
+from Products.CMFCore import utils as cmfutils
+from Products.Five.browser import pagetemplatefile
+#from Products.Five.browser import absoluteurl
+
+
+
+from jw.tustep import tustepMessageFactory as _
+
+from zope.component import getMultiAdapter 
+import urllib
+import xml.dom.minidom as dom
+import os
+import shutil
+import re
+import webbrowser
+
+class ITustepFormSchema(interface.Interface):
+    # -*- extra stuff goes here -*-
+
+    @interface.invariant
+    def invariant_url(input):
+        pass
+	# Check input values example:
+	# if input.name != 'value':
+        #    raise interface.Invalid(_(u"Some error occurred !"))
+
+class TustepForm(formbase.PageForm):
+    form_fields = form.FormFields(ITustepFormSchema)
+    label = _(u'TUSTEP Ausgabe')
+    description = _(u'Es wird ein PDF-Dokument mithilfe von TUSTEP erzeugt.')
+    result_template = pagetemplatefile.ZopeTwoPageTemplateFile('ergebnis.pt')
+    #link = absoluteurl('http://germa61.uni-trier.de/tustep_pdf/buri.pdf')
+
+    @form.action('pdf')
+    def actionpdf(self, action, data):
+        pass
+        # Put the action handler code here 
+        
+       
+        #-Jonas-Wagner------------------------------------------------------
+        #Kontext-Prüfung
+        #-------------------------------------------------------------------
+        pstate = getMultiAdapter((self.context, self.request), name='plone_context_state')
+        url = pstate.current_base_url()
+        url = re.sub('/tustepform','',url)        
+        urltest = open('/home/plone/urltest', "w") 
+        urltest.write(url) 
+        urltest.close()
+
+        #Auslesen des Quelltextes
+        #-------------------------------------------------------------------
+        urllib.urlretrieve(url, '/home/plone/Quelltext.xml')
+
+        # Aufbereitung des Quelltextes in einen DOM-Baum
+        #-------------------------------------------------------------------
+        baum = dom.parse('/home/plone/Quelltext.xml')
+        divs = baum.lastChild.getElementsByTagName("div")
+
+        # Hier werden die nicht benoetigten Divisionen getilgt
+        #------------------------------------------------------------------- 
+        rausschmiss = ["documentActions", "visualClear", "relatedItems", "customized"]
+        for divpruef in divs:
+            if divpruef.getAttribute("class") in rausschmiss:
+                print 'LOESCHEN: '
+                print divpruef
+        
+                divpruef.parentNode.removeChild(divpruef)
+                #divpruef.unlink()
+
+        # Hier wird die Content-Division in den Ausgabestring geladen
+        #-------------------------------------------------------------------
+        ausgabestring = "Wenn man dies sieht, ist etwas schief gegangen!"
+        for divpruef in divs:
+            if divpruef.getAttribute("id") == "content":
+                #print len(divs)
+                ausgabestring = divpruef.toxml(encoding = 'UTF-8')
+                #print ausgabestring
+
+        # Ausgabe in die Datei 'ymir.xml'   
+        #-------------------------------------------------------------------    
+        ausgabe = open('/home/plone/ymir.xml', "w") 
+        ausgabe.write(ausgabestring) 
+        ausgabe.close()
+        
+        # Aufruf von Tustep / PDF-Erzeugung und Übergabe
+        #-------------------------------------------------------------------
+        os.system('tcsh -c "tustep 1"')
+        os.system('ps2pdf /home/plone/buri.ps /home/plone/buri.pdf')
+        shutil.copy ('/home/plone/buri.pdf', '/var/www/tustep_pdf/buri.pdf')
+        #webbrowser.open_new("http://germa61.uni-trier.de/tustep_pdf/buri.pdf")
+        
+        pstate = getMultiAdapter((self.context, self.request), name='plone_context_state')
+        obj = pstate.object_title()
+        self.ergebnisse = obj
+        return self.result_template()
+ 
+
+
+
+    @form.action('einstellungen')
+    def actioneinstellungen(self, action, data):
+        # Put the action handler code here 
+        pstate = getMultiAdapter((self.context, self.request), name='plone_context_state')
+        url = pstate.current_base_url()
+        url = re.sub('/tustepform','',url)
+        obj = pstate.object_title()
+        self.ergebnisse = obj
+        return self.result_template()
+        #return ("http://germa61.uni-trier.de/tustep_pdf/buri.pdf")
+
+
+
+
