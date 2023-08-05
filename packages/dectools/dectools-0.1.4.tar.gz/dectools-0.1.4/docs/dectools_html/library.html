@@ -1,0 +1,186 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Using the Prebuilt Decorators &mdash; dectools v0.1.4 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '#',
+        VERSION:     '0.1.4',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="dectools v0.1.4 documentation" href="index.html" />
+    <link rel="next" title="Using the Make_call_* Constructors" href="makecall.html" />
+    <link rel="prev" title="Changes Between Versions" href="changes.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="makecall.html" title="Using the Make_call_* Constructors"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="changes.html" title="Changes Between Versions"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">dectools v0.1.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="using-the-prebuilt-decorators">
+<h1>Using the Prebuilt Decorators<a class="headerlink" href="#using-the-prebuilt-decorators" title="Permalink to this headline">¶</a></h1>
+<p>To use the library decorators, add this import line:</p>
+<blockquote>
+import dectools</blockquote>
+<div class="section" id="debugging-decorators">
+<h2>Debugging Decorators<a class="headerlink" href="#debugging-decorators" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="log">
+<h3>&#64;log()<a class="headerlink" href="#log" title="Permalink to this headline">¶</a></h3>
+<p>Print a log all parameters passed to the function, and the return value or exception.</p>
+<p>You can use the log decorator to print a message before and after each
+function call.   The basic output is one statement to standard output when
+your function is called and one when your function returns.  There are also
+parameters to change the output destination and a parameter to
+each before and after calling that take functions.  I may change this
+API slightly to take a format string for before and after functions.</p>
+<p><strong>Recipe:  Basic Usage</strong></p>
+<p><em>Code</em>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">dectools</span> <span class="kn">import</span> <span class="n">log</span>
+
+<span class="nd">@log</span>
+<span class="k">def</span> <span class="nf">add_two</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">second</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">first</span> <span class="o">+</span> <span class="n">second</span>
+
+<span class="n">total</span> <span class="o">=</span> <span class="n">add_two</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">second</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and
+<em>Output</em>:</p>
+<div class="highlight-python"><pre>&gt;add_two(first=5, second=3)
+&lt;add_two. return value: 8</pre>
+</div>
+<p>You can find additional examples in the test case: <em>test/test_log.py</em></p>
+</div>
+<div class="section" id="pre-and-post">
+<h3>&#64;pre and &#64;post<a class="headerlink" href="#pre-and-post" title="Permalink to this headline">¶</a></h3>
+<p>Assert an expression is true before or after the function is executed.</p>
+<p>These decorators take an expression and execute either before, for &#64;pre,
+or after, for &#64;post, your function.  You can use both &#64;pre and &#64;post to
+decorate a single function.   Internally, this uses the Python eval()
+function, which creates an issue for locals and globals.</p>
+<p>If your expressions check only the parameters or variables referenced
+through the self parameter, you can use just function like:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">dectools</span> <span class="kn">import</span> <span class="n">pre</span><span class="p">,</span> <span class="n">post</span>
+
+<span class="nd">@post</span><span class="p">(</span><span class="s">&#39;self.total &gt;= 0 and self.tax &gt;= 0&#39;</span><span class="p">)</span>
+<span class="nd">@pre</span><span class="p">(</span><span class="s">&#39;item and item.name and item.price &gt;= 0&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">add_to_purchase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+    <span class="n">do_something</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>If you have a pre or post condition that references other global or
+local variable, you should pass the current globals and locals as
+parameters, as in this example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="nd">@post</span><span class="p">(</span><span class="s">&#39;Database.get_item_by_name(name) &gt; 0&#39;</span><span class="p">,</span> <span class="nb">globals</span><span class="p">(),</span> <span class="nb">locals</span><span class="p">())</span>
+<span class="k">def</span> <span class="nf">add_new_item_to_database</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">price</span><span class="p">):</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="invariant">
+<h3>&#64;invariant<a class="headerlink" href="#invariant" title="Permalink to this headline">¶</a></h3>
+<p>A class decorator to force calling the function self._invariant() after
+the __init__() method and before and after each public method.  A public
+method of a class is one that is not a &#64;classmethod or &#64;staticmethod and
+does not start with an underscore.  A public method takes &#8216;self&#8217; as its
+first parameter.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="#">Using the Prebuilt Decorators</a><ul>
+<li><a class="reference external" href="#debugging-decorators">Debugging Decorators</a><ul>
+<li><a class="reference external" href="#log">&#64;log()</a></li>
+<li><a class="reference external" href="#pre-and-post">&#64;pre and &#64;post</a></li>
+<li><a class="reference external" href="#invariant">&#64;invariant</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="changes.html"
+                                  title="previous chapter">Changes Between Versions</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="makecall.html"
+                                  title="next chapter">Using the Make_call_* Constructors</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/library.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="makecall.html" title="Using the Make_call_* Constructors"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="changes.html" title="Changes Between Versions"
+             >previous</a> |</li>
+        <li><a href="index.html">dectools v0.1.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2010, Charles Merriam.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.5.
+    </div>
+  </body>
+</html>
