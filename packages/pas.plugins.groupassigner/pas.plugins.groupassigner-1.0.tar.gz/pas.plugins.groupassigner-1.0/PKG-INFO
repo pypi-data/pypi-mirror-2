@@ -1,0 +1,154 @@
+Metadata-Version: 1.0
+Name: pas.plugins.groupassigner
+Version: 1.0
+Summary: Assign a group to user based on an expression.
+Home-page: http://www.reflab.com
+Author: Riccardo Lemmi
+Author-email: riccardo@reflab.com
+License: GPL
+Description: Introduction
+        ============
+        
+        The plugin creates a virtual group and helps to assign this group to
+        users by evaluation of a TALES expression.
+        
+        Installation
+        ============
+        
+        Buildout
+        
+        See docs/INSTALL.txt
+        
+        Plone Site
+        
+        - Go in the site acl_users then add "Group Assigner"
+        - Set the properties: group id, group title and the condition
+        (see below for the meaning of 'debug')
+        - Activate all the functionalities provided by the plugin
+        
+        Notes
+        =====
+        
+        The expression is based only on principal methods and attributes.
+        It is not possible to assign the group on context base.
+        
+        Variable available are:
+        
+        principal
+        portal
+        nothing
+        modules
+        
+        From 'principal' you can use the 'getProperty' method to use in your
+        expression. For example:
+        
+        python: principal.getProperty('email').split('@')[-1] in ['reflab.com',]
+        
+        To assign more than one group you have to add one plugin for each group.
+        
+        To cache the plugin add a RAMCache manager and assign the plugin to him.
+        If the plugin is cached remember to invalidate the cache when changing
+        properties.
+        
+        You can activate the 'debug' properties to log the evaluation of the
+        expression (in this case don't use cache).
+        
+        Other infos
+        ===========
+        
+        Questions and comments to riccardo@reflab.com
+        
+        Report bugs at riccardo@reflab.com
+        
+        Code repository: http://svn.plone.org/svn/collective/PASPlugins/pas.plugins.groupassigner
+        
+        Change history
+        **************
+        
+        1.0 (2010-07-02)
+        ----------------
+        
+        - Released plugin
+        
+        Detailed Documentation
+        **********************
+        
+        Tests for pas.plugins.groupassigner
+        
+        Test setup
+        ----------
+        
+        >>> from Testing.ZopeTestCase import user_password
+        >>> from Products.Five.testbrowser import Browser
+        >>> browser = Browser()
+        
+        Plugin setup
+        ------------
+        
+        >>> acl_users_url = "%s/acl_users" % self.portal.absolute_url()
+        >>> browser.addHeader('Authorization', 'Basic %s:%s' % ('portal_owner', user_password))
+        
+        >>> self.portal.acl_users.userFolderAddUser('test_user_2_', 'secret', ['Member'], [])
+        >>> u1 = self.portal.acl_users.getUserById('test_user_1_')
+        >>> gtool = self.portal.portal_groups
+        >>> gtool.addGroup('group1', ())
+        True
+        
+        pas.plugins.groupassigner should be in the list of installable plugins:
+        
+        >>> browser.open("%s/manage_main" % acl_users_url)
+        >>> browser.url
+        'http://nohost/plone/acl_users/manage_main'
+        >>> form = browser.getForm(index=0)
+        >>> select = form.getControl(name=':action')
+        
+        >>> 'Group Assigner' in select.displayOptions
+        True
+        
+        and we can select it:
+        
+        >>> select.getControl('Group Assigner').click()
+        >>> select.displayValue
+        ['Group Assigner']
+        >>> select.value
+        ['manage_addProduct/pas.plugins.groupassigner/manage_add_groupassigner_form']
+        
+        we add 'Group Assigner' to acl_users:
+        
+        >>> from pas.plugins.groupassigner.plugin import GroupAssigner
+        >>> assigner = GroupAssigner('group_assigner_test', 'Group Assigner')
+        >>> assigner.group = 'group1'
+        >>> assigner.condition = "python: 'reflab.com' in principal.getProperty('email')"
+        >>> self.portal.acl_users['group_assigner_test'] = assigner
+        >>> assigner = self.portal.acl_users['group_assigner_test']
+        
+        Now the tests:
+        
+        >>> assigner.getGroupsForPrincipal(u1)
+        ()
+        >>> assigner.getGroupMembers('group1')
+        ()
+        >>> u1.setProperties(email='u1@reflab.com')
+        >>> assigner.getGroupsForPrincipal(u1)
+        ('group1',)
+        >>> assigner.getGroupMembers('group1')
+        ()
+        
+        >>> assigner.enumerateGroups()
+        [{'pluginid': 'group_assigner_test', 'title': 'Group Assigner', 'id': 'group1', 'groupid': 'group1'}]
+        >>> assigner.enumerateGroups(id='group1')
+        [{'pluginid': 'group_assigner_test', 'title': 'Group Assigner', 'id': 'group1', 'groupid': 'group1'}]
+        >>> assigner.enumerateGroups(id='groupX')
+        []
+        
+        Contributors
+        ************
+        
+        Riccardo Lemmi, Reflab Srl
+        
+        
+Platform: UNKNOWN
+Classifier: Framework :: Plone
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
