@@ -1,0 +1,285 @@
+Metadata-Version: 1.0
+Name: repoze.bfg
+Version: 1.3a3
+Summary: The repoze.bfg web application framework
+Home-page: http://bfg.repoze.org
+Author: Agendaless Consulting
+Author-email: repoze-dev@lists.repoze.org
+License: BSD-derived (http://www.repoze.org/LICENSE.txt)
+Description: repoze.bfg
+        ==========
+        
+        ``repoze.bfg`` is a small, fast, down-to-earth, open source Python web
+        development framework. It makes real-world web application development
+        and deployment more fun, more predictable, and more productive.
+        
+        Support and Documentation
+        -------------------------
+        
+        See the `repoze.bfg website <http://bfg.repoze.org>`_ to view
+        documentation, report bugs, and obtain support.
+        
+        License
+        -------
+        
+        ``repoze.bfg`` is offered under the BSD-derived `Repoze Public License
+        <http://repoze.org/license.html>`_.
+        
+        Authors
+        -------
+        
+        ``repoze.bfg`` is made available by `Agendaless Consulting
+        <http://agendaless.com>`_ and a team of contributors.
+        
+        
+        
+        1.3a3 (2010-05-01)
+        ==================
+        
+        Paster Templates
+        ----------------
+        
+        - The ``bfg_alchemy`` and ``bfg_routesalchemy`` templates no longer
+        register a ``handle_teardown`` event listener which calls
+        ``DBSession.remove``.  This was found by Chris Withers to be
+        unnecessary.
+        
+        Documentation
+        -------------
+        
+        - The "bfgwiki2" (URL dispatch wiki) tutorial code and documentation
+        was changed to remove the ``handle_teardown`` event listener which
+        calls ``DBSession.remove``.
+        
+        - Any mention of the ``handle_teardown`` event listener as used by the
+        paster templates was removed from the URL Dispatch narrative chapter.
+        
+        - A section entitled Detecting Available Languages was added to the
+        i18n narrative docs chapter.
+        
+        1.3a2 (2010-04-28)
+        ==================
+        
+        Features
+        --------
+        
+        - A locale negotiator no longer needs to be registered explicitly. The
+        default locale negotiator at
+        ``repoze.bfg.i18n.default_locale_negotiator`` is now used
+        unconditionally as... um, the default locale negotiator.
+        
+        - The default locale negotiator has become more complex.
+        
+        * First, the negotiator looks for the ``_LOCALE_`` attribute of
+        the request object (possibly set by a view or an event listener).
+        
+        * Then it looks for the ``request.params['_LOCALE_']`` value.
+        
+        * Then it looks for the ``request.cookies['_LOCALE_']`` value.
+        
+        Backwards Incompatibilities
+        ---------------------------
+        
+        - The default locale negotiator now looks for the parameter named
+        ``_LOCALE_`` rather than a parameter named ``locale`` in
+        ``request.params``.
+        
+        Behavior Changes
+        ----------------
+        
+        - A locale negotiator may now return ``None``, signifying that the
+        default locale should be used.
+        
+        Documentation
+        -------------
+        
+        - Documentation concerning locale negotiation in the
+        Internationalizationa and Localization chapter was updated.
+        
+        - Expanded portion of i18n narrative chapter docs which discuss
+        working with gettext files.
+        
+        1.3a1 (2010-04-26)
+        ==================
+        
+        Features
+        --------
+        
+        - Added "exception views".  When you use an exception (anything that
+        inherits from the Python ``Exception`` builtin) as view context
+        argument, e.g.::
+        
+        from repoze.bfg.view import bfg_view
+        from repoze.bfg.exceptions import NotFound
+        from webob.exc import HTTPNotFound
+        
+        @bfg_view(context=NotFound)
+        def notfound_view(request):
+        return HTTPNotFound()
+        
+        For the above example, when the ``repoze.bfg.exceptions.NotFound``
+        exception is raised by any view or any root factory, the
+        ``notfound_view`` view callable will be invoked and its response
+        returned.
+        
+        Other normal view predicates can also be used in combination with an
+        exception view registration::
+        
+        from repoze.bfg.view import bfg_view
+        from repoze.bfg.exceptions import NotFound
+        from webob.exc import HTTPNotFound
+        
+        @bfg_view(context=NotFound, route_name='home')
+        def notfound_view(request):
+        return HTTPNotFound()
+        
+        The above exception view names the ``route_name`` of ``home``,
+        meaning that it will only be called when the route matched has a
+        name of ``home``.  You can therefore have more than one exception
+        view for any given exception in the system: the "most specific" one
+        will be called when the set of request circumstances which match the
+        view registration.  The only predicate that cannot be not be used
+        successfully is ``name``.  The name used to look up an exception
+        view is always the empty string.
+        
+        Existing (pre-1.3) normal views registered against objects
+        inheriting from ``Exception`` will continue to work.  Exception
+        views used for user-defined exceptions and system exceptions used as
+        contexts will also work.
+        
+        The feature can be used with any view registration mechanism
+        (``@bfg_view`` decorator, ZCML, or imperative ``config.add_view``
+        styles).
+        
+        This feature was kindly contributed by Andrey Popp.
+        
+        - Use "Venusian" (`http://docs.repoze.org/venusian
+        <http://docs.repoze.org/venusian>`_) to perform ``bfg_view``
+        decorator scanning rather than relying on a BFG-internal decorator
+        scanner.  (Truth be told, Venusian is really just a generalization
+        of the BFG-internal decorator scanner).
+        
+        - Internationalization and localization features as documented in the
+        narrative documentation chapter entitled ``Internationalization and
+        Localization``.
+        
+        - A new deployment setting named ``default_locale_name`` was added.
+        If this string is present as a Paster ``.ini`` file option, it will
+        be considered the default locale name.  The default locale name is
+        used during locale-related operations such as language translation.
+        
+        - It is now possible to turn on Chameleon template "debugging mode"
+        for all Chameleon BFG templates by setting a BFG-related Paster
+        ``.ini`` file setting named ``debug_templates``. The exceptions
+        raised by Chameleon templates when a rendering fails are sometimes
+        less than helpful.  ``debug_templates`` allows you to configure your
+        application development environment so that exceptions generated by
+        Chameleon during template compilation and execution will contain
+        more helpful debugging information.  This mode is on by default in
+        all new projects.
+        
+        - Add a new method of the Configurator named ``derive_view`` which can
+        be used to generate a BFG view callable from a user-supplied
+        function, instance, or class. This useful for external framework and
+        plugin authors wishing to wrap callables supplied by their users
+        which follow the same calling conventions and response conventions
+        as objects that can be supplied directly to BFG as a view callable.
+        See the ``derive_view`` method in the
+        ``repoze.bfg.configuration.Configurator`` docs.
+        
+        ZCML
+        ----
+        
+        - Add a ``translationdir`` ZCML directive to support localization.
+        
+        - Add a ``localenegotiator`` ZCML directive to support localization.
+        
+        Deprecations
+        ------------
+        
+        -  The exception views feature replaces the need for the
+        ``set_notfound_view`` and ``set_forbidden_view`` methods of the
+        ``Configurator`` as well as the ``notfound`` and ``forbidden`` ZCML
+        directives.  Those methods and directives will continue to work for
+        the foreseeable future, but they are deprecated in the
+        documentation.
+        
+        Dependencies
+        ------------
+        
+        - A new install-time dependency on the ``venusian`` distribution was
+        added.
+        
+        - A new install-time dependency on the ``translationstring``
+        distribution was added.
+        
+        - Chameleon 1.2.3 or better is now required (internationalization and
+        per-template debug settings).
+        
+        Internal
+        --------
+        
+        - View registrations and lookups are now done with three "requires"
+        arguments instead of two to accomodate orthogonality of exception
+        views.
+        
+        - The ``repoze.bfg.interfaces.IForbiddenView`` and
+        ``repoze.bfg.interfaces.INotFoundView`` interfaces were removed;
+        they weren't APIs and they became vestigial with the addition of
+        exception views.
+        
+        - Remove ``repoze.bfg.compat.pkgutil_26.py`` and import alias
+        ``repoze.bfg.compat.walk_packages``.  These were only required by
+        internal scanning machinery; Venusian replaced the internal scanning
+        machinery, so these are no longer required.
+        
+        Documentation
+        -------------
+        
+        - Exception view documentation was added to the ``Hooks`` narrative
+        chapter.
+        
+        - A new narrative chapter entitled ``Internationalization and
+        Localization`` was added.
+        
+        - The "Environment Variables and ``ini`` File Settings" chapter was
+        changed: documentation about the ``default_locale_name`` setting was
+        added.
+        
+        - A new API chapter for the ``repoze.bfg.i18n`` module was added.
+        
+        - Documentation for the new ``translationdir`` and
+        ``localenegotiator`` ZCML directives were added.
+        
+        - A section was added to the Templates chapter entitled "Nicer
+        Exceptions in Templates" describing the result of setting
+        ``debug_templates = true``.
+        
+        Paster Templates
+        ----------------
+        
+        - All paster templates now create a ``setup.cfg`` which includes
+        commands related to nose testing and Babel message catalog
+        extraction/compilation.
+        
+        - A ``default_locale_name = en`` setting was added to each existing paster
+        template.
+        
+        - A ``debug_templates = true`` setting was added to each existing
+        paster template.
+        
+        Licensing
+        ---------
+        
+        - The Edgewall (BSD) license was added to the LICENSES.txt file, as
+        some code in the ``repoze.bfg.i18n`` derives from Babel source.
+        
+        
+Keywords: web wsgi bfg
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Framework :: BFG
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI
+Classifier: License :: Repoze Public License
