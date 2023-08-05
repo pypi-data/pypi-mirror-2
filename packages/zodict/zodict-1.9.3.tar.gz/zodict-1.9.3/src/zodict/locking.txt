@@ -1,0 +1,45 @@
+
+Thread locking for Nodes
+========================
+
+A Dummy Node with _waiting flag for access collision check.
+::
+
+    >>> from zodict import Node
+    >>> class Dummy(Node):
+    ...     _waiting = False
+    >>> dummy = Dummy()
+    >>> global dummy
+
+We need a thread implementation which checks for access collision.
+::
+
+    >>> import time
+    >>> from threading import Thread
+    >>> from zodict.locking import TreeLock
+    >>> class TestThread(Thread):
+    ...     def run(self):
+    ...         self._waited = False
+    ...         while dummy._waiting:
+    ...             self._waited = True
+    ...             time.sleep(3)
+    ...         lock = TreeLock(dummy)
+    ...         lock.acquire()
+    ...         dummy._waiting = True
+    ...         time.sleep(1)
+    ...         dummy._waiting = False
+    ...         lock.release()
+
+    >>> t1 = TestThread()
+    >>> t2 = TestThread()
+    >>> t1.start()
+    >>> t2.start()
+
+We expect ``t1`` to proceed without waiting, ``t2`` waited some time.
+::
+    
+    >>> t1._waited
+    False
+    
+    >>> t2._waited
+    True
