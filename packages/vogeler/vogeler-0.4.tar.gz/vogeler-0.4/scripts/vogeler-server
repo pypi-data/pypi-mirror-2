@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+"""
+    Author: John E. Vincent
+	Email:	lusis.org+github.com@gmail.com
+"""
+import datetime
+import argparse
+import yaml
+
+from vogeler.vogeler import VogelerServer
+from couchdbkit import *
+from couchdbkit.loaders import FileSystemDocsLoader
+
+class SystemRecord(Document):
+    system_name = StringProperty()
+    updated_at = DateTimeProperty()
+
+def process_message(message):
+
+    response = message
+    syskey = message['syskey']
+    format = message['format']
+    del message['syskey']
+    del message['format']
+
+    print "Incoming message from: %s" % syskey
+
+    # now we save the record
+    # check if the systemrecord already exists
+    # if not, create it. if so, update it
+    doc = SystemRecord.get_or_create(syskey)
+
+    for k, v in response.iteritems():
+        print "Got response for: %s" % k
+        try:
+            if format == 'list':
+                v_split = [s.strip() for s in v.split("\n")]
+                doc[k] = v_split
+
+            if format == 'yaml':
+                v_dict = yaml.load(v)
+                doc[k] = v_dict
+        except:
+            return 1
+            exit
+
+    try:
+        doc.system_name=syskey
+        doc.updated_at=datetime.datetime.utcnow()
+        doc.save()
+    except:
+        raise
+
+def startup():
+    server = Server()
+    db = server.get_or_create_db("system_records")
+    SystemRecord.set_db(db)
+
+    # Load our views
+    loader = FileSystemDocsLoader('../etc/_design')
+    loader.sync(db, verbose=True)
+    s.monitor()
+
+def shutdown():
+    print "Shutting down"
+    s.close()
+    return 0
+    exit
+
+if __name__ == "__main__":
+    try:
+        s = VogelerServer(callback_function=process_message)
+        startup()
+    except KeyboardInterrupt:
+        shutdown()
+# vim: set ts=4 et sw=4 sts=4 sta filetype=python :
