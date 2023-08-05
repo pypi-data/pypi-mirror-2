@@ -1,0 +1,300 @@
+# -*- coding: utf-8 -*-
+<%inherit file="content_layout.html"/>
+<%page args="toc, extension, paged"/>
+<%namespace  name="formatting" file="formatting.html"/>
+<%namespace  name="nav" file="nav.html"/>
+<%def name="title()">Mako Documentation - Defs</%def>
+<%!
+    filename = 'defs'
+%>
+## This file is generated.  Edit the .txt files instead of this one.
+
+
+<%call expr="formatting.section(path='defs',paged=paged,extension=extension,toc=toc)">
+
+<p>The def is the single tag used to demarcate any block of text and/or code.  It exists within generated Python as a callable function. 
+</p>
+<%call expr="formatting.code()"><%text><%def name="hello()">
+    hello world
+</%def>
+</%text></%call><p>They are normally called as expressions.
+</p>
+<%call expr="formatting.code()"><%text>the def:  ${hello()}
+</%text></%call><p>If the <code><%text filter='h'><%def></%text></code> is not nested inside of another <code><%text filter='h'><%def></%text></code>, its known as a <strong>top level def</strong> and can be accessed anywhere in the template, including above where it was defined.
+</p>
+<p>All defs, top level or not, have access to the current contextual namespace in exactly the same way their containing template does.  Suppose the template below is executed with the variables <code><%text filter='h'>username</%text></code> and <code><%text filter='h'>accountdata</%text></code> inside the context:
+</p>
+<%call expr="formatting.code()"><%text>Hello there ${username}, how are ya.  Lets see what your account says:
+
+${account()}
+
+<%def name="account()">
+    Account for ${username}:<br/>
+
+    % for row in accountdata:
+        Value: ${row}<br/>
+    % endfor
+</%def>
+</%text></%call><p>The <code><%text filter='h'>username</%text></code> and <code><%text filter='h'>accountdata</%text></code> variables are present within the main template body as well as the body of the <code><%text filter='h'>account()</%text></code> def.
+</p>
+<p>Since defs are just Python functions, you can define and pass arguments to them as well:
+</p>
+<%call expr="formatting.code()"><%text>${account(accountname='john')}
+
+<%def name="account(accountname, type='regular')">
+    account name: ${accountname}, type ${type}
+</%def>
+</%text></%call><p>When you declare an argument signature for your def, they are required to follow normal Python conventions (i.e., all arguments are required except keyword arguments with a default value).  This is in contrast to using context-level variables, which evaluate to <code><%text filter='h'>UNDEFINED</%text></code> if you reference a name that does not exist.
+</p>
+
+<%call expr="formatting.section(path='defs_remotedefs',paged=paged,extension=extension,toc=toc)">
+
+<p>Top level <code><%text filter='h'><%defs></%text></code> are <strong>exported</strong> by your template's module, and can be called from the outside; including from other templates, as well as normal Python code.  Calling a <code><%text filter='h'><%def></%text></code> from another template is something like using an <code><%text filter='h'><%include></%text></code> - except you are calling a specific function within the template, not the whole template.
+</p>
+<p>The remote <code><%text filter='h'><%def></%text></code> call is also a little bit like calling functions from other modules in Python.  There is an "import" step to pull the names from another template into your own template; then the function or functions are available.
+</p>
+<p>To import another template, use the <code><%text filter='h'><%namespace></%text></code> tag:
+</p>
+<%call expr="formatting.code()"><%text><%namespace name="mystuff" file="mystuff.html"/>
+</%text></%call><p>The above tag adds a local variable "mystuff" to the current scope.
+</p>
+<p>Then, just call the defs off of <code><%text filter='h'>mystuff</%text></code>:
+</p>
+<%call expr="formatting.code()"><%text>${mystuff.somedef(x=5,y=7)}
+</%text></%call><p>The <code><%text filter='h'><%namespace></%text></code> tag also supports some of the other semantics of Python's <code><%text filter='h'>import</%text></code> statement, including pulling names into the local variable space, or using <code><%text filter='h'>*</%text></code> to represent all names, using the <code><%text filter='h'>import</%text></code> attribute:
+</p>
+<%call expr="formatting.code()"><%text><%namespace file="mystuff.html" import="foo, bar"/>
+</%text></%call><p>This is just a quick intro to the concept of a <strong>namespace</strong>, which is a central Mako concept that has its own chapter in these docs.  For more detail and examples, see <%call expr="nav.toclink(path='namespaces',paged=paged,extension=extension,toc=toc)"></%call>.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='defs_programmatic',paged=paged,extension=extension,toc=toc)">
+
+<p>You can call def's programmatically from any <code><%text filter='h'>Template</%text></code> object using the <code><%text filter='h'>get_def()</%text></code> method, which returns a <code><%text filter='h'>DefTemplate</%text></code> object.  This is a <code><%text filter='h'>Template</%text></code> subclass which the parent <code><%text filter='h'>Template</%text></code> creates, and is usable like any other template:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+from mako.template import Template
+
+template = Template("""
+    <%def name="hi(name)">
+        hi ${name}!
+    </%def>
+
+    <%def name="bye(name)">
+        bye ${name}!
+    </%def>
+""")
+
+print template.get_def("hi").render(name="ed")
+print template.get_def("bye").render(name="ed")
+</%text></%call>
+</%call>
+<%call expr="formatting.section(path='defs_nesteddefs',paged=paged,extension=extension,toc=toc)">
+
+<p>The def model follows regular Python rules for closures.  Declaring <code><%text filter='h'><%def></%text></code> inside another <code><%text filter='h'><%def></%text></code> declares it within the parent's <strong>enclosing scope</strong>:
+</p>
+<%call expr="formatting.code()"><%text><%def name="mydef()">
+    <%def name="subdef()">
+        a sub def
+    </%def>
+
+    im the def, and the subcomopnent is ${subdef()}
+</%def>
+</%text></%call><p>Just like Python, names that exist outside the inner <code><%text filter='h'><%def></%text></code> exist inside it as well:
+</p>
+<%call expr="formatting.code()"><%text><%
+    x = 12
+%>
+<%def name="outer()">
+    <%
+        y = 15
+    %>
+    <%def name="inner()">
+        inner, x is ${x}, y is ${y}
+    </%def>
+
+    outer, x is ${x}, y is ${y}
+</%def>
+</%text></%call><p>Assigning to a name inside of a def declares that name as local to the scope of that def (again, like Python itself).  This means the following code will raise an error:
+</p>
+<%call expr="formatting.code()"><%text><%
+    x = 10
+%>
+<%def name="somedef()">
+    ## error !
+    somedef, x is ${x}  
+    <%
+        x = 27  
+    %>
+</%def>
+</%text></%call><p>...because the assignment to <code><%text filter='h'>x</%text></code> declares x as local to the scope of <code><%text filter='h'>somedef</%text></code>, rendering the "outer" version unreachable in the expression that tries to render it.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='defs_defswithcontent',paged=paged,extension=extension,toc=toc)">
+
+<p>A flip-side to def within def is a def call with content.  This is where you call a def, and at the same time declare a block of content (or multiple blocks) that can be used by the def being called.  The main point of such a call is to create custom, nestable tags, just like any other template language's custom-tag creation system - where the external tag controls the execution of the nested tags and can communicate state to them.  Only with Mako, you don't have to use any external Python modules, you can define arbitrarily nestable tags right in your templates.
+</p>
+<p>To achieve this, the target def is invoked using the form <code><%text filter='h'><%namepacename:defname></%text></code> instead of the normal <code><%text filter='h'>${}</%text></code> syntax.  This syntax, introduced in Mako 0.2.3, is functionally equivalent another tag known as <code><%text filter='h'>call</%text></code>, which takes the form <code><%text filter='h'><%call expr='namespacename.defname(args)'></%text></code>.  While <code><%text filter='h'>%call</%text></code> is available in all versions of Mako, the newer style is probably more familiar looking.  The <code><%text filter='h'>namespace</%text></code> portion of the call is the name of the <strong>namespace</strong> in which the def is defined - in the most simple cases, this can be <code><%text filter='h'>local</%text></code> or <code><%text filter='h'>self</%text></code> to reference the current template's namespace (the difference between <code><%text filter='h'>local</%text></code> and <code><%text filter='h'>self</%text></code> is one of inheritance - see <%call expr="nav.toclink(path='namespaces_builtin',paged=paged,extension=extension,toc=toc)"></%call> for details).
+</p>
+<p>When the target def is invoked, a variable <code><%text filter='h'>caller</%text></code> is placed in its context which contains another namespace containing the body and other defs defined by the caller.  The body itself is referenced by the method <code><%text filter='h'>body()</%text></code>.  Below, we build a <code><%text filter='h'>%def</%text></code> that operates upon <code><%text filter='h'>caller.body()</%text></code> to invoke the body of the custom tag:
+</p>
+<%call expr="formatting.code()"><%text><%def name="buildtable()">
+    <table>
+        <tr><td>
+            ${caller.body()}
+        </td></tr>
+    </table>
+</%def>
+
+<%self:buildtable>
+    I am the table body.
+</%self:buildtable>
+</%text></%call><p>This produces the output (whitespace formatted):
+</p>
+<%call expr="formatting.code(syntaxtype='html')"><%text>
+<table>
+    <tr><td>
+        I am the table body.
+    </td></tr>
+</table>
+</%text></%call><p>Using the older <code><%text filter='h'>%call</%text></code> syntax looks like:
+</p>
+<%call expr="formatting.code()"><%text><%def name="buildtable()">
+    <table>
+        <tr><td>
+            ${caller.body()}
+        </td></tr>
+    </table>
+</%def>
+
+<%call expr="buildtable()">
+    I am the table body.
+</%call>
+</%text></%call><p>The <code><%text filter='h'>body()</%text></code> can be executed multiple times or not at all.  This means you can use def-call-with-content to build iterators, conditionals, etc:
+</p>
+<%call expr="formatting.code()"><%text><%def name="lister(count)">
+    % for x in range(count):
+        ${caller.body()}
+    % endfor
+</%def>
+
+<%self:lister count="${3}">
+    hi
+</%self:lister>
+</%text></%call><p>Produces:
+</p>
+<%call expr="formatting.code(syntaxtype='html')"><%text>
+hi
+hi
+hi
+</%text></%call><p>Notice above we pass <code><%text filter='h'>3</%text></code> as a Python expression, so that it remains as an integer.
+</p>
+<p>A custom "conditional" tag:
+</p>
+<%call expr="formatting.code()"><%text><%def name="conditional(expression)">
+    % if expression:
+        ${caller.body()}
+    % endif
+</%def>
+
+<%self:conditional expression="${4==4}">
+    im the result
+</%self:conditional>
+</%text></%call><p>Produces:
+</p>
+<%call expr="formatting.code(syntaxtype='html')"><%text>
+im the result
+</%text></%call><p>But that's not all.  The <code><%text filter='h'>body()</%text></code> function also can handle arguments, which will augment the local namespace of the body callable.  The caller must define the arguments which it expects to receive from its target def using the <code><%text filter='h'>args</%text></code> attribute, which is a comma-separated list of argument names.  Below, our <code><%text filter='h'><%def></%text></code> calls the <code><%text filter='h'>body()</%text></code> of its caller, passing in an element of data from its argument:
+</p>
+<%call expr="formatting.code()"><%text><%def name="layoutdata(somedata)">
+    <table>
+    % for item in somedata:
+        <tr>
+        % for col in item:
+            <td>${caller.body(col=col)}</td>
+        % endfor
+        </tr>
+    % endfor
+    </table>
+</%def>
+
+<%self:layoutdata somedata="${[[1,2,3],[4,5,6],[7,8,9]]}" args="col">\
+Body data: ${col}\
+</%self:layoutdata>
+</%text></%call><p>Produces:
+</p>
+<%call expr="formatting.code(syntaxtype='html')"><%text>
+<table>
+   <tr>
+       <td>Body data: 1</td>
+       <td>Body data: 2</td>
+       <td>Body data: 3</td>
+   </tr>
+   <tr>
+       <td>Body data: 4</td>
+       <td>Body data: 5</td>
+       <td>Body data: 6</td>
+   </tr>
+   <tr>
+       <td>Body data: 7</td>
+       <td>Body data: 8</td>
+       <td>Body data: 9</td>
+   </tr>
+</table>
+</%text></%call><p>You don't have to stick to calling just the <code><%text filter='h'>body()</%text></code> function.  The caller can define any number of callables, allowing the <code><%text filter='h'><%call></%text></code> tag to produce whole layouts:
+</p>
+<%call expr="formatting.code()"><%text><%def name="layout()">
+    ## a layout def
+    <div class="mainlayout">
+        <div class="header">
+            ${caller.header()}
+        </div>
+        <div class="sidebar">
+            ${caller.sidebar()}
+        </div>
+        <div class="content">
+            ${caller.body()}
+        </div>
+    </div>
+</%def>
+
+## calls the layout def
+<%self:layout>
+    <%def name="header()">
+        I am the header
+    </%def>
+    <%def name="sidebar()">
+        <ul>
+            <li>sidebar 1</li>
+            <li>sidebar 2</li>
+        </ul>
+    </%def>
+
+        this is the body
+</%self:layout>
+</%text></%call><p>The above layout would produce:
+</p>
+<%call expr="formatting.code()"><%text><div class="mainlayout">
+   <div class="header">
+   I am the header
+   </div>
+
+   <div class="sidebar">
+   <ul>
+       <li>sidebar 1</li>
+       <li>sidebar 2</li>
+   </ul>
+   </div>
+
+   <div class="content">
+   this is the body
+   </div>
+</div>
+</%text></%call><p>The number of things you can do with <code><%text filter='h'><%call></%text></code> and/or the <code><%text filter='h'><%namespacename:defname></%text></code> calling syntax is enormous.  You can create form widget libraries, such as an enclosing <code><%text filter='h'><FORM></%text></code> tag and nested HTML input elements, or portable wrapping schemes using <code><%text filter='h'><div></%text></code> or other elements.  You can create tags that interpret rows of data, such as from a database, providing the individual columns of each row to a <code><%text filter='h'>body()</%text></code> callable which lays out the row any way it wants.  Basically anything you'd do with a "custom tag" or tag library in some other system, Mako provides via <code><%text filter='h'><%def></%text></code>s and plain Python callables which are invoked via <code><%text filter='h'><%namespacename:defname></%text></code> or <code><%text filter='h'><%call></%text></code>.
+</p>
+
+
+</%call>
+</%call>
+</html>

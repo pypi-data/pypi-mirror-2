@@ -1,0 +1,228 @@
+# -*- coding: utf-8 -*-
+<%inherit file="content_layout.html"/>
+<%page args="toc, extension, paged"/>
+<%namespace  name="formatting" file="formatting.html"/>
+<%namespace  name="nav" file="nav.html"/>
+<%def name="title()">Mako Documentation - Namespaces</%def>
+<%!
+    filename = 'namespaces'
+%>
+## This file is generated.  Edit the .txt files instead of this one.
+
+
+<%call expr="formatting.section(path='namespaces',paged=paged,extension=extension,toc=toc)">
+
+<p>Namespaces are used to organize groups of components into categories, and also to "import" components from other files.
+</p>
+<p>If the file <code><%text filter='h'>components.html</%text></code> defines these two components:
+</p>
+<%call expr="formatting.code()"><%text>## components.html
+<%def name="comp1()">
+    this is comp1
+</%def>
+
+<%def name="comp2(x)">
+    this is comp2, x is ${x}
+</%def>
+</%text></%call><p>You can make another file, for example <code><%text filter='h'>index.html</%text></code>, that pulls those two components into a namespace called <code><%text filter='h'>comp</%text></code>:
+</p>
+<%call expr="formatting.code()"><%text>## index.html
+<%namespace name="comp" file="components.html"/>
+
+Heres comp1:  ${comp.comp1()}
+Heres comp2:  ${comp.comp2(x=5)}
+</%text></%call><p>The <code><%text filter='h'>comp</%text></code> variable above is an instance of <code><%text filter='h'>mako.runtime.Namespace</%text></code>, a <strong>proxy object</strong> which delivers method calls to the underlying template callable using the current context.
+</p>
+<p><code><%text filter='h'><%namespace></%text></code> also provides an <code><%text filter='h'>import</%text></code> attribute which can be used to pull the names into the local namespace, removing the need to call it via the ".".  When <code><%text filter='h'>import</%text></code> is used, the <code><%text filter='h'>name</%text></code> attribute is optional.
+</p>
+<%call expr="formatting.code()"><%text><%namespace file="components.html" import="comp1, comp2"/>
+
+Heres comp1:  ${comp1()}
+Heres comp2:  ${comp2(x=5)}
+</%text></%call><p><code><%text filter='h'>import</%text></code> also supports the "*" operator:
+</p>
+<%call expr="formatting.code()"><%text><%namespace file="components.html" import="*"/>
+
+Heres comp1:  ${comp1()}
+Heres comp2:  ${comp2(x=5)}
+</%text></%call><p>The names imported by the <code><%text filter='h'>import</%text></code> attribute take precedence over any names that exist within the current context.
+</p>
+<p><strong>Note</strong> - in current versions of Mako, usage of "import='*'" is known to decrease performance of the template.  This will be fixed in a future release.
+</p>
+
+<%call expr="formatting.section(path='namespaces_howtocall',paged=paged,extension=extension,toc=toc)">
+
+<p>There are essentially four ways to call a function from a namespace.
+</p>
+<p>The "expression" format, as described previously.  Namespaces are just Python objects with functions on them, and can
+   be used in expressions like any other function:
+</p>
+<%call expr="formatting.code()"><%text>${mynamespace.somefunction('some arg1', 'some arg2', arg3='some arg3', arg4='some arg4')}
+</%text></%call><p>Synonymous with the "expression" format is the "custom tag" format, when a "closed" tag is used.  This format, introduced in Mako 0.2.3, allows the usage of a "custom" Mako tag, with the function arguments passed in using named attributes:
+</p>
+<%call expr="formatting.code()"><%text><%mynamespace:somefunction arg1="some arg1" arg2="some arg2" arg3="some arg3" arg4="some arg4"/>
+</%text></%call><p>When using tags, the values of the arguments are taken as literal strings by default.  To embed Python expressions as arguments, use the embedded expression format:
+</p>
+<%call expr="formatting.code()"><%text><%mynamespace:somefunction arg1="${someobject.format()}" arg2="${somedef(5, 12)}"/>
+</%text></%call><p>The "custom tag" format is intended mainly for namespace functions which recognize body content, which in Mako is known as a "def with embedded content":
+</p>
+<%call expr="formatting.code()"><%text><%mynamespace:somefunction arg1="some argument" args="x, y">
+    Some record: ${x}, ${y}
+</%mynamespace:somefunction>
+</%text></%call><p>The "classic" way to call defs with embedded content is the <code><%text filter='h'><%call></%text></code> tag:
+</p>
+<%call expr="formatting.code()"><%text><%call expr="mynamespace.somefunction(arg1='some argument')" args="x, y">
+    Some record: ${x}, ${y}
+</%call>
+</%text></%call><p>For information on how to construct defs that embed content from the caller, see <%call expr="nav.toclink(path='defs_defswithcontent',paged=paged,extension=extension,toc=toc)"></%call>.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='namespaces_frommodules',paged=paged,extension=extension,toc=toc)">
+
+<p>Namespaces can also import regular Python functions from modules.  These callables need to take at least one argument, <code><%text filter='h'>context</%text></code>:
+</p>
+<p>A module file <code><%text filter='h'>some/module.py</%text></code> might contain the callable:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+def my_tag(context):
+    context.write("hello world")
+    return ''
+</%text></%call><p>A template can use this module via:
+</p>
+<%call expr="formatting.code()"><%text><%namespace name="hw" module="some.module"/>
+
+${hw.my_tag()}
+</%text></%call><p>Note that the <code><%text filter='h'>context</%text></code> argument is not needed in the call; the <code><%text filter='h'>namespace</%text></code> tag creates a locally-scoped callable which takes care of it.   The <code><%text filter='h'>return ''</%text></code> is so that the def does not dump a <code><%text filter='h'>None</%text></code> into the output stream - the return value of any def is rendered after the def completes, in addition to whatever was passed to <code><%text filter='h'>context.write()</%text></code> within its body.
+</p>
+<p>If your def is to be called in an "embedded content" context, that is as described in <%call expr="nav.toclink(path='defs_defswithcontent',paged=paged,extension=extension,toc=toc)"></%call>, you should use the <code><%text filter='h'>@supports_caller</%text></code> decorator, which will ensure that Mako will ensure the correct "caller" variable is available when your def is called, supporting embedded content:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+from mako.runtime import supports_caller
+
+@supports_caller
+def my_tag(context):
+    context.write("<div>")
+    context['caller'].body()
+    context.write("</div>")
+    return ''
+</%text></%call><p>Capturing of output is available as well, using the outside-of-templates version of the <code><%text filter='h'>capture()</%text></code> function, which accepts the "context" as its first argument:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+from mako.runtime import supports_caller, capture
+
+@supports_caller
+def my_tag(context):
+    return "<div>%s</div>" % \
+            capture(context, context['caller'].body, x="foo", y="bar")
+</%text></%call>
+</%call>
+<%call expr="formatting.section(path='namespaces_declaring',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'><%namespace></%text></code> tag supports the definition of <code><%text filter='h'><%defs></%text></code> directly inside the tag.  These defs become part of the namespace like any other function, and will override the definitions pulled in from a remote template or module:
+</p>
+<%call expr="formatting.code()"><%text>## define a namespace
+<%namespace name="stuff">
+    <%def name="comp1()">
+        comp1
+    </%def>
+</%namespace>
+
+## then call it
+${stuff.comp1()}
+</%text></%call>
+</%call>
+<%call expr="formatting.section(path='namespaces_body',paged=paged,extension=extension,toc=toc)">
+
+<p>Every namespace that is generated from a template contains a method called <code><%text filter='h'>body()</%text></code>.  This method corresponds to the main body of the template, and plays its most important roles when using inheritance relationships as well as def-calls-with-content.
+</p>
+<p>Since the <code><%text filter='h'>body()</%text></code> method is available from a namespace just like all the other defs defined in a template, what happens if you send arguments to it ?  By default, the <code><%text filter='h'>body()</%text></code> method accepts no positional arguments, and for usefulness in inheritance scenarios will by default dump all keyword arguments into a dictionary called <code><%text filter='h'>pageargs</%text></code>.  But if you actually want to get at the keyword arguments, Mako recommends you define your own argument signature explicitly.  You do this via using the <code><%text filter='h'><%page></%text></code> tag:
+</p>
+<%call expr="formatting.code()"><%text><%page args="x, y, someval=8, scope='foo', **kwargs"/>
+</%text></%call><p>A template which defines the above signature requires that the variables <code><%text filter='h'>x</%text></code> and <code><%text filter='h'>y</%text></code> are defined, defines default values for <code><%text filter='h'>someval</%text></code> and <code><%text filter='h'>scope</%text></code>, and sets up <code><%text filter='h'>**kwargs</%text></code> to receive all other keyword arguments.  If <code><%text filter='h'>**kwargs</%text></code> or similar is not present, the argument <code><%text filter='h'>**pageargs</%text></code> gets tacked on by Mako.  When the template is called as a top-level template (i.e. via <code><%text filter='h'>template.render()</%text></code>) or via the <code><%text filter='h'><%include></%text></code> tag, the values for these arguments will be pulled from the <code><%text filter='h'>Context</%text></code>.  In all other cases, i.e. via calling the <code><%text filter='h'>body()</%text></code> method, the arguments are taken as ordinary arguments from the method call.  So above, the body might be called as:
+</p>
+<%call expr="formatting.code()"><%text>${self.body(5, y=10, someval=15, delta=7)}
+</%text></%call><p>The <code><%text filter='h'>Context</%text></code> object also supplies a <code><%text filter='h'>kwargs</%text></code> accessor, for cases when youd like to pass along whatever is in the context to a <code><%text filter='h'>body()</%text></code> callable:
+</p>
+<%call expr="formatting.code()"><%text>${next.body(**context.kwargs)}
+</%text></%call><p>The usefulness of calls like the above become more apparent when one works with inheriting templates.  For more information on this, as well as the meanings of the names <code><%text filter='h'>self</%text></code> and <code><%text filter='h'>next</%text></code>, see <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='namespaces_properties',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'>Namespace</%text></code> class includes helpful accessors and methods:
+</p>
+<ul>
+ <li>
+     <code><%text filter='h'>attr</%text></code> - allows access module level attributes by name.  This accessor allows templates to supply "scalar" attributes which are particularly handy in inheritance relationships.  See the example in <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>.
+ </li>
+
+ <li>
+     <code><%text filter='h'>module</%text></code> - the Python module referenced by this Namespace.  If the namespace references a <code><%text filter='h'>Template</%text></code>, then this module is the equivalent of <code><%text filter='h'>template.module</%text></code>, i.e. the generated module for the template.
+ </li>
+
+ <li>
+     <code><%text filter='h'>filename</%text></code> - the path of the filesystem file used for this Namespace's module or template.  If this is a pure module-based Namespace, this evaluates to <code><%text filter='h'>module.__file__</%text></code>.  If a template-based namespace, it evaluates to the original template file location.
+ </li>
+
+ <li>
+     <code><%text filter='h'>template</%text></code> - the <code><%text filter='h'>Template</%text></code> object referenced by this Namespace, if any.
+ </li>
+
+ <li>
+     <code><%text filter='h'>uri</%text></code> - the uri for this Namespace's template (i.e. whatever was sent to <code><%text filter='h'>lookup.get_template()</%text></code>).  This is the equivalent of <code><%text filter='h'>template.uri</%text></code>.
+ </li>
+
+ <li>
+     <code><%text filter='h'>context</%text></code> - the <code><%text filter='h'>Context</%text></code> object for this namespace.  Namespaces are often created with copies of contexts that contain slightly different data, particularly in inheritance scenarios.  Using the <code><%text filter='h'>Context</%text></code> off of a <code><%text filter='h'>Namespace</%text></code> one can traverse an entire chain of templates that inherit from one-another.
+ </li>
+
+ <li>
+     <code><%text filter='h'>get_namespace(uri)</%text></code> - this method returns a <code><%text filter='h'>Namespace</%text></code> at the given <code><%text filter='h'>uri</%text></code>.  If the given uri is a relative uri (i.e. it does not contain ia leading slash <code><%text filter='h'>/</%text></code>), the uri is adjusted to be relative to the uri <strong>of the namespace itself</strong>.  This method is therefore mostly useful off of the built-in <code><%text filter='h'>local</%text></code> namespace, described in the next section.  In most cases, a template wouldn't need this function, and should instead use the <code><%text filter='h'><%namespace></%text></code> tag to load namespaces.  However, since all <code><%text filter='h'><%namespace></%text></code> tags are evaulated before the body of the template ever runs, this method can be used to locate namespaces using expressions that were generated within the body code of the template, or to conditionally use a particular namespace.
+ </li>
+</ul>
+
+</%call>
+<%call expr="formatting.section(path='namespaces_builtin',paged=paged,extension=extension,toc=toc)">
+
+<p>The namespace is so great that Mako gives your template one (or two) for free.  The names of these namespaces are <code><%text filter='h'>local</%text></code> and <code><%text filter='h'>self</%text></code>.  Other built-in namespaces include <code><%text filter='h'>parent</%text></code> and <code><%text filter='h'>next</%text></code>, which are optional and are described in <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>.
+</p>
+
+<%call expr="formatting.section(path='namespaces_builtin_local',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'>local</%text></code> namespace is basically the namespace for the currently executing template.  This means that all of the top level defs defined in your template, as well as your template's <code><%text filter='h'>body()</%text></code> function, are also available off of the <code><%text filter='h'>local</%text></code> namespace.
+</p>
+<p>The <code><%text filter='h'>local</%text></code> namespace is also where properties like <code><%text filter='h'>uri</%text></code>, <code><%text filter='h'>filename</%text></code>, and <code><%text filter='h'>module</%text></code> and the <code><%text filter='h'>get_namespace</%text></code> method can be particularly useful.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='namespaces_builtin_self',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'>self</%text></code> namespace, in the case of a template that does not use inheritance, is synonomous with <code><%text filter='h'>local</%text></code>.  If inheritance is used, then <code><%text filter='h'>self</%text></code> references the topmost template in the inheritance chain, where it is most useful for providing the ultimate form of various "method" calls which may have been overridden at various points in an inheritance chain.  See <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>.
+</p>
+
+</%call>
+</%call>
+<%call expr="formatting.section(path='namespaces_inheritable',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'><%namespace></%text></code> tag includes an optional attribute <code><%text filter='h'>inheritable="True"</%text></code>, which will cause the namespace to be attached to the <code><%text filter='h'>self</%text></code> namespace.  Since <code><%text filter='h'>self</%text></code> is globally available throughout an inheritance chain (described in the next section), all the templates in an inheritance chain can get at the namespace imported in a super-template via <code><%text filter='h'>self</%text></code>.
+</p>
+<%call expr="formatting.code()"><%text>## base.html
+<%namespace name="foo" file="foo.html" inheritable="True"/>
+
+${next.body()}
+
+## somefile.html
+<%inherit file="base.html"/>
+
+${self.foo.bar()}
+</%text></%call><p>This allows a super-template to load a whole bunch of namespaces that its inheriting templates can get to, without them having to explicitly load those namespaces themselves.
+</p>
+<p>The <code><%text filter='h'>import="*"</%text></code> part of the <code><%text filter='h'><%namespace></%text></code> tag doesn't yet interact with the <code><%text filter='h'>inheritable</%text></code> flag, so currently you have to use the explicit namespace name off of <code><%text filter='h'>self</%text></code>, followed by the desired function name.  But more on this in a future release.
+</p>
+
+
+</%call>
+</%call>
+</html>
