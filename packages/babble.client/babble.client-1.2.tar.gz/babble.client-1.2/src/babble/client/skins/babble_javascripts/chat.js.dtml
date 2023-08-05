@@ -1,0 +1,488 @@
+/*
+GNU General Public License (GPL)
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+02110-1301, USA.
+*/
+
+var blink_order = 0;
+var doc_title;
+var messages_found = 0;
+var poll_count = 0;         // The amount of server polls that have been made
+
+<dtml-let pollmax="portal_chat.poll_max">
+var poll_max = &dtml-pollmax;;  // The maximum polling period
+</dtml-let>
+
+<dtml-let pollmin="portal_chat.poll_min">
+var poll_min = &dtml-pollmin;;  // The minimum polling period
+</dtml-let>
+
+var poll_time = poll_min;   // The initial polling period
+
+<dtml-let member="portal_membership.getAuthenticatedMember().getId().encode('utf-8')">
+var username = "&dtml-member;";
+</dtml-let>
+
+var window_focus = true;
+var chat_focus = new Array();
+var has_messages = new Array();
+var new_chats = new Array();
+var chats = new Array();    // Records new chat windows being opened. 
+
+function get_minimized_chats() {
+    if (jQuery.cookie('chats_minimized'))
+        return jQuery.cookie('chats_minimized').split(/\|/);
+    return Array()
+}
+
+function oc(a) {
+    // Thanks to Jonathan Snook: http://snook.ca
+    var o = {};
+    for(var i=0; i<a.length; i++) {
+        o[a[i]]='';
+    }
+    return o;
+}
+
+function initialize(){  
+    var open_chats = Array();
+    var cookie = jQuery.cookie('chats-open-'+username);
+    log.info('initialize: cookie = ' + cookie + '\n');
+    jQuery.cookie('chats-open-'+username, null, {path: '/'});
+    if (cookie) {
+        open_chats = cookie.split('|');
+        for (var i=0; i<open_chats.length; i++) {
+            var user = open_chats[i];
+            if (user) { 
+                createChat(user, 1);
+            }
+        }
+    }
+    jQuery.ajax({
+        url: "@@initialize",
+        cache: false,
+        dataType: "json",
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            // If an error occured, call initialize again after 20 seconds.
+            setTimeout('initialize();', 20000); 
+        },
+        success: function(data) {
+            var msgdict = data.messages;
+            for(var user in msgdict) {
+                var messages = msgdict[user];
+                if (messages.length) {
+                    messages_found += 1;
+                    has_messages[user] = true;
+                    new_chats[user] = true;
+                    var chat = jQuery("#chatbox_"+user);
+                    if (chat.length <= 0) {
+                        createChat(user, 1);
+                    }
+                    if (chat.css('display') == 'none') {
+                        chat.css('display','block');
+                        reorderChats();
+                    }
+                    var chat_content = jQuery("#chatbox_"+user+" .chat-content");
+                    for (var i=0; i<messages.length; i++) {
+                        message = messages[i]
+                        if (message[0] == user) {
+                            chat_content.append(
+                                '<div class="chat-message">' + 
+                                    '<span class="chat-message-them">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                                    '<span class="chat-message-content">'+message[3]+'</span>' + 
+                                '</div>'
+                            );
+                        }
+                        else {
+                            chat_content.append(
+                                '<div class="chat-message">' + 
+                                    '<span class="chat-message-me">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                                    '<span class="chat-message-content">'+message[3]+'</span>' + 
+                                '</div>'
+                            );
+                        }
+                    }
+                    chat_content.scrollTop(chat_content[0].scrollHeight);
+                    //setTimeout('chat_content.scrollTop(chat_content[0].scrollHeight);', 100); // IE bug
+                }
+            };
+            if (username) {
+                setTimeout('poll();', poll_time);
+            }
+        }
+    });
+}
+
+function reorderChats() {
+    var index = 0;
+    for (var i=0; i < chats.length; i++) {
+        title = chats[i];
+        var chatbox =  jQuery("#chatbox_"+title);
+        if (chatbox.css('display') != 'none') {
+            if (index == 0) {
+                chatbox.css('right', '20px');
+            } 
+            else {
+                width = (index)*(225+7)+20;
+                chatbox.css('right', width+'px');
+            }
+            index++;
+        }
+    }
+}
+
+function positionNewChat(chatbox) {
+    var num_chats = 0;
+    for (var i=0; i<chats.length; i++) {
+        if (jQuery("#chatbox_"+chats[i]).css('display') != 'none') {
+            num_chats++;
+        }
+    }
+    if (num_chats == 0) {
+        chatbox.css('right', '20px');
+    } 
+    else {
+        width = (num_chats)*(225+7)+20;
+        chatbox.css('right', width+'px');
+    }
+}
+
+function closeChat(title) {
+    jQuery('#chatbox_'+title).css('display','none');
+    reorderChats();
+    var cookie = jQuery.cookie('chats-open-'+username);
+    if (cookie)
+        var open_chats = cookie.split('|');
+    else
+        var open_chats = Array();
+
+    var new_chats = Array();
+    for (var i=0; i < open_chats.length; i++) {
+        if (open_chats[i] != title) {
+            new_chats.push(open_chats[i]);
+        }
+    }
+    log.info('closeChat: cookie \n');
+    if (new_chats.length) {
+        jQuery.cookie('chats-open-'+username, new_chats.join('|'), {path: '/'});
+    }
+    else {
+        jQuery.cookie('chats-open-'+username, null, {path: '/'});
+    }
+    jQuery.ajax({
+        url: "@@clear_messages",
+        cache: false,
+        data: {contact: title},
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+        },
+        success: function() {
+            log.info(title + "'s messages succesfully cleared. \n");
+        }
+    });
+}
+
+function startChat(contact) {
+    createChat(contact);
+    jQuery("#chatbox_"+contact+" .chat-textarea").focus();
+    poll_time = poll_min;
+    poll_count = 1;
+    messages_found = 0;
+    setTimeout('poll();', poll_time);
+}
+
+function createChatBox(title) {
+    jQuery.ajax({
+        url: "@@render_chat_box",
+        cache: false,
+        async: false,
+        data: {
+            box_id: "chatbox_"+title,
+            contact: title,
+            },
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            return
+        },
+        success: function(data) {
+            jQuery('body').append(data);
+        }
+    });
+    return jQuery('#chatbox_'+title);
+}
+
+function handleChatEvents(title) {
+    chat_focus[title] = false;
+    jQuery("#chatbox_"+title+" .chat-textarea").blur(function(){
+        chat_focus[title] = false;
+        jQuery("#chatbox_"+title+" .chat-textarea").removeClass('chat-textarea-selected');
+    }).focus(function(){
+        chat_focus[title] = true;
+        has_messages[title] = false;
+        jQuery('#chatbox_'+title+' .chat-head').removeClass('chat-blink');
+        jQuery("#chatbox_"+title+" .chat-textarea").addClass('chat-textarea-selected');
+    });
+
+    jQuery("#chatbox_"+title).click(function() {
+        if (jQuery('#chatbox_'+title+' .chat-content').css('display') != 'none') {
+            jQuery("#chatbox_"+title+" .chat-textarea").focus();
+        }
+    });
+}
+
+function createChat(title, minimize) {
+    var cookie = jQuery.cookie('chats-open-'+username);
+    if (cookie)
+        var open_chats = cookie.split('|');
+    else
+        var open_chats = Array();
+    open_chats.push(title);
+    log.info('createChat: cookie = ' + open_chats.toString());
+    var new_cookie = open_chats.join('|');
+    jQuery.cookie('chats-open-'+username, new_cookie, {path: '/'});
+    log.info('createChat: cookie = ' + new_cookie);
+
+    if (jQuery("#chatbox_"+title).length > 0) {
+        // The chatbox exists, merely hidden
+        if (jQuery("#chatbox_"+title).css('display') == 'none') {
+            jQuery("#chatbox_"+title).css('display','block');
+            reorderChats();
+        }
+        jQuery("#chatbox_"+title+" .chat-textarea").focus();
+        return;
+    }
+    chatbox = createChatBox(title);
+    positionNewChat(chatbox);
+    chats.push(title);
+    if (minimize == 1) {
+        // Minimize the chat if it's in the minimized_chats cookie
+        var minimized_chats = get_minimized_chats();
+        if (title in oc(minimized_chats)) {
+            jQuery('#chatbox_'+title+' .chat-content').css('display','none');
+            jQuery('#chatbox_'+title+' .chat-input').css('display','none');
+        }
+    }
+    handleChatEvents(title)
+    chatbox.show();
+}
+
+function poll(){
+    // log.info('Poll: poll_time: ' + poll_time);
+    if (window_focus == false) {
+        var blink_number = 0;
+        var title_changed = 0;
+        for (var i = 0; i < new_chats.length; i++) {
+            if (new_chats[i] == true) {
+                ++blink_number;
+                if (blink_number >= blink_order) {
+                    document.title = i+' says...';
+                    title_changed = 1;
+                    break;	
+                }
+            }
+        }
+        if (title_changed == 0) {
+            document.title = doc_title;
+            blink_order = 0;
+        } 
+        else {
+            ++blink_order;
+        }
+    } 
+    else {
+        for (var i = 0; i < new_chats.length; i++) {
+            new_chats[i] = false;
+        }
+    }
+    for (var i = 0; i < new_chats.length; i++) {
+        if (has_messages[i] == true) {
+            if (chat_focus[i] == false) {
+                //FIXME: toggle all or none policy
+                jQuery('#chatbox_'+ i +' .chat-head').toggleClass('chat-blink');
+            }
+        }
+    }
+    poll_server();
+
+    poll_count++;
+    if (messages_found > 0) {
+        poll_time = poll_min;
+        poll_count = 1;
+        messages_found = 0;
+    } 
+    else if ((poll_count >= 10) && (poll_time < poll_max)) {
+        poll_time *= 2;
+        poll_count = 1;
+        if (poll_time > poll_max) {
+            poll_time = poll_max;
+        }
+    }
+    setTimeout('poll();', poll_time);
+}
+
+function poll_server() {
+    jQuery.ajax({
+        url: "@@poll",
+        cache: false,
+        dataType: "json",
+        timeout: poll_min - 100,
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            for (var i=0; i<chats.length; i++) {
+                var user = chats[i];
+                content = jQuery("#chatbox_"+user+" .chat-content");
+                content.append(
+                    '<div class="chat-message">' + 
+                        '<span class="chat-message-error">Connection Error</span>' + 
+                    '</div>'
+                );
+                content.scrollTop(content[0].scrollHeight);
+                poll_time = 20000; 
+            }
+        },
+        success: function(data) {
+            var msgdict = data.messages;
+            for(var user in msgdict) {
+                var messages = msgdict[user];
+                // jQuery.each(data.messages, function(i,item){
+                // var user = item.user;
+                if (messages.length) {
+                    messages_found += 1;
+                    has_messages[user] = true;
+                    new_chats[user] = true;
+                    var chat = jQuery("#chatbox_"+user);
+                    if (chat.length <= 0) {
+                        createChat(user);
+                    }
+                    if (chat.css('display') == 'none') {
+                        chat.css('display','block');
+                        reorderChats();
+                    }
+                    var chat_content = jQuery("#chatbox_"+user+" .chat-content");
+                    for (var i=0; i<messages.length; i++) {
+                        message = messages[i]
+                        if (message[0] == user) {
+                            chat_content.append(
+                                '<div class="chat-message">' + 
+                                    '<span class="chat-message-them">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                                    '<span class="chat-message-content">'+message[3]+'</span>' + 
+                                '</div>'
+                            );
+                        }
+                        else {
+                            chat_content.append(
+                                '<div class="chat-message">' + 
+                                    '<span class="chat-message-me">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                                    '<span class="chat-message-content">'+message[3]+'</span>' + 
+                                '</div>'
+                            );
+                        }
+                    }
+                    var chat_content = jQuery("#chatbox_"+user+" .chat-content");
+                    chat_content.scrollTop(chat_content[0].scrollHeight);
+                }
+            };
+        }
+    });
+}
+
+function keypressed(event, textarea, title) {
+	if(event.keyCode == 13 && event.shiftKey == 0)  {
+		message = jQuery(textarea).val();
+		message = message.replace(/^\s+|\s+jQuery/g,"");
+		jQuery(textarea).val('');
+		jQuery(textarea).focus();
+		jQuery(textarea).css('height','44px');
+		if (message != '') {
+            jQuery.ajax({
+                url: "@@send_message",
+                cache: false,
+                data: {to: title, message: message}, 
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    log.error(textStatus);
+                    if (errorThrown)
+                        log.error(errorThrown)
+                    jQuery("#chatbox_"+title+" .chat-content").append(
+                        '<div class="chat-message">' + 
+                            '<span class="chat-message-error">Connection Error</span>' + 
+                        '</div>');
+                    jQuery("#chatbox_"+title+" .chat-content").scrollTop(jQuery("#chatbox_"+title+" .chat-content")[0].scrollHeight);
+                },
+                success: function(data) { 
+                    message = message.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
+                    var now = new Date();
+                    var time = now.getHours()+':'+now.getMinutes();
+                    jQuery("#chatbox_"+title+" .chat-content").append(
+                        '<div class="chat-message">' + 
+                            '<span class="chat-message-me">'+username+' '+time+':&nbsp;&nbsp;</span>' + 
+                            '<span class="chat-message-content">'+message+'</span>' + 
+                        '</div>');
+                    jQuery("#chatbox_"+title+" .chat-content").scrollTop(jQuery("#chatbox_"+title+" .chat-content")[0].scrollHeight);
+                }
+            });
+		}
+		poll_time = poll_min;
+		poll_count = 1;
+        setTimeout('poll();', poll_time);
+		return false;
+	}
+	var adjustedHeight = textarea.clientHeight;
+	var maxHeight = 94;
+	if (maxHeight > adjustedHeight) {
+		adjustedHeight = Math.max(textarea.scrollHeight, adjustedHeight);
+		if (maxHeight)
+			adjustedHeight = Math.min(maxHeight, adjustedHeight);
+		if (adjustedHeight > textarea.clientHeight)
+			jQuery(textarea).css('height',adjustedHeight+8 +'px');
+	} 
+    else {
+		jQuery(textarea).css('overflow','auto');
+	}
+}
+
+function toggleChat(title) {
+    var minimized_chats = get_minimized_chats();
+    if (jQuery('#chatbox_'+title+' .chat-content').css('display') == 'none') {  
+        // Chat will be maximized
+        var new_cookie = Array();
+        for (var i=0; i < minimized_chats.length; i++) {
+            if (minimized_chats[i] != title) {
+                new_cookie.push(minimized_chats[i]);
+            }
+        }
+        jQuery.cookie('chats_minimized', new_cookie.join('|'));
+        var chat_content = jQuery('#chatbox_'+title+' .chat-content');
+        chat_content.css('display','block');
+        chat_content.scrollTop(jQuery("#chatbox_"+title+" .chat-content")[0].scrollHeight);
+        jQuery('#chatbox_'+title+' .chat-input').css('display','block');
+    } 
+    else {
+        // Chat will be minimized
+        if (!(title in oc(minimized_chats))) {
+            var new_cookie = title;
+            new_cookie += '|'+minimized_chats.join('|');
+            jQuery.cookie('chats_minimized', new_cookie);
+        }
+        jQuery('#chatbox_'+title+' .chat-content').css('display','none');
+        jQuery('#chatbox_'+title+' .chat-input').css('display','none');
+    }
+}
+
