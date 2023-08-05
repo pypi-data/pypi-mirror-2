@@ -1,0 +1,64 @@
+Introduction
+============
+
+This package will allow you to create your own search engines for your packages and sets of packages.
+It's not perfect, but I find it useful. It's really fast and easier to find what you're looking for often.
+
+You can search specifically for methods, classes and filenames or just do a full text search.
+
+It's built on repoze.bfg, repoze.catalog and pygments.
+
+Install
+-------
+
+Start off with a virtualenv::
+
+	>>> virtualenv pysourcesearch --no-site-packages
+	>>> cd pysourcesearch
+	>>> ./bin/easy_install pysourcesearch
+	>>> ./bin/easy_install PasteScript
+
+
+Then you can use the ini WSGI configuration provided with the package or create your own similar to this::
+
+	>>> [app:main]
+	>>> use = egg:pysourcesearch#app
+	>>> debug_notfound = false
+	>>> catalogs_location = %(here)s/catalogs
+	>>> reindex = False
+	>>> package_groups = 
+	>>>     Plone:/Applications/Plone/buildout-cache/eggs
+	>>> skipped_paths =
+	>>>		tests
+	>>>
+	>>> [server:main]
+	>>> use = egg:Paste#http
+	>>> host = 0.0.0.0
+	>>> port = 6543
+	
+Then run::
+
+	>>> ./bin/paster serve pysourcesearch.ini
+	
+The first time it runs it will take some time to index everything. If you tail the catalog you'll
+be able to see the status of indexing.
+
+   >>> tail -f pysourcesearch.log
+
+
+
+Configuration
+-------------
+
+Here are some of the WSGI configuration options::
+
+* catalogs_location = Location where the indexes are stored
+* reindex = If you want to reindex every time it's run
+* package_groups = a list of locations to egg packages. This is normally a `buildout-cache/eggs` direction or a `lib/python2.6/site-packages` directory
+* skipped_paths = a list of folders that you'd rather not index the contents of
+
+
+
+
+
+
