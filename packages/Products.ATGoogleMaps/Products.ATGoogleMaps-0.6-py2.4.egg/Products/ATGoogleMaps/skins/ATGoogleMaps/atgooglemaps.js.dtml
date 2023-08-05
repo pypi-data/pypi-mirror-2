@@ -1,0 +1,86 @@
+function createMap(map_id, lat, lng, zoom, mapType, typeCtl, navCtl) {
+    var options = {
+	zoom: zoom,
+	center: new google.maps.LatLng(lat, lng)
+    };
+    options.mapTypeId = eval("google.maps.MapTypeId." + mapType);
+
+    if (typeCtl != null) {
+	if (typeCtl == "hide") {
+	    options.mapTypeControl = false;
+	}
+	else {
+	    options.mapTypeControl = true;
+	    options.mapTypeControlOptions = {};
+	    options.mapTypeControlOptions.style = eval("google.maps.MapTypeControlStyle." + typeCtl);
+	}
+    }
+
+    if (navCtl != null) {
+	if (navCtl == "hide") {
+	    options.navigationControl = false;
+	}
+	else {
+	    options.navigationControl = true;
+	    options.navigationControlOptions = {};
+	    options.navigationControlOptions.style = eval("google.maps.NavigationControlStyle." + navCtl);
+	}
+    }
+
+    return new google.maps.Map(document.getElementById(map_id), options);
+}
+
+var visibleInfoWindow = null;
+
+function createMarker(map, lat, lng, index, title, draggable) {
+    var shape = {
+        coord: <dtml-var "gmap_properties.icon_shape">,
+	type: 'poly'
+    };
+    <dtml-with "_['gmap_marker.png']">
+    var icon = new google.maps.MarkerImage("&dtml-absolute_url;",
+        new google.maps.Size(&dtml-width;, &dtml-height;),
+        new google.maps.Point(0, 0),
+        new google.maps.Point(<dtml-var "gmap_properties.icon_anchor_x">, <dtml-var "gmap_properties.icon_anchor_y">));
+    </dtml-with>
+    <dtml-with "_['gmap_shadow.png']">
+    var shadow = new google.maps.MarkerImage("&dtml-absolute_url;",
+        new google.maps.Size(&dtml-width;, &dtml-height;),
+        new google.maps.Point(0, 0),
+        new google.maps.Point(<dtml-var "gmap_properties.shadow_anchor_x">, <dtml-var "gmap_properties.shadow_anchor_y">));
+    </dtml-with>
+
+    if (draggable == null) {
+	draggable = false;
+    }
+    var marker = new google.maps.Marker({
+	position: new google.maps.LatLng(lat, lng),
+	map: map,
+	title: title,
+        icon: icon,
+        shadow: shadow,
+        shape: shape,
+	draggable: draggable
+    });
+
+    if (index) {
+        var content = document.getElementById('infowindow_html_' + index).innerHTML;
+	var infoWindow = new google.maps.InfoWindow({
+	    content: content
+        });
+        google.maps.event.addListener(marker, 'click', function() {
+            if (visibleInfoWindow) {
+	        visibleInfoWindow.close();
+            }
+            infoWindow.open(map, marker);
+	    visibleInfoWindow = infoWindow;
+	});
+
+	var link = document.getElementById("infowindow_link_" + index);
+	link.onclick = function() {
+            google.maps.event.trigger(marker, "click");
+	};
+    }
+
+    return marker;
+}
