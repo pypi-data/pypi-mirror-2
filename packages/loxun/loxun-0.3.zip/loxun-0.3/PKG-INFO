@@ -1,0 +1,224 @@
+Metadata-Version: 1.0
+Name: loxun
+Version: 0.3
+Summary: large output in XML using unicode and namespaces
+Home-page: http://pypi.python.org/pypi/loxun/
+Author: Thomas Aglassinger
+Author-email: roskakori@users.sourceforge.net
+License: GNU Lesser General Public License 3 or later
+Description: 
+        loxun is a Python module to write large output in XML using Unicode and
+        namespaces. Of course you can also use it for small XML output with plain 8
+        bit strings and no namespaces.
+        
+        loxun's features are:
+        
+        * **small memory foot print**: the document is created on the fly by writing to
+        an output stream, no need to keep all of it in memory.
+        
+        * **easy to use namespaces**: simply add a namespace and refer to it using the
+        standard ``namespace:tag`` syntax.
+        
+        * **mix unicode and string**: pass both unicode or plain 8 bit strings to any
+        of the methods. Internally loxun converts them to unicode, so once a
+        parameter got accepted by the API you can rely on it not causing any
+        messy ``UnicodeError`` trouble.
+        
+        * **automatic escaping**: no need to manually handle special characters such
+        as ``<`` or ``&`` when writing text and attribute values.
+        
+        * **robustness**: while you write the document, sanity checks are performed on
+        everything you do. Many silly mistakes immediately result in an
+        ``XmlError``, for example missing end elements or references to undeclared
+        namespaces.
+        
+        * **open source**: distributed under the GNU Lesser General Public License 3
+        or later.
+        
+        Here is a very basic example. First you have create an output stream. In many
+        cases this would be a file, but for the sake of simplicity we use a
+        ``StringIO`` here:
+        
+        >>> from StringIO import StringIO
+        >>> out = StringIO()
+        >>> xml = XmlWriter(out)
+        
+        Now write the content:
+        
+        >>> xml.addNamespace("xhtml", "http://www.w3.org/1999/xhtml")
+        >>> xml.startTag("xhtml:html")
+        >>> xml.startTag("xhtml:body")
+        >>> xml.text("Hello world!")
+        >>> xml.tag("xhtml:img", {"src": "smile.png", "alt": ":-)"})
+        >>> xml.endTag()
+        >>> xml.endTag()
+        >>> xml.close()
+        
+        And the result is:
+        
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.0" encoding="utf-8"?>
+        <xhtml:html xlmns:xhtml="http://www.w3.org/1999/xhtml">
+        <xhtml:body>
+        Hello world!
+        <xhtml:img alt=":-)" src="smile.png" />
+        </xhtml:body>
+        </xhtml:html>
+        
+        Writing a simple document
+        =========================
+        
+        The following example creates a very simple XHTML document.
+        
+        To make it simple, the output goes to a string, but you could also use
+        a file that has been created using
+        ``codecs.open(filename, "wb", encoding)``.
+        
+        >>> from StringIO import StringIO
+        >>> out = StringIO()
+        
+        First create an `XmlWriter` to write the XML code to the specified output:
+        
+        >>> xml = XmlWriter(out)
+        
+        This automatically adds the XML prolog:
+        
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.0" encoding="utf-8"?>
+        
+        Next add the ``<html>`` start tag:
+        
+        >>> xml.startTag("html")
+        
+        Now comes the <body>. To pass attributes, specify them in a dictionary.
+        So in order to add::
+        
+        <body id="top">
+        
+        use:
+        
+        >>> xml.startTag("body", {"id": "top"})
+        
+        Let' add a little text so there is something to look at:
+        
+        >>> xml.text("Hello world!")
+        
+        Wrap it up: close all elements and the document.
+        
+        >>> xml.endTag()
+        >>> xml.endTag()
+        >>> xml.close()
+        
+        And this is what we get:
+        
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.0" encoding="utf-8"?>
+        <html>
+        <body id="top">
+        Hello world!
+        </body>
+        </html>
+        
+        Now the same thing but with a namespace. First create the prolog
+        and header like above:
+        
+        >>> out = StringIO()
+        >>> xml = XmlWriter(out)
+        
+        Next add the namespace:
+        
+        >>> xml.addNamespace("xhtml", "http://www.w3.org/1999/xhtml")
+        
+        Now elements can use qualified tag names using a colon (:) to separate
+        namespace and tag name:
+        
+        >>> xml.startTag("xhtml:html")
+        >>> xml.startTag("xhtml:body")
+        >>> xml.text("Hello world!")
+        >>> xml.endTag()
+        >>> xml.endTag()
+        >>> xml.close()
+        
+        As a result, tag names are now prefixed with "xhtml:":
+        
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.0" encoding="utf-8"?>
+        <xhtml:html xlmns:xhtml="http://www.w3.org/1999/xhtml">
+        <xhtml:body>
+        Hello world!
+        </xhtml:body>
+        </xhtml:html>
+        
+        Changing the XML prolog
+        
+        When you create a writer, it automatically write an XML prolog
+        processing instruction to the output. This is what the default prolog
+        looks like:
+        
+        >>> from StringIO import StringIO
+        >>> out = StringIO()
+        >>> xml = XmlWriter(out)
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.0" encoding="utf-8"?>
+        
+        You can change the version or encoding:
+        
+        >>> out = StringIO()
+        >>> xml = XmlWriter(out, encoding=u"ascii", version=u"1.1")
+        >>> print out.getvalue().rstrip("\r\n")
+        <?xml version="1.1" encoding="ascii"?>
+        
+        To completely omit the prolog, set the parameter ``prolog=False``:
+        
+        >>> out = StringIO()
+        >>> xml = XmlWriter(out, prolog=False)
+        >>> out.getvalue()
+        ''
+        
+        Version history
+        ===============
+        
+        Version 0.3, 17-May-2010
+        ------------------------
+        
+        * Added scoped namespaces which are removed automatically by ``endTag()``.
+        
+        * Changed ``text()`` to normalize newlines and white space if pretty printing
+        is enabled.
+        
+        * Moved writing of XML prolog to the constructor and removed ``prolog()`. To
+        omit the prolog, specify ``prolog=False`` when creating the ``XmlWriter``.
+        If you later want to write the prolog yourself, use
+        ``processingInstruction()``.
+        
+        * Renamed ``*Element()`` to ``*Tag`` because they really only write tags, not
+        whole elements.
+        
+        Version 0.2, 16-May-2010
+        ------------------------
+        
+        * Added ``comment()``, ``cdata()`` and ``processingInstruction()`` to write
+        these specific XML constructs.
+        * Added indentation and automatic newline to text if pretty printing is
+        enabled.
+        * Removed newline from prolog in case pretty printing is disabled.
+        * Fixed missing "?" in prolog.
+        
+        Version 0.1, 15-May-2010
+        ------------------------
+        
+        * Initial release.
+        
+Keywords: xml output stream large big huge namespace unicode memory footprint
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Plugins
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Topic :: Internet :: WWW/HTTP :: Dynamic Content
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Text Processing :: Markup :: XML
