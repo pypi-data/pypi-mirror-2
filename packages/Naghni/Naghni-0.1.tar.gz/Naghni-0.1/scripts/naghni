@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Naghni: a breath-taking side-scroller focusing on round lifeforms
+# Copyright (C) 2010  Niels Serup, based on dililatum from
+# Dililatum <http://metanohi.org/projects/dililatum/>
+
+# This file is part of Naghni.
+#
+# Naghni is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Naghni is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Naghni.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## naghni
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Starts the Naghni system
+##[ Start date  ]## 2010 July 13
+
+
+import sys
+from optparse import OptionParser
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = lambda x: None
+
+try:
+    import naghni
+except ImportError:
+    # Naghni is not installed, trying an ugly fix. Considering that
+    # this executable is in the scripts/ directory, appending the
+    # directory one level up to sys.path should make importing possible.
+    import os.path
+    sys.path.append(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0])
+
+import naghni.various as various
+from naghni.world import World
+import naghni.generalinformation as ginfo
+
+class NewOptionParser(OptionParser):
+    def error(self, msg, cont=True):
+        various.error(msg, cont, self.prog + ': error')
+
+parser = NewOptionParser(
+    prog='naghni',
+    usage='Usage: %prog [OPTION]...',
+    description='runs Naghni, a breath-taking side-scroller focusing on \
+round lifeforms',
+    version=ginfo.version_text,
+    epilog='This version does not feature a menu. When completing a \
+level, Naghni will automatically run the next one. Use the arrow \
+keys to play, PageUp/PageDown to zoom in/out and Shift+F to toggle \
+an FPS viewer. To restart a level, press the R key. Have fun!')
+
+parser.add_option('-l', '--load-level', dest='levelpath', metavar='FILE',
+                  default=None,
+                  help='bypass Naghni\'s normal menu and directly play an external level')
+parser.add_option('-f', '--fullscreen', dest='is_fullscreen',
+                  action='store_true', default=False,
+                  help='play in fullscreen mode (windowed mode is the default)')
+parser.add_option('-F', '--fakefullscreen', dest='is_fakefullscreen',
+                  action='store_true', default=False,
+                  help='play in a "fake" fullscreen mode, utilizing your current screen resolution')
+parser.add_option('-s', '--size', dest='size', metavar='[WIDTH]x[HEIGHT]',
+                  default=None,
+                  help='set the window size (a manual version of --fakefullscreen, default is 800x600)')
+parser.add_option('-b', '--backend', dest='backend_name', metavar='STRING',
+                  default='pygame',
+                  help='set the graphics and sound backend (default: pygame, available: pygame)')
+parser.add_option('-B', '--noborder', dest='has_border',
+                  action='store_false', default=True,
+                  help='do not show a border on the game window')
+parser.add_option('-H', '--nohwaccel', dest='has_hwaccel',
+                  action='store_false', default=True,
+                  help='do not attempt to use hardware acceleration')
+parser.add_option('-D', '--nodoublebuf', dest='has_doublebuf',
+                  action='store_false', default=True,
+                  help='do not attempt to use double buffering (faster but perhaps uglier)')
+parser.add_option('-m', '--mute', dest='mute',
+                  action='store_true', default=False,
+                  help='do not play sound and music (not recommended) (currently not important, as no sound is yet to be included with Naghni)')
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false', default=True,
+                  help='don\'t print status messages')
+parser.add_option('-C', '--nocolorprint', dest='term_colorprint',
+                  action='store_false', default=True,
+                  help='don\'t attempt to color status messages in the terminal')
+parser.add_option('-S', '--simpleprint', dest='term_simpleprint',
+                  action='store_true', default=False,
+                  help='simplify the design of status messages in the terminal')
+parser.add_option('-E', '--nocolorerrors', dest='term_colorerrors',
+                  action='store_false', default=True,
+                  help='do not attempt to print error messages in the terminal in a red color')
+
+(options, args) = parser.parse_args()
+
+if options.term_colorerrors:
+    try:
+        from termcolor import colored
+    except ImportError:
+        colored = lambda x, *y: x
+    class ColoredErrors:
+        def write(self, msg):
+            sys.__stderr__.write(colored(msg, 'red'))
+    sys.stderr = ColoredErrors()
+
+
+if options.size is not None:
+    try:
+        spl = options.size.split('x')
+        options.size = []
+        for i in range(2):
+            if spl[i] == '':
+                options.size.append(i and 600 or 800)
+            else:
+                options.size.append(int(spl[i]))
+        if len(options.size) < 2:
+            raise Exception()
+    except Exception:
+        parser.error('size syntax is wrong, use [WIDTH]x[HEIGHT], quitting', False)
+else:
+    options.size = (800, 600)
+
+setproctitle(parser.prog)
+
+s = World(options, parser.error)
+try:
+    s.start()
+finally:
+    s.end()
