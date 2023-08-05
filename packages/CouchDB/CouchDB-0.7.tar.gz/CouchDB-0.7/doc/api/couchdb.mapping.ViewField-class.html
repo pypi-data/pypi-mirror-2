@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="ascii"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>couchdb.mapping.ViewField</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+  <script type="text/javascript" src="epydoc.js"></script>
+</head>
+
+<body bgcolor="white" text="black" link="blue" vlink="#204080"
+      alink="#204080">
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="couchdb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Project homepage -->
+      <th class="navbar" align="right" width="100%">
+        <table border="0" cellpadding="0" cellspacing="0">
+          <tr><th class="navbar" align="center"
+            ><a class="navbar" target="_top" href="../index.html">Documentation Index</a></th>
+          </tr></table></th>
+  </tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr valign="top">
+    <td width="100%">
+      <span class="breadcrumbs">
+        <a href="couchdb-module.html">Package&nbsp;couchdb</a> ::
+        <a href="couchdb.mapping-module.html">Module&nbsp;mapping</a> ::
+        Class&nbsp;ViewField
+      </span>
+    </td>
+    <td>
+      <table cellpadding="0" cellspacing="0">
+        <!-- hide/show private -->
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ==================== CLASS DESCRIPTION ==================== -->
+<h1 class="epydoc">Class ViewField</h1><p class="nomargin-top"></p>
+<pre class="base-tree">
+object --+
+         |
+        <strong class="uidshort">ViewField</strong>
+</pre>
+
+<hr />
+<p>Descriptor that can be used to bind a view definition to a property of
+a <a href="couchdb.mapping.Document-class.html" class="link">Document</a> class.</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">class</span> <span class="py-defname">Person</span>(Document):
+<span class="py-more">... </span>    name = TextField()
+<span class="py-more">... </span>    age = IntegerField()
+<span class="py-more">... </span>    by_name = ViewField(<span class="py-string">'people'</span>, <span class="py-string">'''\</span>
+<span class="py-more">... </span><span class="py-string">        function(doc) {</span>
+<span class="py-more">... </span><span class="py-string">            emit(doc.name, doc);</span>
+<span class="py-more">... </span><span class="py-string">        }'''</span>)
+<span class="py-prompt">&gt;&gt;&gt; </span>Person.by_name
+<span class="py-output">&lt;ViewDefinition '_design/people/_view/by_name'&gt;</span></pre>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">print</span> Person.by_name.map_fun
+<span class="py-output">function(doc) {</span>
+<span class="py-output">    emit(doc.name, doc);</span>
+<span class="py-output">}</span></pre>
+<p>That property can be used as a function, which will execute the view.</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">from</span> couchdb <span class="py-keyword">import</span> Database
+<span class="py-prompt">&gt;&gt;&gt; </span>db = Database(<span class="py-string">'http://localhost:5984/python-tests'</span>)</pre>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>Person.by_name(db, count=3)
+<span class="py-output">&lt;ViewResults &lt;PermanentView '_design/people/_view/by_name'&gt; {'count': 3}&gt;</span></pre>
+<p>The results produced by the view are automatically wrapped in the
+<a href="couchdb.mapping.Document-class.html" class="link">Document</a> subclass the descriptor is bound to. In this example, it would
+return instances of the <code class="link">Person</code> class. But please note that this requires
+the values of the view results to be dictionaries that can be mapped to the
+mapping defined by the containing <a href="couchdb.mapping.Document-class.html" class="link">Document</a> class. Alternatively, the
+<tt class="rst-docutils literal"><span class="pre">include_docs</span></tt> query option can be used to inline the actual documents in
+the view results, which will then be used instead of the values.</p>
+<p>If you use Python view functions, this class can also be used as a
+decorator:</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">class</span> <span class="py-defname">Person</span>(Document):
+<span class="py-more">... </span>    name = TextField()
+<span class="py-more">... </span>    age = IntegerField()
+<span class="py-more">...</span>
+<span class="py-more">... </span>    @ViewField.define(<span class="py-string">'people'</span>)
+<span class="py-more">... </span>    <span class="py-keyword">def</span> <span class="py-defname">by_name</span>(doc):
+<span class="py-more">... </span>        yield doc[<span class="py-string">'name'</span>], doc</pre>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>Person.by_name
+<span class="py-output">&lt;ViewDefinition '_design/people/_view/by_name'&gt;</span></pre>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">print</span> Person.by_name.map_fun
+<span class="py-output">def by_name(doc):</span>
+<span class="py-output">    yield doc['name'], doc</span></pre>
+
+<!-- ==================== INSTANCE METHODS ==================== -->
+<a name="section-InstanceMethods"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Instance Methods</span></td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="couchdb.mapping.ViewField-class.html#__init__" class="summary-sig-name">__init__</a>(<span class="summary-sig-arg">self</span>,
+        <span class="summary-sig-arg">design</span>,
+        <span class="summary-sig-arg">map_fun</span>,
+        <span class="summary-sig-arg">reduce_fun</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">language</span>=<span class="summary-sig-default"><code class="variable-quote">'</code><code class="variable-string">javascript</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">wrapper</span>=<span class="summary-sig-default">DEFAULT</span>,
+        <span class="summary-sig-arg">**defaults</span>)</span><br />
+      Initialize the view descriptor.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__get__"></a><span class="summary-sig-name">__get__</span>(<span class="summary-sig-arg">self</span>,
+        <span class="summary-sig-arg">instance</span>,
+        <span class="summary-sig-arg">cls</span>=<span class="summary-sig-default">None</span>)</span></td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" class="summary">
+    <p class="indent-wrapped-lines"><b>Inherited from <code>object</code></b>:
+      <code>__delattr__</code>,
+      <code>__format__</code>,
+      <code>__getattribute__</code>,
+      <code>__hash__</code>,
+      <code>__new__</code>,
+      <code>__reduce__</code>,
+      <code>__reduce_ex__</code>,
+      <code>__repr__</code>,
+      <code>__setattr__</code>,
+      <code>__sizeof__</code>,
+      <code>__str__</code>,
+      <code>__subclasshook__</code>
+      </p>
+    </td>
+  </tr>
+</table>
+<!-- ==================== CLASS METHODS ==================== -->
+<a name="section-ClassMethods"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Class Methods</span></td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="define"></a><span class="summary-sig-name">define</span>(<span class="summary-sig-arg">cls</span>,
+        <span class="summary-sig-arg">design</span>,
+        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">language</span>=<span class="summary-sig-default"><code class="variable-quote">'</code><code class="variable-string">python</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">wrapper</span>=<span class="summary-sig-default">DEFAULT</span>,
+        <span class="summary-sig-arg">**defaults</span>)</span><br />
+      Factory method for use as a decorator (only suitable for Python
+view code).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
+<!-- ==================== PROPERTIES ==================== -->
+<a name="section-Properties"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Properties</span></td>
+</tr>
+  <tr>
+    <td colspan="2" class="summary">
+    <p class="indent-wrapped-lines"><b>Inherited from <code>object</code></b>:
+      <code>__class__</code>
+      </p>
+    </td>
+  </tr>
+</table>
+<!-- ==================== METHOD DETAILS ==================== -->
+<a name="section-MethodDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Method Details</span></td>
+</tr>
+</table>
+<a name="__init__"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">__init__</span>(<span class="sig-arg">self</span>,
+        <span class="sig-arg">design</span>,
+        <span class="sig-arg">map_fun</span>,
+        <span class="sig-arg">reduce_fun</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">name</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">language</span>=<span class="sig-default"><code class="variable-quote">'</code><code class="variable-string">javascript</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">wrapper</span>=<span class="sig-default">DEFAULT</span>,
+        <span class="sig-arg">**defaults</span>)</span>
+    <br /><em class="fname">(Constructor)</em>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  Initialize the view descriptor.
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>design</code></strong> - the name of the design document</li>
+        <li><strong class="pname"><code>map_fun</code></strong> - the map function code</li>
+        <li><strong class="pname"><code>reduce_fun</code></strong> - the reduce function code (optional)</li>
+        <li><strong class="pname"><code>name</code></strong> - the actual name of the view in the design document, if
+it differs from the name the descriptor is assigned to</li>
+        <li><strong class="pname"><code>language</code></strong> - the name of the language used</li>
+        <li><strong class="pname"><code>wrapper</code></strong> - an optional callable that should be used to wrap the
+result rows</li>
+        <li><strong class="pname"><code>defaults</code></strong> - default query string parameters to apply</li>
+    </ul></dd>
+    <dt>Overrides:
+        object.__init__
+    </dt>
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="couchdb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Project homepage -->
+      <th class="navbar" align="right" width="100%">
+        <table border="0" cellpadding="0" cellspacing="0">
+          <tr><th class="navbar" align="center"
+            ><a class="navbar" target="_top" href="../index.html">Documentation Index</a></th>
+          </tr></table></th>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%%">
+  <tr>
+    <td align="left" class="footer">
+    Generated by Epydoc 3.0.1 on Thu Apr 15 16:22:43 2010
+    </td>
+    <td align="right" class="footer">
+      <a target="mainFrame" href="http://epydoc.sourceforge.net"
+        >http://epydoc.sourceforge.net</a>
+    </td>
+  </tr>
+</table>
+
+<script type="text/javascript">
+  <!--
+  // Private objects are initially displayed (because if
+  // javascript is turned off then we want them to be
+  // visible); but by default, we want to hide them.  So hide
+  // them unless we have a cookie that says to show them.
+  checkCookie();
+  // -->
+</script>
+</body>
+</html>
