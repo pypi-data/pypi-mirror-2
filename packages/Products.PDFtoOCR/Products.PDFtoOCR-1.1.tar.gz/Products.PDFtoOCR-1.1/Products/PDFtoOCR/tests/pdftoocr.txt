@@ -1,0 +1,61 @@
+Doctests for Products.PDFtoCOR
+================================
+
+PDFtoOCR processes text in PDF documents using OCR.
+
+Is everything there?
+====================
+
+Make sure we are admin
+
+    >>> self.loginAsPortalOwner()
+
+Do we have the path to the binary of the tools needed for processing. First
+check the path to ghostscript, then the path to tesseract.
+
+    >>> import os
+    >>> gs = os.environ.get('GS')
+    >>> gs != None
+    True
+    >>> os.path.isfile(gs)
+    True
+    >>> tess = os.environ.get('TESSERACT')
+    >>> tess != None
+    True
+    >>> os.path.isfile(tess)
+    True
+
+Do we have the content rule used for added the pdf document to the processing queue.
+
+    >>> from zope.component import getUtility
+    >>> from zope.component.interfaces import IObjectEvent
+    >>> from plone.contentrules.rule.interfaces import IRuleAction
+    >>> element = getUtility(IRuleAction, name='plone.actions.PDFtoOCR')
+    >>> 'plone.actions.PDFtoOCR' == element.addview
+    True
+    >>> 'edit' == element.editview
+    True
+    >>> None == element.for_
+    True
+    >>> IObjectEvent == element.event
+    True
+
+Do we have the local utility that is used for OCR indexing PDF files
+
+    >>> from Products.PDFtoOCR.interfaces import IIndex
+    >>> sm = self.portal.getSiteManager()
+    >>> sm.queryUtility(IIndex, name='pdf_to_ocr_indexer')
+    <Index at /plone/>
+
+
+Do we have the view for indexing documents in the queue?
+    >>> self.portal.restrictedTraverse("@@do_pdf_ocr_index")
+    <Products.Five.metaclass.DoIndexView  object at ...>
+
+Do we have the view for reindexing all documents in Plone site?
+    >>> self.portal.restrictedTraverse("@@do_pdf_ocr_reindex")
+    <Products.Five.metaclass.DoIndexView object at ...>
+
+Do we have the cron4plone configuration view?
+    >>> self.portal.restrictedTraverse("@@pdf_ocr_status")
+    <Products.Five.metaclass.SimpleViewClass from ...>
