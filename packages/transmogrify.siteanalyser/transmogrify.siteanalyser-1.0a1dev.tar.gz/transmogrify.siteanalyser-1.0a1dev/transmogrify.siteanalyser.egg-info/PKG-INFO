@@ -1,0 +1,570 @@
+Metadata-Version: 1.0
+Name: transmogrify.siteanalyser
+Version: 1.0a1dev
+Summary: transmogrifier source blueprints for crawling html
+Home-page: http://github.com/djay/transmogrify.siteanalyser
+Author: Dylan Jay
+Author-email: software@pretaweb.com
+License: GPL
+Description: Introduction
+        ============
+        
+        Transmogrifier blueprints that look at how html items are linked to gather metadata
+        about items.
+        
+        transmogrify.siteanalyser.defaultpage
+        Determines an item is a default page for a container if it has many links
+        to items in that container.
+        
+        transmogrify.siteanalyser.relinker
+        Fix links in html content. Previous blueprints can adjust the '_path' and set the original
+        path to '_origin' and relinker will fix all the img and href links. It will also normalize
+        ids.
+        
+        transmogrify.siteanalyser.attach
+        Find attachments which are only linked to from a single page. Attachments are merged into the
+        linking item either by setting keys or moving it into a folder.
+        
+        transmogrify.siteanalyser.title
+        Determine the title of an item from the link text used.
+        
+        IsIndex
+        =======
+        
+        IsIndex attempts to guess if a html file is really an index that should
+        be the default page on a folder. It does this by looking at the links in
+        the content. If it contains many links all pointing to objects in a
+        certain folder then it will make this as teh index.
+        If multiple are indexes then only one will win.
+        If the file is not in the folder for which its an index, this will
+        adjust the path to put it inside the folder.
+        
+        The strategy used is as follows:
+        
+        - get all the potential indexes and determine what they are most likely to be
+        index of.
+        
+        - rank them on the depth of that dir
+        
+        - pick most deep dir. move all indexes that point to it into there.
+        
+        - choose one of those to be the index
+        
+        - loop (this move indexes that point to indexes)
+        
+        
+        
+        >>> from collective.transmogrifier.tests import registerConfig
+        >>> from collective.transmogrifier.transmogrifier import Transmogrifier
+        >>> transmogrifier = Transmogrifier(plone)
+        
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     isindex
+        ...     printer
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... content=<a href="f1/blah1"></a><a href="f1/blah2"></a>
+        ... f1/blah1=blah1
+        ... f1/blah2=blah2
+        ...
+        ... [isindex]
+        ... blueprint = transmogrify.webcrawler.isindex
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(u'test1', config)
+        >>> transmogrifier(u'test1')
+        {'_mimetype': 'text/html',
+        '_origin': 'content',
+        '_path': 'f1/content',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="f1/blah1"></a><a href="f1/blah2"></a>'}
+        {'_backlinks': [('http://test.com/content', '')],
+        '_mimetype': 'text/html',
+        '_path': 'f1/blah1',
+        '_site_url': 'http://test.com/',
+        'text': 'blah1'}
+        {'_backlinks': [('http://test.com/content', '')],
+        '_mimetype': 'text/html',
+        '_path': 'f1/blah2',
+        '_site_url': 'http://test.com/',
+        'text': 'blah2'}
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     isindex
+        ...     printer
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... f1/content=<a href="blah1"></a><a href="blah2"></a>
+        ... f1/blah1=blah1
+        ... f1/blah2=blah2
+        ...
+        ... [isindex]
+        ... blueprint = transmogrify.webcrawler.isindex
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        
+        >>> registerConfig(u'test2', config)
+        >>> transmogrifier(u'test2')
+        {'_mimetype': 'text/html',
+        '_path': 'f1/content',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="blah1"></a><a href="blah2"></a>'}
+        {'_backlinks': [('http://test.com/f1/content', '')],
+        '_mimetype': 'text/html',
+        '_path': 'f1/blah1',
+        '_site_url': 'http://test.com/',
+        'text': 'blah1'}
+        {'_backlinks': [('http://test.com/f1/content', '')],
+        '_mimetype': 'text/html',
+        '_path': 'f1/blah2',
+        '_site_url': 'http://test.com/',
+        'text': 'blah2'}
+        Relinker
+        ==========
+        
+        >>> from collective.transmogrifier.tests import registerConfig
+        >>> from collective.transmogrifier.transmogrifier import Transmogrifier
+        >>> transmogrifier = Transmogrifier(plone)
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     webcrawler
+        ...     relinker
+        ...     printer
+        ...
+        ... [webcrawler]
+        ... blueprint = transmogrify.webcrawler.test.htmlsource
+        ... level3/index=<a href="../level2/index">Level 2</a>
+        ... level2/index=<a href="../level3/index">Level 3</a><img src="+&image%20blah">
+        ... level2/+&image%20blah=<h1>content</h1>
+        ...
+        ... [relinker]
+        ... blueprint = transmogrify.webcrawler.relinker
+        ... link_expr = python:item['_path']+'/image_web'
+        ...
+        ... [moves]
+        ... blueprint = transmogrify.webcrawler.pathmover
+        ... moves =
+        ... 	level2	level3
+        ... 	level3	level2
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        
+        >>> registerConfig(u'test', config)
+        >>> transmogrifier = Transmogrifier(plone)
+        >>> transmogrifier(u'test')
+        {'_mimetype': 'text/html',
+        '_path': 'level3/index',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <a href="../level2/index/image_web">Level 2</a>\n</html>\n'}
+        {'_mimetype': 'text/html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <a href="../level3/index/image_web">Level 3</a>\n  <img src="image-blah/image_web"/>\n</html>\n'}
+        {'_mimetype': 'text/html',
+        '_path': 'level2/image-blah',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <h1>content</h1>\n</html>\n'}
+        
+        It is designed to cope with any combination of quoting of urls
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     webcrawler
+        ...     relinker
+        ...     printer
+        ...
+        ... [webcrawler]
+        ... blueprint = transmogrify.webcrawler.test.htmlsource
+        ... one%20two's+strange1=<a href="one two+is+strange2">Level 2</a>
+        ... one%20two%20is+strange2=<a href="one two's%20strange1">Level 2</a>
+        ...
+        ... [relinker]
+        ... blueprint = transmogrify.webcrawler.relinker
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ...
+        ... """
+        >>> registerConfig(u'test2', config)
+        >>> transmogrifier(u'test2')
+        {'_mimetype': 'text/html',
+        '_path': 'one-twos-strange1',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <a href="one-two-is-strange2">Level 2</a>\n</html>\n'}
+        {'_mimetype': 'text/html',
+        '_path': 'one-two-is-strange2',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <a href="one-twos-strange1">Level 2</a>\n</html>\n'}
+        
+        It will deal with moving many parts at the same time
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     moves
+        ...     relinker
+        ...     treeserializer
+        ...     printer
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... a/img=blah
+        ... a/content1=<a href="img">
+        ...
+        ... [moves]
+        ... blueprint = transmogrify.webcrawler.pathmover
+        ... moves =
+        ...    a	b
+        ...
+        ... [relinker]
+        ... blueprint = transmogrify.webcrawler.relinker
+        ...
+        ... [treeserializer]
+        ... blueprint = transmogrify.webcrawler.treeserializer
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(u'test3', config)
+        >>> transmogrifier(u'test3')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'b'}
+        {'_mimetype': 'text/html',
+        '_path': 'b/content1',
+        '_site_url': 'http://test.com/',
+        'text': '<html>\n  <a href="img"/>\n</html>\n'}
+        {'_backlinks': [('http://test.com/b/content1', '')],
+        '_mimetype': 'text/html',
+        '_path': 'b/img',
+        '_site_url': 'http://test.com/',
+        'text': '<html>blah</html>\n'}
+        
+        MakeAttachments
+        ===============
+        
+        Will look for items that are linked from just one place and also have no
+        other links out. These 'deadends' will then be moved 'into' the linking item.
+        
+        If the fields option is set to a list of tuples then these indicate changes
+        to make to item to merge in the subitem. The head of the list will be used as
+        the filename to relink any html links to.
+        
+        If no fields are set then a folder will be created, the item set as its default
+        view and any subitems moved into that folder.
+        
+        
+        Our condition ensures in this doesn't produce a move there are only one subitem.
+        
+        >>> from collective.transmogrifier.tests import registerConfig
+        >>> from collective.transmogrifier.transmogrifier import Transmogrifier
+        >>> transmogrifier = Transmogrifier(plone)
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     makeattachments
+        ...     treeserializer
+        ...     printer
+        ...
+        ... [source]
+        ... blueprint = transmogrify.htmltesting.htmlbacklinksource
+        ... level3/index=<a href="../level2/index">Level 2</a>
+        ... level2/index=<a href="../level3/index">Level 3</a><img src="+&image%20blah">
+        ... level2/+&image%20blah=<h1>content</h1>
+        ...
+        ... [makeattachments]
+        ... blueprint = transmogrify.webcrawler.makeattachments
+        ... fields = python:i>=0 and (('attachment'+str(i+1)+'Image', subitem['text']),('attachment'+str(i+1)+'Title', 'blah'), )
+        ...
+        ... [treeserializer]
+        ... blueprint = transmogrify.webcrawler.treeserializer
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        
+        Add two more subitems and then we get attachments
+        
+        >>> registerConfig(u'test', config)
+        >>> transmogrifier(u'test')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level2'}
+        {'_backlinks': [('http://test.com/level3/index', 'Level 2')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        'attachment1Image': '<h1>content</h1>',
+        'attachment1Title': 'blah',
+        'text': '<a href="../level3/index">Level 3</a><img src="+&image%20blah">'}
+        {'_origin': 'level2/+&image%20blah',
+        '_path': 'level2/index/attachment1Image',
+        '_site_url': 'http://test.com/'}
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level3'}
+        {'_backlinks': [('http://test.com/level2/index', 'Level 3')],
+        '_mimetype': 'text/html',
+        '_path': 'level3/index',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="../level2/index">Level 2</a>'}
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... include = test
+        ...
+        ... [source]
+        ... level3/index=<a href="../level2/index">Level 2</a>
+        ... level2/index=<a href="../level3/index">Level 3</a><img src="+&image%20blah"><img src="pdf">
+        ... level2/+&image%20blah=<h1>content</h1>
+        ... level2/pdf=<img src="pdf2">
+        ... level2/pdf2=pdf2
+        ...
+        ... """
+        >>> registerConfig(u'test2', config)
+        >>> transmogrifier(u'test2')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level2'}
+        {'_backlinks': [('http://test.com/level3/index', 'Level 2')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        'attachment1Image': '<h1>content</h1>',
+        'attachment1Title': 'blah',
+        'text': '<a href="../level3/index">Level 3</a><img src="+&image%20blah"><img src="pdf">'}
+        {'_origin': 'level2/+&image%20blah',
+        '_path': 'level2/index/attachment1Image',
+        '_site_url': 'http://test.com/'}
+        {'_backlinks': [('http://test.com/level2/index', '')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/pdf',
+        '_site_url': 'http://test.com/',
+        'attachment1Image': 'pdf2',
+        'attachment1Title': 'blah',
+        'text': '<img src="pdf2">'}
+        {'_origin': 'level2/pdf2',
+        '_path': 'level2/pdf/attachment1Image',
+        '_site_url': 'http://test.com/'}
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level3'}
+        {'_backlinks': [('http://test.com/level2/index', 'Level 3')],
+        '_mimetype': 'text/html',
+        '_path': 'level3/index',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="../level2/index">Level 2</a>'}
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... include = test2
+        ...
+        ... [makeattachments]
+        ... blueprint = transmogrify.webcrawler.makeattachments
+        ... condition = python:subitem['_path'].count('pdf') and i>=0
+        ...
+        ... """
+        >>> registerConfig(u'test3', config)
+        >>> transmogrifier(u'test3')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level2'}
+        {'_backlinks': [('http://test.com/level2/index', '')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/+&image%20blah',
+        '_site_url': 'http://test.com/',
+        'text': '<h1>content</h1>'}
+        {'_backlinks': [('http://test.com/level3/index', 'Level 2')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="../level3/index">Level 3</a><img src="+&image%20blah"><img src="pdf">'}
+        {'_backlinks': [('http://test.com/level2/index', '')],
+        '_mimetype': 'text/html',
+        '_path': 'level2/pdf',
+        '_site_url': 'http://test.com/',
+        'attachment1Image': 'pdf2',
+        'attachment1Title': 'blah',
+        'text': '<img src="pdf2">'}
+        {'_origin': 'level2/pdf2',
+        '_path': 'level2/pdf/attachment1Image',
+        '_site_url': 'http://test.com/'}
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level3'}
+        {'_backlinks': [('http://test.com/level2/index', 'Level 3')],
+        '_mimetype': 'text/html',
+        '_path': 'level3/index',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="../level2/index">Level 2</a>'}
+        
+        It is possible to not use fields for attachments but rather use a folder with a
+        default view. Just set fields to False (default).
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... include = test
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... level3/index=<a href="level3"
+        ... level2/index=<a href="../level3/index">Level 3</a><img src="+&image%20blah">
+        ... level2/+&image%20blah=<h1>content</h1>
+        ...
+        ... """
+        
+        >>> registerConfig(u'test4', config)
+        >>> transmogrifier(u'test4')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level2'}
+        {'_mimetype': 'text/html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        'attachment1Image': '<a href="level3"',
+        'attachment1Title': 'blah',
+        'attachment2Image': '<h1>content</h1>',
+        'attachment2Title': 'blah',
+        'text': '<a href="../level3/index">Level 3</a><img src="+&image%20blah">'}
+        {'_origin': 'level3/index',
+        '_path': 'level2/index/attachment1Image',
+        '_site_url': 'http://test.com/'}
+        {'_origin': 'level2/+&image%20blah',
+        '_path': 'level2/index/attachment2Image',
+        '_site_url': 'http://test.com/'}
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... include = test
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... level3/index=<a href="level3"
+        ... level2/index=<a href="../level3/index">Level 3</a><img src="+&image%20blah">
+        ... level2/+&image%20blah=<h1>content</h1>
+        ...
+        ... [makeattachments]
+        ... fields = python:False
+        ...
+        ... """
+        >>> registerConfig(u'test5', config)
+        >>> transmogrifier(u'test5')
+        {'_type': 'Folder', '_site_url': 'http://test.com/', '_path': 'level2'}
+        {'_defaultpage': 'index-html',
+        '_path': 'level2/index',
+        '_site_url': 'http://test.com/',
+        '_type': 'Folder'}
+        {'_backlinks': [('http://test.com/level2/index', '')],
+        '_mimetype': 'text/html',
+        '_origin': 'level2/+&image%20blah',
+        '_path': 'level2/index/+&image%20blah',
+        '_site_url': 'http://test.com/',
+        'text': '<h1>content</h1>'}
+        {'_backlinks': [('http://test.com/level2/index', 'Level 3')],
+        '_mimetype': 'text/html',
+        '_origin': 'level3/index',
+        '_path': 'level2/index/index',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="level3"'}
+        {'_mimetype': 'text/html',
+        '_origin': 'level2/index',
+        '_path': 'level2/index/index-html',
+        '_site_url': 'http://test.com/',
+        'text': '<a href="../level3/index">Level 3</a><img src="+&image%20blah">'}
+        
+        Test content that isn't linked up to makes sure its still passed through
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     makeattachments
+        ...     treeserializer
+        ...     printer
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... blah1=blah1
+        ... blah2=blah2
+        ...
+        ... [makeattachments]
+        ... blueprint = transmogrify.webcrawler.makeattachments
+        ...
+        ... [treeserializer]
+        ... blueprint = transmogrify.webcrawler.treeserializer
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(u'test5.5', config)
+        >>> transmogrifier(u'test5.5')
+        {'_mimetype': 'text/html',
+        '_path': 'blah1',
+        '_site_url': 'http://test.com/',
+        'text': 'blah1'}
+        {'_mimetype': 'text/html',
+        '_path': 'blah2',
+        '_site_url': 'http://test.com/',
+        'text': 'blah2'}
+        
+        You can use a combination of folder and field attachments
+        
+        >>> config = """
+        ... [transmogrifier]
+        ... pipeline =
+        ...     source
+        ...     makeattachments
+        ...     treeserializer
+        ...     printer
+        ...
+        ... [source]
+        ... blueprint = transmogrify.webcrawler.test.htmlbacklinksource
+        ... content=<img src="blah1"><img src="blah2">
+        ... blah1=blah1
+        ... blah2=blah2
+        ...
+        ... [makeattachments]
+        ... blueprint = transmogrify.webcrawler.makeattachments
+        ... fields = python:i<1 and [('attach%i'%i,subitem['text'])]
+        ...
+        ... [treeserializer]
+        ... blueprint = transmogrify.webcrawler.treeserializer
+        ...
+        ... [printer]
+        ... blueprint = collective.transmogrifier.sections.tests.pprinter
+        ... """
+        >>> registerConfig(u'test6', config)
+        >>> transmogrifier(u'test6')
+        {'_defaultpage': 'index-html',
+        '_path': 'content',
+        '_site_url': 'http://test.com/',
+        '_type': 'Folder'}
+        {'_backlinks': [('http://test.com/content', '')],
+        '_mimetype': 'text/html',
+        '_origin': 'blah2',
+        '_path': 'content/blah2',
+        '_site_url': 'http://test.com/',
+        'text': 'blah2'}
+        {'_mimetype': 'text/html',
+        '_origin': 'content',
+        '_path': 'content/index-html',
+        '_site_url': 'http://test.com/',
+        'attach0': 'blah1',
+        'text': '<img src="blah1"><img src="blah2">'}
+        {'_origin': 'blah1',
+        '_path': 'content/index-html/attach0',
+        '_site_url': 'http://test.com/'}
+        
+        
+        Changelog
+        =========
+        
+        1.0 - Unreleased
+        ----------------
+        
+Keywords: transmogrifier blueprint funnelweb source plone import conversion microsoft office
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
