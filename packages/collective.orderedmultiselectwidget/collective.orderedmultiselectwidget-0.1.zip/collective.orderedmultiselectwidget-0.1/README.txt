@@ -1,0 +1,56 @@
+Introduction:
+-------------
+
+This package fixes a Plone/Zope2 Acquisition bug for the
+OrderedMultiSelectWidget that appears in zope.app.form.browser.itemswidgets.py line 556. 
+
+Note: The itemswidgets.py module has been moved to zope.formlib in newer versions of
+zope/ztk.
+
+The OrderedMultiSelectWidget is used automatically for zope.schema.List type
+fields.
+
+
+How do I know if this bug affects me?
+--------------------------------------
+
+If you get errors in your traceback or error_log similar to the one below, 
+you might have be affected: (XXX is variable)
+
+ 
+ |  Line 166, Column 8
+ |  Expression: <PathExpr standard:u'view/selected'>
+ |  Names:
+ |  {'args': (),
+ |  'context': <zope.schema._field.List object at 0x2aaab329f110>,
+ |  'usage': <zope.pagetemplate.pagetemplate.TemplateUsage object at 0x2aaab1800090>,
+ |  'view': <zope.app.form.browser.itemswidgets.OrderedMultiSelectWidget object at 0x2aaaae5684d0>,
+ |  'views': <zope.app.pagetemplate.viewpagetemplatefile.ViewMapper object at 0x2aaab1800650>}
+ |  Module zope.tales.expressions, line 217, in __call__
+ |  Module zope.tales.expressions, line 211, in _eval
+ |  Module zope.app.form.browser.itemswidgets, line 562, in selected
+ |  Module zope.schema.vocabulary, line 124, in getTerm
+ |  LookupError: XXXX
+
+
+Installation:
+-------------
+
+Just make sure that collective.orderedmultiselectwidget is installed via the
+plone control panel or the portal_quickinstaller tool in the ZMI.
+
+Afterwards it should just work.
+
+
+Why not fix the bug in zope.app.form and zope.formlib?
+------------------------------------------------------
+
+zope.app.form and zope.formlib are Plone/Zope2/Acquisition agnostic. They do not
+depend on Acquisition and no one will want them to.
+
+A bug might however be contributed to plone.app.form. I'll contact the
+dev-list, but for now, this is a bug-fix package for people being affected on
+in-production systems.
+
+
+
