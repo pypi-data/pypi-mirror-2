@@ -1,0 +1,145 @@
+# -*- coding: utf-8 -*-
+"""Setup the {{project}} application"""
+import logging
+import os
+# import time
+import datetime
+import hashlib
+import string
+from time import time
+from random import choice, randint
+import pytz
+import pylons.test
+
+from {{package}}.config.environment import load_environment
+
+log = logging.getLogger(__name__)
+
+from paste.deploy import loadapp
+from pylons import config
+from elixir import *
+from {{package}} import model
+from {{package}}.model import user
+
+
+def setup_app(command, conf, vars):
+    """Place any commands to setup {{package}} here"""
+    # Don't reload the app if it was loaded under the testing environment
+    if not pylons.test.pylonsapp:
+        config = load_environment(conf.global_conf, conf.local_conf)
+    model.metadata.drop_all()
+    model.metadata.create_all()
+    gadmin = model.identity.Group(
+            name = u"Administrators",
+            description = u"Administration group",
+            created = datetime.datetime.utcnow(),
+            active = True)
+    model.Session.add(gadmin)
+    # Check the status
+    g = model.Session.query(
+            model.identity.Group).filter_by(
+                name=u"Administrators").all()
+    assert len(g) == 1
+    assert g[0] == gadmin
+    admin = model.identity.User(
+                displayname = u"Site Administrator",
+                username=u"admin",
+                password=hashlib.sha1("123456").hexdigest(),
+                email="admin@example.com",
+                created = datetime.datetime.utcnow())
+    addpass = ''.join(
+        [choice(string.digits+string.letters+'-*.+')
+            for i in xrange(8)])
+    admin.password = admin.hash_password(addpass)
+    model.Session.add(admin)
+    gadmin.users.append(admin)
+    # model.Session.add(gadmin)
+    model.Session.commit()
+    # Check the status
+    u = model.Session.query(
+            model.identity.User).filter_by(
+                displayname=u"Site Administrator").all()
+    assert len(u) == 1
+    assert u[0] == admin
+    # Just get bizarre and create a bunch of users for testing
+    fn = zip(open(os.getcwd()+'/{{package}}/parts/female.txt').readlines(), 
+             open(os.getcwd()+'/{{package}}/parts/male.txt').readlines())
+    ln = open(os.getcwd()+'/{{package}}/parts/surnames2.txt').readlines()[5:]
+    nonceperms = []
+    noncepermseeds = [(u'Comment',u'Can comment'),
+                      (u'Edit',u'Can edit'),
+                      (u'Delete',u'Can delete'),
+                      (u'Create',u'Can create'),
+                      (u'Recruit',u'Can recruit'),
+                      (u'Ban',u'Can ban')]
+    for i in noncepermseeds:
+        (name, description) = i
+        nonceperms.append(
+            model.identity.Permission(
+                name = name,
+                description = description,
+                created = datetime.datetime.fromtimestamp(
+                            time()-(randint(1000, 10000)*3600)),
+                active = True))
+    canread = model.identity.Permission(name = u"Read", description = u"Can read")
+    noncegroups = []
+    noncegroupseeds = [(u'Guests',u'Not signed in'),
+                       (u'Visitors',u'Signed in'),
+                       (u'Staff',u'Website staff'),
+                       (u'Admin staff',u'Website admin'),
+                       (u'Editors',u'Editing staff'),
+                       (u'Writers',u'Content staff'),
+                       (u'Authors',u'Content staff'),
+                       (u'Bloggers',u'Blogger ranks'),
+                       (u'Friends of Carlotta',u'One one side'),
+                       (u'Enemies of Carlotta',u'On the other')]
+    for i in noncegroupseeds:
+        (name, description) = i
+        g = model.identity.Group(
+                    name = name,
+                    description = description)
+        g.permissions.append(canread)
+        for i in xrange(2, 5):
+            p = choice(nonceperms)
+            if not p in g.permissions:
+                g.permissions.append(p) 
+        noncegroups.append(g)
+    for i in xrange(randint(450, 500)):
+        dt = datetime.datetime.fromtimestamp(
+                    time()-(randint(100, 1000)*3600))
+        dn = (choice(fn)[randint(0,1)][:-1].capitalize(), 
+              choice(ln).capitalize())
+        o = model.identity.User(
+                    displayname=u"%s %s" % dn,
+                    username=u''+dn[0][0].lower()+dn[1][:-1].lower(),
+                    last_login=dt,
+                    timezone=choice(pytz.common_timezones),
+                    email="%s.%s@.%s" % (
+                        dn[0][0].lower(), 
+                        dn[1][:-1].lower(), 
+                        choice(
+                            ['gnail.com',
+                            (dn[1][:-1]).decode('utf8').lower()+ \
+                            '.'+choice(['meh','afog','nah','cat','dum']),
+                            'hotmilt.com',
+                            'yehah.com'])),
+                    active = choice([True, False])
+                    )
+        side_effect_bingo = [ng.users.append(o) 
+                for ng in [ 
+                             ]]
+        for j in xrange(1, randint(2, 9)):
+            c = choice(noncegroups)
+            if o not in c.users:
+                c.users.append(o)
+    model.Session.commit()
+    import re
+    fn = os.getcwd()+'/{{package}}/public/index.html'
+    print(fn)
+    data = open(fn,'r').read()
+    data = re.sub(r'password="\w+"', 
+                'password="%s"' % addpass, 
+                 data)
+    open(fn, 'w').write(data)
+    print("Administrator login is: [ admin@example.com ] and [ %s ]" % addpass)
+
