@@ -1,0 +1,495 @@
+/*
+GNU General Public License (GPL)
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+02110-1301, USA.
+*/
+
+var blink_order = 0;
+var doc_title;
+var messages_found = 0;
+var poll_count = 0;         // The amount of server polls that have been made
+var poll_cycle = 10;        // The amount of polls to make in a cycle
+var reset_poll = false;
+
+<dtml-let pollmax="portal_chat.poll_max">
+var poll_max = &dtml-pollmax;;  // The maximum polling period
+</dtml-let>
+
+<dtml-let pollmin="portal_chat.poll_min">
+var poll_min = &dtml-pollmin;;  // The minimum polling period
+</dtml-let>
+
+var timeout = 1000;
+var poll_interval = poll_min;   // The initial polling period
+
+<dtml-let member="portal_membership.getAuthenticatedMember().getId().encode('utf-8')">
+var username = "&dtml-member;";
+</dtml-let>
+
+<dtml-let baseurl="portal_url()">
+var base_url = "&dtml-baseurl;";
+</dtml-let>
+
+var window_focus = true;
+var chat_focus = new Array();
+var new_chats = new Array();
+var chats = new Array();    // Records new chat windows being opened. 
+
+if (!log) {
+    var log = {
+        toggle: function() {},
+        move:   function() {},
+        resize: function() {},
+        clear:  function() {},
+        debug:  function() {},
+        info:   function() {},
+        warn:   function() {},
+        error:  function() {},
+        profile: function() {}
+    };
+}
+
+function getMinimizedChats() {
+    var cookie = jQuery.cookie('chats_minimized_'+username);
+    if (cookie)
+        return cookie.split(/\|/);
+    return Array()
+}
+
+
+function sanitizePath(call) {
+    return base_url + call
+}
+
+function oc(a) {
+    // Thanks to Jonathan Snook: http://snook.ca
+    var o = {};
+    for(var i=0; i<a.length; i++) {
+        o[a[i]]='';
+    }
+    return o;
+}
+
+jQuery(document).ready(function() {
+    if (initialize()) { 
+        jQuery.doTimeout(poll_max, function() {
+            initialize();
+        });
+    }
+});
+
+
+function initialize() {  
+    if (!username)
+        return true; // This will let doTimout continue, i.e initialize will be called again.
+
+    var open_chats = Array();
+    var cookie = jQuery.cookie('chats-open-'+username);
+    log.info('initialize: cookie = ' + cookie + '\n');
+    jQuery.cookie('chats-open-'+username, null, {path: '/'});
+    if (cookie) {
+        open_chats = cookie.split('|');
+        for (var i=0; i<open_chats.length; i++) {
+            var user = open_chats[i];
+            if (user) { 
+                createChat(user, 1);
+            }
+        }
+    }
+    path = sanitizePath('/@@babblechat/initialize')
+    jQuery.ajax({
+        url: path,
+        cache: false,
+        dataType: "json",
+        timeout: timeout,
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            return true; // This will let doTimout continue, i.e initialize will be called again.
+        },
+        success: function(data) {
+            for(var user in data.messages) {
+                var messages = data.messages[user];
+                if (!messages.length) {
+                    continue
+                }
+                appendMessages(user, messages, 0);
+            };
+            poll_interval = poll_min;
+            poll();
+        }
+    });
+}
+
+function appendMessages(user, messages, minimized) {
+    messages_found += 1;
+    new_chats[user] = true;
+    var chat = jQuery("#chatbox_"+user);
+    if (chat.length <= 0) {
+        createChat(user, minimized);
+    }
+    if (chat.css('display') == 'none') {
+        chat.css('display','block');
+        reorderChats();
+    }
+    var chat_content = chat.find(".chat-content");
+    for (var i=0; i<messages.length; i++) {
+        message = messages[i]
+        var text = message[3].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+        if (message[0] == user) {
+
+            chat_content.append(
+                '<div class="chat-message">' + 
+                    '<span class="chat-message-them">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                    '<span class="chat-message-content">'+text+'</span>' + 
+                '</div>'
+            );
+        }
+        else {
+            chat_content.append(
+                '<div class="chat-message">' + 
+                    '<span class="chat-message-me">'+message[0]+' '+message[2]+':&nbsp;&nbsp;</span>' + 
+                    '<span class="chat-message-content">'+text+'</span>' + 
+                '</div>'
+            );
+        }
+    }
+    chat_content.scrollTop(chat_content[0].scrollHeight);
+}
+
+
+function reorderChats() {
+    var index = 0;
+    for (var i=0; i < chats.length; i++) {
+        title = chats[i];
+        var chatbox =  jQuery("#chatbox_"+title);
+        if (chatbox.css('display') != 'none') {
+            if (index == 0) {
+                chatbox.css('right', '20px');
+            } 
+            else {
+                width = (index)*(225+7)+20;
+                chatbox.css('right', width+'px');
+            }
+            index++;
+        }
+    }
+}
+
+function positionNewChat(chatbox) {
+    var num_chats = 0;
+    for (var i=0; i<chats.length; i++) {
+        if (jQuery("#chatbox_"+chats[i]).css('display') != 'none') {
+            num_chats++;
+        }
+    }
+    if (num_chats == 0) {
+        chatbox.css('right', '20px');
+    } 
+    else {
+        width = (num_chats)*(225+7)+20;
+        chatbox.css('right', width+'px');
+    }
+}
+
+function closeChat(title) {
+    jQuery('#chatbox_'+title).css('display','none');
+    reorderChats();
+    var cookie = jQuery.cookie('chats-open-'+username);
+    if (cookie)
+        var open_chats = cookie.split('|');
+    else
+        var open_chats = Array();
+
+    var new_chats = Array();
+    for (var i=0; i < open_chats.length; i++) {
+        if (open_chats[i] != title) {
+            new_chats.push(open_chats[i]);
+        }
+    }
+    log.info('closeChat: cookie \n');
+    if (new_chats.length) {
+        jQuery.cookie('chats-open-'+username, new_chats.join('|'), {path: '/'});
+    }
+    else {
+        jQuery.cookie('chats-open-'+username, null, {path: '/'});
+    }
+    path = sanitizePath('/@@babblechat/clear_messages');
+    jQuery.ajax({
+        url: path,
+        cache: false,
+        data: {contact: title},
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+        },
+        success: function() {
+            log.info(title + "'s messages succesfully cleared. \n");
+        }
+    });
+}
+
+function startChat(contact) {
+    createChat(contact);
+    jQuery("#chatbox_"+contact+" .chat-textarea").focus();
+    messages_found = 0;
+    reset_poll = true;
+}
+
+function createChatBox(title) {
+    path = sanitizePath('/@@render_chat_box');
+    jQuery.ajax({
+        url: path,
+        cache: false,
+        async: false,
+        data: {
+            box_id: "chatbox_"+title,
+            contact: title,
+            },
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            return
+        },
+        success: function(data) {
+            jQuery('body').append(data);
+        }
+    });
+    return jQuery('#chatbox_'+title);
+}
+
+function handleChatEvents(title) {
+    chat_focus[title] = false;
+    var chat_area = jQuery("#chatbox_"+title+" .chat-textarea");
+    chat_area.blur(function(){
+        chat_focus[title] = false;
+        chat_area.removeClass('chat-textarea-selected');
+    }).focus(function(){
+        chat_focus[title] = true;
+        chat_area.addClass('chat-textarea-selected');
+    });
+
+    var chatbox = jQuery("#chatbox_"+title);
+    chatbox.click(function() {
+        if (chatbox.find('.chat-content').css('display') != 'none') {
+            chatbox.find('.chat-textarea').focus();
+        }
+    });
+}
+
+function createChat(title, minimize) {
+    var cookie = jQuery.cookie('chats-open-'+username);
+    if (cookie)
+        var open_chats = cookie.split('|');
+    else
+        var open_chats = Array();
+    open_chats.push(title);
+    log.info('createChat: cookie = ' + open_chats.toString());
+    var new_cookie = open_chats.join('|');
+    jQuery.cookie('chats-open-'+username, new_cookie, {path: '/'});
+    log.info('createChat: cookie = ' + new_cookie);
+
+    var chatbox = jQuery("#chatbox_"+title);
+    if (chatbox.length > 0) {
+        // The chatbox exists, merely hidden
+        if (chatbox.css('display') == 'none') {
+            chatbox.css('display','block');
+            reorderChats();
+        }
+        chatbox.find(".chat-textarea").focus();
+        return;
+    }
+    chatbox = createChatBox(title);
+    positionNewChat(chatbox);
+    chats.push(title);
+    if (minimize == 1) {
+        // Minimize the chat if it's in the minimized_chats cookie
+        var minimized_chats = getMinimizedChats();
+        if (title in oc(minimized_chats)) {
+            chatbox.find('.chat-content').css('display','none');
+            chatbox.find('.chat-input').css('display','none');
+        }
+    }
+    handleChatEvents(title)
+    chatbox.show();
+    var chat_content = chatbox.find('.chat-content');
+    chat_content.scrollTop(chat_content[0].scrollHeight);
+}
+
+function poll() {
+    /* The way doTimout works, it will execute the code in the callback
+     * function *after* poll_interval has passed.
+     */
+    jQuery.doTimeout(poll_interval, function(){
+        if (reset_poll) {
+            poll_interval = poll_min;
+            poll_count = 0;
+            reset_poll = false;
+            return true
+        }
+
+        if (poll_count < poll_cycle) { 
+            poll_server();
+            poll_count++;
+            if (messages_found > 0) {
+                poll_interval = poll_min;
+                poll_count = 1;
+                messages_found = 0;
+                poll();
+                return false;
+            } 
+            return true;
+        } 
+        else {
+            poll_count = 1;
+            if (poll_interval < poll_max)
+                poll_interval *= 2;
+             
+            if (poll_interval > poll_max)
+                poll_interval = poll_max;
+
+            poll();
+            return false;
+        }
+    });
+}
+
+function poll_server() {
+    path = sanitizePath('/@@babblechat/poll');
+    jQuery.ajax({
+        url: path,
+        cache: false,
+        async: true,
+        timeout: timeout,
+        dataType: "json",
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            log.error(textStatus);
+            log.error(errorThrown);
+            for (var i=0; i<chats.length; i++) {
+                var user = chats[i];
+                content = jQuery("#chatbox_"+user+" .chat-content");
+                content.append(
+                    '<div class="chat-message">' + 
+                        '<span class="chat-message-error">Connection Error</span>' + 
+                    '</div>'
+                );
+                content.scrollTop(content[0].scrollHeight);
+                poll_interval = 20000; 
+            }
+        },
+        success: function(data) {
+            for(var user in data.messages) {
+                var messages = data.messages[user];
+                if (!messages.length) {
+                    continue
+                }
+                appendMessages(user, messages, 0);
+            };
+        }
+    });
+}
+
+function keypressed(event, textarea, title) {
+	if(event.keyCode == 13 && event.shiftKey == 0) {
+        var textbox = jQuery(textarea);
+		var message = textbox.val();
+		message = message.replace(/^\s+|\s+jQuery/g,"");
+		textbox.val('').focus().css('height','44px');
+		if (message != '') {
+            path = sanitizePath('/@@babblechat/send_message');
+            jQuery.ajax({
+                url: path,
+                cache: false,
+                async: true,
+                data: {to: title, message: message}, 
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    log.error(textStatus);
+                    if (errorThrown)
+                        log.error(errorThrown)
+
+                    var chat_content = jQuery("#chatbox_"+title+" .chat-content");
+                    chat_content.append(
+                        '<div class="chat-message">' + 
+                            '<span class="chat-message-error">Connection Error</span>' + 
+                        '</div>');
+                    chat_content.scrollTop(chat_content[0].scrollHeight);
+                },
+                success: function(data) { 
+                    message = message.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
+                    var now = new Date();
+                    var time = now.getHours()+':'+now.getMinutes();
+                    var chat_content = jQuery("#chatbox_"+title+" .chat-content");
+                    chat_content.append(
+                        '<div class="chat-message">' + 
+                            '<span class="chat-message-me">'+username+' '+time+':&nbsp;&nbsp;</span>' + 
+                            '<span class="chat-message-content">'+message+'</span>' + 
+                        '</div>');
+                    chat_content.scrollTop(chat_content[0].scrollHeight);
+
+                    reset_poll = true;
+                    if (poll_interval > poll_min) {
+                        // The poll time will only be reset once the current 
+                        // interval has been passed. Therefore we poll the
+                        // server in the meantime.
+                        poll_server();
+                    }
+                    return false;
+                }
+            });
+		}
+	}
+	var adjustedHeight = textarea.clientHeight;
+	var maxHeight = 94;
+	if (maxHeight > adjustedHeight) {
+		adjustedHeight = Math.max(textarea.scrollHeight, adjustedHeight);
+		if (maxHeight)
+			adjustedHeight = Math.min(maxHeight, adjustedHeight);
+		if (adjustedHeight > textarea.clientHeight)
+			jQuery(textarea).css('height',adjustedHeight+8 +'px');
+	} 
+    else {
+		jQuery(textarea).css('overflow','auto');
+	}
+}
+
+function toggleChat(title) {
+    var minimized_chats = getMinimizedChats();
+    if (jQuery('#chatbox_'+title+' .chat-content').css('display') == 'none') {  
+        // Chat will be maximized
+        var new_cookie = Array();
+        for (var i=0; i < minimized_chats.length; i++) {
+            if (minimized_chats[i] != title) {
+                new_cookie.push(minimized_chats[i]);
+            }
+        }
+        jQuery.cookie('chats_minimized_'+username, new_cookie.join('|'));
+        var chat_content = jQuery('#chatbox_'+title+' .chat-content');
+        chat_content.css('display','block');
+        chat_content.scrollTop(chat_content[0].scrollHeight);
+        jQuery('#chatbox_'+title+' .chat-input').css('display','block');
+    } 
+    else {
+        // Chat will be minimized
+        if (!(title in oc(minimized_chats))) {
+            var new_cookie = title;
+            new_cookie += '|'+minimized_chats.join('|');
+            jQuery.cookie('chats_minimized_'+username, new_cookie);
+        }
+        jQuery('#chatbox_'+title+' .chat-content').css('display','none');
+        jQuery('#chatbox_'+title+' .chat-input').css('display','none');
+    }
+}
+
