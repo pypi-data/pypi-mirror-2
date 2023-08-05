@@ -1,0 +1,173 @@
+Metadata-Version: 1.0
+Name: Argot
+Version: 0.5
+Summary: argot text markup -- a markdown dialect
+Home-page: http://dev.jmoiron.net/hg/argot/
+Author: Jason Moiron
+Author-email: jmoiron@jmoiron.net
+License: MIT
+Description: argot text markup -- a markdown dialect
+        =======================================
+        
+        Argot is a small set of extensions on the markdown_ markup language designed
+        primarily for writing technical blog entries.  The extensions are not
+        "proper" markdown extensions;  they are implemented as preprocessors that
+        compile down into markdown or html syntax.  In addition to markdown's regular
+        syntax, which argot does not interfere with, argot provides these features:
+        
+        * `moin-style highlighted code blocks`_
+        * `blockquote blocks`_
+        * `link target processors`_
+        
+        You can install argot with pip::
+        
+        pip install argot
+        
+        You can fork argot `from its hg repository
+        <http://bitbucket.org/jmoiron/argot/>`_::
+        
+        hg clone http://bitbucket.org/jmoiron/argot/
+        
+        .. _markdown: http://daringfireball.net/projects/markdown/
+        
+        requirements
+        ------------
+        
+        ``argot`` requires markdown and pygments.  The optional amazon link processor,
+        disabled by default, requires lxml.
+        
+        version 0.5 notes
+        -----------------
+        
+        Version 0.5 of argot adds blockquote blocks, and is in this way incompatible
+        with older versions.  These blocks are unlikely to have occured by chance,
+        so this should probably not be a problem.
+        
+        A non-documented method of extending the way argot applied preprocessors that
+        was nevertheless implied by the code has been removed as its presence was
+        viewed as needless complexity.  If you were extending argot by adding to
+        ``enabled_extensions``, you will have to find another entrypoint for your
+        customizations.  The old method of operation will not be restored in future
+        versions.
+        
+        moin-style highlighted code blocks
+        ----------------------------------
+        
+        In markdown, code blocks are blocks of text one level of indentation removed
+        from the body text.  However, when dealing with more primative browser input
+        mechanisms, indenting lots of text can be problematic (as ``tab`` often shifts
+        input focus).  In addition to allowing for this convention, ``argot`` implements
+        moin/tracwiki style code blocks that feature syntax highlighting via pygments.
+        
+        syntax
+        ~~~~~~
+        
+        The general syntax is '{{{' followed by an optional shebang and desired
+        pygments parser, followed by your code block, and bookended with '}}}'::
+        
+        {{{#!parser
+        ... code ...
+        }}}
+        
+        By default, if no parser is provided, ``argot`` uses pygments to try and guess
+        what language is being used.  It falls back to the plain text lexer.  If you
+        want to force the text lexer, use a lexer of ``text``.
+        
+        blockquote blocks
+        -----------------
+        
+        Like the moin-style highlighted code blocks, blockquote blocks are primarily
+        intended for easy cut/paste insertion of quoted blocks into a body.
+        
+        syntax
+        ~~~~~~
+        
+        The syntax for blockquote blocks is similar to that of the code blocks, except
+        that parens are used instead of braces::
+        
+        ((("citation url"
+        quoted text
+        )))
+        
+        The quoted text is converted to HTML via regular markdown syntax rules.
+        Nesting blockquote blocks is not supported.  The optional citation url can be
+        surrounded in single quotes (``'``) or double quotes (``"``).
+        
+        link target processors
+        ----------------------
+        
+        Markdown links are in the style of ``[link text](url)``, but this will often
+        interrupt writing with digging around for urls that might be complex or even
+        unknown.  Rather than linking to urls, ``argot`` allows you to encode the
+        target information in customizable ways.
+        
+        syntax
+        ~~~~~~
+        
+        Link processors are made up of the processor tag, followed by a colon,
+        followed by a query for that processor.  For example::
+        
+        [Quick reStructured Text](google: restructured text quick ref)
+        
+        This calls the link processor `google` with the query `restructured text
+        quick ref`.  By default, only the link processor `google` is enabled.  There
+        is an `amazon` link processor that can be enabled, but it is suggested that
+        for stable queries you append 'amazon' to google queries.
+        
+        setting a google referer
+        ~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        Google's ajax search API (which the link processor uses) requires that you
+        set a referer url.  If you set a google referer, Argot will fetch the first
+        link and use that url directly::
+        
+        from argot import set_google_referer
+        set_google_referer('http://example.com')
+        
+        By default, the google link processor will return a url to an "I'm feeling
+        lucky" google search page, which will then forward to the first search result.
+        It's highly recommended that you cache the results of your argot rendering as
+        searching google for each url every time a page is loaded will be extremely
+        slow.
+        
+        writing new link processors
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        Link processors are functions that take a single argument, the `query` as a
+        string, and return another string::
+        
+        def wiki_processor(query):
+        return google_processor('wikipedia %s' % query)
+        argot.enable_link_processor(wiki_processor)
+        
+        This hypothetical wiki processor merely does a google search for 'wikipedia'
+        and the query provided.  The tag for the processor can be provided in 3 ways:
+        
+        * the name of the function before the first underscore
+        * a ``tag`` attribute on the function
+        * an optional second argument to ``enable_link_processor``
+        
+        argot command line tool
+        -----------------------
+        
+        Like ``markdown``, argot ships with a command line tool that will convert
+        text files to html called ``argot``.  It's usage is::
+        
+        Usage: argot [options] file
+        
+        Options:
+        --version             show program's version number and exit
+        -h, --help            show this help message and exit
+        -r REFERER, --referer=REFERER
+        http referer for google link parser
+        
+        
+Keywords: html markup markdown
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP :: Dynamic Content :: CGI Tools/Libraries
+Classifier: Topic :: Text Processing :: Markup :: HTML
