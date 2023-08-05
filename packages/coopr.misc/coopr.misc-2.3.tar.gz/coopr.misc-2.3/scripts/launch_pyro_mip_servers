@@ -1,0 +1,51 @@
+#! /usr/bin/env python
+
+#  _________________________________________________________________________
+#
+#  Coopr: A COmmon Optimization Python Repository
+#  Copyright (c) 2010 Sandia Corporation.
+#  This software is distributed under the BSD License.
+#  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+#  the U.S. Government retains certain rights in this software.
+#  For more information, see the FAST README.txt file.
+#  _________________________________________________________________________
+
+# a simple utility to launch a given number of pyro mip servers on a specific
+# host - intended for use in a multi-core/SMP environment. only works for 
+# unix, or at least there are too many caveats relating to the Python
+# subprocess and Windows to make me uncomfortable with even testing it there.
+
+import os
+import sys
+import subprocess
+
+if len(sys.argv) != 2:
+   print "***Incorrect invocation - use: launch_pyro_mip_servers num-servers"
+   sys.exit(1)
+
+num_servers = eval(sys.argv[1])
+
+print "Number of servers to launch="+str(num_servers)
+
+server_pids = []
+
+for i in range(1, num_servers+1):
+   print "Launching server number "+str(i)
+   output_filename = "pyro_mip_server"+str(i)+".out"
+   # the "exec" ensures that (at least for bash) that the server process
+   # will be the process returned, i.e., it becomes the child process - no
+   # shell process intermediate. more correctly, exec exits the current
+   # process before it does so (no fork).
+   pid=subprocess.Popen("exec pyro_mip_server >& pyro_mip_server."+str(i)+".out", shell=True).pid
+#   print "PID="+str(pid)
+   server_pids.append(pid)
+
+# perhaps a better place would be in the users home directory, but I'll 
+# worry about that a bit later.
+pid_output_filename = "pyro_mip_servers.pids"
+pid_output_file = open(pid_output_filename,"w")
+for pid in server_pids:
+   print >>pid_output_file, pid
+pid_output_file.close()
+
+print "PIDs for launched servers recorded in file="+pid_output_filename
