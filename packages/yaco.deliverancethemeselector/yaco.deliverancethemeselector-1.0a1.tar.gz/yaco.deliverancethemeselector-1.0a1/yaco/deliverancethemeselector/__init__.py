@@ -1,0 +1,6 @@
+# -*- coding: utf-8 -*-
+from zope.i18nmessageid import MessageFactory
+DTSMessageFactory = MessageFactory('yaco.deliverancethemeselector') 
+
+def initialize(context):
+    """Initializer called when used as a Zope 2 product."""
