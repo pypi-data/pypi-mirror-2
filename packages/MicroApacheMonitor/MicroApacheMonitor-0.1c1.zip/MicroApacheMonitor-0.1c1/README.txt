@@ -1,0 +1,65 @@
+===================
+MicroApache Monitor
+===================
+
+MicroApache Monitor is an application for controlling MicroApache
+from the Windows notification area (commonly referred to as the
+system tray).  Analogous to ApacheMonitor.exe that ships with the
+standard Apache distribution, MicroApache Monitor provides context
+menu actions for starting, stopping, and restarting MicroApache.
+
+Requirements
+============
+
+* A Windows PC (I use Windows XP SP3)
+
+* MicroApache (I use `MicroApache version 2.2.2`_)
+
+* Python (I use `Python 2.6.5`_)
+
+* `PyWin32 Python package`_
+
+* setuptools (just run the `ez_setup.py Python script`_)
+
+.. _MicroApache version 2.2.2: http://microapache.amadis.sytes.net/#MicroApache%202.2.x
+.. _Python 2.6.5: http://www.python.org/download/releases/2.6.5/
+.. _PyWin32 Python package: http://sourceforge.net/projects/pywin32/
+.. _ez_setup.py Python script: http://peak.telecommunity.com/dist/ez_setup.py
+
+Installation and Setup
+======================
+
+* Install the requirements listed above.
+
+* From command prompt, run::
+    ``easy_install MicroApacheMonitor``
+
+* Edit ``C:\Python26\Scripts\mapachemon_start.bat`` to point to your MicroApache installation.
+
+* Optionally, you can add ``mapache_start.bat`` to your startup folder, so it will start automatically when you log in to Windows.
+
+Usage
+=====
+
+* Run ``mapachemon_start.bat``.  By default, this also starts the MicroApache server.
+
+* Use the context menu actions to control MicroApache.
+
+* The *Quit* context menu action will also stop the MicroApache server.
+
+Other Notes
+===========
+
+* MicroApache Monitor does not use Windows services.  This means any user can use MicroApache Monitor without needing administrative priveleges.
+
+* All of the requirements can be installed without administrative priveleges also.
+
+Thanks to
+=========
+
+* The Apache Software Foundation
+
+* The maintainer of MicroApache (http://microapache.amadis.sytes.net/)
+
+* Simon Brunning -- for providing his SysTrayIcon.py module (http://www.brunningonline.net/simon/blog/archives/001835.html)
+
