@@ -1,0 +1,111 @@
+.. -*- mode: rst -*-
+
+==============
+django-hgadmin
+==============
+
+Features
+========
+
+1. Create new repository and delete
+2. Create's backup tarball before delete
+3. Change repository settings
+4. Authentification
+
+Install
+=======
+
+1. Create new Django project
+2. Set ``HGWEBDIR_CONF``, ``HGWEBDIR_WSGI``, ``HGWEBDIR_ROOT`` paths
+   and set ``HGADMIN_ALLOW_REMOVE`` True or False
+3. Cange Apache configuration (see example)
+4. Put your repos and run
+   ``$ python manage.py syncdb``
+5. ???
+6. PROFIT :)
+
+Examples
+========
+
+Project tree
+------------
+
+::
+
+    project
+    |-- __init__.py
+    |-- auth.wsgi -> ./hgadmin/auth.wsgi
+    |-- django.wsgi
+    |-- hgadmin
+    |-- hgweb.config
+    |-- hgwebdir.wsgi
+    |-- manage.py
+    |-- repos
+    |   |-- test0
+    |   |-- test1.tar.bz2
+    |   `-- test2
+    |-- settings.py
+    `-- urls.py
+
+
+Django settings
+---------------
+
+::
+
+    ##
+    # Helpers
+    import os.path
+    PROJECT_ROOT = os.path.normpath(os.path.dirname(__file__))
+
+    ##
+    # Paths
+    HGWEBDIR_CONF = os.path.join(PROJECT_ROOT, 'hgweb.config')
+    HGWEBDIR_WSGI = os.path.join(PROJECT_ROOT, 'hgwebdir.wsgi')
+    HGWEBDIR_ROOT = os.path.join(PROJECT_ROOT, 'repos')
+
+    ##
+    # Allow remove repo from server.
+    # Be careful!
+    HGADMIN_ALLOW_REMOVE = False
+
+
+Apache settings
+---------------
+
+::
+
+    <VirtualHost *:80>
+        ServerAdmin     webmaster@example.com
+        ServerName      hg.example.com
+        DocumentRoot    /path/to/hg/root
+
+        ##
+        # WSGI
+        #
+        # WSGIProcessGroup group-name
+        # WSGIDaemonProcess group-name user=username group=group maximum-requests=2000
+        #
+        # Django settings.HGWEBDIR_WSGI
+        WSGIScriptAlias / /path/to/hgwebdir.wsgi
+
+        <Location />
+            Order allow,deny
+            Allow from all
+
+            ##
+            # WSGI based auth
+            AuthName "Mercurial repository"
+            AuthType Basic
+            AuthBasicProvider wsgi
+            WSGIAuthUserScript /path/to/hgadmin/auth.wsgi
+
+            <LimitExcept GET>
+                    Require valid-user
+            </LimitExcept>
+        </Location>
+
+        LogLevel debug
+        ErrorLog /var/log/httpd/hg.example.com-error.log
+        CustomLog /var/log/httpd/hg.example.com-access.log common
+    </VirtualHost>
