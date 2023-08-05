@@ -1,0 +1,327 @@
+import os
+from fabric.api import *
+from getpass import getpass
+from fabric.contrib.console import confirm
+from fabric.contrib.files import *
+from fabric.contrib.project import rsync_project
+
+
+env.maintenance_users = ${maintenance_users}
+env.hosts = ['\${config:ip}:\${ports:ssh}']
+env.path = os.getcwd()
+
+prompt("Which maintenance user would you like to use to connect to the server?", default='zupo', key='user')
+
+def deploy():
+    # configure users and access to server
+    configure_ssh_to_run_on_custom_port()
+    enable_sudo()
+    create_maintenance_users()
+    harden_ssh()
+    lock_root_password()
+    create_services_users()
+    
+    # bootstrap server
+    set_system_time()
+    install_software_stack()
+    upload_static_files()
+    
+    # deploy application
+    create_buildout_environment()
+    run_buildout()
+    upload_data()
+    start_supervisor()
+
+def configure_ssh_to_run_on_custom_port():
+    
+    with settings(user='root', password='\${config:temp_root_pass}', host_string = '\${config:ip}:22'):
+        # Configure SSH to run on port 985
+        sed('/etc/ssh/sshd_config','#Port 22', 'Port 985')
+        
+        # upload iptables config file
+        put('%(path)s/etc/iptables' % env, '/etc/sysconfig/iptables')
+        
+        # reload iptables configuration and restart SSHd in one go
+        run('iptables-restore < /etc/sysconfig/iptables && /etc/init.d/sshd restart')
+
+def enable_sudo():
+    
+    with settings(user='root', password='\${config:temp_root_pass}'):
+        # comment this out to enable usage of fabric.api.sudo
+        comment('/etc/sudoers', 'Defaults    requiretty')
+
+def create_maintenance_users():
+    """Create maintenance accounts, so we don't access server with root account."""
+
+    with settings(user='root', password='\${config:temp_root_pass}'):                
+        for user in maintenance_users.split(','):
+            user = user.strip()
+        
+            # create user
+            run('grep %(user)s /etc/passwd || /usr/sbin/adduser %(user)s' % locals())
+        
+            # set password
+            password = getpass("Enter password that maintenance user \'%(user)s\' will use for sudo-ing: " % locals())
+            run('echo "%(user)s:%(password)s" | chpasswd' % locals())
+        
+            # add public key for SSH access
+            run('ls -a /home/%(user)s | grep .ssh || mkdir /home/%(user)s/.ssh' % locals())
+            put("%(path)s/etc/%(user)s.pub","home/%(user)s/.ssh/authorized_keys" % locals())
+        
+            # allow sudo for maintenance user
+            run("echo '%(user)s	ALL=(ALL) 	ALL' >> /etc/sudoers" % locals())
+
+def harden_ssh():
+
+    with settings(user='root', password='\${config:temp_root_pass}'):
+        # Enable public-key authentication
+        uncomment('/etc/ssh/sshd_config', '#RSAAuthentication yes')
+        uncomment('/etc/ssh/sshd_config', '#PubkeyAuthentication yes')
+
+        # Disable password authentication
+        sed('/etc/ssh/sshd_config','PasswordAuthentication yes', 'PasswordAuthentication no')
+        
+        # Disable GSSAPI authentication
+        sed('/etc/ssh/sshd_config','GSSAPIAuthentication yes', 'GSSAPIAuthentication no')
+        
+        # Deny root login
+        sed('/etc/ssh/sshd_config', '#PermitRootLogin yes', 'PermitRootLogin no')
+    
+        # Deny dedicated users login
+        append('/etc/ssh/sshd_config', 'DenyUsers root@* nginx@* production@*')
+        
+        # Apply changes
+        run('/etc/init.d/sshd restart')
+
+def lock_root_password():
+    sudo('passwd --lock root')
+
+def create_services_users():
+    
+    # user for running nginx webproxy in isolated environment   
+    sudo('grep nginx /etc/passwd || /usr/sbin/adduser nginx')
+    
+    # a user that will hold actual production environments (buildout, code, cronjobs, etc. )
+    sudo('grep production /etc/passwd || /usr/sbin/adduser production')
+
+def set_system_time():
+    
+    # set timezone
+    sudo('cp /usr/share/zoneinfo/GMT /etc/localtime')
+    
+    # install NTP
+    sudo('yum -y install ntp')
+    sudo('chkconfig ntpd on')
+    sudo('ntpdate pool.ntp.org')
+    sudo('/etc/init.d/ntpd start')
+
+def install_software_stack():
+    # build software stack
+    install_system_libs()
+    enable_epel_repositories()
+    install_python()
+    install_sendmail()
+    install_munin()
+    install_nginx()
+    clean_yum()
+
+def install_system_libs():
+    # install bunch of stuff we need
+    sudo('yum -y install '
+             # tools
+             'vim-enhanced '
+             'curl '
+             'lynx '
+             'rsync '
+             'which '
+             'gcc-c++ '
+             'make '
+             'subversion '
+             
+             # pretty fonts
+             'xorg-x11-fonts-truetype.noarch '
+             'freetype-devel '
+             
+             # image formats
+             'libpng-devel '
+             'libjpeg-devel '
+             
+             # other libs
+             'zlib-devel '
+             'pcre-devel '
+             'openssl-devel '
+             
+             # xdv support
+             'libxml2-devel '
+             'libxslt-devel '
+             )
+
+def enable_epel_repositories():
+    
+    # enable EPEL repositories (we need them for installing python2.6, nginx, munin, etc.)
+    sudo('rpm -Uvh http://download.fedora.redhat.com/pub/epel/5Server/x86_64/epel-release-5-4.noarch.rpm')
+
+def install_python():
+    
+    sudo('yum -y install python26 python26-devel')
+
+    install_distribute()
+    install_virtualenv()
+
+def install_distribute():
+    
+    sudo('wget http://python-distribute.org/distribute_setup.py')
+    sudo('python distribute_setup.py')
+    sudo('rm -f distribute_setup.py')
+    sudo('rm -f distribute-0.6.10.tar.gz')
+
+def install_virtualenv():
+    
+    sudo('easy_install virtualenv')
+
+def install_sendmail():
+
+    # install munin
+    sudo('yum -y install sendmail')
+    
+    # set server's hostname and make it persistent
+    comment('/etc/sysconfig/network', 'HOSTNAME', use_sudo=True)
+    append('HOSTNAME=${package}.niteoweb.com', '/etc/sysconfig/network', use_sudo=True)
+    sudo('hostname ${package}.niteoweb.com')
+
+    # all email should be sent to maintenance@niteoweb.com
+    append('root:           ${maintenance_email}', '/etc/aliases', use_sudo=True)
+
+    # set crontab's MAILTO variable to maintenance@niteoweb.com
+    sed('/etc/crontab', 'MAILTO=root' ,'MAILTO=${maintenance_email}')
+    sudo('echo "MAILTO=${maintenance_email}" >> /var/spool/cron/root')
+    sudo('echo "MAILTO=${maintenance_email}" >> /var/spool/cron/production')
+
+    # start sendmail
+    sudo('chkconfig sendmail on')
+    sudo('/etc/init.d/sendmail start')
+
+def install_munin():
+    
+    # install munin
+    sudo('yum -y install munin-node')
+    
+    # TODO: use regex to patch iostat plugin
+    
+    # install config file 
+    upload_template('%(path)s/etc/munin-node.conf' % env, '/etc/munin/munin-node.conf', use_sudo=True)
+    
+    # TODO: patch IOStat plugin
+    
+    # start munin-node
+    sudo('chkconfig munin-node on')
+    sudo('/etc/init.d/munin-node start')
+    
+    # add node to munin-master
+    confirm('Now you have to add this node to munin-master on the Headquarters server in file /etc/munin/munin.conf. Once done, press Y to continue.')
+
+def install_nginx():
+    
+    # install
+    sudo('yum -y install nginx')
+    
+    # start
+    sudo('chkconfig nginx on')
+    sudo('/etc/init.d/nginx start')
+
+def clean_yum():
+    
+    # During its normal use yum creates a cache of metadata and packages. 
+    # This cache can take up a lot of space. The yum clean command allows you 
+    # to clean up these files. All the files yum clean will act on are 
+    # normally stored in /var/cache/yum.
+    sudo('yum clean all')
+
+def upload_static_files():
+    """Upload static HTML/CSS files served directly by Nginx."""
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    sudo('rm -rf /home/nginx/static/')
+    sudo('svn export --no-auth-cache --username %(username)s --password %(password)s \
+        https://\${config:namespace}.unfuddle.com/svn/\${config:namespace}_\${config:package}/trunk/src/\${config:namespace}/\${config:package}/static /home/nginx/static'
+        % locals())
+
+def checkout_code():
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    sudo('svn co --no-auth-cache --username %(username)s --password %(password)s \
+          https://\${config:namespace}.unfuddle.com/svn/\${config:namespace}_\${config:package}/\${config:namespace}.\${config:package}/trunk \${config:version}' 
+          % locals())
+    sudo('chown -R production:production /home/production/\${config:version}')
+
+def create_buildout_environment():
+    with cd('/home/production'):
+        checkout_code()
+        with cd('/home/production/\${config:version}'):
+            sudo('virtualenv -p python2.6 --no-site-packages ./', user='production')
+            sudo('bin/python bootstrap.py -c production_with_cronjobs.cfg', user='production')
+
+def run_buildout():
+    with cd('/home/production/\${config:version}'):
+        sudo('bin/buildout -c production_with_cronjobs.cfg', user='production')    
+
+def upload_data():
+    """Upload Zope's data to the server."""
+    
+    confirm("This will destroy all current Zope data on the server. Are you sure you want to continue?")
+    
+    # first upload Data.fs
+    if os.path.exists('/home/production/\${config:version}/var/filestorage/Data.fs'):
+        sudo('rm -rf /home/production/\${config:version}/var/filestorage/Data.fs')
+    if os.path.exists('/tmp/Data.fs'):
+        sudo('/tmp/Data.fs' % env)
+    put('%(path)s/var/filestorage/Data.fs' % env, '/tmp/Data.fs')
+    sudo('mv /tmp/Data.fs /home/production/\${config:version}/var/filestorage/Data.fs')
+    sudo('chown -R production:production /home/production/\${config:version}/var/filestorage/Data.fs')
+    
+    # now upload Blobs
+    if os.path.exists('/home/production/\${config:version}/var/blobstorage' % env):
+        sudo('rm -rf /home/production/\${config:version}/var/blobstorage' % env)
+    if os.path.exists('/tmp/blobstorage'):
+        sudo('/tmp/blobstorage')
+    rsync_project('/tmp', local_dir='%(path)s/var/blobstorage' % env, extra_opts="-e 'ssh -p 985'")
+    sudo('rsync -avhP /tmp/blobstorage /home/production/\${config:version}/var')
+    sudo('chown -R production:production /home/production/\${config:version}/var/blobstorage')
+
+def start_supervisor():
+    with cd('/home/production/0.1'):
+        sudo('bin/supervisord', user='production')    
+
+def status():
+    env.supervisor_command = 'status'
+def stop():
+    env.supervisor_command = 'stop all'
+def restart():
+    env.supervisor_command = 'restart all'
+
+def supervisor_command():
+    require('supervisor_command', provided_by = [status, stop, restart])
+    with cd('/home/production/0.1'):
+        sudo('bin/supervisorctl %(supervisor_command)s' % env, user='production')    
+        
+def download_Datafs():
+    """Download Zope's Data.fs from the server."""
+    
+    if os.path.exists('%(path)s/var/filestorage/Data.fs' % env):
+        local('mv %(path)s/var/filestorage/Data.fs %(path)s/var/filestorage/Data.fs_bak' % env)
+    
+    if exists('~/Data.fs', use_sudo=True):
+        sudo('mv ~/Data.fs ~/Data.fs_bak')
+    
+    sudo('rsync -avhP /home/production/\${config:version}/var/filestorage/Data.fs ~/Data.fs')
+    get('~/Data.fs', '%(path)s/var/filestorage/Data.fs' % env)
+
+    #TODO: also download blobs
+    
+def reload_nginx_config():
+
+    # re-upload config file 
+    upload_template('%(path)s/etc/nginx.conf' % env, '/etc/nginx/nginx.conf', use_sudo=True)
+    
+    # reload config
+    sudo('/etc/init.d/nginx reload')

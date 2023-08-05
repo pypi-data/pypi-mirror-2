@@ -1,0 +1,181 @@
+[buildout]
+extends = base.cfg
+eggs +=
+     iw.rotatezlogs
+
+parts += 
+
+# deployment tools
+    releaser
+    fabfile
+    fabric
+
+# generate config files
+    nginx-conf
+    munin-node-conf
+
+# appserver
+    zeo
+    zope1
+
+# process monitor
+    supervisor
+    
+# backups
+    backup
+    
+
+# =============================
+# Global settings and constants
+# =============================
+
+# various config constants
+[config]
+
+# Namespace name is used for:
+# - constructing repository urls
+namespace = ${namespace_package}
+
+# Package name is used for:
+# - id of Plone instance
+# - constructing repository urls
+# - TextMate project file filename
+package = ${package}
+
+# Deployment version is used for:
+# - constructing directory paths for production user
+version = ${version}
+
+# Temporary root password given by Rackspace Cloud
+temp_root_pass = ${temp_root_pass}
+
+# IP of production server
+ip = ${ip}
+
+# Domain on which this project runs on
+hostname = ${hostname}
+
+# Ports of backend servers and services
+[ports]
+varnish    = 11201
+haproxy    = 11301
+zope1      = 11401
+zope2      = 11402
+debug      = 11409
+zeo        = 11501
+supervisor = 11901
+ssh        = 985
+munin      = 4949
+
+
+# ==================================================
+# Configure zest.releaser package releasing commands
+# ==================================================
+[releaser]
+recipe = zc.recipe.egg
+eggs = zest.releaser
+
+
+# ====================================
+# Configure Fabric deployment commands
+# ====================================
+[fabric]
+recipe = zc.recipe.egg
+eggs = Fabric
+
+[fabfile]
+recipe = collective.recipe.template
+input = \${buildout:directory}/etc_templates/fabfile.py.in
+output = \${buildout:directory}/fabfile.py
+
+
+# ==============================
+# Configure Munin system monitor
+# ==============================
+[munin-node-conf]
+recipe = collective.recipe.template
+input = \${buildout:directory}/etc_templates/munin-node.conf.in
+output = \${buildout:directory}/etc/munin-node.conf
+
+
+# ====================================
+# Configure Nginx front-end Web Server
+# ====================================
+[nginx-conf]
+recipe = collective.recipe.template
+input = \${buildout:directory}/etc_templates/nginx.conf.in
+output = \${buildout:directory}/etc/nginx.conf
+
+
+# ===================================================================
+# For collective.xdv to work properly, we need a static build of lxml
+# and it's dependencies on OS X and x86_64 Linux                     
+# ===================================================================
+[lxml]
+recipe = z3c.recipe.staticlxml
+egg = lxml
+force = false
+static-build = true
+
+
+# ===========================================
+# Build and configure Zope application server
+# ===========================================
+[zeo]
+recipe = plone.recipe.zeoserver
+blob-storage = \${buildout:directory}/var/blobstorage
+zeo-address = \${ports:zeo}
+
+[zope1]
+recipe = plone.recipe.zope2instance
+user = admin:admin
+verbose-security = off
+debug-mode = off
+http-address = 127.0.0.1:\${ports:zope1}
+zeo-address = \${zeo:zeo-address}
+zeo-client = on
+shared-blob = on
+eggs =
+    \${buildout:eggs}
+zcml =
+    \${buildout:zcml}
+z2-log = off
+environment-vars = DISABLE_PTS True
+zodb-cache-size = 5000
+mailinglogger = 
+    <mailing-logger>
+    level error
+    flood-level 3
+    smtp-server localhost
+    from zope1@\${config:hostname}
+    to ${maintenance_email}
+    subject [\${config:hostname} error] [%(hostname)s] %(line)s
+    </mailing-logger>
+event-log-custom =
+  %import iw.rotatezlogs
+  <rotatelogfile>
+    path \${buildout:directory}/var/log/zope1.log
+    max-bytes 1MB
+    backup-count 9
+  </rotatelogfile>
+    
+    
+# ====================================================
+# Set up supervisor to run and supervise all processes
+# ====================================================
+[supervisor]
+recipe = collective.recipe.supervisor
+port = \${ports:supervisor}
+serverurl = http://127.0.0.1:\${ports:supervisor}
+
+programs =
+    10 zeo   \${zeo:location}/bin/runzeo true
+    20 zope  \${buildout:directory}/bin/zope1 [console] true
+
+
+# ==================
+# Setup backup tools
+# ==================
+[backup] 
+recipe = collective.recipe.backup
+keep = 5
