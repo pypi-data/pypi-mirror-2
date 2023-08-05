@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Dililatum: a quest system for simple RPGs
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of Dililatum.
+#
+# Dililatum is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Dililatum is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Dililatum.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## convert-linked-places-file-to-a-simpler-format
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Converts files created with link-places to the
+                  # simpler internal format used by Dililatum
+
+import sys
+import os.path
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
+def get_name(p):
+    name = os.path.basename(p[0][0])
+    name = name[:name.find('.')]
+    return name
+
+def convert_from_internal_to_other_internal(path):
+    f = open(path, 'rb')
+    data = pickle.load(f)
+    f.close()
+    out = ''
+    dp = data['places']
+    dl = data['links']
+
+    points = {}
+    i = 0
+    for plc in dp:
+        j = 0
+        for p in plc[2]:
+            points['%d:%d' % (i, j)] = (get_name(plc), p)
+            j += 1
+        i += 1
+
+    i = 0
+    for p in dp:
+        name = get_name(p)
+        out += '%s\n' % name
+        rects = p[1]
+        j = 0
+        for r in rects:
+            out += '%s|' % r[2]
+            target = None
+            for l in dl:
+                if l[0][0] == 1:
+                    lrect = l[0]
+                    lpoint = l[1]
+                else:
+                    lrect = l[1]
+                    lpoint = l[0]
+                if lrect[1] == i and lrect[2] == j:
+                    target = points['%d:%d' % (lpoint[1], lpoint[2])]
+                    break
+            j += 1
+            if target is not None:
+                out += '%s|%d,%d|' % (target[0], target[1][0],
+                                        target[1][1])
+            else:
+                out += '||'
+            out += '%d,%d %d,%d|%s\n' % (r[0][0], r[0][1], r[0][0] + r[1][0],
+                                         r[0][1] + r[1][1], r[3])
+        out += '\n'
+        i += 1
+
+    return out[:-1]
+
+###################
+args = sys.argv[1:]
+if len(args) == 1:
+    if args[0] == '-H' or args[0] == '--help':
+        print """\
+Usage: convertlinkedplacestootherinternalformat FILE
+Converts any linkplaces file to the internal format used by Dililatum
+
+Options:
+  -H, --help        show this help and exit
+  -V, --version     show version information and exit
+
+Converted content is written to standard out.\
+"""
+        sys.exit()
+    elif args[0] == '-V' or args[0] == '--version':
+        import dililatum.generalinformation as ginfo
+        print ginfo.version_text
+        sys.exit()
+    else:
+        path = args[0]
+else:
+    path = args[1]
+
+print convert_from_internal_to_other_internal(path),

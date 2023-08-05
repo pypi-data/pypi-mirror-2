@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Dililatum: a quest system for simple RPGs
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of Dililatum.
+#
+# Dililatum is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Dililatum is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Dililatum.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## link-places
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## A tool for linking places together
+
+import sys
+try:
+    from dililatum.tools.placelinker import *
+except ImportError:
+    import os.path
+    sys.path.append(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0])
+    from dililatum.tools.placelinker import *
+
+args = sys.argv[1:]
+if len(args) == 1:
+    if args[0] == '-H' or args[0] == '--help':
+        print """\
+Usage: link-places n[size]|l[size] images|(datafile [new images])
+Enables one to visually link places together using the background
+images of the respective places
+
+Options:
+  -H, --help        show this help and exit
+  -V, --version     show version information and exit
+
+"n" creates a new document, while "l" loads a file containing existing
+information. When creating a new document, you *must* add images. When
+loading a file, you *can* add images.
+"size" is in the format WIDTHxHEIGHT.
+
+Saving automatically takes place. The default filename is
+"linked-places.lnkdplcs".
+
+Examples of usage:
+  link-places n *.jpg
+  link-places l linkfile
+  link-places n800x600 000.jpg 005.jpg 028.jpg
+  link-places l1337x630 linkfile
+  link-places l linkfile 2*0.jpg
+  link-places l650x650 linkfile 7.jpg
+"""
+        print placelinker_help
+        sys.exit()
+    elif args[0] == '-V' or args[0] == '--version':
+        import dililatum.generalinformation as ginfo
+        print ginfo.version_text
+        sys.exit()
+    elif args[0][0] == 'n':
+        sys.stderr.write('link-places: error: no images have been specified')
+        sys.exit(1)
+    elif args[0][0] == 'l':
+        sys.stderr.write('link-places: error: no data file has been specified')
+        sys.exit(1)
+    else:
+        sys.stderr.write('link-places: error: wrong command')
+        sys.exit(1)
+elif len(args) == 0:
+    sys.stderr.write('link-places: error: you didn\'t specify any commands!\n')
+    sys.exit(1)
+elif args[0][0] not in ('n', 'l'):
+    sys.stderr.write('link-places: error: wrong command')
+    sys.exit(1)
+
+# Else:
+evtsize = args[0][1:]
+if evtsize:
+    size = [[int(x) for x in evtsize.split('x')]]
+else:
+    size = []
+
+# Start the place linker
+pl = PlaceLinker(*size)
+pl.start()
+
+if args[0][0] == 'n':
+    pl.new(*args[1:])
+elif args[0][0] == 'l':
+    pl.load(args[1], *args[2:])
+
+try:
+    pl.run()
+finally:
+    pl.save()
