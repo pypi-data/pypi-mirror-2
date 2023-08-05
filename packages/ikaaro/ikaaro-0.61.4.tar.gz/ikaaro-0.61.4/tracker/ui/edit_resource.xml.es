@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<stl:block xmlns="http://www.w3.org/1999/xhtml" xmlns:stl="http://www.hforge.org/xml-namespaces/stl">
+
+<form action="${action}" method="post">
+  <fieldset>
+    <legend stl:if="not id">Asignar un recurso</legend>
+    <legend stl:if="id">Edit the assignment #${id}</legend>
+    <table>
+      <tr>
+        <td valign="top">
+          <label for="resource">Resource:</label><br></br>
+          <select class="tracker-select" id="resource" name="resource">
+            <option value="${item/name}" selected="${item/selected}" stl:repeat="item users">${item/value}</option>
+          </select>
+        </td>
+        <td valign="top">
+          <label for="dtstart">Start:</label><br></br>
+          <input name="dtstart" size="10" id="dtstart" class="dateField" type="text" value="${d_start}"></input>
+          <input value="..." type="button"></input>  <br></br>  <input id="tstart" value="${t_start}" name="tstart" size="5" type="text"></input> (HH:MM)
+        </td>
+        <td valign="top">
+          <label for="dtend">End:</label><br></br>
+          <input name="dtend" size="10" id="dtend" class="dateField" type="text" value="${d_end}"></input>
+          <input value="..." type="button"></input>   
+          <select id="time-select" onchange="update_time('time-select')" name="time_select">
+            <option value=""></option>
+            <option value="${option/name}" stl:repeat="option time_select">${option/start} - ${option/end}</option>
+          </select>
+          <br></br>
+          <input id="tend" value="${t_end}" name="tend" size="5" type="text"></input> (HH:MM)
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" valign="top">
+          <label for="comment">Comentario:</label><br></br>
+          <textarea id="comment" rows="3" cols="80" name="comment">${comment}</textarea>
+        </td>
+      </tr>
+    </table>
+    <button value="add" type="submit" class="button-ok" name="action" stl:if="not id">Assign</button>  <button value="edit" type="submit" class="button-ok" name="action" stl:if="id">Save</button>
+  </fieldset>
+</form>
+<br></br>
+
+<script language="javascript">
+jQuery( "input.dateField" ).dynDateTime({
+  ifFormat: "%Y-%m-%d",
+  button: ".next()" })
+
+function update_time(name){
+  var elt = document.getElementById(name);
+  var text = elt.options.item(elt.selectedIndex).text;
+  var start = ""; var end = "";
+  if (text != ""){
+    var reg = new RegExp(" - +", "g");
+    var value = text.split(reg);
+    start = value[0];
+    end = value[1];
+    }
+  document.getElementById("tstart").value = start;
+  document.getElementById("tend").value = end;
+}
+</script>
+
+</stl:block>
