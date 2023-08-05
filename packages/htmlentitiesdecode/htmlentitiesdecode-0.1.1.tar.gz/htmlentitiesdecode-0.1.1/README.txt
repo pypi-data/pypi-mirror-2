@@ -1,0 +1,52 @@
+==================
+htmlentitiesdecode
+==================
+
+This module makes it easy to decode html entities in strings.
+
+License
+=======
+htmlentitiesdecode is free software under the terms of the Do What The
+Fuck You Want To Public License version 2 (or any later version). The
+author of htmlentities is Niels Serup, contactable at
+ns@metanohi.org. This is version 0.1.1 of the program.
+
+Installing
+==========
+If you have python-setuptools installed, you can just do this::
+
+  $ sudo easy_install htmlentitiesdecode
+
+Alternatively, download and extract the gzipped tarball found on this
+very page, and then run this::
+
+  $ sudo python setup.py install
+
+The newest version of ``htmlentitiesdecode`` is always available at
+http://metanohi.org/projects/htmlentitiesdecode/ and at the Python
+Package Index.
+
+Using
+=====
+This module has only one main function: ``decode``. Example usage:
+
+>>> from htmlentitiesdecode import decode as entity_decode
+>>> print entity_decode('Wie hei&szlig;t du?')
+Wie heißt du?
+>>> print entity_decode('Ich hei&#223;e "htmlentitiesdecode".')
+Ich heiße "htmlentitiesdecode".
+>>> print entity_decode('Wir hei&#x00DF;en "modules".')
+Wir heißen "modules".
+
+Running
+=======
+When this module has been installed, you will have both a module and a
+command-line script that uses the decode function of the module. This
+script can be run this way::
+
+  $ decodehtmlentities TEXT
+
+Changelog
+=========
+* Version 0.1.0: Initial release
+* Version 0.1.1: Fixed error in README
