@@ -1,0 +1,66 @@
+# -*- coding: utf-8 -*-
+from datetime import datetime
+from elixir import *
+from elixir import events
+import hashlib
+from pylons import url
+from {{package}}.model import Session, metadata
+
+options_defaults['inheritance'] = 'multi'
+
+import re
+import sys
+if sys.version < 2.6:
+    import sets.Set as set
+from docutils.core import publish_parts
+from sqlalchemy import orm
+import {{package}}.lib.helpers as h
+# disable docutils security hazards:
+# http://docutils.sourceforge.net/docs/howto/security.html
+SAFE_DOCUTILS = dict(file_insertion_enabled=False, raw_enabled=False)
+wikiwords = re.compile(r"\b([A-Z]\w+[A-Z]+\w+)", re.UNICODE)
+
+class Page(Entity):
+    title = Field(Unicode, primary_key=True)
+    content = Field(UnicodeText, default='')
+    using_options(tablename='pages',shortnames=True)
+    
+    def __unicode__(self):
+        return self.title
+    
+    __str__ = __unicode__
+    def __repr__(self):
+        return "<Page('%s', '%s')>" % (self.title, self.content)
+    
+    @orm.validates('title')
+    def validate_title(self, key, title):
+        """Assure that page titles are wikiwords and valid length"""
+        if len(title) > 40:
+            raise ValueError('Page title must be 40 characters or fewer')
+        if not wikiwords.match(title):
+            log.warning('%s: invalid title (%s)' % (self.__class__.__name__,
+                                                    title))
+            raise ValueError('Page title must be a wikiword (CamelCase)')
+        return title
+    
+    def get_wiki_content(self):
+        """Convert reStructuredText content to HTML for display, and
+        create links for WikiWords
+        """
+        content = publish_parts(self.content, writer_name='html',
+                                settings_overrides=SAFE_DOCUTILS)['html_body']
+        titles = set(wikiwords.findall(content))
+        for title in titles:
+            title_url = url(controller='pages', action='show', title=title)
+            content = content.replace(title, h.link_to(title, title_url))
+        return content
+    
+    # Borrowed from tw.dynforms
+    @classmethod
+    def text_search(cls, search):
+        return cls.query.filter(cls.title.like('%'+search+'%'))
+    
+    def __json__(self):
+        return {'id': self.id, 'value':self.title}
+    
+

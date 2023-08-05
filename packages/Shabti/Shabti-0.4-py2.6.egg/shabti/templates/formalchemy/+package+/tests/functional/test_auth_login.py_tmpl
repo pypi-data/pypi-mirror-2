@@ -1,0 +1,54 @@
+# formalchemy/tests/functional/test_auth_login
+from pylons import url
+from {{package}}.tests import *
+
+class TestAuthLoginController(TestController):
+    def test_admin_signin(self):
+        """TestAuthLogin (auth): Ensure that signin is successful"""
+        appresponse = self.app.post(
+                 url(controller='login', action='signin'),
+                 params={'username':u'admin',
+                         'password':"admin"})
+        
+        assert appresponse.status_int == 302
+        assert appresponse.location == 'http://localhost/demo/privindex'
+    
+
+    def test_admin_signout(self):
+        """TestAuthLogin (auth): Ensure that signout is successful."""
+        appresponse = self.app.get(
+                url(controller='login', action='signout'))
+        
+        assert appresponse.status_int == 302
+        
+        assert appresponse.location == 'http://localhost/login/index'
+    
+
+    def test_unauthorised_model_access_is_prohibited(self):
+        """TestAuthLogin (auth): Unauthorised GET access is prohibited."""
+        appresponse = self.app.get(
+                url(controller='demo', action='privindex'))
+        
+        assert appresponse.status_int == 302
+        
+        assert appresponse.location == 'http://localhost/login/index'
+    
+    
+    def test_authorised_model_access_is_permitted(self):
+        """TestAuthLogin (auth): Authorised GET access is permitted."""
+        appresponse = self.app.post(
+                url(controller='login', action='signin'),
+                params={'username':u'admin',
+                        'password':"admin"})
+        
+        assert appresponse.status_int == 302
+        
+        assert appresponse.location == 'http://localhost/demo/privindex'
+        
+        newappresponse = appresponse.follow()
+        
+        assert 'Welcome <span style="color:green">admin</span>.' in newappresponse
+    
+    
+
+# Overwritten by Shabti formalchemy template
