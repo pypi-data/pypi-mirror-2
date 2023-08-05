@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<dc-workflow workflow_id="pox.banner_workflow"
+             title="Banners and Sections workflow"
+             description=" - Simple workflow that is used by pox.banner content types (Section and Banner). - Things start out as published, and can be retracted if required. - Only commercial staff (&quot;Manage banners and sections&quot; permission) can move from state to state."
+             state_variable="review_state"
+             initial_state="published">
+ <permission>View</permission>
+ <state state_id="private" title="Private">
+  <description>Can only be seen (and edited) by the commercial staff.
+</description>
+  <exit-transition transition_id="publish"/>
+  <permission-map name="View" acquired="False">
+   <permission-role>Commercial</permission-role>
+   <permission-role>Manager</permission-role>
+  </permission-map>
+ </state>
+ <state state_id="published" title="Published">
+  <description>Visible to everyone.
+</description>
+  <exit-transition transition_id="retract"/>
+  <permission-map name="View" acquired="False">
+   <permission-role>Anonymous</permission-role>
+  </permission-map>
+ </state>
+ <transition transition_id="publish"
+             title="Commercial staff publishes ads"
+             new_state="published" trigger="USER"
+             before_script="" after_script="">
+  <description>Publishing the item makes it visible to other users.</description>
+  <action url="%(content_url)s/content_status_modify?workflow_action=publish"
+          category="workflow">Publish</action>
+  <guard>
+   <guard-permission>Manage banners and sections</guard-permission>
+  </guard>
+ </transition>
+ <transition transition_id="retract"
+             title="Commercial staff retract published ads"
+             new_state="private" trigger="USER"
+             before_script="" after_script="">
+  <description>If section or banner aren't ready to be displayed or customer's campaign isn't updated, you can retract to private (hidden) state.</description>
+  <action url="%(content_url)s/content_status_modify?workflow_action=retract"
+          category="workflow">Retract</action>
+  <guard>
+   <guard-permission>Manage banners and sections</guard-permission>
+  </guard>
+ </transition>
+ <worklist worklist_id="reviewer_queue" title="">
+  <description>Reviewer tasks</description>
+  <action url="%(portal_url)s/search?review_state=pending"
+          category="global">Pending (%(count)d)</action>
+  <guard>
+   <guard-permission>Manage banners and sections</guard-permission>
+  </guard>
+  <match name="review_state" values="pending"/>
+ </worklist>
+ <variable variable_id="action" for_catalog="False"
+           for_status="True" update_always="True">
+  <description>Previous transition</description>
+  <default>
+   
+   <expression>transition/getId|nothing</expression>
+  </default>
+  <guard>
+  </guard>
+ </variable>
+ <variable variable_id="actor" for_catalog="False"
+           for_status="True" update_always="True">
+  <description>The ID of the user who performed the previous transition</description>
+  <default>
+   
+   <expression>user/getUserName</expression>
+  </default>
+  <guard>
+  </guard>
+ </variable>
+ <variable variable_id="comments" for_catalog="False"
+           for_status="True" update_always="True">
+  <description>Comment about the last transition</description>
+  <default>
+   
+   <expression>python:state_change.kwargs.get('comment', '')</expression>
+  </default>
+  <guard>
+  </guard>
+ </variable>
+ <variable variable_id="review_history" for_catalog="False"
+           for_status="False" update_always="False">
+  <description>Provides access to workflow history</description>
+  <default>
+   
+   <expression>state_change/getHistory</expression>
+  </default>
+  <guard>
+   <guard-permission>Request review</guard-permission>
+   <guard-permission>Review portal content</guard-permission>
+  </guard>
+ </variable>
+ <variable variable_id="time" for_catalog="False"
+           for_status="True" update_always="True">
+  <description>When the previous transition was performed</description>
+  <default>
+   
+   <expression>state_change/getDateTime</expression>
+  </default>
+  <guard>
+  </guard>
+ </variable>
+</dc-workflow>
