@@ -1,0 +1,116 @@
+#!/usr/bin/python
+#-------------------------------------------------------------------------------
+# Name:         testPerformance.py
+# Purpose:      Tests keep track of long-term performance targets
+#
+# Authors:      Christopher Ariza
+#
+# Copyright:    (c) 2009 The music21 Project
+# License:      LGPL
+#-------------------------------------------------------------------------------
+
+
+
+
+import doctest, unittest
+
+import music21
+from music21 import common, corpus
+
+from music21 import environment
+_MOD = 'test/testPerformance.py'
+environLocal = environment.Environment(_MOD)
+
+#-------------------------------------------------------------------------------
+class Test(unittest.TestCase):
+
+    def runTest(self):
+        pass
+
+
+    def testGetElements(self):
+        from music21 import note, stream
+
+        # create a stream with 750 notes, 250 rests
+        s = stream.Stream()
+        for i in range(1000):
+            n = note.Note()
+            s.append(n)
+        for i in range(500):
+            r = note.Rest()
+            s.append(r)
+        
+        t = common.Timer()
+        t.start()
+        post = s.flat.getElementsByClass([note.Rest, note.Note])
+        t.stop()
+        dur = t()
+        environLocal.printDebug(['timing tolerance for getElementsByClass for class match', dur])
+        self.assertEqual(len(post), 1500)
+
+        t = common.Timer()
+        t.start()
+        post = s.flat.getElementsByClass(['Rest', 'Note'])
+        t.stop()
+        dur = t()
+        environLocal.printDebug(['timing tolerance for getElementsByClass for string match', dur])
+        self.assertEqual(len(post), 1500)
+
+
+
+    def testTimingTolerance(self):
+        '''Test the performance of loading various files
+        This may not produce errors as such, but is used to provide reference
+        if overall performance has changed.
+        '''
+        # provide work and expected min/max in seconds
+        for known, max, best in [
+            ('beethoven/opus59no2/movement3', 9, 
+                {'2009.12.14': 7.42, 
+                 '2009.12.15': 6.686,
+                 '2010.06.24': 7.475,
+                 '2010.07.08': 3.562,
+                }),
+            ('haydn/opus74no1/movement3', 5, 
+                {'2009.12.14': 4.08, 
+                 '2009.12.15': 3.531,
+                 '2010.06.24': 3.932,
+                 '2010.07.08': 1.935,
+                }),
+            ('schumann/opus41no1/movement2', 7, 
+                {'2009.12.14': 5.88, 
+                 '2009.12.15': 5.126,
+                 '2010.06.24': 5.799,
+                 '2010.07.08': 2.761,
+                }),
+            ('luca/gloria', 4,
+                {'2009.12.14': 3.174, 
+                 '2009.12.15': 2.954,
+                 '2010.06.24': 3.063,
+                 '2010.07.08': 1.508,
+                }),
+            ]:
+
+            t = common.Timer()
+            t.start()
+            x = corpus.parseWork(known, forceSource=True)
+            t.stop()
+            dur = t()
+            environLocal.printDebug(['timing tolerance for', known, 
+                'this run:', dur, 'best runs:', 
+                ['%s: %s' % (x, y) for x, y in best.items()]])
+            #self.assertEqual(True, dur <= max) # performance test
+
+
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) == 1: # normal conditions
+        music21.mainTest(Test)
+
+    elif len(sys.argv) > 1:
+        a = Test()
+        a.testGetElements()
+
