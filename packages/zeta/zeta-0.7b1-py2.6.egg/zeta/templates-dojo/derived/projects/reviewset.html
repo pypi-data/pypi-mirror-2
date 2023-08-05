@@ -1,0 +1,198 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+[ 'Help',
+"""
+Collection of reviews. Especially useful to create review entries for every
+modified / added file in repository changeset
+"""
+],
+[ 'Author',
+"""<em>Author</em> can add comments, comment's nature and also
+reponsible for taking actions on all review comments."""
+],
+[ 'Moderator',
+"""<em>Moderator</em> can add comments, comment's nature and is responsible
+for approving actions taken on review comments. Once all the comments are
+approve, the moderator can close the review."""
+],
+[ 'Participant',
+"""<em>Participants</em> can comment and reply to other paticipants
+comment."""
+],
+[ 'Timeline',
+"""Timeline gives a log of all updates done to Review(s)."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="reviewsets( rsets )">
+    <table class="ml50 w50" style="border-collapse : collapse;">
+    <tr class="bggray1">
+        <th class="p5" style="border: 1px solid gray">Id</th>
+        <th class="p5" style="border: 1px solid gray">Name</th>
+        <th class="p5" style="border: 1px solid gray">CreatedOn</th>
+    </tr>
+    % for rset in rsets :
+        <tr>
+            <td class="p5" style="border: 1px solid gray">
+                <a href="${h.url_forrset(c.projectname, rset.id)}">${rset.id}</a>
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${rset.name}
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${rset.created_on.strftime("%a, %b %d, %Y")}
+            
+            </td>
+        </tr>
+    % endfor
+    </table>
+</%def>
+
+<%def name="reviewset( rs )">
+    <h3 class="br2 pl5 mt5 mb5 bgaliceblue">${rs.name}</h3>
+    <div class="floatl ml20">
+        ${forms.form_updaterset( c.authuser, c.project, rs,
+                                 h.suburl_updaterset, request.url )}
+    </div>
+    <div class="floatl mt10 ml20 pl10 mb10"
+         style="border-left: 2px solid gray;">
+        ${forms.form_addtorset( c.authuser, c.project, rs,
+                                h.suburl_addtorset, c.revwloner, request.url )}
+        <br></br>
+        ${forms.form_delfromrset( c.authuser, c.project, rs,
+                                  h.suburl_delfromrset, c.revwinrset, request.url )}
+    </div>
+    <table class="w100" style="border-collapse : collapse;">
+    <tr class="bggray1">
+        <th class="p5" style="border: 1px solid gray">Review</th>
+        <th class="p5" style="border: 1px solid gray">Status</th>
+        <th class="p5" style="border: 1px solid gray">Author</th>
+        <th class="p5" style="border: 1px solid gray">Moderator</th>
+        <th class="p5" style="border: 1px solid gray">Participants</th>
+        <th class="p5" style="border: 1px solid gray">Comments</th>
+    </tr>
+    % for r in rs.reviews :
+        <% 
+            a_author    = '<a href="%s">%s</a>' % ( 
+                                h.url_foruser( r.author.username ),
+                                r.author.username
+                          )
+            a_moderator = '<a href="%s">%s</a>' % (
+                                h.url_foruser( r.moderator.username ),
+                                r.moderator.username
+                          )
+            a_particpts = [ '<a href="%s">%s</a>' % (
+                                h.url_foruser( partc.username ),
+                                partc.username
+                            ) for partc in r.participants ]
+            a_review    = '<a href="%s">%s</a>' % (
+                                h.url_forreview( c.projectname, r.id ),
+                                r.resource_url
+                          )
+        %>
+        <tr>
+            <td class="p5" style="border: 1px solid gray">
+                ${a_review | n} <em class="fggray">(${r.version})</em>
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${ '<span class="fgblue">closed</span>' if r.closed else \
+                '<span class="fgcrimson">open</span>' | n }
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${a_author |n}
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${a_moderator |n}
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                % for a in a_particpts : 
+                    <div>${a |n}</div>
+                % endfor
+            </td>
+            <td class="p5" style="border: 1px solid gray">
+                ${len(r.comments)}
+            </td>
+        </tr>
+    % endfor
+    </table>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+
+        revwsets = '<span class="ml10 fwnormal fntsmall"> \
+                    <a href="%s" title="List of reviews sets"> \
+                    Reviewsets</a></span>' % h.url_reviewsets
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+        tline  = capture( elements.iconlink, h.url_revwtimeline,
+                          'timeline', title="Timeline of reviews" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ sel_revw, sel_rset, revwsets ],
+                           rspans=[ charts, tline ], tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div class="ml10 mr10">
+            % if c.reviewset :
+               ${reviewset( c.reviewset )}
+            % elif c.reviewsets :
+               ${reviewsets( c.reviewsets )}
+            % endif 
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_selrevw = dojo.query( '#selectrevw' )[0];
+            var n_selrset = dojo.query( '#selectrset' )[0];
+            n_selrevw ? select_goto( n_selrevw ) : null;
+            n_selrset ? select_goto( n_selrset ) : null;
+        });
+        dojoaddOnLoad( 'initform_updaterset' );
+        dojoaddOnLoad( 'initform_addtorset' );
+        dojoaddOnLoad( 'initform_delfromrset' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

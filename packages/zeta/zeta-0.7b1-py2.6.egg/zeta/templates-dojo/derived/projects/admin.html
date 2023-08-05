@@ -1,0 +1,576 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements"  file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Only project administrator can access this page. Use this page to,
+configure project, add/modify/remove project milestones, components and
+versions. Setup project teams and team-permissions.
+"""
+],
+[ 'Project',
+"""Upload project logo and icon which will be used where ever relevant.
+One such case is the header element in the layout, where the project logo
+is displayed on top-right corner of the page. Tickets, wiki pages,
+version controls, reviews are always associated with a project.
+"""
+],
+[ 'Components',
+"""Divide project into components, assigining owner to each one of them.
+Tickets can be associated with a component.
+"""
+],
+[ 'Milestones',
+"""Create and describe milestones with due-date. Milestones can be closed by
+'cancelling' or 'completing' it and providing a closing remark.
+Tickets can be associated with project milestone.
+"""
+],
+[ 'Versions',
+"""Versions can be used to track release, both internal and external.
+Tickets can be associated with project version.
+"""
+],
+[ 'Teams',
+"""Team names are common to all projects. Project's administrator
+can assign user as part of one or more team, one can view
+team as a role the user is expected to play in the project.
+<br/>
+Project-wise permission are managed via teams.  Registered users 
+who are not associated with a project (i.e) who are not
+part of a project's team will be classified as 'non-members'
+(a special team created by default). Thus the administrator can
+manage the permissions to these users via 'non-members'.
+<a href="/help/pms">Know more about permission system</a>
+"""
+],
+[ 'Timeline',
+"""Timeline of project's administrative activities."""
+],
+
+]
+
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    <%
+        project_id = (c.project and c.project.id) or ''
+        projusers  = map( lambda x: { 'val' : x, 'txt' : x }, sorted(c.projusers) )
+        adminuser  = c.project.admin.username
+
+    %>
+
+    /* Gotcha : The *_oncomplete and refresh_* functions are globally scoped
+     * since they are required across several callbacks.
+     */
+    projusers = ${h.json.dumps( projusers ) |n };
+    adminuser = ${h.json.dumps( adminuser ) |n };
+
+    // Data store fetch on-complete for `pcomplist`
+    function pcomplist_oncomplete( items, req ) {
+        this.items = items;
+        var pcomps  = pcomplist.itemValues( ['id', 'componentname'] );
+        var selpcomp_updt = dojo.query( 'div#prjcomponents select#updtpcomp')[0];
+        var options = dojo.map( pcomps, "return {val:item[0], txt:item[1]}" );
+        dojo.publish( 'updtpcomp', [ options, selpcomp_updt.value ] );
+        dojo.publish( 'rmpcomp', [ options, null ] );
+        refresh_pcompdetail();
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+    function refresh_pcompdetail() {
+        var selpcomp_updt = dojo.query( 'div#prjcomponents select#updtpcomp')[0];
+        var pcomp  = pcomplist.itembyID( selpcomp_updt.value );
+        if ( pcomp ) {
+            var id    = pcomplist.store.getValue( pcomp, 'id' );
+            var name  = pcomplist.store.getValue( pcomp, 'componentname' );
+            var owner = pcomplist.store.getValue( pcomp, 'owner' );
+            var desc  = pcomplist.store.getValue( pcomp, 'description' );
+
+            dojo.query( 'input[name=component_id]', form_updatepcomp
+                      )[0].value = id;
+            dojo.query( 'input[name=componentname]', form_updatepcomp
+                      )[0].value = name;
+            dojo.query( 'span[name=ownername]', form_updatepcomp
+                      )[0].innerHTML = owner;
+            dojo.query( 'textarea[name=description]', form_updatepcomp
+                      )[0].value = desc;
+            dojo.publish( 'updtpcompowners', [ projusers, owner ]);
+            dijit.byId( "updtpcompdesc" ).resize();
+        }
+    }
+    function projcomp() {
+        /* Setup component selection */
+        var selpcomp_updt    = dojo.query( 'div#prjcomponents select#updtpcomp')[0];
+        function updtpcomp_onchange( e ) {
+            refresh_pcompdetail();
+            dojo.stopEvent(e);
+        }
+        new ZSelect( selpcomp_updt, 'updtpcomp', updtpcomp_onchange )
+    }
+
+    // Data store fetch on-complete for `mstnlist`
+    function mstnlist_oncomplete( items, req ) {
+        this.items = items;
+        var mstns   = mstnlist.itemValues( ['id', 'milestone_name' ] );
+        var options = dojo.map( mstns, "return {val:item[0], txt:item[1]}" );
+        var selmstn_updt = dojo.query( 'div#prjmilestones select#updtmstn')[0];
+        dojo.publish( 'updtmstn', [ options, selmstn_updt.value ] );
+        dojo.publish( 'rmmstn', [ options, null ] );
+        refresh_mstndetail();
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+    function refresh_mstndetail() {
+        var selmstn_updt = dojo.query( 'div#prjmilestones select#updtmstn')[0];
+        var mstn = mstnlist.itembyID( selmstn_updt.value );
+        var duedate = dijit.byId( 'updtduedate' );
+        if ( mstn ) {
+            var id       = mstnlist.store.getValue( mstn, 'id' );
+            var name     = mstnlist.store.getValue( mstn, 'milestone_name' );
+            var due_date = mstnlist.store.getValues( mstn, 'due_date' );
+            var desc     = mstnlist.store.getValue( mstn, 'description' );
+            var closr    = mstnlist.store.getValue( mstn, 'closing_remark' );
+            var mstatus  = mstnlist.store.getValue( mstn, 'status' );
+
+            dojo.query( 'input[name=milestone_id]', form_updatemstn
+                      )[0].value = id;
+            dojo.query( 'input[name=milestone_name]', form_updatemstn
+                      )[0].value = name;
+            if( due_date.length ) {
+                dd = new Date( due_date[0], due_date[1]-1, due_date[2] );
+                duedate.setValue( dd );
+            } else {
+                duedate.setValue( '' );
+            }
+
+            dojo.query( 'textarea[name=description]', form_updatemstn
+                      )[0].value = desc;
+            dijit.byId( "updtmstndesc" ).resize();
+            cremark = dojo.query( 'textarea[name=closing_remark]',
+                                  form_updatemstn
+                                )[0]
+            cremark.value = closr;
+            var cancelled = dijit.byId( 'mstnstatus1' );
+            var completed = dijit.byId( 'mstnstatus2' );
+            completed.setChecked( false );
+            cancelled.setChecked( false );
+            if ( mstatus == 'cancelled' ) {
+                cancelled.setChecked( true );
+            } else if ( mstatus == 'completed' ) {
+                completed.setChecked( true );
+            }
+        }
+    }
+    function projmilestones() {
+        /* Setup milestone selection */
+        var selmstn_updt   = dojo.query( 'div#prjmilestones select#updtmstn')[0];
+        function updtmstn_onchange( e ) {
+            refresh_mstndetail();
+            dojo.stopEvent(e);
+        }
+        new ZSelect( selmstn_updt, 'updtmstn', updtmstn_onchange )
+    }
+
+    // Data store fetch on-complete for `verlist`
+    function verlist_oncomplete( items, req ) {
+        this.items = items;
+        var vers = verlist.itemValues( [ 'id', 'version_name' ] );
+        var options = dojo.map( vers, "return {val:item[0], txt:item[1]}" );
+        var selver_updt = dojo.query( 'div#prjversions select#updtver')[0];
+        dojo.publish( 'updtver', [ options, selver_updt.value ] );
+        dojo.publish( 'rmver', [ options, null ] );
+        refresh_verdetail();
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+    function refresh_verdetail() {
+        var selver_updt = dojo.query( 'div#prjversions select#updtver')[0];
+        var ver = verlist.itembyID( selver_updt.value );
+        if ( ver ) {
+            var id   = verlist.store.getValue( ver, 'id' );
+            var name = verlist.store.getValue( ver, 'version_name' );
+            var desc = verlist.store.getValue( ver, 'description' );
+
+            dojo.query( 'input[name=version_id]', form_updatever
+                      )[0].value = id;
+            dojo.query( 'input[name=version_name]', form_updatever
+                      )[0].value = name;
+            dojo.query( 'textarea[name=description]', form_updatever
+                      )[0].value = desc;
+            dijit.byId( "updtverdesc" ).resize();
+        }
+    }
+    function projversions() {
+        /* Setup version selection */
+        var selver_updt = dojo.query( 'div#prjversions select#updtver')[0];
+        function updtver_onchange( e ) {
+            refresh_verdetail();
+            dojo.stopEvent(e);
+        }
+        new ZSelect( selver_updt, 'updtver', updtver_onchange )
+    }
+
+    // Data store fetch on-complete for `projectteams`
+    function projectteams_oncomplete( items, req ) {
+        this.items = items;
+        refresh_projuser( 'toadd,todel' );
+        dojo.publish( 'flash', [ 'hide' ] );
+
+        // When ever a fresh list is fetched, re-populate the visual elements
+        // with the fresh project user list.
+        var _projusers = {}
+        for( i=0; i < this.items.length; i++ ) {
+            var item     = this.items[i];
+            var usersids = this.store.getValues( item, 'usersids' );
+            for( j=0; j < usersids.length; j++ ) {
+                _projusers[usersids[j][1]] = true;
+            }
+        }
+        _projusers= keys( _projusers )
+        _projusers[ _projusers.length ] = adminuser // add project admin
+        _projusers.sort();
+        projusers = dojo.map( _projusers, "return { val: item, txt: item }" )
+        dojo.publish( 'projusers', [ projusers ] );
+        if( pcomplist.items ) {
+            var selpcomp_updt = dojo.query( 'div#prjcomponents select#updtpcomp')[0];
+            var pcomp  = pcomplist.itembyID( selpcomp_updt.value );
+            if( pcomp ) {
+                dojo.publish(
+                    'updtpcompowners',
+                    [ projusers, pcomplist.store.getValue( pcomp, 'owner' ) ]
+                );
+            }
+        }
+    }
+    function refresh_projuser( dostr ) {
+        var aselect_tt = dojo.query( 'form#addprjteam select[name=team_type]' )[0];
+        var ateam = projectteams.itembyID( aselect_tt.value );
+        if( ateam ) {
+            var x_usernames = projectteams.store.getValues( ateam, 'x_usernames');
+            if( /toadd/.test( dostr )) {
+                dojo.publish(
+                    'addprojuser',
+                    [ dojo.map( x_usernames, "return {val:item, txt:item}")]
+                );
+            }
+        }
+
+        var dselect_tt = dojo.query( 'form#delprjteam select[name=team_type]' )[0];
+        var dteam = projectteams.itembyID( dselect_tt.value );
+        if( dteam ) {
+            var usersids = projectteams.store.getValues( dteam, 'usersids');
+            if ( /todel/.test( dostr )) {
+                dojo.publish(
+                    'delprojuser',
+                    [ dojo.map( usersids, "return {val:item[0], txt:item[1]}" )]
+                );
+            }
+        }
+    }
+
+    // Data store fetch on-complete for `teamperms`
+    function teamperms_oncomplete( items, req ) {
+        this.items = items;
+        refresh_teamperms( 'toadd,todel' );
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+    function refresh_teamperms( dostr ) {
+        var aselect_tt = dojo.query( 'form#addteamperms select[name=team_type]')[0];
+        var dselect_tt = dojo.query( 'form#delteamperms select[name=team_type]')[0];
+        var ateam = teamperms.itembyID( aselect_tt.value );
+        var dteam = teamperms.itembyID( dselect_tt.value );
+        var x_permissions = teamperms.store.getValues( ateam, 'x_permissions' );
+        var permsids      = teamperms.store.getValues( dteam, 'permsids' );
+        if( /toadd/.test( dostr )) {
+            dojo.publish(
+                'addpgtoteam',
+                [ dojo.map( x_permissions, "return {val:item, txt:item}")]
+            );
+        }
+        if ( /todel/.test( dostr )) {
+            dojo.publish(
+                'delpgfromteam',
+                [ dojo.map( permsids, "return {val:item[0], txt:item[1]}" )]
+            );
+        }
+    }
+
+    function padmin_forms() {
+        /* Initial Fetching of JSON objects */
+        make_ifrs_pcomplist( '${h.url_pcomplist | n}' );
+        make_ifrs_mstnlist( '${h.url_mstnlist | n}' );
+        make_ifrs_verlist( '${h.url_verlist | n}' );
+        make_ifrs_projectteams( '${h.url_projectteams | n}' );
+        make_ifrs_teamperms( '${h.url_teamperms | n}' );
+
+        pcomplist.fetch({ onComplete : pcomplist_oncomplete,
+                          sort : [ { attribute : 'componentname' } ]
+                        })
+        mstnlist.fetch({ onComplete : mstnlist_oncomplete,
+                         sort : [ { attribute : 'milestone_name' } ]
+                       });
+        verlist.fetch({ onComplete : verlist_oncomplete,
+                        sort : [ { attribute : 'version_name' } ]
+                      });
+        projectteams.fetch({ onComplete : projectteams_oncomplete });
+        teamperms.fetch({ onComplete : teamperms_oncomplete });
+
+        /* Setup tabs */
+        new zeta.ConfigTabs({
+            id: "patabs",
+            tabs: dojo.query( "div[name=patab]" )
+            }, dojo.query( "div[name=patabs]" )[0]
+        )
+        
+        /* Project Logo */
+        new zeta.Attachments(
+            { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+              id: 'logoattachblk',
+              addform: [ 'addprjlogo', '${h.suburl_addprjlogo | n}' ],
+              delform: [ 'delprjlogo', '${h.suburl_delprjlogo | n}' ],
+              attachon: [ '${str(project_id)}', 'project_id' ],
+              editable: ${[0,1][c.logo_editable == True]},
+              url: '${h.url_prjlrefresh | n}',
+              attachs: ${ h.json.dumps(c.logoattach) | n },
+              label: 'Project logo'
+            }, dojo.query( "div[name=projlogo]" )[0]
+        )
+
+        /* Project Icon */
+        new zeta.Attachments(
+            { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+              id: 'iconattachblk',
+              addform: [ 'addprjicon', '${h.suburl_addprjicon | n}' ],
+              delform: [ 'delprjicon', '${h.suburl_delprjicon | n}' ],
+              attachon: [ '${str(project_id)}', 'project_id' ],
+              editable: ${[0,1][c.icon_editable == True]},
+              url: '${h.url_prjirefresh | n}',
+              attachs: ${ h.json.dumps(c.iconattach) | n },
+              label: 'Project icon'
+              }, dojo.query( "div[name=projicon]" )[0]
+        )
+
+        projcomp();
+        projmilestones();
+        projversions();
+    }
+
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+    ctxt_title = "'%s' - Administration" % c.project.projectname 
+    fav        = capture( elements.favoriteicon, 'favproj' )
+    tline      = capture( elements.iconlink, h.url_projadmtimeline,
+                          'timeline', title="Timeline" )
+    ctxt_spans = [ fav, '<span class="fggray fntbold">%s</span>' % ctxt_title, ]
+    rspans     = [ tline ]
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( ctxt_spans, tooltips=page_tooltips, rspans=rspans )}
+    <div id="bdy" class="w100">
+    % if c.userpanes :
+    <div class="panel1">
+    % else :
+    <div class="fullpanel1">
+    % endif
+
+    ${forms.form_projfav(
+        c.authuser, c.project, h.suburl_projfav,
+        c.isfavorite and 'delfavuser' or 'addfavuser'
+    )}
+
+    <div class="m10">
+    <div name="patabs">
+        <div id="projectinfo" class="dispnone" name="patab" title="Project"
+             selected="true">
+            <div name="projlogo"></div>
+            <div name="projicon"></div>
+            <div class="bclear ml50">
+            ${forms.form_projectinfo(
+                c.authuser, c.project, c.licensenames, c.usernames,
+                h.url_license, h.suburl_projectinfo
+            )}
+            </div>
+        </div>
+        <div id="prjcomponents" class="dispnone" name="patab" title="Components">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>New component : </b></div>
+                <div class="disptcell">
+                    ${forms.form_createpcomp(
+                            c.authuser, c.project, c.projusers,
+                            h.suburl_createpcomp
+                    )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Update component : </b></div>
+                <div class="disptcell">
+                    ${forms.form_updatepcomp(
+                            c.authuser, c.project, c.projusers,
+                            c.pcomplist, h.suburl_updatepcomp
+                    )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptcell w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Remove components : </b></div>
+                <div class="disptcell">
+                    ${forms.form_rmpcomp( c.authuser, c.project,
+                                          h.suburl_rmpcomp )}
+                </div>
+            </div>
+        </div>
+        <div id="prjmilestones" class="dispnone" name="patab" title="Milestones">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>New milestone : </b></div>
+                <div class="disptcell">
+                    ${forms.form_createmstn( c.authuser, c.project,
+                                             h.suburl_createmstn )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Update milestone : </b></div>
+                <div class="disptcell">
+                    ${forms.form_updatemstn( c.authuser, c.project, c.mstnlist,
+                                             h.suburl_updatemstn )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Remove milestone : </b></div>
+                <div class="disptcell">
+                    ${forms.form_rmmstn( c.authuser, c.project,
+                                         h.suburl_rmmstn )}
+                </div>
+            </div>
+        </div>
+        <div id="prjversions" class="dispnone" name="patab" title="Versions">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>New version : </b></div>
+                <div class="disptcell">
+                    ${forms.form_createver( c.authuser, c.project,
+                                            h.suburl_createver )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Update version : </b></div>
+                <div class="disptcell">
+                    ${forms.form_updatever( c.authuser, c.project, c.verlist,
+                                            h.suburl_updatever )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Remove versions : </b></div>
+                <div class="disptcell">
+                    ${forms.form_rmver( c.authuser, c.project,
+                                        h.suburl_rmver )}
+                </div>
+            </div>
+        </div>
+        <div id="prjteams" class="dispnone" name="patab" title="Teams">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Add users to team : </b></div>
+                <div class="disptcell">
+                    ${forms.form_addprjteam(
+                                c.authuser, c.project, c.teamtypes,
+                                c.defteamtype, c.x_teamusers, h.suburl_addprjteam
+                    )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Remove users from team : </b></div>
+                <div class="disptcell">
+                    ${forms.form_delprjteam(
+                                c.authuser, c.project, c.teamtypes,
+                                c.defteamtype, c.teamusers, h.suburl_delprjteam
+                    )}
+                </div>
+            </div>
+        </div>
+        <div id="prjpermissions" class="dispnone" name="patab" title="Permissions">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Add permissions to team : </b></div>
+                <div class="disptcell">
+                    ${forms.form_addteamperms(
+                                c.authuser, c.project, c.teamtypes_p,
+                                c.defteamtype, c.x_teampgroups, h.suburl_addteamperms
+                    )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell vtop ml10" style="width : 20em;">
+                    <b>Remove permissions from team : </b></div>
+                <div class="disptcell">
+                    ${forms.form_delteamperms(
+                                c.authuser, c.project, c.teamtypes_p,
+                                c.defteamtype, c.teampgroups, h.suburl_delteamperms
+                    )}
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    </div>
+    % if c.userpanes :
+    <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( padmin_forms );
+        dojoaddOnLoad( 'initform_projfav' );
+        dojoaddOnLoad( 'initform_projectinfo' );
+        dojoaddOnLoad( 'initform_createpcomp' );
+        dojoaddOnLoad( 'initform_updatepcomp' );
+        dojoaddOnLoad( 'initform_rmpcomp' );
+        dojoaddOnLoad( 'initform_createmstn' );
+        dojoaddOnLoad( 'initform_updatemstn' );
+        dojoaddOnLoad( 'initform_rmmstn' );
+        dojoaddOnLoad( 'initform_createver' );
+        dojoaddOnLoad( 'initform_updatever' );
+        dojoaddOnLoad( 'initform_rmver' );
+        dojoaddOnLoad( 'initform_addprjteam' );
+        dojoaddOnLoad( 'initform_delprjteam' );
+        dojoaddOnLoad( 'initform_addteamperms' );
+        dojoaddOnLoad( 'initform_delteamperms' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

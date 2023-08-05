@@ -1,0 +1,757 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+    sel_charts = {
+        'chart1'  : 'tagged-resource-pie',
+        'chart2'  : 'uploaders',
+        'chart3'  : 'files-downloaded',
+        'chart4'  : 'tagged-files',
+        'chart5'  : 'uploaded-timeline',
+        'chart6'  : 'license-projects',
+        'chart7'  : 'tagged-license',
+        'chart8'  : 'user activity',
+        'chart9'  : 'user-site-permissions',
+        'chart10' : 'project-administrators',
+        'chart11' : 'component-owners',
+        'chart12' : 'project-activities',
+        'chart13' : 'milestone-tickets',
+        'chart14' : 'project-activity',
+        'chart15' : 'roadmap',
+        'chart16' : 'wiki-edits',
+        'chart17' : 'wiki-votes',
+        'chart18' : 'wiki-authors',
+        'chart19' : 'wiki-commenters',
+        'chart20' : 'wiki-tags',
+        'chart21' : 'project-tickets',
+        'chart22' : 'ticket-owners',
+        'chart23' : 'ticket-components',
+        'chart24' : 'ticket-milestones',
+        'chart25' : 'ticket-versions',
+        'chart26' : 'ticket-commenters',
+        'chart27' : 'reviewers',
+    }
+%>
+
+<%def name="selectcharts( options, default )">
+    <% options = [ [ opt, sel_charts[opt] ] for opt in options ] %>
+    <div class="ralign pb3 pr10" style="border-bottom: 1px solid gray">
+        <span class="fgcrimson fntbold">Select chart : </span>
+        ${forms.select( id="selchart", options=options, opt_selected=default )}
+    </div>
+</%def>
+
+## ---------------------------- Tag charts ----------------------------
+
+<%def name="chart1( chart1_data, relatedtags )">
+    <div class="floatr p5 bgwhite">
+        <div class="chartcntnr">
+            <div id="chart1" class="chart" style="width: 500px; height: 325px;">
+            </div>
+        </div>
+        <div class="br5 bgwhite p5 mt10"
+             style="width:490px; border: 2px solid LightSteelBlue">
+             <h4>Related tags :</h4>
+             % for tagname, weight in relatedtags :
+                <span class="mr10 vmiddle" style="font-size : ${70 + weight}%">
+                      <a href="${h.url_fortag( tagname)}">${tagname}</a>
+                </span>
+             % endfor
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart1() {
+        var data = ${ h.json.dumps( chart1_data )  | n}
+        chart1_tagchart( data, 'chart1' );
+    }
+    </script>
+</%def>
+
+## ---------------------------- Attachment charts ----------------------------
+
+<%def name="chart2( chart2_data, payload, fcount )">
+    <%
+        topupld    = sorted( chart2_data, key=lambda x : x[1], reverse=True )
+        toppyld    = sorted( chart2_data, key=lambda x : x[2], reverse=True )
+        chartwidth = h.computechartwidth( len(chart2_data), 50, 100 )
+    %>
+    <div name="chart2" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div class="bgblue1 p5 br5 calign" style="margin-left: 20%; margin-right: 20%">
+                Number of files uploaded by registered users, and its payload
+            </div>
+            <div id="chart2" class="chart" style="width: ${chartwidth}%; height: 400px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 fntbold fgcrimson">
+                Around 
+                <span class="fgblack">${payload/(1024*1024)} MB</span>
+                in
+                <span class="fgblack">${fcount} </span> files
+            </div>
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                <div class="fntbold">Top uploaders, by files </div>
+                <table>
+                % for x in topupld[:10] :
+                    <tr>
+                        <td class="fggray ralign p3">
+                            <a href="${h.url_foruser(x[0])}">${x[0]}</a>
+                        </td>
+                        <td class="fggray p3"> ${x[1]} files</td>
+                    </tr>
+                % endfor
+                </table>
+            </div>
+            <div class="br5 p5 mt10 ml20"
+                 style="border: 2px solid LightSteelBlue">
+                <div class="fntbold">Top uploaders, by payload </div>
+                <table>
+                % for x in toppyld[:10] :
+                    <tr>
+                        <td class="fggray ralign p3">
+                            <a href="${h.url_foruser(x[0])}">${x[0]}</a>
+                         </td>
+                        <td class="fggray p3"> ${x[2]} b</td>
+                    </tr>
+                % endfor
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart2() {
+        var chart2_data = ${ h.json.dumps(chart2_data) | n}
+        zcharts['chart2'] = {
+            init: dojo.partial( chart2_user_vs_attach, chart2_data, 'chart2'),
+            cntnr: dojo.query( '[name=chart2]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart3( chart3_data )">
+    <%
+        topdwnd = sorted( chart3_data, key=lambda x : x[2], reverse=True )
+    %>
+    <div name="chart3" class="dispnone ml10 mr10 mt10 bgwhite">
+        <div id="chart3" class="chart floatl" style="width: 75%; height: 400px;">
+        </div>
+        <div class="vtop p10 floatl" style="width: 22%">
+            <div class="br5 p5 ml20" style="border: 2px solid LightSteelBlue">
+                <div class="fntbold">Top downloads : </div>
+                % for x in topdwnd[:10] :
+                    <div class="p3">
+                        <span class="fggray">${x[1]}, </span>
+                        <span class="fgblue">${x[2]}</span>
+                    </div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart3() {
+        var chart3_data  = ${ h.json.dumps(chart3_data) | n}
+        zcharts['chart3'] = {
+            init: dojo.partial( chart3_attach_vs_download, chart3_data, 'chart3' ),
+            cntnr: dojo.query( '[name=chart3]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart4( chart4_data, tagnames )">
+    <%
+        chartwidth = h.computechartwidth( len(chart4_data), 50, 100 )
+    %>
+    <div name="chart4" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart4" class="chart" style="width: ${chartwidth}%; height: 400px;">
+            </div>
+        </div>
+        <div class="vtop p10 floatl" style="width: 22%;">
+            <div class="br5 p5 ml20" style="border: 2px solid LightSteelBlue">
+                <div class="fntbold">Tagnames : </div>
+                ${ ', '.join([ '<a href="%s">%s</a>' % ( h.url_fortag(tag), tag )
+                               for tag in tagnames ]) | n}
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart4() {
+        var chart4_data  = ${ h.json.dumps(chart4_data) | n}
+        zcharts['chart4'] = {
+            init: dojo.partial( chart4_attach_vs_tags, chart4_data, 'chart4' ),
+            cntnr: dojo.query( '[name=chart4]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart5( chart5_data, startdt )">
+    <div name="chart5" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="disptable w100">
+        <div class="disptrow w100">
+            <div id="chart5" class="chart disptcell" style="width: 800px; height: 400px;">
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart5() {
+        var chart5_data  = ${ h.json.dumps(chart5_data) | n}
+        zcharts['chart5'] = {
+            init: dojo.partial( chart5_attach_vs_time, Date.UTC( ${','.join(startdt)} ),
+                                chart5_data, 'chart5' ),
+            cntnr: dojo.query( '[name=chart5]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+## ---------------------------- license charts ----------------------------
+
+<%def name="chart6( chart6_data )">
+    <div name="chart6" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart6" class="chart floatl" style="width: 65%; height: 400px;">
+        </div>
+        <div class="vtop p10 floatl" style="width: 32%;">
+            <div class="br5 p5 ml20" style="border: 2px solid LightSteelBlue">
+                <table class="w100">
+                % for lid, lic, projects in chart6_data :
+                <tr>
+                    <td class="p3 ralign" style="border-right: 1px dotted gray;">
+                        <a href="${h.url_forlicense(lid)}">${lic}</a>
+                    </td>
+                    <td class="p3">
+                        ${ ', '.join([ '<a href="%s">%s</a>' % ( h.url_forproject(p), p )
+                           for p in projects ]) | n}
+                    </td>
+               </tr>
+               % endfor
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart6() {
+        var chart6_data  = ${ h.json.dumps(chart6_data) | n}
+        zcharts['chart6'] = {
+            init: dojo.partial( chart6_license_projects, chart6_data, 'chart6'),
+            cntnr: dojo.query( '[name=chart6]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart7( chart7_data, tagnames )">
+    <div name="chart7" class="dispnone ml10 mt10 mr10 bgwhite">
+            <div id="chart7" class="chart floatl" style="width: 80%; height: 400px;">
+            </div>
+            <div class="vtop p10 floatl" style="width: 17%">
+                <div class="br5 p5 ml20" style="border: 2px solid LightSteelBlue">
+                    <div class="fntbold">Tagnames : </div>
+                    ${ ', '.join([ '<a href="%s">%s</a>' % ( h.url_fortag(tag), tag )
+                                   for tag in tagnames ]) | n}
+                </div>
+            </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart7() {
+        var chart7_data  = ${ h.json.dumps(chart7_data) | n}
+        zcharts['chart7'] = {
+            init: dojo.partial( chart7_license_vs_tags, chart7_data, 'chart7' ),
+            cntnr: dojo.query( '[name=chart7]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+
+## ---------------------------- users charts ----------------------------
+
+<%def name="chart8( chart8_data )">
+    <%
+        chartwidth = h.computechartwidth( len(chart8_data), 50, 100 )
+    %>
+    <div name="chart8" class="dispnone ml10 mt10 mr10 bgwhite"
+         style="width: 95%; overflow: auto;">
+        <div id="chart8" class="chart" style="width: ${chartwidth}%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart8() {
+        var chart8_data  = ${ h.json.dumps(chart8_data) | n}
+        zcharts['chart8'] = {
+            init: dojo.partial( chart8_users_activity, chart8_data, 'chart8' ),
+            cntnr: dojo.query( '[name=chart8]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart9( chart9_data )">
+    <%
+        chartwidth = h.computechartwidth( len(chart9_data), 50, 95 )
+    %>
+    <div name="chart9" class="dispnone ml10 mt10 mr10 bgwhite"
+         style="width: 95%; overflow: auto;">
+         <div id="chart9" class="chart" style="width: ${chartwidth}%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart9() {
+        var chart9_data  = ${ h.json.dumps(chart9_data) | n}
+        zcharts['chart9'] = {
+            init: dojo.partial( chart9_users_siteperm, chart9_data, 'chart9' ),
+            cntnr: dojo.query( '[name=chart9]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart10( chart10_data )">
+    <div name="chart10" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart10" class="chart" style="width: 100%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart10() {
+        var chart10_data  = ${ h.json.dumps(chart10_data) | n}
+        zcharts['chart10'] = {
+            init: dojo.partial( chart10_project_admins, chart10_data, 'chart10' ),
+            cntnr: dojo.query( '[name=chart10]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart11( chart11_data, components_no )">
+    <div name="chart11" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart11" class="chart" style="width: 100%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart11() {
+        var chart11_data  = ${ h.json.dumps(chart11_data) | n}
+        zcharts['chart11'] = {
+            init: dojo.partial( chart11_component_owners, ${components_no},
+                                chart11_data, 'chart11' ),
+            cntnr: dojo.query( '[name=chart11]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+## ---------------------------- user charts ----------------------------
+
+<%def name="chart12( chart12_data )">
+    <div name="chart12" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart12" class="chart" style="width: 100%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart12() {
+        var chart12_data  = ${ h.json.dumps(chart12_data) | n}
+        zcharts['chart12'] = {
+            init: dojo.partial( chart12_userproject_activity,
+                                chart12_data, 'chart12' ),
+            cntnr: dojo.query( '[name=chart12]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+## ---------------------------- milestone charts ----------------------------
+
+<%def name="chart13( id, reslved, unreslved )">
+    <% 
+        total       = reslved + unreslved
+        res_width   = total and int( (reslved/float(total)) * 60 )
+        unres_width = total and int( (unreslved/float(total)) * 60 )
+    %>
+    % if total :
+        <div class="m10 br2" style="width: 90%; height: 1.2em;">
+            <div class="compbar posr floatl brtl4 brbl4"
+                 style="background-color: #9cdfb9; width: ${res_width}%; height: 1.2em;
+                        border-left: 2px solid #b2ffd4; border-top: 2px solid #b2ffd4;
+                        border-bottom: 2px solid #83bc9c;">
+                <div class="tooltip dispnone posa br4 p3 bggray1"
+                     style="left: 20%; bottom: -50%; width: 7em; height: 1.2em; border: 2px solid green;
+                            opacity: 0.4; filter:alpha(opacity=40); z-index: 99">
+                    <span><b>resolved, ${reslved}</b></span>
+                </div>
+            </div>
+            <div class="compbar posr floatl brtr4 brbr4"
+                 style="background-color: #df9c9c; width: ${unres_width}%; height: 1.2em;
+                        border-right: 2px solid #ae7a7a; border-top: 2px solid #ffc9c9;
+                        border-bottom: 2px solid #ae7a7a;">
+                <div class="tooltip dispnone posa br4 p3 bggray1"
+                    style="left: 20%; bottom: -50%; width: 8em; height: 1.2em; border: 2px solid red;
+                           opacity: 0.4; filter:alpha(opacity=40); z-index: 99">
+                   <span><b>unresolved, ${unreslved}</b></span>
+                </div>
+            </div>
+            <span class="pl10 vmiddle disptcell fntbold" style="height: 1.2em;">
+                ${int(reslved/float(total)*100)} % complete
+            </span>
+        </div>
+    % endif
+    <div name="chart13" class="ml10 mt10 mr10 bgwhite">
+        <div id="chart13_${id}" class="chart" style="width: 900px; height: 210px;">
+        </div>
+    </div>
+</%def>
+
+## ---------------------------- project charts ----------------------------
+
+<%def name="chart14( chart14_data )">
+    <div name="chart14" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart14" class="chart" style="width: 100%; height: 400px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart14() {
+        var chart14_data  = ${ h.json.dumps(chart14_data) | n}
+        zcharts['chart14'] = {
+            init: dojo.partial( chart14_project_activity, chart14_data, 'chart14' ),
+            cntnr: dojo.query( '[name=chart14]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart15( chart15_data, startdt )">
+    <%
+        chart_height = (len(chart15_data) * 50) + 50
+        chart_height = 400 if chart_height < 400 else chart_height
+    %>
+    <div name="chart15" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart15" class="chart" style="width: 100%; height: ${chart_height}px;">
+        </div>
+    </div>
+
+
+    <script type="text/javascript">
+    function setup_chart15() {
+        var chart15_data  = ${ h.json.dumps(chart15_data) | n}
+        zcharts['chart15'] = {
+            init: dojo.partial( chart15_roadmap, Date.UTC( ${','.join(startdt)} ),
+                                chart15_data, 'chart15' ),
+            cntnr: dojo.query( '[name=chart15]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+## ---------------------------- wiki charts ----------------------------
+
+<%def name="chart16( chart16_data, wikis )">
+    <%
+        chartwidth = h.computechartwidth( len(chart16_data), 40, 100 )
+    %>
+    <div name="chart16" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart16" class="chart" style="width: ${chartwidth}%; height: 600px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for w in wikis :
+                <div><a href="${w[0]}">${w[1]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart16() {
+        var chart16_data = ${ h.json.dumps(chart16_data) | n}
+        zcharts['chart16'] = {
+            init: dojo.partial( chart16_wiki_cmtsvers, chart16_data, 'chart16'),
+            cntnr: dojo.query( '[name=chart16]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart17( chart17_data )">
+    <div name="chart17" class="dispnone ml10 mr10 mt10 bgwhite">
+        <div id="chart17" class="chart" style="width: 100%; height: 600px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart17() {
+        var chart17_data  = ${ h.json.dumps(chart17_data) | n}
+        zcharts['chart17'] = {
+            init: dojo.partial( chart17_wikivotes, chart17_data, 'chart17' ),
+            cntnr: dojo.query( '[name=chart17]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart18( chart18_data, users )">
+    <%
+        chartwidth = h.computechartwidth( len(chart18_data), 50, 100 )
+    %>
+    <div name="chart18" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart18" class="chart" style="width: ${chartwidth}%; height: 600px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for u in users :
+                <div><a href="${u[1]}">${u[0]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart18() {
+        var chart18_data  = ${ h.json.dumps(chart18_data) | n}
+        zcharts['chart18'] = {
+            init: dojo.partial( chart18_wikiauthors, chart18_data, 'chart18' ),
+            cntnr: dojo.query( '[name=chart18]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart19( chart19_data, users )">
+    <%
+        chartwidth = h.computechartwidth( len(chart19_data), 50, 100 )
+    %>
+    <div name="chart19" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart19" class="chart" style="width: ${chartwidth}%; height: 600px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for u in users :
+                <div><a href="${u[1]}">${u[0]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart19() {
+        var chart19_data  = ${ h.json.dumps(chart19_data) | n}
+        zcharts['chart19'] = {
+            init: dojo.partial( chart19_wikicommentors, chart19_data, 'chart19' ),
+            cntnr: dojo.query( '[name=chart19]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart20( chart20_data, tagnames )">
+    <%
+        chartwidth = h.computechartwidth( len(chart20_data), 50, 100 )
+    %>
+    <div name="chart20" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart20" class="chart" style="width: ${chartwidth}%; height: 600px;">
+            </div>
+        </div>
+        <div class="vtop p10 floatl" style="width: 22%;">
+            <div class="br5 p5 ml20" style="border: 2px solid LightSteelBlue">
+                <div class="fntbold">Tagnames : </div>
+                ${ ', '.join([ '<a href="%s">%s</a>' % ( h.url_fortag(tag), tag )
+                               for tag in tagnames ]) | n}
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart20() {
+        var chart20_data  = ${ h.json.dumps(chart20_data) | n}
+        zcharts['chart20'] = {
+            init: dojo.partial( chart20_wiki_vs_tags, chart20_data, 'chart20' ),
+            cntnr: dojo.query( '[name=chart20]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+## ---------------------------- ticket charts ----------------------------
+
+<%def name="chart21( chart21_data )">
+    <div name="chart21" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart21" class="chart" style="width: 100%; height: 600px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart21() {
+        var chart21_data  = ${ h.json.dumps(chart21_data) | n}
+        zcharts['chart21'] = {
+            init: dojo.partial( chart21_projtickets, chart21_data, 'chart21' ),
+            cntnr: dojo.query( '[name=chart21]' )[0]
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart22( chart22_data, users )">
+    <% chartheight = (320 * len(users)) + 100 %>
+    <div name="chart22" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart22" class="chart" style="width: 100%; height: ${chartheight}px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for u in users :
+                <div><a href="${u[1]}">${u[0]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart22() {
+        var chart22_data  = ${ h.json.dumps(chart22_data) | n}
+        zcharts['chart22'] = {
+            init: dojo.partial( chart22_ticketowners, chart22_data, 'chart22' ),
+            cntnr: dojo.query( '[name=chart22]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart23( chart23_data )">
+    <% chartheight = (320 * len(chart23_data)) + 100 %>
+    <div name="chart23" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart23" class="chart" style="width: 100%; height: ${chartheight}px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart23() {
+        var chart23_data  = ${ h.json.dumps(chart23_data) | n}
+        zcharts['chart23'] = {
+            init: dojo.partial( chart23_ticketcomponents, chart23_data, 'chart23' ),
+            cntnr: dojo.query( '[name=chart23]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart24( chart24_data )">
+    <% chartheight = (320 * len(chart24_data)) + 100 %>
+    <div name="chart24" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart24" class="chart" style="width: 100%; height: ${chartheight}px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart24() {
+        var chart24_data  = ${ h.json.dumps(chart24_data) | n}
+        zcharts['chart24'] = {
+            init: dojo.partial( chart24_ticketmilestones, chart24_data, 'chart24' ),
+            cntnr: dojo.query( '[name=chart24]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart25( chart25_data )">
+    <% chartheight = (320 * len(chart25_data)) + 100 %>
+    <div name="chart25" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div id="chart25" class="chart" style="width: 100%; height: ${chartheight}px;">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart25() {
+        var chart25_data  = ${ h.json.dumps(chart25_data) | n}
+        zcharts['chart25'] = {
+            init: dojo.partial( chart25_ticketversions, chart25_data, 'chart25' ),
+            cntnr: dojo.query( '[name=chart25]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart26( chart26_data, users )">
+    <div name="chart26" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart27" class="chart" style="width: 100%; height: 600px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for u in users :
+                <div><a href="${u[1]}">${u[0]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart26() {
+        var chart26_data  = ${ h.json.dumps(chart26_data) | n}
+        zcharts['chart26'] = {
+            init: dojo.partial( chart26_ticketcommentors, chart26_data, 'chart26' ),
+            cntnr: dojo.query( '[name=chart26]' )[0]
+
+        }
+    }
+    </script>
+</%def>
+
+<%def name="chart27( chart27_data, users )">
+    <div name="chart27" class="dispnone ml10 mt10 mr10 bgwhite">
+        <div class="floatl" style="width: 75%; overflow: auto;">
+            <div id="chart27" class="chart" style="width: 100%; height: 400px;">
+            </div>
+        </div>
+        <div class="floatl p10 w20">
+            <div class="p5 ml20 br5" style="border: 2px solid LightSteelBlue">
+                % for u in users :
+                <div><a href="${u[1]}">${u[0]}</a></div>
+                % endfor
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    function setup_chart27() {
+        var chart27_data  = ${ h.json.dumps(chart27_data) | n}
+        zcharts['chart27'] = {
+            init: dojo.partial( chart27_reviewusers, chart27_data, 'chart27' ),
+            cntnr: dojo.query( '[name=chart27]' )[0]
+
+        }
+    }
+    </script>
+</%def>

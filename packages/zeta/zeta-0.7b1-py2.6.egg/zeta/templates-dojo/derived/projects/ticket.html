@@ -1,0 +1,845 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+[ 'Help',
+"""Tickets are helpful to track bugs, tasks, requirements etc ...
+<br/>
+The three main attributes of a ticket are <b>type, status, severity</b>.
+Type should give an idea about why? and what? of a ticket. Status actually
+tracks the flow of work or activity happening on a ticket. Severity, well tells
+how severe the ticket is to the project (synonymous to priority).
+<br/>
+Every ticket status change should provide the next status of the ticket and
+due-date to act on the ticket state. The user who changes the ticket status
+will become the new owner of the ticket.
+<br/>
+If, in case the changed ticket status actually expects a response from a user
+other than the ticket owner, it can be indicated so using 'promptuser'
+attribute.
+<br/>
+Use ticket id, where ever the ticket needs to be referenced.
+"""
+],
+[ 'Attachments',
+"""Upload attachments by clicking on the iconized title. Clicking on the
+same once again will hide it. Delete attachments by clicking on the cross-wire.
+Upload any number of attachments files to ticket.
+<br/><br/>
+Every attached file, will have its "id" in paranthesis. Use the id value when
+refering to the attachment.
+"""
+],
+[ 'Tags',
+"""Tag a ticket by clicking on the iconized title. Delete tags by clicking on
+the cross-wire. Tag names should be 2 or more characters
+"""
+],
+[ 'Favorites',
+"""Registered users can pick ticket(s) as their favorite, provided the user
+has got 'TICKET_VIEW' permission"""
+],
+[ 'Vote',
+"""Registered users can up-vote or down-vote a ticket."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    /********** Setup Ticket Grid **************/
+    <% 
+       ticket_id   = (c.ticket and c.ticket.id) or ''
+       tckeditable = c.tckeditable and 'true' or 'false' 
+    %>
+
+    // Add empty component, milestone, version for select options
+    components  = ${ h.json.dumps( dict( c.pcomponents + [('','')] )) | n }
+    milestones  = ${ h.json.dumps( dict( c.pmilestones + [('','')] )) | n }
+    versions    = ${ h.json.dumps( dict( c.pversions + [('','')] )) | n }
+
+    tck_typenames= ${ h.json.dumps( c.tck_typenames ) | n }
+    tck_severitynames= ${ h.json.dumps( c.tck_severitynames ) |n }
+    projusers   = ${ h.json.dumps( c.projusers ) |n }
+
+    tckccodes   = ${ c.tckccodes | n }
+
+    function setup_ticket() {
+        var div_zticketpage= dojo.query( 'div.zticketpage' )[0];
+        var div_tcomments  = dojo.query( 'div#tcomments' )[0];
+
+        /* Setup the wiki goto list */
+        select_goto( dojo.query( '#selectticket' )[0] );
+
+        make_ifrs_tckcomments( '${h.url_tckcomments | n}',
+                               items_tckcomments );
+        make_ifrs_tckrcomments( '${h.url_tckrcomments | n}' );
+
+        /* Attachments */
+        new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'tckattachblk',
+                  addform: [ 'addtckattachs', '${h.suburl_addtckattachs | n}' ],
+                  delform: [ 'deltckattachs', '${h.suburl_deltckattachs | n}' ],
+                  attachon: [ '${str(ticket_id)}', 'ticket_id' ],
+                  editable: ${[0,1][c.att_editable == True]},
+                  url: '${h.url_tckattachments | n}',
+                  attachs: ${ h.json.dumps(c.attachs) | n },
+                  clsdisplayitem: "dispblk"
+                }, dojo.query( "div[name=tattachblk]" )[0]
+            )
+        /* Tags */
+        new zeta.Tags(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'tcktagblk',
+                  addform: [ 'addtcktags', '${h.suburl_addtcktags | n}' ],
+                  delform: [ 'deltcktags', '${h.suburl_deltcktags | n}' ],
+                  tagon: [ '${str(ticket_id)}', 'ticket_id' ],
+                  editable: ${[0,1][c.tag_editable == True]},
+                  url: '${h.url_tcktags | n}',
+                  tags: ${ h.json.dumps(c.tags) | n }
+                }, dojo.query( "div[name=ttagblk]" )[0]
+            )
+        /* Comment list */
+        new zeta.CommentContainer({
+                ifrs_comments: tckcomments,
+                ifrs_rcomments: tckrcomments,
+                crformid: 'createtcmt',
+                rpformid: 'replytcmt',
+                edformid: 'updatetcmt',
+                sortby: 'ticket_comment_id',
+                identity: 'ticket_comment_id'
+            }, div_tcomments );
+
+        // Widgetify forms for inline editing.
+        if( ${tckeditable} ) {
+            new zeta.Form({ normalsub: true, formid: 'tcksummary' });
+            new zeta.Form({ normalsub: true, formid: 'tcktype' });
+            new zeta.Form({ normalsub: true, formid: 'tckseverity' });
+            new zeta.Form({ normalsub: true, formid: 'tckcomponent' });
+            new zeta.Form({ normalsub: true, formid: 'tckmilestone' });
+            new zeta.Form({ normalsub: true, formid: 'tckversion' });
+            new zeta.Form({ normalsub: true, formid: 'tckpromptuser' });
+            new zeta.Form({ normalsub: true, formid: 'tckparent' });
+            new zeta.Form({ normalsub: true, formid: 'tckblockedby' });
+            new zeta.Form({ normalsub: true, formid: 'tckblocking' });
+            new zeta.Form({ normalsub: true, formid: 'tckdescription' });
+
+            function createtstat_onsubmit( e ) {
+                submitform( form_createtstat, e );
+                dojo.stopEvent(e);
+                update_colorcode();
+            }
+            new zeta.Form({ onsubmit: createtstat_onsubmit,
+                            formid: 'createtstat' });
+        }
+
+        /* Inline Editing */
+        function update_colorcode() {
+            var st = form_createtstat ?
+                     dojo.query( 'select[name=tck_statusname]', form_createtstat
+                             )[0].value
+                     : null;
+            var sv = form_tckseverity ?
+                     dojo.query( 'input[name=tck_severityname]', form_tckseverity
+                             )[0].value
+                     : null;
+            var ty = form_tcktype ?
+                     dojo.query( 'input[name=tck_typename]', form_tcktype
+                             )[0].value
+                     : null;
+            var tckdetail = {
+                tck_statusname : st,
+                tck_severityname : sv,
+                tck_typename : ty,
+            }
+            var bgcolor = tckcolorcode( tckdetail, tckccodes );
+            dojo.publish( 'tckbrd_chbg', [ 'tckboard', bgcolor ] );
+        }
+
+        var inlines = []
+        if( ${tckeditable} ) {
+            inlines = dojo.query( 'span.inedit', div_zticketpage );
+        }
+        function inline_onchange( formnode, field, value ) {
+            // Translate the component name into id
+            if( field == 'component_id' ) {
+                value = keyforvalue( components, value );
+            } else if ( field == 'milestone_id' ) {
+                value = keyforvalue( milestones, value );
+            } else if ( field == 'version_id' ) {
+                value = keyforvalue( versions, value );
+            }
+            dojo.query( 'input[name=' + field + ']', formnode 
+                      )[0].value = value;
+            submitform( formnode );
+            update_colorcode();
+        }
+        dojo.forEach(
+            inlines,
+            function (item) {
+                var name     = dojo.attr( item, 'name' );
+                var formnode = null;
+                if ( name == 'summary' ) {
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.TextBox",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tcksummary, 'summary' 
+                                    ),
+                        width : '40em',
+                        renderAsHtml: true
+                    }, item )        
+                } else if ( name == 'tck_typename' ) {
+                    var store = create_ifrs_store( tck_typenames );
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tcktype, 'tck_typename'
+                                    ),
+                        editorParams : { class: "fntbold", store: store }
+                    }, item )        
+                } else if ( name == 'tck_severityname' ) {
+                    var store = create_ifrs_store( tck_severitynames );
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckseverity, 'tck_severityname'
+                                    ),
+                        editorParams : { store : store }
+                    }, item )        
+                } else if ( name == 'component_id' ) {
+                    var store = create_ifrs_store( values(components).sort() );
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckcomponent, 'component_id'
+                                    ),
+                        editorParams : { store : store }
+                    }, item )        
+                } else if ( name == 'milestone_id' ) {
+                    var store = create_ifrs_store( values(milestones).sort() );
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckmilestone, 'milestone_id'
+                                    ),
+                        editorParams : { store : store }
+                    }, item )        
+                } else if ( name == 'version_id' ) {
+                    var store = create_ifrs_store( values(versions).sort());
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckversion, 'version_id'
+                                    ),
+                        editorParams : { store : store }
+                    }, item )        
+                } else if ( name == 'promptuser' ) {
+                    var store = create_ifrs_store( projusers );
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.FilteringSelect",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckpromptuser, 'promptuser'
+                                    ),
+                        editorParams : { store : store }
+                    }, item )        
+                } else if ( name == 'parent_id' ) {
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.TextBox",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckparent, 'parent_id'
+                                    )
+                    }, item )        
+                } else if ( name == 'blockedby_ids' ) {
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.TextBox",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckblockedby, 'blockedby_ids'
+                                    )
+                    }, item )        
+                } else if ( name == 'blocking_ids' ) {
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.TextBox",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckblocking, 'blocking_ids'
+                                    )
+                    }, item )        
+                }
+                /*
+                else if ( name == 'description' ) {
+                    new dijit.InlineEditBox({
+                        editor : "dijit.form.Textarea",
+                        onChange  : dojo.hitch(
+                                        null, inline_onchange,
+                                        form_tckdescription, 'description'
+                                    )
+                    }, item )
+                }
+                */
+            }
+        );
+
+        /* Change status */
+        var span_togglest = dojo.query( "span.togglest" );
+        if( span_togglest.length ){
+            dojo.connect(
+                span_togglest[0],
+                'onclick',
+                function( e ) {
+                    dojo.toggleClass( dojo.query( 'div.changest' )[0],
+                                      'dispnone', false );
+                    dojo.toggleClass( dojo.query( 'div.viewst' )[0],
+                                      'dispnone', true );
+                    dojo.stopEvent( e );
+                }
+            );
+        }
+
+        /* Graph and Tree */
+        toggler(
+            dojo.query( 'span[name=depgraph]' )[0],
+            dojo.query( 'div[name=graph]' )[0],
+            'Hide', 'Graph', true,
+            function( n_trigger, n, v_text, h_text ) { // Onshow
+                var n_obj = dojo.query( 'object', n )[0];
+                var b_obj = dojo.coords( n_obj );
+                var b_par = dojo.coords( n_obj.parentNode );
+                dojo.style(
+                    n_obj,
+                    { marginLeft : ((b_par.w - b_obj.w) / 2)+'px' }
+                );
+                console.log( (b_par.w - b_obj.w) / 2 )
+            }
+        )
+        toggler(
+            dojo.query( 'span[name=hiertree]' )[0],
+            dojo.query( 'div[name=tree]' )[0],
+            'Hide', 'Tree', true,
+            function( n_trigger, n, v_text, h_text ) { // Onshow
+                var n_obj = dojo.query( 'object', n )[0];
+                var b_obj = dojo.coords( n_obj );
+                var b_par = dojo.coords( n_obj.parentNode );
+                dojo.style(
+                    n_obj,
+                    { marginLeft : ((b_par.w - b_obj.w) / 2)+'px' }
+                );
+            }
+        )
+    }
+    </script>
+</%def>
+
+<%def name="ticket_details( tckdet )">
+    <%
+        due_date       = tckdet.get( 'due_date', '' )
+        statusname     = tckdet['status']
+        parent_id      = tckdet.get( 'parent', '' )
+        blockers       = ', '.join([ str(b) for b in  c.blockers ])
+        blocking       = ', '.join([ str(b) for b in  c.blocking ])
+        children       = ', '.join([ str(child) for child in  c.children ])
+        flash_schedule = ''
+        flashfg        = ''
+
+        if due_date :
+            due_date = due_date.astimezone( h.timezone(c.authuser.timezone))
+            daysleft = due_date.astimezone( h.timezone('UTC') ) - \
+                       h.timezone('UTC').localize( h.dt.datetime.utcnow() )
+            if statusname not in c.ticketresolv :
+                if (daysleft < h.dt.timedelta(0)) and statusname not in c.ticketresolv :
+                    flash_schedule = "( Schedule overun by %s )" % \
+                                     h.olderby( abs(daysleft.days) )
+                    flashfg = 'fgred'
+                else :
+                    flash_schedule = "( %s left )" % h.olderby( daysleft.days )
+                    flashfg = 'fggreen'
+
+        tckcreator  = c.ticketstatus[0][4]
+    %>
+    <div class="w100 ralign fgcrimson fntbold pr10">
+        Created by, <a href="${h.url_foruser(tckcreator)}">${tckcreator}</a>,
+        on ${c.ticket.created_on.strftime('%a, %b %d, %Y')}
+    </div>
+    <div class="disptable">
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Summary</span>
+            </div>
+            <div class="p5 disptcell">
+                <% summary = tckdet['summary'] %>
+                <span name="summary" class="fntbold inedit">${summary |n}</span>
+            </div>
+        </div>
+    </div>
+    <hr></hr>
+    %if c.tckeditable :
+        <span class="togglest floatr pointer fgblue">Change-status</span>
+    % endif
+    <div class="viewst">
+    <div class="disptable">
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">status</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="tck_statusname" class="fntbold undrln">
+                    ${statusname.upper()}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">Duedate</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="due_date" class="fntbold">
+                    ${due_date and due_date.strftime('%a, %b %d, %Y') or '-'}
+                </span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">Owner</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="owner" class="fntbold">${tckdet['owner']}</span>
+            </div>
+            <div class="p5 ml50 disptcell">
+                <span class="${flashfg}" >${flash_schedule}</span>
+            </div>
+        </div>
+    </div>
+    </div>
+    <div class="changest dispnone">
+        ${forms.form_changetckst(
+                    c.authuser, c.project, c.ticket,
+                    tckdet['status'],
+                    due_date and due_date.strftime('%m/%d/%Y') or '-',
+                    h.suburl_changetckst, c.tck_statusnames
+        )}
+    </div>
+    <hr></hr>
+    <div class="floatr pl10 m5 pr10"
+         style="border-left : 2px solid crimson">
+        <b class="dispblk undrln pb10">Reference</b>
+        <%
+            parent   = tckdet['parent']
+        %>
+        <div>
+        % if parent :
+        <a href="${h.url_forticket( h.maptckproj(parent), parent )}"
+           >${parent}</a>
+        % endif
+        </div>
+        <div>
+        % for tck in c.children :
+            <a href="${h.url_forticket( h.maptckproj(tck), tck )}"
+               class="mr5">${tck}</a>
+        % endfor
+        </div>
+        <div>
+        % for tck in c.blockers :
+            <a href="${h.url_forticket( h.maptckproj(tck), tck )}"
+               class="mr5">${tck}</a>
+        % endfor
+        </div>
+        <div>
+        % for tck in c.blocking :
+            <a href="${h.url_forticket( h.maptckproj(tck), tck )}"
+               class="mr5">${tck}</a>
+        % endfor
+        </div>
+    </div>
+    <div class="disptable">
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Type</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="tck_typename" class="fntbold inedit">
+                    ${tckdet['type']}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">&ensp;Severity</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="tck_severityname" class="fntbold inedit">
+                    ${tckdet['severity']}</span>
+            </div>
+        </div>
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Component</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="component_id" class="fntbold inedit">
+                    ${tckdet['compname']}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">&ensp;Milestone</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="milestone_id" class="fntbold inedit">
+                    ${tckdet['mstnname']}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">&ensp;Version</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="version_id" class="fntbold inedit">
+                    ${tckdet['vername']}</span>
+            </div>
+        </div>
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Prompting</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="promptuser" class="fntbold inedit">
+                    ${tckdet['promptuser']}</span>
+            </div>
+        </div>
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Parent</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="parent_id" class="fntbold inedit">
+                    ${tckdet['parent']}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">&ensp;Children</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="fntbold">${children}</span>
+            </div>
+        </div>
+        <div class="disptrow">
+            <div class="p5 disptcell">
+                <span class="">Blockers</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="blockedby_ids" class="fntbold inedit">${blockers}</span>
+            </div>
+            <div class="p5 disptcell">
+                <span class="">&ensp;Blocking</span>
+            </div>
+            <div class="p5 disptcell">
+                <span name="blocking_ids" class="fntbold inedit">${blocking}</span>
+            </div>
+        </div>
+    </div>
+    <hr></hr>
+    <div class="p5">
+        <span class="describe floatr pointer fgblue">Describe</span>
+        <div class="fntbold">Description</div>
+        <div name="descriptionhtml" class="">
+            ${tckdet['descriptionhtml'] | n}
+        </div>
+        <div name="descriptionform" class="dispnone">
+            ${forms.form_tckdescription(
+                c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+        </div>
+    </div>
+    <script type="text/javascript">
+        dojo.addOnLoad( function () {
+            dojo.connect(
+                dojo.query( 'span.describe' )[0],
+                'onclick',
+                function( e ) {
+                    dojo.toggleClass( dojo.query( 'div[name=descriptionhtml]' )[0],
+                                      'dispnone', true );
+                    dojo.toggleClass( dojo.query( 'div[name=descriptionform]' )[0],
+                                      'dispnone', false );
+                    dojo.stopEvent( e );
+                }
+            );
+        })
+    </script>
+    ${forms.form_tcksummary( 
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tcktype(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckseverity(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckcomponent(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckmilestone(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckversion(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckpromptuser(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckparent(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckblockedby(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+    ${forms.form_tckblocking(
+        c.authuser, c.project, h.suburl_configtck, t=c.ticket )}
+</%def>
+
+<%def name="status_block( ts, refdt )">
+    <%
+        created_on = h.timezone( c.authuser.timezone ).localize( ts[3] )
+        before     = refdt - created_on
+        stfg       = ts[1] in c.ticketresolv and 'fggray' or 'fgblue'
+        ownername  = ts[4]
+    %>
+    <div class="p3">
+        <div class="${stfg} p2 fntbold">${ts[1]}</div>
+        <div class="p2">by, <a href="${h.url_foruser(ownername)}">${ownername}</a></div>
+        <div class="p2">
+            ${created_on.strftime('%a, %b %d, %Y')}
+        </div>
+    </div>
+</%def>
+
+<%def name="status_delimiter( ts, actualdt=None )">
+    <%
+        if ts[2] :
+            due_date = ts[2].astimezone( h.timezone(c.authuser.timezone))
+            diffdt   = due_date - actualdt
+            diffdays = int(repr(diffdt.days))
+            if 0 <= diffdays :
+                diffby = 'beaten by ' + h.olderby( diffdays )
+                difffg = 'fggreen'
+            else :
+                diffby = 'overrun by ' + h.olderby( abs(diffdays) )
+                difffg = 'fgred'
+        else :
+            diffby = '-'
+            difffg = 'fggray'
+    %>
+    <div>
+        <div>
+            <div style="width : 49%; height: 1em; border-right: 2px solid #f2f2f2;"> 
+            </div>
+        </div>
+        <div class="${difffg} p2">${diffby}</div>
+        <div>
+            <div style="width : 49%; height: 1em; border-right: 2px solid #f2f2f2"> 
+            </div>
+        </div>
+    </div>
+</%def>
+
+<%def name="status_flow( tckstat )">
+    <% 
+        tss    = tckstat
+        tss.reverse()
+        currdt = h.timezone(c.authuser.timezone).localize( h.dt.datetime.utcnow() )
+        nextdt = h.timezone(c.authuser.timezone).localize( tss[0][3] )
+    %>
+    <div class="p3" style="border-bottom: 2px solid #f2f2f2;">
+        <div class="fntbold">Status Flow</div>
+        <div>(in reverse chonology)</div>
+    </div>
+    ${status_block( tss[0], currdt )}
+    % for ts in tss[1:] :
+        ${status_delimiter( ts, nextdt )}
+        <% nextdt = h.timezone(c.authuser.timezone).localize( ts[3] ) %>
+        ${status_block( ts, currdt )}
+    % endfor
+</%def>
+
+<%def name="show_ticket()">
+    <%
+        tckdet    = c.ticketdetail
+        tckccodes = h.json.loads( c.tckccodes )
+        bgcolor   = h.tckcolorcode(
+                            { 'tck_statusname'  : tckdet['status'],
+                              'tck_severityname': tckdet['severity'],
+                              'tck_typename'    : tckdet['type'],
+                            },
+                            tckccodes
+                    )
+        resolved= tckdet['status'] in c.ticketresolv and 'strike' or ''
+    %>
+    <div class="zticketpage mr5">
+        <div class="pb2" style="height: 1.5em; border-bottom : 1px solid gray">
+            <div class="floatl">
+                <span class="fntbold ${resolved} ml10 mr10" style="font-size: 125%">
+                    Ticket ${c.ticket.id} :
+                </span>
+                <span name="tckvote"></span>
+            </div>
+            <div class="floatr dispinln">
+                <span name="depgraph" title="Ticket dependency graph"
+                      class="fgblue pointer mr5">Graph</span>
+                <span name="hiertree" title="Parent-children hierarchy"
+                      class="fgblue pointer mr5">Tree</span>
+                <a class="nodec mr5" href="#comments">Comments</a>
+            </div>
+        </div>
+        <div>
+            <div class="floatl" style="width:200px;">
+                <div>
+                    <div name="tattachblk"></div>
+                </div>
+                <div class="bclear">
+                    <div name="ttagblk"></div>
+                </div>
+                <div class="ml10 fntbold bclear">
+                    <a href="${h.url_tagcloud}">Visit tag cloud ...</a>
+                </div>
+            </div>
+
+            <div class="calign vtop floatr"
+                 style="width : 150px; border-left : 4px solid #f2f2f2;">
+                ${status_flow( c.ticketstatus )}
+            </div>
+
+            <div style="margin: 0px 150px 0px 200px;">
+                <div class="">
+                    <div name="graph" class="ml10 mr20 pt10 dispnone">
+                        <div class="bgaliceblue">
+                            <h4 class="">Dependency graph</h4>
+                        </div>
+                        <div style="max-width: 100%;
+                                    max-height: 400px; overflow: auto;">
+                        <object data="${h.url_ticketgraph}" class="ml20"
+                                type="image/svg+xml"></object>
+                        </div>
+                    </div>
+                    <div name="tree" class="ml10 mr20 pt10 dispnone">
+                        <div class="bgaliceblue">
+                            <h4 class="">Task tree</h4>
+                        </div>
+                        <div style="max-width: 100%;
+                                    max-height: 400px; overflow: auto;">
+                        <object data="${h.url_tickettree}" class="ml20"
+                                type="image/svg+xml"></object>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ml10 mr10">
+                    <div class="m2 p5 br5"
+                         style="border: 1px solid gray; top : 1.2em;
+                         margin-left: 0px; background: ${bgcolor}"
+                         name="tckboard">
+                        ${ticket_details( c.ticketdetail )}
+                    </div>
+                </div>
+
+                <div class="commentbox ml10 mr10">
+                    <div><a name="comments"></a></div>
+                    <div id="tcomments" class="" class="mt20"> </div>
+                    <div id="createtcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone mb10 pl3 pt3 w80">
+                        <div class="posr fntbold">Add your comment :</div>
+                        ${forms.form_createtcmt( c.authuser, c.project, c.ticket,
+                                                 h.suburl_createtcmt )}
+                    </div>
+                    <div id="updatetcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_updatetcmt( c.authuser, c.project, c.ticket,
+                                                 h.suburl_updatetcmt )}
+                    </div>
+                    <div id="replytcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_replytcmt( c.authuser, c.project, c.ticket,
+                                                h.suburl_replytcmt )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        items_tckcomments = ${c.items_tckcomments | n }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchticket', 'Search-ticket',
+                        h.suburl_search, c.searchfaces
+                    )
+        sel_tck = capture( forms.form_selectticket, c.authuser,
+                           c.seltickets, c.ticket and str(c.ticket.id) or '' )
+        if c.tckeditable :
+            newtck  = '<span class="ml10 fwnormal fntsmall"> \
+                       <a href="%s" title="Create a new ticket"> \
+                       Create</a></span>' % h.url_ticketcreate
+        else :
+            newtck = '<span></span>'
+        fav   = capture( elements.favoriteicon, 'favtck' )
+
+        charts = capture( elements.iconlink, h.url_ticketcharts,
+                          'barchart', title="Ticket analytics" )
+        tline = capture( elements.iconlink, h.url_tcktimeline,
+                         'timeline', title="Timeline for ticket" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ fav, searchbox, sel_tck, newtck, ],
+                           rspans=[ charts, tline ],
+                           tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                % if c.authorized :
+                    ${forms.form_tckfav(
+                        c.authuser, c.project, c.ticket, h.suburl_tckfav,
+                        c.isuserfavorite and 'delfavuser' or 'addfavuser'
+                    )}
+                    ${forms.form_votetck(
+                        c.authuser, c.project, c.ticket, h.suburl_votetck,
+                        c.upvotes, c.downvotes, c.currvote
+                    )}
+                % endif
+                ${show_ticket()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_ticket );
+        dojo.addOnLoad( function() {
+            dojo.subscribe(
+                'tckbrd_chbg',
+                function( name, bgcolor ) {
+                    n = dojo.query( 'div[name='+name+']' )[0];
+                    dojo.style( n, { background : bgcolor });
+                }
+            );
+        });
+        dojoaddOnLoad( 'initform_tckfav' );
+        dojoaddOnLoad( 'initform_votetck' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

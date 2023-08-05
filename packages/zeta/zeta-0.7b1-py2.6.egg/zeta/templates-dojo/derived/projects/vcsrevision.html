@@ -1,0 +1,234 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Details about each repository revision listed in reverse chronological order.
+"""
+],
+[ 'Repository-list',
+"""Integrate one or more repositories with projects by providing its
+<em>type</em> (like svn ...) and <em>root-url</em>. Make sure that
+<em>root-url</em> points to the same machine, or to a machine on the local network.
+<br/>
+Repositories integrated with this project are listed in grid-style. Edit them
+inline.
+"""
+],
+[ 'Browsing',
+"""
+Browsing the repository is provided in explorer style. By default the latest
+version of the repository is shown in the explorer widget. To explore a different
+revision use <b>< revno</b> and <b>revno ></b> links.
+"""
+],
+[ 'Files',
+"""
+Files in repository are viewable with syntax highlighting, annotation and
+changesets.
+"""
+],
+
+]
+
+import xml.etree.cElementTree as et
+from   pygments.formatters    import HtmlFormatter
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+    <style type="text/css">
+        ${HtmlFormatter().get_style_defs('.highlight')}
+        ## The following are for current pygmentation. When pygmentation and
+        ## annotations are merged, take a relook.
+        .highlighttable td.linenos { padding : 3px }
+        .highlighttable td.code { padding : 3px }
+    </style>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="changedfile( cf )">
+    <%
+        cf_ddurl = ''
+        if cf['mime_type'] == 'text/directory' :
+            cf_url   = '<span class="fggray">dir: '+cf['repos_path']+'</span>'
+        else :
+            cf_url   = '<a href="%s">file:%s</a>' % \
+                            ( cf['fileurl'], cf['repos_path'] )
+
+        cfdiff = cf['diff'].strip()
+        cfdiff = cf['diff'].strip('\r\n\t')
+        if cfdiff :
+            cfdiff = h.syntaxhl( cfdiff, lexname='diff', linenos=True )
+            cfdiff = '<code class="wsprewrap">%s</code>' % cfdiff
+        else :
+            cfdiff = '<em> Empty difference</em>'
+    %>
+    <tr class="cfrows">
+    % if cf['changetype']   == 'modified' :
+        <td class="pt10" style="width: 10em">
+            Modified
+            ( <span name="diff" class="fgblue pointer"> diff </span> )
+        </td>
+        <td class="pt10 pl10">
+            <span>${cf_url |n}</span>
+            <a class="ml10 fgIred" href="${cf['diffdownlurl'] | n}">download-diff</a>
+        </td>
+    % elif cf['changetype'] == 'added' :
+        <td class="pt10 fggreen">Added</td>
+        <td class="pl10 pt10 ">${cf_url |n}</td>
+    % elif cf['changetype'] == 'deleted' :
+        <td class="fgred">Deleted</td>
+        <td class="pl10 pt10 fggray">${cf['repos_path']}</td>
+    % elif cf['changetype'] == 'normal' :
+        <td class="fggray">Normal</td>
+        <td class="pl10 pt10">${cf_url |n}</td>
+    % endif
+    </tr>
+    <tr class="cfrows dispnone ml50 pt10 pl10">
+        <td class="pl20 pt10 pb10" colspan="3">
+            <div class="pl5" style="border-left: 2px solid gray;">
+            ${cfdiff | n}
+            </div>
+        </td>
+    </tr>
+</%def>
+
+<%def name="showrevision()">
+    <%
+        if c.revno_p :
+            prevrev = [ '&#8249; r'+str(c.revno_p) or '', h.url_revprev ]
+        if c.revno_n :
+            nextrev = [ 'r'+str(c.revno_n)+' &#8250;' or '', h.url_revnext ]
+    %>
+    <div class="disptable w100">
+    <div class="disptrow w100">
+        <div class="disptcell w100">
+            <div class="ml10 pb5" style="border-bottom : 1px solid gray">
+                <div class="ml10 posr floatr">
+                    % if c.revno_p :
+                        <a href="${prevrev[1]}" class="pl10">${prevrev[0] | n}</a>
+                    % endif
+                    <span class="fntbold pl10">r${c.revno}</span>
+                    % if c.revno_n :
+                        <a href="${nextrev[1]}" class="pl10">${nextrev[0] | n}</a>
+                    % endif
+                </div>
+                <a class="ml10 floatr"
+                   title="Review all modified / added files in this changeset"
+                   href="${h.url_reviewrev}">Review</a>
+                <span class="fntbold">Revision: </span>
+                <span class="fntbold fggreen">r${c.revision[1]} </span>
+                <span class="pl10">by <span>
+                <span class="fggreen">${c.revision[2]}, </span>
+                <span class="pl10">on <span>
+                <span class="fggreen">
+                    ${c.revision[3].strftime( '%a, %b %d, %Y' )}
+                </span>
+            </div>
+            <div class="pl10">
+                <br></br>
+                <div class="fnt100 fntbold">Log Message</div>
+                <br></br>
+                <pre class="wsprewrap" style="margin-left:1em;">${c.revision[0]}</pre>
+                <br></br>
+                <div class="fnt100 fntbold floatl">Affected Files</div>
+                <div class="ml10 fntsmall floatl">
+                <a class="fgIred" title="download it as patchfile"
+                   href="${c.revision[4]}">download-diff</a>
+                </div>
+                <br></br>
+                <table id="affectedfiles" class="ml20">
+                % for cf in c.changedfiles :
+                    ${changedfile( cf )}
+                % endfor
+                </table>
+            </div>
+        </div>
+    </div>
+    </div>
+    <script type="text/javascript">
+        function setup_diff() {
+            var n_tbl = dojo.byId( "affectedfiles" );
+            if( n_tbl ) {
+                var n_trs = dojo.query( "tr.cfrows", n_tbl );
+                for( i = 0; i < n_trs.length; i+=2 ) {
+                    var n_span = dojo.query( "span[name=diff]", n_trs[i] )[0];
+                    if( n_span ) {
+                        toggler( n_span, n_trs[i+1], "close", "diff", true )
+                    }
+                }
+            }
+        };
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title   = '<a class="fntbold ml10">%s</a>' % c.vcs.name
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        vcsbrowse = '<a class="ml10" title="Browse latest version" \
+                     href="%s">Browser</a>' % h.url_vcsbrowse
+        revlist   = '<a class="ml10" title="List of repository revisions" \
+                     href="%s">Revisions</a>' % h.url_revlist
+        if c.vcseditable :
+            newvcs  = '<span class="ml10 fwnormal fntsmall">' +\
+                      '<a href="%s" \
+                          title="Integrate a new repository">Integrate</a></span>' % \
+                               h.url_vcscreate
+        else :
+            newvcs = ''
+        tline = capture( elements.iconlink, h.url_vcstimeline,
+                         'timeline', title="Timeline of vcs-integration" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title, sel_vcs, vcsbrowse, revlist, newvcs, ],
+                          rspans=[ tline ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div class="mr10">
+                ${showrevision()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            /* Setup the vcs goto list */
+            select_goto( dojo.query( '#selectvcs' )[0] );
+        });
+        dojo.addOnLoad( setup_diff );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

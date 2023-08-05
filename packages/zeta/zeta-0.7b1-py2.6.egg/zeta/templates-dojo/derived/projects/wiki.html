@@ -1,0 +1,477 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Each wiki page is rendered with html translated wiki document and gives simple
+statistical details for the page. Download a wiki page as text, pdf, html or
+ps file.
+"""
+],
+
+[ 'Comments',
+"""Discussions on wiki document"""
+],
+[ 'History',
+"""List of previous versions of a wiki page and color coded differences
+between them.
+"""
+],
+[ 'Attachments',
+"""Upload attachments by clicking on the iconized title. Clicking on the
+same once again will hide it. Delete attachments by clicking on the cross-wire.
+Upload any number of files.
+<br/>
+Every attached file, will have its "id" in paranthesis. Use the id value when
+refering to the attachment.
+"""
+],
+[ 'Tags',
+"""Tag a wiki page by clicking on the iconized title. Delete tags by clicking
+on the cross-wire. Tag names should be 2 or more characters.
+"""
+],
+[ 'Markups',
+"""
+<table style="border-collapse: separate; border-spacing: 5px">
+<tr>
+<td>Text-Markup </td>
+<td>
+    <div class="disptrow">
+    <div class="disptcell">
+        &ensp;&ensp;'' <b>bold</b> '' &ensp;&ensp;// <em>italic</em> //
+        &ensp;&ensp;__ <u>underline</u> __
+        &ensp;&ensp;^^ <sup>super-script</sup> ^^
+        &ensp;&ensp;,, <sub>super-script</sub> ,,
+        &ensp;&ensp;'/ <b><em>bold-italic</em></b> '/
+        &ensp;&ensp;'_ <b><u>bold-underline</u></b> '_
+    </div></div>
+    <div class="disptrow">
+    <div class="disptcell">
+        &ensp;&ensp;/_ <em><u>italic-underline</u></em> /_
+        &ensp;&ensp;'/_ <b><em><u>super-script</u></em></b> '/_
+        &ensp;&ensp;~? escape one character 
+        &ensp;&ensp;\\\n escape newline 
+        &ensp;&ensp;\\\\ line break
+    </div></div>
+</td>
+</tr>
+<tr>
+<td>Links and anchor </td>
+<td>
+    &ensp;&ensp;[[ href | text ]] &ensp;&ensp;[[ *href_in_newwindow | text ]]
+    &ensp;&ensp;[[ $anchor | text ]] &ensp;&ensp;[[ +image | text ]]
+</td>
+</tr>
+<tr>
+<td>Heading </td>
+<td>&ensp;&ensp;=, ==, ===, ====, =====, for upto five levels of sub-headings</td>
+</tr>
+<tr>
+<td>Horizontal-rule </td><td>&ensp;&ensp;----</td>
+</tr>
+<tr>
+<td>Block-Markup</td>
+    <div class="disptrow">
+    <div class="disptcell">&ensp;&ensp;*{1,5} for upto 5 levels of unordered list</div>
+    </div>
+    <div class="disptrow">
+    <div class="disptcell">&ensp;&ensp;#{1,5} for upto 5 levels of ordered list </div>
+    </div>
+    <div class="disptrow">
+    <div class="disptcell">
+        &ensp;&ensp;>{1,5} for upto 5 levels of block-quoted text.</div>
+    </div>
+</tr>
+</table>
+<br/>
+To know more about macros, extensions, zetalinks and several other features
+visit <a href="/help/zwiki/ZWiki">here</a>.
+"""
+],
+[ 'Favorites',
+"""Registered users can pick wikipage(s) as their favorite."""
+],
+[ 'Vote',
+"""Registered users can up-vote or down-vote a wiki page."""
+]
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="show_wikipage()">
+    <%
+        author     = c.wcnt.author
+        created_on = h.utc_2_usertz( c.wcnt.created_on, c.authuser.timezone )
+    %>
+    <div class="zwikipage mr5">
+        <div class="posr pb2" style="height: 1.25em; border-bottom : 1px solid gray">
+            <div class="floatl">
+                <span name="wikivote"></span>
+            </div>
+            <div class="floatr">
+                <span name="wdownload" title="Download in different formats"
+                      class="fntbold fgblue pointer">
+                    download<span class="fntxsmall vmiddle"> &#9660;</span>
+                </span>
+                <span name="wvermenu" title="Goto previous version of document"
+                      class="ml5 fntbold fgblue pointer">
+                    ver<span class="fntxsmall vmiddle"> &#9660;</span>
+                </span>
+                <a class="ml5" title="Create review entry for this document"
+                   href="${h.url_reviewwiki}">Review</a>
+                <a class="ml5" title="Discuss this document"
+                   href="${h.url_wtalkpage}">Talkpage</a>
+                % if c.wikieditable :
+                <a class="ml5" href="${h.url_wikiedit}">Edit</a>
+                % endif
+                <a class="ml5" title="Watch document history"
+                   href="${h.url_whistory}">History</a>
+            </div>
+        </div>
+        <div class="ml10 mr10">
+            <div class="floatr" style="width: 250px;">
+                <div class="br4 ml10" style="border : 1px dotted gray;">
+                    <div class="p3 fntbold bggray1">
+                        Page Info
+                        <div class="floatr fggray fntitalic">
+                            Version ${c.wcnt.id}
+                        </div>
+                    </div>
+                    <div class="p3 calign">
+                        document type,
+                        <span class="fgLCoral fntbold">
+                            ${c.wiki.type.wiki_typename}</span>
+                    </div>
+                    <div class="p3 calign">
+                        last edited by,
+                        <a class="fntbold" href="${h.url_foruser(author)}"
+                           >${author} </a>
+                    </div>
+                    <div class="p3 calign"
+                         title="${created_on.strftime('%b %d, %Y, %r')}">
+                        last edited on,
+                        <span class="fggreen fntbold">
+                             ${created_on.strftime('%b %d, %Y')}</span>
+                    </div>
+                </div>
+
+                <div class="br4 ml10 mt5 fntbold" style="border : 1px dotted gray;">
+                    <div class="p3 bggray1">Authors </div>
+                    <table class="w100">
+                    % for auth, count in c.wikiauthors.iteritems() :
+                        <tr>
+                         <td class="p3 calign" style="border: none;">
+                            <a href="${h.url_foruser(auth)}">${auth}</a>
+                        </td>
+                        <td class="p3 fggray lalign" style="border: none;">
+                            ${count} edits
+                        </td>
+                        </tr>
+                    % endfor
+                    </table>
+                </div>
+                <div>
+                    <div name="wattachblk"></div>
+                </div>
+                <div class="bclear">
+                    <div name="wtagblk"></div>
+                </div>
+                <div class="ml10 fntbold bclear">
+                    <a href="${h.url_tagcloud}">Visit tag cloud ...</a>
+                </div>
+            </div>
+
+            <div style="margin-right: 250px">
+                <div>
+                    ${c.wikihtml | n}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    <% wiki_id      = (c.wiki and c.wiki.id) or '' %>
+    function setup_wikipage() {
+
+        /* Setup the wiki version menu */
+        var wvMenu=null;
+        var vernode    = dojo.query( 'span[name=wvermenu]' )[0];
+        var wversions  = ${h.json.dumps( c.wversions ) | n};
+
+        if ( vernode ) {
+            wvMenu = new zeta.Menu({ 
+                            targetNodes   : [ vernode ],
+                            style: { fontSize: 'small',
+                                     color: 'blue',
+                                     minWidth: '2em'
+                                   }
+                         });
+            dojo.forEach( wversions,
+                function( ver ) {
+                    wverurl = '<a href="' + ver[0] + '">' + ver[1] + '</a>'
+                    wvMenu.addChild(
+                        new zeta.MenuItem(
+                            { content: wverurl, class: 'fntbold hoverhighlight' }
+                        )
+                    );
+                }
+            );
+        }
+
+        /* Setup wiki download menu */
+        var wdMenu=null;
+        var dwnnode    = dojo.query( 'span[name=wdownload]' )[0];
+        var wdownload  = ${h.json.dumps( c.wdownload ) | n};
+
+        if( dwnnode ) {
+            wdMenu = new zeta.Menu({ 
+                            targetNodes   : [ dwnnode ],
+                            style: { fontSize: 'small',
+                                     fontStyle: 'italic',
+                                     color: 'crimson',
+                                     minWidth: '5em'
+                                   }
+                         });
+            dojo.forEach( wdownload,
+                function( d ) {
+                    wdurl = '<a href="' + d[0] + '">' + d[1] + '</a>'
+                    wdMenu.addChild(
+                        new zeta.MenuItem(
+                            { content: wdurl, class: 'fntbold, hoverhighlight' }
+                        )
+                    );
+                }
+            );
+        }
+
+
+        /* Attachments */
+        new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'wikiattachblk',
+                  addform: [ 'addwikiattachs', '${h.suburl_addwikiattachs | n}' ],
+                  delform: [ 'delwikiattachs', '${h.suburl_delwikiattachs | n}' ],
+                  attachon: [ '${str(wiki_id)}', 'wiki_id' ],
+                  editable: ${[0,1][c.att_editable == True]},
+                  url: '${h.url_wikiattachments | n}',
+                  attachs: ${ h.json.dumps(c.attachs) | n },
+                  clsdisplayitem: "dispblk"
+                }, dojo.query( "div[name=wattachblk]" )[0]
+            )
+        /* Tags */
+        new zeta.Tags(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'wikitagblk',
+                  addform: [ 'addwikitags', '${h.suburl_addwikitags | n}' ],
+                  delform: [ 'delwikitags', '${h.suburl_delwikitags | n}' ],
+                  tagon: [ '${str(wiki_id)}', 'wiki_id' ],
+                  editable: ${[0,1][c.tag_editable == True]},
+                  url: '${h.url_wikitags | n}',
+                  tags: ${ h.json.dumps(c.tags) | n }
+                }, dojo.query( "div[name=wtagblk]" )[0]
+            )
+        linkencode();
+    }
+    </script>
+</%def>
+
+<%def name="wiki_talkpage()">
+    <div class="zwikitalkpage mr5">
+        <div class="pb2 posr ralign" style="border-bottom : 1px solid gray">
+            <a class="mr5" href="${h.url_wikipage}">Page</a>
+        </div>
+        <div class="commentbox bclear ml20 mr20">
+            <div class="bclear"><a name="comments"></a></div>
+            <div id="wcomments" class="bclear" class="mt20"></div>
+            <div id="createwcmt_cntnr" style="border: 1px dotted gray"
+                 class="dispnone bclear mb10 pl3 pt3 w80">
+                ${forms.form_createwcmt( c.authuser, c.wiki, h.suburl_createwcmt )}
+            </div>
+            <div id="updatewcmt_cntnr" style="border: 1px dotted gray"
+                 class="dispnone ml10 mr10 w80">
+                ${forms.form_updatewcmt( c.authuser, c.wiki, h.suburl_updatewcmt )}
+            </div>
+            <div id="replywcmt_cntnr" style="border: 1px dotted gray"
+                 class="dispnone ml10 mr10 w80">
+                ${forms.form_replywcmt( c.authuser, c.wiki, h.suburl_replywcmt )}
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    items_wikicomments  = ${c.items_wikicomments | n }
+    function setup_talkpage() {
+        var div_wcomments   = dojo.query( 'div#wcomments' )[0];
+
+        make_ifrs_wikicomments( '${h.url_wikicomments | n}', items_wikicomments )
+        make_ifrs_wikircomments('${h.url_wikircomments | n}' )
+
+        /* Comment list */
+        new zeta.CommentContainer({
+                ifrs_comments: wikicomments,
+                ifrs_rcomments: wikircomments,
+                crformid: 'createwcmt',
+                rpformid: 'replywcmt',
+                edformid: 'updatewcmt',
+                sortby: 'wiki_comment_id',
+                identity: 'wiki_comment_id'
+            }, div_wcomments );
+    }
+    </script>
+</%def>
+
+<%def name="wiki_edit()">
+    <div class="zwikiedit mr5">
+        <div class="pb2 posr ralign" style="border-bottom : 1px solid gray">
+            <a href="${h.url_wikipage}">Page</a>
+            <a class="ml5 mr5" href="${h.url_whistory}">History</a>
+        </div>
+        <div class="dispnone mt10 ml10 mr10">
+            <fieldset style="background: #F4F4F4 url(/preview_bg.png) repeat scroll 0">
+                <legend>Preview( <a href="#edit">edit</a> )</legend>
+                <div class="ml10 mr10 wikipreview"></div>
+            </fieldset>
+            <br></br>
+            <hr></hr>
+        </div>
+        <div class="mt10">
+            <a name="edit"></a>
+            ${forms.form_wikicontent( c.authuser, c.wiki, c.wcnt,
+                                      h.suburl_wikiedit, h.url_wikipage )}
+        </div>
+    </div>
+</%def>
+
+<%def name="wiki_history()">
+    <div class="zwikihistory mr5">
+        <div class="pb2 posr ralign" style="border-bottom : 1px solid gray">
+            <a class="mr5" href="${h.url_wikipage}">Page</a>
+        </div>
+        <div class="ml10 mr10 mt10">
+            ${forms.form_wikidiff( c.authuser, c.wiki,
+                                   h.url_wikidiff, c.wikicontents )}
+        </div>
+    </div>
+</%def>
+
+<%def name="wiki_diff()">
+    <div class="zwikidiff mr5">
+        <div class="pb2 posr ralign" style="border-bottom : 1px solid gray">
+            <a href="${h.url_wikipage}">Page</a>
+            <a class="ml5 mr5" href="${h.url_whistory}">History</a>
+        </div>
+        <div class="ml10 mr10 mt10">
+            ${elements.difftable(  c.oldver, c.newver,
+                                   c.wcnt_oldver.text.splitlines(),
+                                   c.wcnt_newver.text.splitlines(),
+                                )}
+        </div>
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_wp  = capture( forms.form_selectwikipage, c.authuser,
+                           c.wikipagenames, c.wikipagename or '' )
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchwiki', 'Search-wiki',
+                        h.suburl_search, c.searchfaces
+                    )
+        fav   = capture( elements.favoriteicon, 'favwiki' )
+
+        tindex = '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="Index of wiki pages"> \
+                   Titleindex</a></span>' % h.url_wikititleindex )
+
+        refr   = capture( elements.iconlink, h.url_translatewiki,
+                          'refresh', classes="mr5",
+                          title='Bring this wiki-html upto-date' )
+        charts = capture( elements.iconlink, h.url_wikicharts,
+                          'barchart', title="Wiki charts" )
+        tline  = capture( elements.iconlink, h.url_wikitimeline,
+                         'timeline', title="Timeline for wiki page" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ fav, searchbox, sel_wp, tindex ],
+                          rspans=[ refr, charts, tline ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                % if c.authorized :
+                    ${forms.form_wikifav(
+                        c.authuser, c.project, c.wiki, h.suburl_wikifav,
+                        c.isuserfavorite and 'delfavuser' or 'addfavuser'
+                    )}
+                % endif
+
+                % if c.wikiedit :
+                    ${wiki_edit()}
+                % elif c.whistory :
+                    ${wiki_history()}
+                % elif c.wikidiff :
+                    ${wiki_diff()}
+                % elif c.wtalkpage :
+                    ${wiki_talkpage()}
+                % elif c.wikipage or c.wcnt :
+                    % if c.authorized :
+                        ${forms.form_votewiki(
+                            c.authuser, c.project, c.wiki, h.suburl_votewiki,
+                            c.upvotes, c.downvotes, c.currvote
+                        )}
+                    % endif
+                    ${show_wikipage()}
+                % endif
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            /* Setup the wiki goto list */
+            select_goto( dojo.query( '#selectwikipage' )[0] );
+        });
+        dojoaddOnLoad( 'setup_talkpage' );
+        dojoaddOnLoad( 'setup_wikipage' );
+        dojoaddOnLoad( 'initform_wikifav' );
+        dojoaddOnLoad( 'initform_votewiki' );
+        dojoaddOnLoad( 'initform_wikicont' );
+        dojoaddOnLoad( 'initform_wikidiff' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

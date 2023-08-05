@@ -1,0 +1,430 @@
+[< <style type="text/css"> >]
+h1, h2, h3, h4, h5 { 
+    margin : 0px;
+    padding: 5px 0px 2px 3px;
+    background-color : #EAEAFC;
+    border-bottom: 1px solid #CCCCCC;
+}
+[< </style> >]
+
+{{ Toc( position='relative', float='right' ) }}
+
+=== Setting up postfix under ubuntu
+
+Install system packages, if you have not done it already,
+
+{{{ Code bash
+sudo apt-get install postfix postfix-mysql postfix-doc libsasl2-2 libsasl2-modules
+sudo apt-get install libsasl2-modules-sql sasl2-bin libpam-mysql openssl metamail telnet
+sudo apt-get install courier-authdaemon courier-authlib-mysql courier-pop
+sudo apt-get install courier-pop-ssl courier-imap courier-imap-ssl
+sudo apt-get install amavisd-new spamassassin clamav clamav-daemon zoo unzip unarj
+}}}
+
+==== Setting up MySQL for e-mail accounts and authentication
+
+{{{ Code mysql
+
+# Create database, for eg, mailprovider that will store account details
+CREATE DATABASE mailprovider;
+
+# Create 'mail_user' in mysql, with appropriate 'password'
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON mailprovider.*
+    TO 'mail_admin'@'localhost' IDENTIFIED BY 'password';
+GRANT SELECT, INSERT, UPDATE, DELETE ON mailprovider.*
+    TO 'mail_admin'@'localhost.localdomain' IDENTIFIED BY 'password';
+GRANT SELECT, INSERT, UPDATE, DELETE ON mailprovider.*
+    TO 'mail_admin'@'127.0.0.1' IDENTIFIED BY 'password';
+FLUSH PRIVILEGES;
+
+# Setup tables
+
+USE mailprovider;
+
+# Setup virtual domains,
+
+CREATE TABLE domains ( domain varchar(50) NOT NULL,
+                     PRIMARY KEY (domain) )
+     TYPE=MyISAM;
+
+# Forwardings from source-emailid -> destination-emailid,
+
+CREATE TABLE forwardings ( source varchar(80) NOT NULL,
+                         destination TEXT NOT NULL,
+                         PRIMARY KEY (source) )
+     TYPE=MyISAM;
+
+# User / email Authentication,
+
+CREATE TABLE users ( email varchar(80) NOT NULL,
+                   password varchar(20) NOT NULL,
+                   PRIMARY KEY (email) )
+     TYPE=MyISAM;
+}}}
+
+Add the following in // /etc/mysql/my.cnf //,
+
+{{{ Code text
+    bind-address    = 127.0.0.1
+}}}
+
+This is required for Postfix to be able to communicate with the database
+server. If you have MySQL set up to run on another IP address (such as an
+internal IP), you will need to substitute this IP address in place of
+127.0.0.1 in later Postfix configuration steps. Please note that it is not
+advisable to run MySQL on a publicly-accessible IP address.
+
+If you changed MySQL's configuration, restart the database server with
+the following command,
+
+{{{Code bash
+sudo /etc/init.d/mysql restart
+}}}
+
+
+==== Postfix Database mapping definitions
+
+Use 127.0.0.1 as hosts, since postfix will be running in a chrooted
+environment.
+
+Add the following lines in // /etc/postfix/mysql-virtual_domains.cf //,
+{{{ Code cfg
+    user = mail_admin
+    password = password
+    dbname = mailprovider
+    table = domains
+    select_field = domain
+    where_field = domain
+    hosts = 127.0.0.1
+}}}
+
+Add the following lines in // /etc/postfix/mysql-virtual_forwardings.cf //,
+{{{ Code cfg
+    user = mail_admin
+    password = password
+    dbname = mailprovider
+    table = forwardings
+    select_field = destination
+    where_field = source
+    hosts = 127.0.0.1
+}}}
+
+Add the following lines in // /etc/postfix/mysql-virtual_mailboxes.cf //,
+{{{ Code cfg
+    user = mail_admin
+    password = password
+    dbname = mailprovider
+    table = users
+    select_field = CONCAT(SUBSTRING_INDEX(email,'@',-1),'/',SUBSTRING_INDEX(email,'@',1),'/')
+    where_field = email
+    hosts = 127.0.0.1
+}}}
+
+Add the following lines in // /etc/postfix/mysql-virtual_email2email.cf //,
+{{{ Code cfg
+    user = mail_admin
+    password = password
+    dbname = mailprovider
+    table = users
+    select_field = email
+    where_field = email
+    hosts = 127.0.0.1
+}}}
+
+Change permissions to postfix configuration files, to avoid visibility to 
+system users,
+{{{ Code bash
+sudo chmod u=rw,g=r,o= /etc/postfix/mysql-virtual_*.cf
+sudo chgrp postfix /etc/postfix/mysql-virtual_*.cf
+}}}
+
+==== Postfix configuration 
+
+Create 'vmail' system user, to store all the mailboxes, make sure that '5000'
+uid is availiable for free, if not use a different uid and set them up in
+postfix configuration as well.
+{{{ Code bash
+sudo groupadd -g 5000 vmail
+sudo useradd -g vmail -u 5000 vmail -d /home/vmail -m
+}}}
+
+Configurations that go into // /etc/postfix/main.cf //,
+{{{ Code cfg
+    inet_interfaces = all
+    myhostname = devwhiz.net
+}}}
+
+Only local domains, dont list virtual domain,
+{{{ Code cfg
+    mydestination = K2-AMDX2-1, localhost.localdomain, , localhost
+    (or)
+    mydestination =
+}}}
+
+"trusted" SMTP clients that have more privileges than "strangers",
+like relaying mail,
+{{{ Code cfg
+    mynetworks = 127.0.0.0/8, 192.168.0.28
+}}}
+
+configuring for virtual hosts and users,
+{{{ Code cfg
+
+    virtual_alias_domains =
+    virtual_alias_maps = mysql:/etc/postfix/mysql-virtual_forwardings.cf, \
+                         mysql:/etc/postfix/mysql-virtual_email2email.cf
+
+    virtual_mailbox_base = /home/vmail
+    virtual_mailbox_domains = mysql:/etc/postfix/mysql-virtual_domains.cf
+    virtual_mailbox_maps = mysql:/etc/postfix/mysql-virtual_mailboxes.cf
+
+    virtual_uid_maps = static:5000
+    virtual_gid_maps = static:5000
+}}}
+
+SASL configuration,
+{{{ Code cfg
+    smtpd_sasl_auth_enable = yes
+    broken_sasl_auth_clients = yes
+    smtpd_sasl_authenticated_header = yes
+    smtpd_use_tls = yes
+    smtpd_sasl_security_options = noanonymous
+    smtpd_sasl_path = smtpd
+    smtpd_sasl_local_domain =
+    smtpd_tls_cert_file = /etc/postfix/smtpd.cert
+    smtpd_tls_key_file = /etc/postfix/smtpd.key
+
+    proxy_read_maps = $local_recipient_maps $mydestination $virtual_alias_maps \
+                      $virtual_alias_domains $virtual_mailbox_maps \
+                      $virtual_mailbox_domains $relay_recipient_maps $relay_domains \
+                      $canonical_maps $sender_canonical_maps $recipient_canonical_maps \
+                      $relocated_maps $transport_maps $mynetworks
+}}}
+
+Recipient restriction,
+{{{ Code cfg
+    smtpd_recipient_restrictions = permit_mynetworks, \
+                                   permit_sasl_authenticated, \
+                                   reject_unauth_destination
+}}}
+
+Optional debuggin settings,
+{{{ Code cfg
+    debug_peer_list = 127.0.0.1, 192.168.0.101
+    smtpd_tls_loglevel = 5
+}}}
+
+Restart postfix and make sure the configurations are OK,
+{{{ Code bash
+sudo /etc/init.d/postfix restart
+sudo /etc/init.d/postfix check
+}}}
+
+==== Postfix configuration to use SASL, Mysql
+
+Postfix access details to fetch refert to usernames and passwords, in,
+// /etc/postfix/sasl/smtpd.conf //,
+{{{ Code text
+    pwcheck_method: auxprop
+    auxprop_plugin: sql
+    mech_list: plain login digest-md5
+    sql_engine: mysql
+    sql_hostnames: 127.0.0.1
+    sql_user: mail_admin
+    sql_passwd: password
+    sql_database: mailprovider
+    sql_select: select password from users where email='%u@%r'
+    loglevel: 5
+}}}
+
+Make the file secure,
+{{{ Code bash
+sudo chown root:postfix /etc/postfix/sasl/smtpd.conf 
+sudo chmod u=rw,g=r,o= /etc/postfix/sasl/smtpd.conf
+}}}
+
+Make your mail server as the certifying authority to encrypt and transmit
+username / password,
+{{{ Code bash
+openssl req -new -outform PEM -out /etc/postfix/smtpd.cert
+            -newkey rsa:2048 -nodes 
+            -keyout /etc/postfix/smtpd.key -keyform PEM -days 3650 -x509
+}}}
+
+You will then be asked a few question about the fields of the certificate.
+It does not matter what you enter. Just fill the fields. One exception
+though - the "Common Name" must be the hostname of your mail server.
+
+{{{Code text
+    Example session:
+
+        Country Name (2 letter code) [AU] : IND
+        State or Province Name (full name) [Some-State] : Tamil Nadu
+        Locality Name (eg, city) [] : CHN
+        Organization Name (eg, company) [Internet Widgits Pty Ltd] : SKR
+        Organizational Unit Name (eg, section) [] : Zeta
+        Common Name (eg, YOUR name) [] : devwhiz.net
+        Email Address [] : postmaster@devwhiz.net
+}}}
+
+After a short moment you will get two files, \\  
+"smtpd.key" (the private key file), \\  
+and, \\ 
+"smtpd.cert" (the certificate)
+
+Make the files secure,
+{{{ Code bash
+sudo chmod u=rw,g=r,o= /etc/postfix/smtpd.key 
+sudo chown root:postfix /etc/postfix/smtpd.key
+}}}
+
+Issue the following command to create a directory for saslauthd,
+{{{ Code bash
+mkdir -p /var/spool/postfix/var/run/saslauthd
+}}}
+
+Edit the file // /etc/default/saslauthd //,
+{{{ Code cfg
+    START=yes
+    DESC="SASL Authentication Daemon"
+    NAME="saslauthd"
+    MECHANISMS="pam"
+    MECH_OPTIONS=""
+    THREADS=5
+    OPTIONS="-c -r -m /var/spool/postfix/var/run/saslauthd"
+}}}
+
+Next, create the file // /etc/pam.d/smtp // and copy in the following two
+lines. For display purposes, each line is broken up into two lines, but these
+should be combined in your configuration file so that you have two lines
+beginning with ''auth'' and ''account''. Be sure to change
+''mail_admin_password'' to the password you chose for your mail
+administration MySQL user earlier.
+
+{{{ Code cfg
+auth    required   pam_mysql.so user=mail_admin passwd=mail_admin_password
+                   host=127.0.0.1 db=mailprovider table=users usercolumn=email
+                   passwdcolumn=password crypt=1
+account sufficient pam_mysql.so user=mail_admin passwd=mail_admin_password
+                   host=127.0.0.1 db=mailprovider table=users usercolumn=email
+                   passwdcolumn=password crypt=1
+}}}
+
+Adjust file modes,
+{{{Code bash
+sudo chmod u=rw,g=r,o= /etc/pam.d/smtp
+}}}
+
+Add `postfix` user to `sasl` group and restart postfix and saslauthd,
+{{{ Code bash
+sudo adduser postfix sasl
+sudo /etc/init.d/postfix restart
+sudo /etc/init.d/saslauthd restart
+}}}
+
+Insert some sample entries into the database,
+{{{ Code mysql
+    USE mailprovider;
+    INSERT INTO domains (domain) VALUES ('example.com');
+    INSERT INTO users (email, password) VALUES ('sales@example.com','password');
+}}}
+
+
+==== Configure Mail Aliases Link
+
+Edit the file // /etc/aliases //, making sure the ''postmaster'' and ''root''
+directives are set properly for your organization.
+{{{ Code text
+    postmaster: root
+    root: postmaster@yourdomain.com
+}}}
+
+After modifying this file, you must run the following commands to update
+aliases and restart Postfix,
+{{{ Code bash
+newaliases
+/etc/init.d/postfix restart
+}}}
+
+==== Setting Courier and configuring it for POP3 and IMAP
+
+Edit the file // /etc/courier/authdaemonrc // and set the directive,
+{{{ Code cfg
+    authmodulelist="authmysql"
+}}}
+
+Define the fields of the MySQL database table in // /etc/courier/authmysqlrc //,
+{{{ Code text
+    MYSQL_SERVER 127.0.0.1
+    MYSQL_USERNAME mail_admin
+    MYSQL_PASSWORD password
+    MYSQL_PORT 0
+    MYSQL_DATABASE mailprovider
+    MYSQL_USER_TABLE users
+    #MYSQL_CRYPT_PWFIELD (comment this out)
+    MYSQL_CLEAR_PWFIELD password
+    MYSQL_UID_FIELD 5000
+    MYSQL_GID_FIELD 5000
+    MYSQL_LOGIN_FIELD email
+    MYSQL_HOME_FIELD "/home/vmail"
+    #MYSQL_NAME_FIELD (comment this out)
+    MYSQL_MAILDIR_FIELD CONCAT(SUBSTRING_INDEX(email,'@',-1),'/',SUBSTRING_INDEX(email,'@',1),'/')
+}}}
+
+Make the files secure,
+{{{ Code bash
+sudo chmod u=rw,g=r,o= /etc/courier/authmysqlrc
+sudo chown root:postfix /etc/courier/authmysqlrc
+}}}
+
+Delete the original certificates created by Courier by issuing the
+following commands,
+{{{ Code bash
+rm -f /etc/courier/imapd.pem
+rm -f /etc/courier/pop3d.pem
+}}}
+
+Edit the files // /etc/courier/imapd.cnf // and // /etc/courier/pop3d.cnf // ,
+replacing the ''CN=localhost'' lines with the fully qualified domain name you
+used for your system mailname. You may also wish to edit other lines in these
+configuration files to set values appropriate for your organization,
+
+Regenerate the certificates for Courier and restart its daemons by issuing the
+following commands,
+{{{ Code bash
+cd /etc/courier
+sudo mkimapdcert
+sudo mkpop3dcert
+sudo /etc/init.d/courier-authdaemon restart
+sudo /etc/init.d/courier-imap restart
+sudo /etc/init.d/courier-imap-ssl restart
+sudo /etc/init.d/courier-pop restart
+sudo /etc/init.d/courier-pop-ssl restart
+}}}
+
+You can test your POP3 server to make sure it's running properly by
+issuing the following command,
+{{{ Code bash
+telnet localhost pop3
+}}}
+
+You should see output similar to the following in your terminal:
+{{{ Code text
+    Trying 127.0.0.1...
+    Connected to localhost.localdomain.
+    Escape character is '^]'.
+    +OK Hello there.
+}}}
+
+Enter the command "quit" to return to your shell. This completes Courier
+configuration. Next, we'll make sure aliases are configured properly.
+
+
+'' Note ''
+
+  * All the administrative commands on a given deployment should be executed
+    in its virtual environment.
+  * Make sure that Apache has read, write access to the deployment directory.
+
+/* vim: set filetype=zwiki : */

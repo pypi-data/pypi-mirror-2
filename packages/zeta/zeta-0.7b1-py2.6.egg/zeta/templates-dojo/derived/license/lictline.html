@@ -1,0 +1,90 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Use the selectable options in the page bar to navigate to desired 
+license page. License can be associated with a project (via project's
+admin page). In the page bar, along with the license name,
+(license-id) will be displayed in paranthesis. Use this 'id' for referring to
+the license.
+"""
+],
+[ 'Timeline',
+"""Timeline gives a log of all updates done to license."""
+],
+
+]
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    <%
+        charttitle = (c.license.licensename if c.license else 'license ') \
+                     + ' activity'
+    %>
+    function setup_charts() {
+        var datatline = ${ h.json.dumps(c.datatline) | n}
+        timelinechart( datatline, Date.UTC( ${','.join(c.startdt)} ),
+                       'chart_tline', '${charttitle}' );
+    }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        if c.license :
+            pagebartext = "Timeline: %s (%s)" % ( c.license.licensename, c.license.id )
+        else :
+            pagebartext = "Timeline"
+        charts  = capture( elements.iconlink, h.url_licensecharts,
+                           'barchart', title="Analytics on license" )
+    %>
+    ${elements.pagebar( 
+        pagebartext,
+        spans=[ capture( forms.form_licenselist, c.licenselist, 
+                         c.license and c.license.licensename ) ],
+        rspans=[ charts ],
+        tooltips=page_tooltips
+    )}
+    <div id="bdy" class="w100">
+    % if c.userpanes :
+    <div id="licensepage" class="panel1">
+    % else :
+    <div id="licensepage" class="fullpanel1">
+    % endif
+        ${elements.timeline_view( c.logs, c.fromoff, c.tooff, c.links,
+                                  chartid='chart_tline' )}
+    </div>
+    % if c.userpanes :
+    <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            /* License shortcut list */
+            select_goto( dojo.query( '#viewlicense' )[0] );
+        });
+        dojo.addOnLoad( setup_charts );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

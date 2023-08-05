@@ -1,0 +1,315 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""List of all wiki pages associated with the project, in a grid-style,
+allowing user to <em>edit attributes in-line</em>. To know how,
+just double click on any of the grid cell (that are not in gray)
+and edit it. It is also possible to navigate from one cell to another using
+'up', 'down', 'left', 'right' arrows, to edit just press enter and edit. To save
+edited content, just press 'enter' or click outside the cell.
+<br/>
+The header row in the grid can be used for two purpose. One, to <em>sort the list
+by desired column</em> (by left clicking), two, to
+<em>add/remove columns</em> (by right clicking). 
+"""
+],
+[ 'Wikipage',
+"""Each wiki page is rendered with html translated wiki document and gives simple
+statistical details for the page. Download a wiki page as text, pdf, html or
+ps file.
+"""
+],
+[ 'Timeline',
+"""Timeline of updates done to all wiki pages in this project"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+    <link href="/zdojo/zdojoGrid.css" rel="stylesheet" type="text/css"></link>
+    <link href="/zdojo/zdojowikiGrid.css" rel="stylesheet" type="text/css"></link>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    /********** Setup Wiki Grid **************/
+    <% 
+       wiki_id      = (c.wiki and c.wiki.id) or ''
+       wikieditable = c.wikieditable and 'true' or 'false' 
+       editcolor    = c.wikieditable and 'color : black;' or 'color : grey;'
+    %>
+    // Grid columns
+    colnames    = { WikiPage : null,
+                    Type     : null,
+                    Summary  : null,
+                    LastModified : null,
+                    Author   : null,
+                    UpVotes  : null,
+                    DownVotes: null,
+                    Version  : null
+                  };
+    // Grid callbacks
+    function get_wikipagename( rowindex, item ) {
+        if( (! grid_windex) || (! item) ) { return; }
+        return [ wikilist.store.getValue( item, 'wikiurl' ),
+                 wikilist.store.getValue( item, 'pagename' ) ]
+    }
+    function format_wikipagename( item, rowindex ) {
+        if( (! grid_windex) || (! item) ) { return; }
+        return create_anchor( item[0], item[1] );
+    }
+    // Grid Data store Write handlers
+    function wl_onset( item, attr_name, oldval, newval ) {
+        if( item ) {
+            var id            = wikilist.store.getValue( item, 'id' );
+            var wiki_typename = wikilist.store.getValue( item, 'wiki_typename' );
+            var summary       = wikilist.store.getValue( item, 'summary' );
+            dojo.query( 'input[name=wiki_id]', form_configwiki
+                      )[0].value = item.id;
+            dojo.query( 'input[name=wiki_typename]', form_configwiki
+                      )[0].value = item.wiki_typename;
+            dojo.query( 'input[name=summary]', form_configwiki
+                      )[0].value = item.summary;
+            submitform( form_configwiki );
+        }
+    }
+
+    // GRID Title customization menu
+    function refresh_csmenu() {
+        // Refresh column labels
+        for( name in colnames ) {
+            var mitem = colnames[name];
+            var check = '<input type="checkbox" checked="checked"></input> &ensp;';
+            mitem.colhide ?
+                mitem.attr( 'label', '&ensp;&ensp;&ensp;&ensp;' + mitem.orglabel )
+                : mitem.attr( 'label', check + mitem.orglabel )
+        }
+    }
+    function on_selectcolumns( name ) {
+        // Toggle the hidden attribute and refresh
+        var visibile = colnames[name].colhide;
+        colnames[name].colhide = colnames[name].colhide ? false : true;
+        refresh_csmenu();
+        // Refresh column hidden status in the layout
+        var cells = grid_windex.layout.cells;
+        for( i=0 ; i < cells.length; i++ ) {
+            if ( name == cells[i].name ) {
+                grid_windex.layout.setColumnVisibility( i, visibile );
+            }
+        }
+    }
+    function setup_csmenu() {
+        // Create Menu on the last column
+        var csmenu   = new dijit.Menu();
+        var mi_title = new dijit.MenuItem({
+                            label : 'Columns',
+                            iconClass:"dispnone",
+                            class : "calign"
+                       });
+
+        dojo.style( mi_title.domNode, { fontWeight: 'bold', color: 'black' });
+        dojo.style( csmenu.domNode, { fontSize: 'small', color: 'blue' });
+
+        csmenu.addChild( mi_title );
+        csmenu.addChild( new dijit.MenuSeparator() );
+
+        // Create menu items
+        for( name in colnames ) {
+            colnames[name] = new dijit.MenuItem({
+                                    label   : name,
+                                    iconClass: "dispnone",
+                                    onClick : dojo.hitch( null,
+                                                          on_selectcolumns,
+                                                          name
+                                                        )
+                             })
+            colnames[name].colhide  = false;
+            colnames[name].orglabel = name;
+            csmenu.addChild( colnames[name] );
+        }
+        colnames.Version.colhide = true;
+        dojo.setObject( 'csmenu', csmenu )
+    }
+
+    function setup_wikilist() {
+        var div_prjwikilist = dojo.byId("prjwikilist");
+
+        /* Setup the wiki goto list */
+        select_goto( dojo.query( '#selectwikipage' )[0] );
+
+        // Grid Layout
+        var glayout_windex = [
+                { // View is an array of cells
+                    cells: [
+                      { name : 'WikiPage',
+                        field: 'wikiurl',
+                        width: '15em',
+                        hidden: false,
+                        get  : get_wikipagename,
+                        formatter : format_wikipagename,
+                        styles : "text-align : left;"
+                      },
+                      { name : 'Type',
+                        field: 'wiki_typename',
+                        width: '7em',
+                        hidden: false,
+                        editable: ${wikieditable},
+                        styles: '${ editcolor }',
+                        type: dojox.grid.cells.Select,
+                        options : ${ h.json.dumps( c.wikitypenames ) | n }
+                      },
+                      { name : 'Summary',
+                        field: 'summary',
+                        width: 'auto',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${wikieditable}
+                      },
+                      { name : 'LastModified',
+                        field: 'last_modified',
+                        width: '13em',
+                        hidden: false,
+                        styles: 'color : gray;'
+                      },
+                      { name : 'Author',
+                        field: 'author',
+                        width: '8em',
+                        hidden: false,
+                        styles: 'color : gray;'
+                      },
+                      { name : 'UpVotes',
+                        field: 'upvotes',
+                        width: '6em',
+                        hidden: false,
+                        styles: 'text-align: center; color : green;'
+                      },
+                      { name : 'DownVotes',
+                        field: 'downvotes',
+                        width: '7em',
+                        hidden: false,
+                        styles: 'text-align: center; color : red;'
+                      },
+                      { name : 'Version',
+                        field: 'latest_version',
+                        width: '6em',
+                        hidden : true,
+                        styles: 'color : gray;'
+                      },
+                    ]
+                },
+            ];
+
+        setup_csmenu();
+
+        make_ifws_wikilist( '${h.url_wikilist | n}', wl_onset );
+
+        /* Grid with Layout */
+        dojo.setObject(
+            'grid_windex',
+            new dojox.grid.DataGrid({
+                            store: wikilist.store,
+                            clientSort: true,
+                            columnReordering: true,
+                            structure: glayout_windex,
+                            headerMenu: csmenu
+             }, document.createElement( 'div' ))
+        );
+
+        /* Append the new grid */
+        div_prjwikilist.appendChild(grid_windex.domNode);
+
+        /* Call startup, in order to render the grid: */
+        grid_windex.startup();
+        refresh_csmenu();
+
+        /* grid resizing */
+        grid_windex.connect( window, 'onresize',
+                             function( e ) { this.resize() } );
+        dojo.subscribe( 'resize_upane', grid_windex,
+                        function( collapsed ) { this.resize() } );
+    }
+
+    </script>
+</%def>
+
+<%def name="wikiindex()">
+    <div id="prjwikilist" class="mt10 ml10 mr10 br5"
+         style="height: 600px; border: 4px solid #B3CFB3;">
+    </div>
+    <div class="dispnone">
+        ${forms.form_configwiki( c.authuser, h.suburl_configwiki )}
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_wp  = capture( forms.form_selectwikipage, c.authuser,
+                           c.wikipagenames, c.wikipagename or '' )
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchwiki', 'Search-wiki',
+                        h.suburl_search, c.searchfaces
+                    )
+
+        attachs= '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="Attachments to wiki pages"> \
+                   Attachments</a></span>' % h.url_wikiattachs )
+
+        tindex = '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="Index of wiki pages"> \
+                   Titleindex</a></span>' % h.url_wikititleindex )
+
+        charts = capture( elements.iconlink, h.url_wikicharts,
+                          'barchart', title="Wiki charts" )
+        tline  = capture( elements.iconlink, h.url_wikitimeline,
+                         'timeline', title="Timeline for all wiki pages" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ searchbox, sel_wp, tindex, attachs, ],
+                           rspans=[ charts, tline ],
+                           tooltips=page_tooltips
+    )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${wikiindex()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_wikilist );
+        dojo.addOnLoad( initform_configwiki );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

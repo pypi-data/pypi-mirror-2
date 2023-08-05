@@ -1,0 +1,97 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Timeline of updates to review(s)."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+
+    <script type="text/javascript">
+    function setup_charts() {
+        var datatline = ${ h.json.dumps(c.datatline) | n}
+        timelinechart( datatline, Date.UTC( ${','.join(c.startdt)} ),
+                       'chart_tline', 'Users Activity' );
+    }
+    </script>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchreview', 'Search-review',
+                        h.suburl_search, c.searchfaces
+                    )
+        if c.revweditable :
+            newrevw  = '<span class="ml10 fwnormal fntsmall"> \
+                        <a href="%s" title="Create a new review"> \
+                        Create</a></span>' % h.url_revwcreate
+        else :
+            newrevw = ''
+
+        attachs= '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="List of files attached to reviews"> \
+                   Attachments</a></span>' % h.url_revwattachs )
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ searchbox, sel_revw, sel_rset, newrevw, attachs ],
+                           rspans=[ charts ], tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${elements.timeline_view( c.logs, c.fromoff, c.tooff, c.links,
+                                          chartid='chart_tline')}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_select = dojo.query( '#selectrevw' )[0];
+            n_select ? select_goto( n_select ) : null;
+        });
+        dojo.addOnLoad( setup_charts );
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

@@ -1,0 +1,116 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+[ 'Help',
+"""Review - documents, code and wiki pages. Every review created, has an
+<em>author</em>, a <em>moderator</em> and <em>participants</em>.
+"""
+],
+[ 'Author',
+"""<em>Author</em> can add comments, comment's nature and also
+reponsible for taking actions on all review comments."""
+],
+[ 'Moderator',
+"""<em>Moderator</em> can add comments, comment's nature and is responsible
+for approving actions taken on review comments. Once all the comments are
+approve, the moderator can close the review."""
+],
+[ 'Participant',
+"""<em>Participants</em> can comment and reply to other paticipants
+comment."""
+],
+[ 'Review-set',
+"""Collection of reviews. Especially useful to create review entries for every
+modified / added file in repository changeset
+"""
+],
+[ 'Timeline',
+"""Timeline of all updates done to Review(s)."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="create_review()">
+    <div id="prjrevwcreate" class="floatl">
+        ${forms.form_createrev( c.authuser, c.project, c.rsets, h.suburl_createrev,
+                                c.projusers, c.usernames, c.forsrc, c.forversion
+                              )}
+    </div>
+    <div id="prjrsetcreate" class="floatl ml10"
+         style="border-left : 2px solid gray;">
+        ${forms.form_createrset( c.authuser, c.project, h.suburl_createrset,
+                                 request.url
+                               )}
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+
+        revwsets = '<span class="ml10 fwnormal fntsmall"> \
+                    <a href="%s" title="List of reviews sets"> \
+                    Reviewsets</a></span>' % h.url_reviewsets
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+        tline  = capture( elements.iconlink, h.url_revwtimeline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ sel_revw, sel_rset, revwsets, ],
+                           rspans=[ charts, tline ], tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${create_review()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_select = dojo.query( '#selectrevw' )[0];
+            n_select ? select_goto( n_select ) : null;
+        });
+        dojo.addOnLoad( initform_createrev );
+        dojo.addOnLoad( initform_createrset );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

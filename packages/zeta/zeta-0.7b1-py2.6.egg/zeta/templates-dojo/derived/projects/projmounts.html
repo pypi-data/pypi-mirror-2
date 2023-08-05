@@ -1,0 +1,158 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Mount one or more repository directory onto zeta site."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="create_mount()">
+    <div name="zmountcreate" class="mr5">
+        ${forms.form_createmount(
+                    c.authuser, c.vcslist, c.contents, h.suburl_createmount 
+        )}
+    </div>
+</%def>
+
+<%def name="mountpoints( p, pmounts )">
+    <div name="zmounts" class="ml50 disptable"
+         style="border-collapse : collapse;">
+        <div class="disptrow">
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">Name</div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">Content type</div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">Repository</div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">Relative Path</div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">Created on</div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray"></div>
+            <div class="fntbold disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray"></div>
+        </div>
+        % for m in pmounts :
+        <% relpath = m[3] %>
+        <div class="disptrow">
+            <div class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">
+                <a href="${h.url_formount( p, str(m[0]), relpath )}">${m[1]}</a>
+             </div>
+            <div class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">${m[2]}</div>
+            <div class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">
+                <a href="${h.url_forvcs(p, m[5])}" title="${m[7]}">${m[6]}</a>
+            </div>
+            <div class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">${m[3]}</div>
+            <div class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">
+                ${m[4].strftime('%a, %b %d, %Y')}
+            </div>
+            <div mount_id="${m[0]}" class="disptcell pt5 pr10 pb5 pl10"
+                 style="border : 1px solid gray">
+                <a href="${h.url_forchmount( p, m[0] )}">change</a>
+            </div>
+             <div mount_id="${m[0]}"
+                  class="delmount disptcell pt5 pr10 pb5 pl10 pointer"
+                 style="border : 1px solid gray">
+                 <img src="/zetaicons/bin.png"</img>
+            </div>
+        </div>
+        % endfor
+    </div>
+    ${forms.form_deletemount( c.authuser, h.suburl_deletemount )}
+    <script type="text/javascript">
+        function setup_delmount() {
+            dojo.forEach( 
+                dojo.query( '.delmount' ),
+                function(n) {
+                    dojo.connect( n, 'onclick',
+                        function(e) {
+                            var n_div    = e.currentTarget
+                            var mountid  = dojo.attr( n_div, 'mount_id' )
+                            var formnode = dojo.byId( 'deletemount' )
+                            var i_mntid  = dojo.byId( 'del_mountid' )
+                            i_mntid.value = mountid; 
+                            submitform( formnode, e )
+                            dojo.stopEvent(e);
+                            window.location = "${h.url_projmounts}";
+                        }
+                    );
+                }
+            );
+        }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title = '<em>Mount points</em>'
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title ], tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            % if c.changeid :
+                ${forms.form_updatemount(
+                    c.authuser, c.mnt, c.vcslist, c.contents,
+                    h.suburl_updatemount
+                )}
+            % else :
+                <h4>Create mount point</h4>
+                <div>${create_mount()}</div>
+                <h4>List of mount points</h4>
+                <div>${mountpoints( c.projectname, c.pmounts )}</div>
+            % endif
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojoaddOnLoad( 'setup_delmount' );
+        dojoaddOnLoad( 'initform_createmount' );
+        dojoaddOnLoad( 'initform_deletemount' );
+        dojoaddOnLoad( 'initform_updatemount' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

@@ -1,0 +1,104 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""If enabled in site-admin -> site-config, watch yourself and your friends in
+googlemap"""
+],
+[ 'Users',
+"""List of all registered users and their summary"""
+],
+[ 'Timeline',
+"""Timeline of users activity"""
+],
+
+]
+
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        pagebartext = "Users on google map"
+
+        users  = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                 ( '<a href="%s">Users</a></div>' % h.url_usershome )
+        charts    = capture( elements.iconlink, h.url_userscharts,
+                             'barchart', title="Analytics on users" )
+        tline  = capture( elements.iconlink, h.url_usertline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.pagebar( pagebartext, [ users, ], 
+                        rspans=[ charts, tline ],
+                        tooltips=page_tooltips )}
+    <div id="bdy">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div id="userpreference" class="fullpanel1">
+    % else :
+        <div id="userpreference" class="panel1">
+    % endif
+    <div class="m10">
+        <div id="useringmap" class="fggray2 p5"
+             style="border: 2px solid gray; width: 100% height: 800px;">
+             want to see users in google maps ? Enable `googlemaps` in
+             site-admin->siteConfig
+        </div>
+    </div>
+    </div>
+    </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    % if c.googlemaps :
+    <script
+        src="http://maps.google.com/maps?file=api&amp;v=2.x&amp;key=${c.googlemaps}"
+        type="text/javascript">
+    </script>
+
+    <script type="text/javascript">
+        var map       = null;
+        var geocoder  = null;
+        var useraddrs = ${ h.json.dumps( c.useraddrs ) | n }
+        function init_gmap() {
+            rc = creategmap( "useringmap", 1000, 600 ) // width, height
+            map      = rc[0];
+            geocoder = rc[1];
+            dojo.forEach(
+                useraddrs,
+                function( uaddr ) {
+                    console.log( uaddr );
+                    uaddr[uaddr.length] = showAddress( uaddr[0], uaddr[1], uaddr[1] );
+                }
+            );
+        }
+    </script>
+    % endif
+
+    <script type="text/javascript">
+        dojoaddOnLoad( 'init_gmap' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>
+

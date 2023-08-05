@@ -1,0 +1,249 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""
+Files in repository are viewable with syntax highlighting, annotation and
+changesets.
+"""
+],
+[ 'Repository-list',
+"""Integrate one or more repositories with projects by providing its
+<em>type</em> (like svn ...) and <em>root-url</em>. Make sure that
+<em>root-url</em> points to the same machine, or to a machine on the local network.
+<br/>
+Repositories integrated with this project are listed in grid-style. Edit them
+inline.
+"""
+],
+[ 'Browsing',
+"""
+Browsing the repository is provided in explorer style. By default the latest
+version of the repository is shown in the explorer widget. To explore a different
+revision use <b>< revno</b> and <b>revno ></b> links.
+"""
+],
+[ 'Revisions',
+"""Details about each repository revision listed in reverse chronological order.
+"""
+],
+
+]
+
+import xml.etree.cElementTree as et
+from   pygments.formatters    import HtmlFormatter
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+    <style type="text/css">
+        ${HtmlFormatter().get_style_defs('.highlight')}
+        ## The following are for current pygmentation. When pygmentation and
+        ## annotations are merged, take a relook.
+        .highlighttable td.linenos { padding : 3px }
+        .highlighttable td.code { padding : 3px }
+    </style>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="showfilerev( log )">
+<% logdet = log[3].strftime( '%b %d, %Y,' ) %>
+<pre class="pb5" style="border-bottom: 1px dotted #f2f2f2;" title="${log[0]}">
+<a href="${log[4]}">${log[1]}</a> \
+<span class="fggray">${logdet}</span> \
+<span class="fggreen">${log[2]}</span>
+</pre>
+</%def>
+
+<%def name="showfile( lines )">
+    <% 
+        bgcolor      = [ '#FFFFFF', '#F2F2F2' ]
+        fileauthors  = set([ l[3] for l in lines ])
+        rf_date       = c.vrep.finfo['l_date']
+        rl_date       = c.vrep.linfo['l_date']
+        rep_lifespan = (rf_date and rl_date) and (rl_date - rf_date).days or 0
+        f_date       = c.filelogs and c.filelogs[-1][3] or ''
+        l_date       = c.filelogs and c.filelogs[0][3] or ''
+        updt_days    = (f_date and l_date) and (l_date - f_date).days or 0
+        before_days  = (rf_date and f_date) and (f_date - rf_date).days or 0
+        after_days   = (l_date and rl_date) and (rl_date - l_date).days or 0
+        w_before       = int((before_days / float(rep_lifespan)) * 100)
+        w_update       = int((updt_days / float(rep_lifespan)) * 100)
+        w_after        = int((after_days / float(rep_lifespan)) * 100)
+        lifespan_title = ''
+        if f_date and l_date :
+            lifespan_title = f_date.strftime( '%a, %b %d %Y' ) + ' TO ' +\
+                             l_date.strftime('%a, %b %d %Y')
+        repospath    = c.fileinfo.get('repos_path', '')
+        filepath     = repospath.replace('/', ' /')
+    %>
+    <style type="text/css">
+        ${HtmlFormatter().get_style_defs('.highlight')}
+        ## The following are for current pygmentation. When pygmentation and
+        ## annotations are merged, take a relook.
+        .highlighttable td.linenos { padding : 3px }
+        .highlighttable td.code { padding : 3px }
+    </style>
+    <div class="m10">
+        <div class="ml10 posr floatr">
+            <div class="disptable w100" 
+                 style="height: 1em; width: 200px; border: 1px dotted gray;">
+            <div class="disptrow w100">
+                <div class="disptcell" style="width: ${w_before}%;"></div>
+                <div class="disptcell calign fggray bgred1" 
+                     style="border-left: 1px solid red; width: ${w_update}%"
+                     title="${lifespan_title}">
+                    ${updt_days}
+                </div>
+                <div class="disptcell bgyellow" style="width: ${w_after}%;"></div>
+            </div>
+            </div>
+        </div>
+        <div class="posr floatr fggreen">LifeSpan : </div>
+        <a class="mr10 floatr" title="Create review entry for this file"
+           href="${h.url_reviewvfile}">Review</a>
+        <div class="pb5" style="border-bottom : 1px solid gray">
+            <span class="fntbold">${filepath} </span>
+            <span class="fntbold fggray"> ( r${c.vfile.revno} ) </span>
+            <span class="ml10 fggreen">${c.fileinfo.get('size', 0)} </span>
+                  <span>bytes, <span>
+            <span class="ml10 fggreen">${len(lines)} </span><span>lines, <span>
+            <a class="ml10 fgIred" href="${h.url_filedownl |n}">download-file</a>
+        </div>
+        <div class="disptable w100">
+        <div class="disptrow w100">
+            <div name="filehistory" class="disptcell w25 pr5">
+
+                <div class="m5 br4" style="border : 1px dotted gray">
+                    <div class="fntbold p5 bggray1">Authors </div>
+                    % for a in fileauthors :
+                    <div class="p3 fggreen"> ${a} </div>
+                    % endfor
+                </div>
+
+                <div class="m5 br4" style="border : 1px dotted gray">
+                    <div class="fntbold p5 bggray1">
+                        File-History
+                    </div>
+                    <div class="p3">
+                    % for log in c.filelogs :
+                        ${showfilerev( log )}
+                    % endfor
+                    </div>
+                </div>
+            </div>
+            <div name="filecont" class="disptcell ml20 w75">
+                <% 
+                   import re
+                   cont     = '\n'.join([ l[1] for l in lines ])
+                   conthtml = h.syntaxhl( cont, lexbyfile=repospath )
+                   htmllines= re.search( r'<pre>((.|[\r\n])*)</pre>', conthtml 
+                                       ).groups()[0].splitlines()
+                   annotats = [ 'revision%s, %s, %s' % (
+                                l[2], l[3], l[4].strftime('%b-%d-%Y') )
+                                for l in lines ]
+                   zipped   = zip( htmllines, annotats )
+                   lineno   = 1
+                %>
+                <div class="highlight disptable">
+                    % for l, title in zipped :
+                    <div class="disptrow">
+                        <div class="pl5 pr5 ralign disptcell bgaliceblue"
+                             style="border-right: 1px solid gray;
+                                    border-bottom: 1px solid gray;">
+                            ${lineno}</div>
+                        <div class="pl5 pr5 disptcell" title="${title}">
+                            <pre>${l | n}</pre>
+                        </div>
+                    </div>
+                    <% lineno += 1 %>
+                    % endfor
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+</%def>
+
+<%def name="showfileerror( error )">
+    <h3 class="m10">${error}</h3>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title     = '<a class="fntbold ml10">%s</a>' % c.vcs.name
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        sel_frev = capture( forms.form_selectfilerevision, c.authuser,
+                            c.sel_frevs, str(c.revno) )
+        vcsbrowse = '<a class="ml10" title="Browse latest version" \
+                     href="%s">Browser</a>' % h.url_vcsbrowse
+        revlist   = '<a class="ml10" title="List of repository revisions" \
+                     href="%s">Revisions</a>' % h.url_revlist
+        if c.vcseditable :
+            newvcs = '<span class="ml10 fwnormal fntsmall">' +\
+                     '<a href="%s" title="Integrate a new repository"> \
+                      Integrate</a></span>' % h.url_vcscreate
+        else :
+            newvcs = ''
+        tline = capture( elements.iconlink, h.url_vcstimeline,
+                         'timeline', title="Timeline of vcs-integration" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title, sel_vcs, sel_frev, vcsbrowse, revlist,
+                            newvcs, ],
+                          rspans=[ tline ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                % if c.fileerror :
+                    ${showfileerror( c.fileerror)}
+                % else :
+                    ${showfile( c.filelines )}
+                % endif
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function () {
+            /* Setup the vcs goto list */
+            select_goto( dojo.query( '#selectvcs' )[0] );
+            /* Setup the file revision goto list */
+            select_goto( dojo.query( '#selectfrev' )[0] );
+
+        });
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

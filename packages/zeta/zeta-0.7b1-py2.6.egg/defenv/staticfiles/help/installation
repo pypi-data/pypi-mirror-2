@@ -1,0 +1,312 @@
+[< <style type="text/css"> >]
+h1, h2, h3, h4, h5 { 
+    margin : 0px;
+    padding: 5px 0px 2px 3px;
+    background-color : #EAEAFC;
+    border-bottom: 1px solid #CCCCCC;
+}
+[< </style> >]
+
+{{ Toc( position='relative', float='right' ) }}
+
+=== Installing on Ubuntu server
+
+Installing ubuntu packages via apt-get //system user// deploying zeta
+must be part of 'www-data' group.
+
+{{{ Code bash
+
+sudo apt-get install python python-dev                      # python
+sudo apt-get install python-svn python-subversion           # Subversion binding
+sudo apt-get install python-setuptools python-virtualenv    # Virtual environment
+sudo apt-get install python-xapian python-mysqldb           # Python binding
+sudo apt-get install python-openid                          # Python openid
+sudo apt-get install build-essential apache2 apache2-utils  # Apache
+sudo apt-get install apache2-threaded-dev apache2-mpm-prefork
+sudo apt-get install mysql-common mysql-client mysql-admin  # MySQL
+sudo apt-get install mysql-server mysql libmysqlclient-dev libmysqlclient15
+sudo apt-get install graphviz graphviz-doc
+sudo apt-get install wget htmldoc html2text                 # Miscellaneous
+
+}}}
+
+=== Database Setup
+
+For demonstration purpose, //zetadev// is used as the database user and
+//password// is used as user's password. The mysql database for the
+demonstration setup is also named //zetadev//
+
+* Create a database in MySQL eg, //zetadev//, \\ 
+  [<PRE    CREATE DATABASE zetadev; >]
+* Create a user eg. //zetadev// in mysql and grant permissions. \\ 
+  [<PRE    GRANT ALL ON zetadev.* TO zetadev@localhost IDENTIFIED BY 'password'; >]
+  where //password// is the password, granting all permission under for
+  database //zetadev//.
+* The database is already initialized or setup.\\ 
+  [<PRE    DROP DATABASE zetadev; >]
+  [<PRE    CREATE DATABASE zetadev; >]
+  commands will enable the administrator to re-setup the application.
+
+=== Fresh Deployment
+
+===== Extract
+
+Untar the installation package, where, the <package-file> will look something
+like, //zeta-<pkgver>-<pyver>.egg.tar//
+
+{{{ Code bash
+tar -zxvf <packaged file>
+}}}
+
+The above command will extract the following files in current directory,
+  * deployzeta.py
+  * zwiki-<pkgver>-<pyver>.egg
+  * zeta-<pkgver>-<pyver>.egg
+
+==== Install
+
+Execute the following command, with deployment name, and the corresponding egg
+files that was extracted along with the //deployzeta.sh// script
+
+{{{Code bash
+deployzeta.py <deploy-name> <zetaegg-file> <zwikiegg-file>
+}}}
+
+Above script will accomplish following things,
+
+  * Creates a directory by name //<deploy-name>// in the current directory and
+    populates it with files required for the virtual environment.
+  * Enters into the virtual environment and installs the zeta package and all
+    its dependencies in the virtual environment.
+  * Generates script by name, //virtz-<deployname>.sh// in the current
+    directory, which can be used by the administrator to enter into the
+    deployment's virtual environment.
+  * Automatically executes the command,
+    [<PRE    paster make-config zeta production.ini >]
+    to create configuration file for the production environment.
+    production.ini can be updated only after 'setup-app' from paster.
+
+Note that, \\ 
+  If in case, there is version conflict between packages in python system
+  environment and virtual environment, check with the system administrator to
+  upgrade the package in the system version or remove the package.
+
+Enter into the deployment's virtual environment,
+
+{{{Code bash
+source virtz-<deployname>.sh
+}}}
+
+''All the administrative commands on a given deployment should be executed
+in its virtual environment.''
+
+==== Initial Configuration
+
+Adjust //production.ini// file with initial configuration (if required) and
+continue with next step,
+
+: zeta.envpath ::
+    By default points to //defpath/ // inside deployed directory. It is
+    preferred to leave this as is, if you want to change it to a different
+    directory change it here.
+: sqlalchemy.url ::
+    Should be a fully qualified mysql database url, Like,
+    [<PRE   mysql://zetadev:password@localhost:3306/zetadev >]
+    Change //zetadev:password// to your database username:password and change
+    //zetadev// database name to your database name.
+: debug ::
+    if debug is //true// change it to //false/
+: log file ::
+    [handler_file] \\ 
+    args = ('%(here)s/defenv/log/application.log', 'a') \\ 
+    specifies the log file. Change //%(here)s/defenv/ // to you //zeta.envpath//
+: zeta.sitelogo ::
+    directory path interpreted as relative to // public/ // directory under
+    zeta.envpath. For eg, a path name // /logo/sitelogo.png // will be
+    interpreted as // %(zeta.envpath)/public/logo/sitelogo.png
+
+[[ /help/IniConfig | Learn more ]] about configuration option.
+
+==== Setup
+
+Finally setup the application,
+
+{{{ Code bash
+paster setup-app production.ini#zetapylons
+}}}
+
+which will,
+  * Initialize the database,
+  * Copy the environment tree to the path
+  * Adjust the defenv/mod_wsgi/dispatch.wsgi file for, sitedir, eggcache, and
+    application config
+
+If database is already initialized, setup-app will fail. Thus forcing the administrator
+to know what he / she is about to do.
+
+==== Setting up search indexing
+
+Optionally, if you want to index the database from command line,
+
+{{{ Code bash
+paster request production.ini /pasteradmin/search do=index
+}}}
+
+==== System directory adjustments
+
+Under the deployed directory, adjust the os-group of // egg-cache/ //
+directory and // defenv/ // directory to the os-group to which the web server
+belongs to. If // www-data // is the os-group, then,
+
+
+{{{ Code bash
+chgrp www-data -R .
+chmod -R g+w .
+}}}
+
+''The linux-user who is deploying zeta must be part of 'www-data' group.''
+
+=== Apache Configuration
+
+Python2.5 version is used for this demonstration,
+
+Install apache packages, if you have not installed before,
+
+{{{ Code bash
+sudo apt-get install build-essential python2.5 python2.5-dev
+sudo apt-get install apache2 apache2-utils apache2-threaded-dev apache2-mpm-prefork
+}}}
+
+[[ #Setting up mod_wsgi | Setup mod_wsgi under apache ]]
+
+With mod_wsgi installed, you'll need to enable it so that Apache can use
+it. Create,
+[<PRE   /etc/apache2/mods-available/wsgi.load >]
+file with following content,
+{{{ Code text
+    LoadModule wsgi_module /usr/lib/apache2/modules/mod_wsgi.so
+}}}
+
+Now enable the mod_wsgi module,
+
+{{{ Code bash
+sudo a2enmod force-reload
+sudo a2enmod wsgi
+}}}
+
+At this point, mod_wsgi is installed. To make debugging Apache easier, it
+is useful to set the log level to info so that you get all the mod_wsgi
+information. You do this by adding the following line to Apache's
+// 'httpd.conf' //,
+{{{ Code text
+    LogLevel info
+}}}
+
+You'll need to restart Apache,
+
+{{{Code bash
+sudo /etc/init.d/apache2 restart
+}}}
+
+Check the error logs to ensure mod_wsgi has loaded,
+
+{{{Code bash
+cat /var/log/apache2/error.log | grep wsgi
+
+}}}
+
+Then when you restart, you will see the following in log,
+{{{ Code text
+
+[Sun Jun 29 04:54:44 2008] [info] mod_wsgi: Initializing Python.
+[Sun Jun 29 04:54:44 2008] [info] mod_wsgi (pid=4237): Attach interpreter ''.
+[Sun Jun 29 04:54:44 2008] [info] mod_wsgi (pid=4239): Attach interpreter ''.
+[Sun Jun 29 04:54:44 2008] [notice] Apache/2.2.8 (Ubuntu) mod_wsgi/2.3
+                                        Python/2.5.2 configured
+                                        -- resuming normal operations
+}}}
+
+Now that mod_wsgi is configured, you'll need to create a virtual host.
+Create a new file called,
+[<PRE   /etc/apache2/sites-available/simplesite_mod_wsgi >]
+with the following content,
+
+{{{ Code apacheconf
+    <VirtualHost 192.168.0.131:5000>
+        ServerName 192.168.0.131
+        ServerAlias 192.168.0.131
+        ErrorLog  /home/deploy/error.log
+        CustomLog /home/deploy/access.log combined
+
+        # Setup mod_wsgi
+        WSGIDaemonProcess zetadev5000 processes=2 display-name=apache5000
+        WSGIProcessGroup zetadev5000
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIScriptAlias / /home/deploy/defenv/mod_wsgi/dispatch.wsgi
+    </VirtualHost>
+}}}
+
+following assumptions are made in the above configuration,
+  * Server ip on which zeta is hosted is 192.168.0.131
+  * Deployed directory is, [<PRE /home/deploy >]
+
+[[ http://code.google.com/p/modwsgi/wiki/ApplicationIssues#Python_Simplified_GIL_State_API | simplified GIL state API ]
+
+Enable the virtual host, that is just created,
+{{{ Code bash
+sudo a2dissite simplesite
+sudo a2ensite simplesite_mod_wsgi
+}}}
+
+Restart Apache,
+{{{ Code bash
+sudo /etc/init.d/apache2 restart
+}}}
+
+To enable debugging, disable apache's multiprocess mode, by adding the
+following in // /etc/apache2/httpd.conf //
+{{{ Code apacheconf
+    ServerLimit 1
+}}}
+
+=== Setting up mod_wsgi
+
+Download and build mod_wsgi,
+{{{ Code bash
+wget http://modwsgi.googlecode.com/files/mod_wsgi-2.3.tar.gz
+tar zxfv mod_wsgi-2.3.tar.gz
+cd mod_wsgi-2.3
+./configure --with-python=/usr/bin/python2.5
+make
+}}}
+
+Check that it can share the Python library by looking for libpython2.5.so
+in the output from the following commands,
+
+{{{ Code bash
+cd .libs
+ldd mod_wsgi.so | grep python2.5 libpython2.5.so.1.0 
+}}}
+
+You can now proceed and install mod_wsgi,
+
+{{{ Code bash
+cd ../
+sudo make install
+}}}
+
+Edit /etc/apache2/mods-available/wsgi.load, and add the following line
+
+{{{ Code apacheconf
+    LoadModule wsgi_module /usr/lib/apache2/modules/mod_wsgi.so
+}}}
+
+Finally, enable mod_wsgi and restart apache,
+
+{{{ Code
+    sudo a2enmod wsgi
+    sudo /etc/init.d/apache2 force-reload
+}}}
+
+
+/* vim: set filetype=zwiki : */

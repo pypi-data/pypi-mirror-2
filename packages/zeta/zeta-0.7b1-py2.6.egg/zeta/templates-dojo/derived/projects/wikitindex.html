@@ -1,0 +1,107 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Index of all wiki pages (for this project) displayed like directory listing
+"""
+],
+[ 'Wiki list',
+"""List of all wiki pages associated with the project, in a grid-style,
+allowing user to <em>edit attributes in-line</em>. To know how,
+just double click on any of the grid cell (that are not in gray)
+and edit it. It is also possible to navigate from one cell to another using
+'up', 'down', 'left', 'right' arrows, to edit just press enter and edit. To save
+edited content, just press 'enter' or click outside the cell.
+<br/>
+The header row in the grid can be used for two purpose. One, to <em>sort the list
+by desired column</em> (by left clicking), two, to
+<em>add/remove columns</em> (by right clicking). 
+"""
+],
+[ 'Wikipage',
+"""Each wiki page is rendered with html translated wiki document and gives simple
+statistical details for the page. Download a wiki page as text, pdf, html or
+ps file.
+"""
+],
+[ 'Timeline',
+"""Timeline of updates done to all wiki pages in this project"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="bd_body()">
+    <%
+        projname = c.project.projectname
+        url_for  = lambda u : h.url_forwiki( projname, u )
+
+        sel_wp  = capture( forms.form_selectwikipage, c.authuser,
+                           c.wikipagenames, c.wikipagename or '' )
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchwiki', 'Search-wiki',
+                        h.suburl_search, c.searchfaces
+                    )
+
+        attachs= '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="Attachments to wiki pages"> \
+                   Attachments</a></span>' % h.url_wikiattachs )
+        charts = capture( elements.iconlink, h.url_wikicharts,
+                          'barchart', title="Wiki charts" )
+        tline  = capture( elements.iconlink, h.url_wikitimeline,
+                         'timeline', title="Timeline for all wiki pages" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ searchbox, sel_wp, attachs, ],
+                           rspans=[ charts, tline ],
+                           tooltips=page_tooltips
+    )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div class="ml20 mr20">
+                ${elements.titleindex( c.titlepages, url_for )}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+    dojo.addOnLoad( function () {
+        /* Setup the wiki goto list */
+        select_goto( dojo.query( '#selectwikipage' )[0] );
+    });
+    dojo.addOnLoad( setup_userpanes );
+    dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

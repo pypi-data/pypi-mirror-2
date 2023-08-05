@@ -1,0 +1,201 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements"  file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+<%namespace name="charts" file="/component/charts.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Learn about individual milestone and its analytics"""
+],
+[ 'Project homepage',
+"""Home page can be constructed using wiki markup. To change home page
+content edit project's <b>'homepage'</b> wiki document.
+"""
+],
+[ 'Roadmap',
+"""Use the Roadmap page to view project's progress and achievements.
+Milestones are grouped into catagories <em>closed</em> and <em>opened</em>,
+and chronologically sorted.<br/>
+<b>Background color coding</b> : 
+<span class="bgblue1">open milestones</span>
+<span class="bggrn2">closed milestones</span>
+<span class="bggray1">cancelled milestones</span>
+<br/><br/>
+Milestone-id is displayed along with the milestone name in paranthesis, use
+this where ever the milestone needs to be referenced.
+<b>Report Card</b> gives a visual segmentation of milestone tickets in terms
+of 'ticket-types', 'ticket-status', 'ticket-severity'.
+"""
+],
+[ 'Mountpoints',
+"""Repository directories can be mounted on-to site's url path, so that
+contents of its directory, including its sub-directory can be viewed as html
+pages"""
+],
+[ 'Favorites',
+"""Registered users can pick project(s) as their favorite, provided the user
+has 'PROJECT_VIEW' permission"""
+],
+[ 'Downloads',
+"""Downloable files for this project."""
+],
+[ 'Attachments',
+"""Add <b>summary</b> and <b>tags</b> to project attachments."""
+],
+[ 'Tags',
+"""Tag a project by clicking on the iconized title. Delete
+tags by clicking on the cross-wire. Tag names should be 2 or more characters.
+"""
+],
+[ 'Timeline',
+"""Timeline for project, shows all updates done in the context of a project
+except project-administrative logs, which is available under admin/timeline."""
+],
+
+]
+
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    var zcharts = {};
+    function setup_charts() {
+        var chart13_data  = ${ h.json.dumps(c.chart13_data) | n}
+        var idx = 'chart13_' + chart13_data[0]
+        zcharts[idx] = chart13_milestone_tickets( chart13_data, idx );
+
+        // Connect hover handler to show tooltip
+        dojo.query( '.compbar' ).forEach(
+            function( n ) {
+                var n_ttip = dojo.query( '.tooltip', n )[0]
+                dojo.connect(
+                    n, 'onmouseenter',
+                    dojo.partial(
+                        function(ntip, e) {
+                            dojo.toggleClass( ntip, 'dispnone', false );
+                        }, n_ttip
+                    )
+
+                );
+                dojo.connect(
+                    n, 'onmouseleave',
+                    dojo.partial(
+                        function( ntip, e) {
+                            dojo.toggleClass( ntip, 'dispnone', true );
+                        }, n_ttip
+                    )
+
+                );
+            }
+        );
+    }
+    </script>
+</%def>
+
+<%def name="milestone( m )">
+    <%
+        status = (m.completed and 'Complete') or \
+                    (m.cancelled and 'Cancelled') or 'Open'
+    %>
+    <h3>${m.milestone_name} (${m.id})</h3>
+    <div class="disptable">
+    <div class="disptrow">
+        <div class="disptcell p3 ralign fggray fntbold">Status :</div>
+        <div class="disptcell p3 fntbold">${status}</div>
+    </div>
+    <div class="disptrow">
+        <div class="disptcell p3 ralign fggray fntbold">Created On :</div>
+        <div class="disptcell p3 fntbold">
+            ${m.created_on and m.created_on.strftime('%a, %b %d, %Y')}
+        </div>
+    </div>
+    <div class="disptrow">
+        <div class="disptcell p3 ralign fggray fntbold">Due On :</div>
+        <div class="disptcell p3 fntbold">
+            ${m.due_date and m.due_date.strftime('%a, %b %d, %Y')}
+        </div>
+    </div>
+    </div>
+    <h4>Description</h4>
+    <div class="ml10">${m.descriptionhtml | n}</div>
+    % if m.closing_remarkhtml :
+        <h4>Closing Remark</h4>
+        <div class="ml10">${m.closing_remarkhtml | n}</div>
+    % endif
+
+    <div class="ml50 bgwhite">
+        ${charts.chart13( m.id, *c.mstnresolved )}
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        fav       = capture( elements.favoriteicon, 'favproj' )
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchproject', 'Search-project',
+                        h.suburl_search, c.searchfaces
+                    )
+        attachs = '<span class="ml10 fwnormal fntsmall">' + \
+                  ( '<a href="%s" title="Project attachmens"> \
+                    Attachments</a></span>' % h.url_projattachs )
+        downlds = '<span class="ml10 fwnormal fntsmall">' + \
+                  ( '<a href="%s" title="Project downloads"> \
+                    Downloads</a></span>' % h.url_projdownloads )
+        roadmap = '<span class="ml10 fwnormal fntsmall">' + \
+                  ( '<a href="%s" title="Past, current and future milestones">\
+                    Roadmap</a></span>' % h.url_projroadmap )
+        mountpt = '<span class="ml10 fwnormal fntsmall">' + \
+                  ( '<a href="%s" title="Mounted repository directories"> \
+                    Mountpoints</a></span>' % h.url_projmounts )
+        charts  = capture( elements.iconlink, h.url_projectcharts,
+                           'barchart', title="Project analytics" )
+        tline   = capture( elements.iconlink, h.url_projtimeline,
+                           'timeline', title="Project timeline" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ fav, searchbox, roadmap, mountpt, attachs, downlds, ],
+                           rspans=[ charts, tline ], tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            % if c.authorized :
+                ${forms.form_projfav(
+                    c.authuser, c.project, h.suburl_projfav,
+                    c.project in c.authuser.favoriteprojects and \
+                    'delfavuser' or 'addfavuser'
+                )}
+            % endif
+            <div class="ml20">
+                ${milestone( c.milestone )}
+            </div>
+        </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_charts );
+        dojoaddOnLoad( 'initform_projfav' );
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

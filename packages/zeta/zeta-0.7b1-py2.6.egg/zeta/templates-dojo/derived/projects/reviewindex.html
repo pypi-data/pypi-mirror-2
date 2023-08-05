@@ -1,0 +1,359 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Review - document, code and wiki pages. Every review created, has
+<em>author</em>, <em>moderator</em> and <em>participants</em>.
+<br/>
+Similar to ticket list, review list uses a grid supporting
+<b>inline editing</b>.
+"""
+],
+[ 'Author',
+"""<em>Author</em> can add comments and also reponsible for taking actions
+on all review comments."""
+],
+[ 'Moderator',
+"""<em>Moderator</em> can add comments and is responsible
+for approving actions taken by author on review comments. Once all the
+comments are approve, moderator can close the review."""
+],
+[ 'Participant',
+"""<em>Participants</em> can give review comments and reply to other comments.
+"""
+],
+[ 'Review-set',
+"""Collection of reviews. Especially useful to create review entries for every
+modified / added file in repository changeset
+"""
+],
+[ 'Attachments',
+"""Add <b>summary</b> and <b>tags</b> to project attachments."""
+],
+[ 'Timeline',
+"""Timeline of all updates done to Review(s)."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+    <link href="/zdojo/zdojoGrid.css" rel="stylesheet" type="text/css"></link>
+    <link href="/zdojo/zdojowikiGrid.css" rel="stylesheet" type="text/css"></link>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="revwlist()">
+    <div id="prjrevwlist" class="mt10 ml10 mr10 br5"
+         style="height: 600px; border: 4px solid #B3CFB3;">
+    </div>
+    <div class="dispnone">
+        ${forms.form_configrev( c.authuser, c.project, h.suburl_configrev )}
+    </div>
+    <script type="text/javascript">
+    <%
+        editcolor    = c.revweditable and 'color : black;' or 'color : grey;'
+        revweditable = c.revweditable and 'true' or 'false'
+    %>
+    // Grid Columns
+    colnames    = { Id           : null,
+                    ReviewSet    : null,
+                    ResourceUrl  : null,
+                    Version      : null,
+                    Author       : null,
+                    Moderator    : null,
+                    Comments     : null,
+                    Olderby      : null
+                  };
+
+    // Format ids.
+    function get_revwids( rowindex, item ) {
+        if( ! grid_rindex ) { return; }
+        if( ! item ) { return; }
+        return [ revwlist.store.getValue( item, 'href' ),
+                 revwlist.store.getValue( item, 'id' ) ]
+    }
+    function format_revwids( item, rowindex ) {
+        if( ! grid_rindex ) { return; }
+        if( ! item ) { return; }
+        return create_anchor( item[0], item[1] );
+    }
+    // Format review set ids
+    function get_rsetids( rowindex, item ) {
+        if( ! grid_rindex ) { return; }
+        if( ! item ) { return; }
+        return [ revwlist.store.getValue( item, 'rshref' ),
+                 revwlist.store.getValue( item, 'reviewset' ) ]
+    }
+    function format_rsetids( item, rowindex ) {
+        if( ! grid_rindex ) { return; }
+        if( ! item ) { return; }
+        return create_anchor( item[0], item[1] );
+    }
+
+    // GRID Title customization menu
+    function refresh_csmenu() {
+        // Refresh column labels
+        for( name in colnames ) {
+            var mitem = colnames[name];
+            var check = '<input type="checkbox" checked="checked"></input> &ensp;';
+            mitem.colhide ?
+                mitem.attr( 'label', '&ensp;&ensp;&ensp;' + mitem.orglabel )
+                : mitem.attr( 'label', check + mitem.orglabel )
+        }
+    }
+    function on_selectcolumns( name ) {
+        // Toggle the hidden attribute and refresh
+        var visibile = colnames[name].colhide;
+        colnames[name].colhide = colnames[name].colhide ? false : true;
+        refresh_csmenu();
+        // Refresh column hidden status in the layout
+        var cells = grid_rindex.layout.cells;
+        for( i=0 ; i < cells.length; i++ ) {
+            if ( name == cells[i].name ) {
+                grid_rindex.layout.setColumnVisibility( i, visibile );
+            }
+        }
+    }
+    function setup_csmenu() {
+        // Create Menu on the last column
+        var csmenu   = new dijit.Menu();
+        var mi_title = new dijit.MenuItem({ 
+                            label : 'Columns',
+                            iconClass:"dispnone",
+                            class: "calign"
+                       });
+
+        dojo.style( mi_title.domNode, { fontWeight: 'bold', color: 'black' });
+        dojo.style( csmenu.domNode, { fontSize: 'small', color: 'blue' });
+
+        csmenu.addChild( mi_title );
+        csmenu.addChild( new dijit.MenuSeparator() );
+
+        // Create menu items
+        for( name in colnames ) {
+            colnames[name] = new dijit.MenuItem({
+                                    label   : name,
+                                    iconClass: "dispnone",
+                                    onClick : dojo.hitch( null,
+                                                          on_selectcolumns,
+                                                          name
+                                                        )
+                             })
+            colnames[name].colhide  = false;
+            colnames[name].orglabel = name;
+            csmenu.addChild( colnames[name] );
+        }
+        dojo.setObject( 'csmenu', csmenu )
+    }
+
+    /* Data store Write handlers */
+    function revwl_onset( item, attr_name, oldval, newval ) {
+        if( item ) {
+            var id        = revwlist.store.getValue( item, 'id' );
+            var rurl      = revwlist.store.getValue( item, 'resource_url' );
+            var version   = revwlist.store.getValue( item, 'version' );
+            var author    = revwlist.store.getValue( item, 'author' );
+            var moderator = revwlist.store.getValue( item, 'moderator' );
+
+            dojo.query( 'input[name=review_id]', form_configrev
+                      )[0].value = id;
+            dojo.query( 'input[name=resource_url]', form_configrev
+                      )[0].value = rurl;
+            dojo.query( 'input[name=version]', form_configrev
+                      )[0].value = version;
+            dojo.query( 'input[name=author]', form_configrev
+                      )[0].value = author;
+            dojo.query( 'input[name=moderator]', form_configrev
+                      )[0].value = moderator;
+            submitform( form_configrev );
+        }
+    }
+    function setup_revwlist() {
+        var div_prjrevwlist = dojo.byId( 'prjrevwlist' );
+        make_ifws_revwlist( '${h.url_revwlist | n}', revwl_onset );
+
+        var glayout_rindex = [
+                { // View is an array of cells
+                    cells: [
+                      { name : 'Id',
+                        field: 'id',
+                        width: '4em',
+                        hidden: false,
+                        get  : get_revwids,
+                        formatter : format_revwids,
+                        styles : "text-align : left;"
+                      },
+                      { name : 'ReviewSet',
+                        field: 'reviewset',
+                        width: '8em',
+                        hidden: false,
+                        get  : get_rsetids,
+                        formatter : format_rsetids,
+                      },
+                      { name : 'ResourceUrl',
+                        field: 'resource_url',
+                        width: 'auto',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${revweditable}
+                      },
+                      { name : 'Version',
+                        field: 'version',
+                        width: '4em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${revweditable}
+                      },
+                      { name : 'Author',
+                        field: 'author',
+                        width: '9em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${revweditable},
+                        type: dojox.grid.cells.Select,
+                        options : ${ h.json.dumps( c.projusers ) | n }
+                      },
+                      { name : 'Moderator',
+                        field: 'moderator',
+                        width: '9em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${revweditable},
+                        type: dojox.grid.cells.Select,
+                        options : ${ h.json.dumps( c.projusers ) | n }
+                      },
+                      { name : 'Comments',
+                        field: 'comments',
+                        width: '6em',
+                        hidden: false,
+                        editable: false,
+                        styles: 'color : gray;'
+                      },
+                      { name : 'Olderby',
+                        field: 'olderby',
+                        width: '7em',
+                        hidden: false,
+                        editable: false,
+                        styles: 'color : gray;'
+                      }
+                    ]
+                },
+            ];
+
+        setup_csmenu();
+
+        /* Grid with Layout */
+        dojo.setObject( 'grid_rindex',
+                        new dojox.grid.DataGrid({
+                                        store: revwlist.store,
+                                        clientSort: true,
+                                        columnReordering: true,
+                                        structure: glayout_rindex,
+                                        headerMenu: csmenu
+                         }, document.createElement( 'div' ))
+        );
+
+        /* Append the new grid */
+        div_prjrevwlist.appendChild( grid_rindex.domNode );
+
+        /* Call startup, in order to render the grid: */
+        grid_rindex.startup();
+        refresh_csmenu();
+
+        /* Grid editing */
+        new zeta.Form({ normalsub: true, formid: 'configrev' });
+
+        /* grid resizing */
+        grid_rindex.connect( window, 'onresize',
+                             function( e ) { this.resize() } );
+        dojo.subscribe( 'resize_upane', grid_rindex,
+                        function( collapsed ) { this.resize() } );
+    }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchreview', 'Search-review',
+                        h.suburl_search, c.searchfaces
+                    )
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+        if c.revweditable :
+            newrevw  = '<span class="ml10 fwnormal fntsmall"> \
+                        <a href="%s" title="Create a new review"> \
+                        Create</a></span>' % h.url_revwcreate
+        else :
+            newrevw = ''
+
+        revwsets = '<span class="ml10 fwnormal fntsmall"> \
+                    <a href="%s" title="List of reviews sets"> \
+                    Reviewsets</a></span>' % h.url_reviewsets
+
+        attachs= '<span class="ml10 fwnormal fntsmall">' + \
+                 ( '<a href="%s" title="List of files attached to reviews"> \
+                   Attachments</a></span>' % h.url_revwattachs )
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+        tline  = capture( elements.iconlink, h.url_revwtimeline,
+                          'timeline', title="Timeline of reviews" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ searchbox, sel_revw, sel_rset, newrevw,
+                             revwsets, attachs, ],
+                           rspans=[ charts, tline ],
+                           tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${revwlist()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_selrevw = dojo.query( '#selectrevw' )[0];
+            var n_selrset = dojo.query( '#selectrset' )[0];
+            n_selrevw ? select_goto( n_selrevw ) : null;
+            n_selrset ? select_goto( n_selrset ) : null;
+        });
+        dojo.addOnLoad( setup_revwlist )
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

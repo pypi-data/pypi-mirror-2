@@ -1,0 +1,294 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Snatpshot of user activity and statistics"""
+],
+[ 'Users',
+"""List of registered users, and their summary"""
+],
+[ 'GoogleMap',
+"""If enable in site-admin -> site-config, watch yourself and your friends in
+googlemap"""
+],
+[ 'MyTickets',
+"""All tickets that user participates in, across projects"""
+],
+[ 'Timeline',
+"""Timeline of user activity"""
+],
+
+]
+
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+</%def>
+
+<%def name="ticketstat( tickets, tckcomments )">
+    <div class="m5">
+        Commented <span class="fgcrimson">${tckcomments}</span> times on tickets
+    </div>
+</%def>
+
+<%def name="wikistat( wikicomments )">
+    <div class="m5">
+        Commented <span class="fgcrimson">${wikicomments}</span> times for
+        wiki pages
+    </div>
+</%def>
+
+<%def name="reviewstat( authoredrevw, modertrevw, particprevw, revwcomments )">
+    <div class="m5">
+        Authored <span class="fgcrimson">${authoredrevw}</span> reviews;
+        Moderated <span class="fgcrimson">${modertrevw}</span> reviews;
+        Participated in <span class="fgcrimson">${particprevw}</span> reviews;
+        Commented <span class="fgcrimson">${revwcomments}</span> times for
+        reviews
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        pagebartext = "%s" % c.user.username
+
+        users = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                   ( '<a href="%s">Users</a></div>' % h.url_usershome )
+        usersgmap = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                    ( '<a href="%s">OnGooglemap</a></div>' % h.url_usersgmap )
+        mytickets = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                    ( '<a href="%s">MyTickets</a></div>' % h.url_mytickets )
+        charts    = capture( elements.iconlink, h.url_usercharts,
+                             'barchart',
+                             title="Analytics on %s" % c.username
+                           )
+        tline  = capture( elements.iconlink, h.url_usertline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.pagebar( pagebartext, [ users, usersgmap, mytickets ],
+                        rspans=[ charts, tline ],
+                        tooltips=page_tooltips )}
+    <div id="bdy">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div id="userpreference" class="fullpanel1">
+    % else :
+        <div id="userpreference" class="panel1">
+    % endif
+    <div class="m10">
+        <div id="userdetail">
+            ${elements.userdetails( c.user, c.user.userinfo, h.url_userphoto )}
+        </div>
+        <div class="floatr ml10 pt10" style="width: 30%" >
+            <%
+                adminprojects = c.statistics['adminprojects']
+                inprojects    = c.statistics['inprojects']
+                projects  = list(set(adminprojects + inprojects.keys()))
+                projcomps = {}
+                [ projcomps.setdefault( comp.project.projectname, [] 
+                                      ).append( comp.componentname )
+                  for comp in c.user.owncomponents ]
+            %>
+            <div class="bgblue1 p5 mb10 br5">
+                <table><tr>
+                    <td class="fntbold p3">Administrator :</td>
+                    <td class="p3">
+                        ${', '.join(
+                            [ '<a href="%s">%s</a>' % ( h.url_forproject(p), p )
+                              for p in adminprojects ]) | n
+                         }
+                    </td>
+                </tr></table>
+            </div>
+            <div class="bgblue1 p5 mb10 br5">
+                <div class="fntbold">Project teams :</div>
+                <table class="ml20 mt10">
+                    % for p in inprojects :
+                    <tr>
+                        <td class="p3 fntbold ralign">${p} : </td>
+                        <td class="p3 fntitalic">${', '.join(inprojects[p])}</td>
+                    </tr>
+                    % endfor
+                </table>
+            </div>
+            <div class="bgblue1 p5 mb10 br5">
+                <div class="fntbold">Own components :</div>
+                <table class="ml20 mt10">
+                    % for p, comps in projcomps.iteritems() :
+                    <tr>
+                        <td class="p3 fntbold ralign">
+                            <a href="${h.url_forproject(p)}">${p} </a>
+                        </td>
+                        <td class="p3 fntitalic">${', '.join(comps)}</td>
+                    </tr>
+                    % endfor
+                </table>
+            </div>
+            <div class="bgblue1 p5 mb10 br5">
+                <table>
+                    <tr>
+                        <td class="p3 fntbold ralign">Files uploaded : </td>
+                        <td class="p3 fntitalic">
+                            <span class="fgcrimson">
+                                ${c.statistics['uploadedfiles']}
+                            </span>
+                            files
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p3 fntbold ralign">Down-voted : </td>
+                        <td class="p3 fntitalic">
+                            <span class="fgcrimson">
+                                ${c.statistics['votes']['down']}
+                            </span>
+                            times
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p3 fntbold ralign">Up-voted : </td>
+                        <td class="p3 fntitalic">
+                            <span class="fgcrimson">
+                                ${c.statistics['votes']['up']}
+                            </span>
+                            times
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p5 fntbold ralign">For tickets : </td>
+                        <td class="p3 fntitalic">
+                            <div>
+                                Participated in
+                                <span class="fgcrimson">
+                                    ${c.statistics['tickets']}
+                                </span> tickets,
+                            </div>
+                            <div>
+                                providing
+                                <span class="fgcrimson">
+                                    ${c.statistics['tckcomments']}
+                                </span> comments
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p5 fntbold ralign">For wiki : </td>
+                        <td class="p3 fntitalic">
+                            <div>
+                                commented
+                                <span class="fgcrimson">
+                                    ${c.statistics['wikicomments']}
+                                </span> times
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p5 fntbold ralign">For review : </td>
+                        <td class="p3 fntitalic">
+                            <div>
+                                Authored
+                                <span class="fgcrimson">
+                                    ${c.statistics['authoredrevw']}
+                                </span> reviews,
+                            </div>
+                            <div>
+                                moderated
+                                <span class="fgcrimson">
+                                    ${c.statistics['modertrevw']}
+                                </span> reviews,
+                            </div>
+                            <div>
+                                participated in
+                                <span class="fgcrimson">
+                                    ${c.statistics['particprevw']}
+                                </span> reviews,
+                            </div>
+                            <div>
+                                providing
+                                <span class="fgcrimson">
+                                    ${c.statistics['revwcomments']}
+                                </span> comments
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div id="useringmap" class="fggray2 p5 mb10 "
+                 style="border: 2px solid gray; width: 95%; height: 200px;">
+                 want to see users in google maps ? Enable `googlemaps` in
+                 site-admin->siteConfig
+            </div>
+        </div>
+        <div class="floatl timeline ml10" style="width : 65%">
+            <h4 class="bggrn2 br4 p2" >Recent activities</h4>
+            <ul>
+            % for log in c.logs :
+                <li>
+                    <div class="mt5 mb5 ml3 wsnowrap w100"
+                         style="overflow: hidden;">
+                        <span class="hoverhighlight">
+                            ${elements.iconize(
+                                    log.created_on.strftime("%a, %b %d, %Y"),
+                                    'plus_exp', span_name='interface',
+                                    classes='pointer mr5'
+                            )}
+                        </span>
+                        <span>in ${log.itemhtml |n }</span>
+                        <span name="logmsg" class="ml10 fggray">${log.log}</span>
+                    </div>
+                </li>
+            % endfor
+            </ul>
+        </div>
+    </div>
+    </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    % if c.googlemaps :
+    <script
+        src="http://maps.google.com/maps?file=api&amp;v=2.x&amp;key=${c.googlemaps}"
+        type="text/javascript">
+    </script>
+
+    <script type="text/javascript">
+        var map       = null;
+        var geocoder  = null;
+        var useraddrs = ${ h.json.dumps( c.useraddr ) | n }
+        function init_gmap() {
+            var cbox = dojo.contentBox( 'useringmap' );
+            rc = creategmap( "useringmap", cbox.w, cbox.h ); // width, height
+            map      = rc[0];
+            geocoder = rc[1];
+            dojo.forEach(
+                useraddrs,
+                function( uaddr ) {
+                    uaddr[uaddr.length] = showAddress( uaddr[0], uaddr[1], uaddr[1] );
+                }
+            );
+        }
+    </script>
+    % endif
+
+    <script type="text/javascript">
+        dojoaddOnLoad( 'init_gmap' );
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>
+

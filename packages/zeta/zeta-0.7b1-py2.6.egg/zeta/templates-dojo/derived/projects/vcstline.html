@@ -1,0 +1,95 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Integrate a repository with Zeta by providing the type (like svn ...) of
+repository and root-url. It is better if the root-url points to the same machine,
+or to a machine on the local network. Use the selectable options in the context-nav
+tool-bar to go-to the desired repository.
+"""
+],
+[ 'Timeline',
+"""Timeline for wiki, shows all updates done one a wiki page or all wiki pages
+under the project."""
+],
+
+]
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        if c.vcs :
+            vcsbrowse = '<a class="ml10" href="'+h.url_vcsbrowse+'">Browse</a>'
+            revlist   = '<a class="ml10" href="'+h.url_revlist+'">Revisions</a>'
+        else :
+            vcsbrowse = ''
+            revlist   = ''
+        if c.vcs :
+            title     = '<a class="fntbold ml10">%s</a>' % c.vcs.name
+        else :
+            title     = ''
+
+        if c.vcseditable :
+            newvcs  = '<span class="ml10 fwnormal fntsmall">' +\
+                      '<a href="%s" \
+                          title="Integrate a new repository">Integrate</a></span>' % \
+                               h.url_vcscreate
+        else :
+            newvcs = ''
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title, sel_vcs, vcsbrowse, revlist, newvcs, ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${elements.timeline_view( c.logs, c.fromoff, c.tooff, c.links )}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            /* Setup the vcs goto list */
+            select_goto( dojo.query( '#selectvcs' )[0] );
+        });
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

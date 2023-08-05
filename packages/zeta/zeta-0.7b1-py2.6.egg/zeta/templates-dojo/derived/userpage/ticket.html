@@ -1,0 +1,522 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Consolidated list of all tickets belonging to the logged in user, across
+all the projects.
+"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+    <link href="/zdojo/zdojoGrid.css" rel="stylesheet" type="text/css"></link>
+    <link href="/zdojo/zdojowikiGrid.css" rel="stylesheet" type="text/css"></link>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    /********** Setup Ticket Grid **************/
+    <%
+       tckeditable = c.tckeditable and 'true' or 'false' 
+       editcolor   = 'color : grey;'
+       ticketresolv= dict([ (str(st), "") for st in c.tstat_resolv ])
+    %>
+
+    tckccodes   = ${ c.tckccodes | n }
+    ticketresolv= ${ ticketresolv }
+    currdate    = new Date();
+
+    // Grid - Row styling using ticket color-coding
+    function compute_rowcolor( item ) {
+        var tckdetail = {
+            tck_statusname   : ticketlist.store.getValue( item, 'tck_statusname'),
+            tck_severityname : ticketlist.store.getValue( item, 'tck_severityname'),
+            tck_typename     : ticketlist.store.getValue( item, 'tck_typename'),
+        };
+        var bgcolor = tckcolorcode( tckdetail, tckccodes );
+        return bgcolor;
+    }
+
+    // GRID
+    colnames    = { Id        : null,
+                    Project   : null,
+                    Summary   : null,
+                    Type      : null,
+                    Severity  : null,
+                    Status    : null,
+                    Duedate   : null,
+                    Owner     : null,
+                    Prompting : null,
+                    Component : null,
+                    Milestone : null,
+                    UpVotes   : null,
+                    DownVotes : null,
+                    Version   : null,
+                    Olderby   : null
+                  };
+    // GRID Cell formatters
+    function get_ticketids( rowindex, item ) {
+        if( ! grid_tindex ) { return; }
+        if( ! item ) { return; }
+        return [ ticketlist.store.getValue( item, 'ticketurl' ),
+                 ticketlist.store.getValue( item, 'id' ) ]
+    }
+    function format_ticketids( item, rowindex ) {
+        if( ! grid_tindex ) { return; }
+        if( ! item ) { return; }
+        return create_anchor( item[0], item[1] );
+    }
+    function get_duedate( idx, item ) { 
+        if( ! grid_tindex ) { return; }
+        if( ! item ) { return; }
+        var dd = ticketlist.store.getValues( item, 'due_date' );
+        dd = dd ? new Date( dd[0], dd[1]-1, dd[2] ) : null;
+        return [ ticketlist.store.getValue( item, 'tck_statusname'), dd, idx ]
+    }
+    function format_date(args){
+        // While re-sorting the grid via user events, this function is called
+        // with empty arguments
+        if ( args ) {
+            var tckstat    = args[0];
+            var inDatum    = args[1];
+            var inRowindex = args[2];
+            var text = String(inDatum) == 'Invalid Date' ? 
+                       '-'
+                       : dojo.date.locale.format(new Date(inDatum), this.constraint )
+            var color  = 'color: gray;'
+            if( tckstat in ticketresolv ) {
+                strike = 'text-decoration: line-through;'
+            } else {
+                color  = 'color: ' + \
+                         (new Date(inDatum) - currdate < 0 ? 'red;' : 'gray;')
+                strike = ''
+            }
+            this.customStyles.push( color + strike )
+            return text
+        }
+    }
+    function format_cctype( val, idx ) {
+        var item = this.grid.getItem( idx );
+        bgcolor  = compute_rowcolor( item )
+        this.view.getRowNode(idx).style.backgroundColor = bgcolor;
+        return val
+    }
+    function format_ccseverity( val, idx ) {
+        var item = this.grid.getItem( idx );
+        bgcolor  = compute_rowcolor( item )
+        this.view.getRowNode(idx).style.backgroundColor = bgcolor;
+        return val
+    }
+
+
+    // GRID Title customization menu
+    function refresh_csmenu() {
+        // Refresh column labels
+        for( name in colnames ) {
+            var mitem = colnames[name];
+            var check = '<input type="checkbox" checked="checked"></input> &ensp;';
+            mitem.colhide ?
+                mitem.attr( 'label', '&ensp;&ensp;&ensp;&ensp;' + mitem.orglabel )
+                : mitem.attr( 'label', check + mitem.orglabel )
+        }
+    }
+    function on_selectcolumns( name ) {
+        // Toggle the hidden attribute and refresh
+        var visibile = colnames[name].colhide;
+        colnames[name].colhide = colnames[name].colhide ? false : true;
+        refresh_csmenu();
+        // Refresh column hidden status in the layout
+        var cells = grid_tindex.layout.cells;
+        for( i=0 ; i < cells.length; i++ ) {
+            if ( name == cells[i].name ) {
+                grid_tindex.layout.setColumnVisibility( i, visibile );
+            }
+        }
+    }
+    function setup_csmenu() {
+        // Create Menu on the last column
+        var csmenu   = new dijit.Menu();
+        var mi_title = new dijit.MenuItem({ 
+                            label : 'Columns',
+                            iconClass:"dispnone",
+                            class: "calign"
+                       });
+
+        dojo.style( mi_title.domNode, { fontWeight: 'bold', color: 'black' });
+        dojo.style( csmenu.domNode, { fontSize: 'small', color: 'blue' });
+
+        csmenu.addChild( mi_title );
+        csmenu.addChild( new dijit.MenuSeparator() );
+
+        // Create menu items
+        for( name in colnames ) {
+            colnames[name] = new dijit.MenuItem({
+                                    label: name,
+                                    iconClass: "dispnone",
+                                    onClick : dojo.hitch( null,
+                                                          on_selectcolumns,
+                                                          name
+                                                        )
+                             })
+            colnames[name].colhide  = false;
+            colnames[name].orglabel = name;
+            csmenu.addChild( colnames[name] );
+        }
+        colnames.Prompting.colhide = true;
+        colnames.Component.colhide = true;
+        colnames.Version.colhide = true;
+        colnames.Olderby.colhide = true;
+        colnames.DownVotes.colhide = true;
+        dojo.setObject( 'csmenu', csmenu )
+    }
+
+    function setup_tcklist() {
+        var div_usertcklist = dojo.byId("usertcklist");
+
+        /* Setup the wiki goto list */
+        select_goto( dojo.byId( 'selectticket' ) );
+        select_goto( dojo.byId( 'selsavfilter' ) );
+
+        // GRID Layout
+        var glayout_tindex = [
+                { // View is an array of cells
+                    cells: [
+                      { name : 'Id',
+                        field: 'id',
+                        width: '4em',
+                        hidden: false,
+                        get  : get_ticketids,
+                        formatter : format_ticketids,
+                        styles : "text-align : left;"
+                      },
+                      { name : 'Project',
+                        field: 'projectname',
+                        width: '8em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'Summary',
+                        field: 'summary',
+                        width: '22em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'Type',
+                        field: 'tck_typename',
+                        width: '7em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        formatter: format_cctype,
+                      },
+                      { name : 'Severity',
+                        field: 'tck_severityname',
+                        width: '7em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        formatter: format_ccseverity,
+                      },
+                      { name : 'Status',
+                        field: 'tck_statusname',
+                        width: '7em',
+                        hidden: false,
+                        styles: 'color : gray;',
+                      },
+                      { name : 'Duedate',
+                        field: 'due_date',
+                        width: '7em',
+                        hidden: false,
+                        get  : get_duedate,
+                        formatter: format_date,
+                      },
+                      { name : 'Owner',
+                        field: 'owner',
+                        width: '7em',
+                        hidden: false,
+                        styles: 'color : gray;'
+                      },
+                      { name : 'Prompting',
+                        field: 'promptuser',
+                        width: '7em',
+                        hidden: true,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'Component',
+                        field: 'componentname',
+                        width: '7em',
+                        hidden: true,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'Milestone',
+                        field: 'milestone_name',
+                        width: '9em',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'UpVotes',
+                        field: 'upvotes',
+                        width: '6em',
+                        hidden: false,
+                        styles: 'text-align: center; color : green;'
+                      },
+                      { name : 'DownVotes',
+                        field: 'downvotes',
+                        width: '7em',
+                        hidden: true,
+                        styles: 'text-align: center; color : red;'
+                      },
+                      { name : 'Version',
+                        field: 'version_name',
+                        width: '7em',
+                        hidden: true,
+                        styles: '${ editcolor }',
+                      },
+                      { name : 'Olderby',
+                        field: 'age',
+                        width: '7em',
+                        hidden: true,
+                        styles: 'color : gray;'
+                      }
+                    ]
+                },
+            ];
+
+        setup_csmenu();
+
+        make_ifws_ticketlist( '${h.url_ticketlist | n}' );
+
+        /* Grid with Layout */
+        dojo.setObject(
+            'grid_tindex',
+            new dojox.grid.DataGrid({
+                    store: ticketlist.store,
+                    clientSort: true,
+                    columnReordering: true,
+                    structure: glayout_tindex,
+                    headerMenu: csmenu,
+                    columnReordering: true
+             }, document.createElement( 'div' ))
+        );
+
+        /* Append the new grid */
+        div_usertcklist.appendChild( grid_tindex.domNode );
+
+        /* Call startup, in order to render the grid: */
+        grid_tindex.startup();
+        refresh_csmenu();
+
+        /* grid resizing */
+        grid_tindex.connect( window, 'onresize',
+                             function( e ) { this.resize() } );
+        dojo.subscribe( 'resize_upane', grid_tindex,
+                        function( collapsed ) { this.resize() } );
+
+        /* Timeout to update ticket count */
+        function tm_onesecrecur() {
+            doticketcount() ? "Done" : setTimeout( tm_onesecrecur, 1000 );
+        }
+        setTimeout( tm_onesecrecur, 1000 )
+    }
+    </script>
+</%def>
+
+<%def name="userticketindex( typenames, severitynames, statusnames,
+                             projectnames )">
+    <div class="disptable w100">
+    <div class="disptrow">
+        <div class="disptcell">
+            <div id="usertcklist" class="posr ml5 mr5 br5"
+                 style="height: 600px; border: 4px solid #B3CFB3;">
+            </div>
+        </div>
+        <div class="disptcell vtop" 
+             style="width: 12em; border-left : 1px solid gray;">
+             <div class="pl5 pb10 fggray fntbold">
+                 <span>Tickets : </span>
+                 <span id="tckcount" class="fgblack">0</span>
+             </div>
+            <div class="pl5 fggray fntbold">Standard Filters</div>
+            <div class="disptable">
+            % for filtername, _l in c.tckfilters :
+            <div class="disptrow">
+                <div id="${filtername}" 
+                     class="disptcell pl10 standrdfilter">
+                     <div class="hoverhighlight br4 fgblue pointer p3">
+                         ${filtername}
+                     </div>
+                </div>
+                <div class="disptcell pl10">
+                    <% 
+                        href = h.url_forutcklist( c.authuser.username,
+                                                  stdfilter=filtername )
+                    %>
+                    ${elements.iconlink( href, 'servergo', title='Filter from server' )}
+                </div>
+            </div>
+            % endfor
+            </div>
+            <div class="pl5 pb5 pt10 fggray fntbold">Custom Filters</div>
+            <div id="filter_usertcklist" class="pl10">
+                <%
+                    filt = h.json.loads( c.savfilterval[1] or '{}' )
+                %>
+                <div forcol="status" class="pt3">
+                    ${forms.select(
+                            name='tck_statusname',
+                            options=['by-status']+statusnames,
+                            opt_selected=filt.get( 'tck_statusname', 'by-status' )
+                     )}
+                </div>
+                <div forcol="type" class="pt3">
+                    ${forms.select(
+                            name='tck_typename',
+                            options=['by-type']+typenames,
+                            opt_selected=filt.get( 'tck_typename', 'by-type' )
+                    )}
+                </div>
+                <div forcol="severity" class="pt3">
+                    ${forms.select(
+                            name='tck_severityname',
+                            options=['by-severity']+severitynames,
+                            opt_selected=filt.get( 'tck_severityname', 'by-severity' )
+                    )}
+                </div>
+                <div forcol="projectname" class="pt3">
+                    ${forms.select(
+                            name='projectname',
+                            options=['by-project']+projectnames,
+                            opt_selected=filt.get( 'projectname', 'by-project' )
+                    )}
+                </div>
+                ${forms.form_addtckfilter( c.authuser, h.suburl_addtckfilter)}
+            </div>
+            <div class="bclear pl5 pb5 pt10 fggray fntbold">Saved Filters</div>
+            <div class="pl10">
+                ${forms.form_selectsavfilter(
+                            c.authuser, c.savfilterlist,
+                            c.savfiltername and c.savfiltername or ''
+                )}
+                % if c.savfilter :
+                    ${forms.form_deltckfilter( c.authuser, c.savfilter, 
+                                               h.suburl_deltckfilter )}
+                % endif
+            </div>
+        </div>
+    </div>
+    </div>
+    <script type="text/javascript">
+        var resolved   = false;
+        var unresolved = false;
+
+        function doticketcount() {
+            var n = dojo.byId( 'tckcount' );
+            n.innerHTML = grid_tindex.rowCount;
+            return grid_tindex.rowCount;
+        }
+
+        function customquery() {
+            var n_selects = dojo.query( '#filter_usertcklist select' );
+            var query     = {}
+            var re        = /by-/
+            for( i = 0; i < n_selects.length; i++ ) {
+                var n = n_selects[i];
+                var v = n.value;
+                if( re.test( v ) ) {
+                    continue;
+                }
+                query[dojo.attr(n, 'name')] = n.value;
+            }
+            return query
+        }
+        function filter_onchange( e ) {
+            grid_tindex.filter( customquery(), true );
+            doticketcount();
+        }
+        function standrd_filter( filtername, e ) {
+            var q = {}
+            q[filtername] = true
+            grid_tindex.filter(q, true );
+            doticketcount();
+        }
+        function setup_tckfilters() {
+            // Connect custom filters
+            dojo.forEach(
+                dojo.query( '#filter_usertcklist select' ),
+                function( n ) { dojo.connect( n, 'onchange', filter_onchange ); }
+            );
+            // Connect standard filters
+            dojo.forEach(
+                dojo.query( '.standrdfilter' ),
+                function( n ) {
+                    var filtername = dojo.attr( n, 'id' );
+                    dojo.connect(
+                        n, 'onclick', dojo.partial( standrd_filter, filtername )
+                    );
+                }
+            );
+        }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        pagebartext = "%s tickets" % c.authusername
+
+        users  = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                 ( '<a href="%s">Users</a></div>' % h.url_usershome )
+        uhome  = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                 ( '<a href="%s">Homepage</a></div>' % h.url_userhome )
+        charts = capture( elements.iconlink, h.url_usercharts,
+                          'barchart', title="Analytics on %s" % c.username
+                        )
+        tline  = capture( elements.iconlink, h.url_usertline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.pagebar( pagebartext, [ uhome, users, ], 
+                        rspans=[ charts, tline ],
+                        tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${userticketindex( c.tck_typenames, c.tck_severitynames,
+                                   c.tck_statusnames, c.projectnames )}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_tcklist );
+        dojo.addOnLoad( setup_tckfilters );
+        dojoaddOnLoad( 'initform_addtckfilter' );
+        dojoaddOnLoad( 'initform_deltckfilter' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

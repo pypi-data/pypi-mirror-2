@@ -1,0 +1,175 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""User preference"""
+],
+[ 'User Home',
+"""Snatpshot of user activity and statistics"""
+],
+[ 'Users',
+"""List of registered users, and their summary"""
+],
+[ 'GoogleMap',
+"""If enable in site-admin -> site-config, watch yourself and your friends in
+googlemap"""
+],
+[ 'MyTickets',
+"""All tickets that user participates in, across projects"""
+],
+[ 'Timeline',
+"""Timeline of user activity"""
+],
+
+]
+
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+        function preference_forms() {
+            var div_accinfo = dojo.byId( "accinfo" );
+
+            /* User photo attachment */
+            new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'photoattachblk',
+                  addform: [ 'userphoto', '${h.suburl_adduserphoto | n}' ],
+                  delform: [ 'deluserphoto', '${h.suburl_deluserphoto | n}' ],
+                  editable: ${[0,1][c.photo_editable == True]},
+                  url: '${h.url_userprefresh | n}',
+                  label: 'Upload Photo',
+                  attachs: ${ h.json.dumps(c.photoattach) | n }
+                }, div_accinfo.childNodes[1]
+            );
+
+            /* User icon attachment */
+            new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'iconattachblk',
+                  addform: [ 'usericon', '${h.suburl_addusericon | n}' ],
+                  delform: [ 'delusericon', '${h.suburl_delusericon | n}' ],
+                  editable: ${[0,1][c.icon_editable == True]},
+                  url: '${h.url_userirefresh | n}',
+                  label: 'Upload Icon',
+                  attachs: ${ h.json.dumps(c.iconattach) | n }
+                }, div_accinfo.childNodes[3]
+            );
+
+            new zeta.ConfigTabs({
+                id: "preftabs",
+                tabs: dojo.query( "div[name=preftab]" )
+                }, dojo.query( "div[name=preftabs]" )[0]
+            );
+
+        }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        pagebartext = "User preference (%s)" % c.authusername
+
+        users = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                   ( '<a href="%s">Users</a></div>' % h.url_usershome )
+        uhome  = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                 ( '<a href="%s">Homepage</a></div>' % h.url_userhome )
+        usersgmap = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                    ( '<a href="%s">OnGooglemap</a></div>' % h.url_usersgmap )
+        mytickets = '<div class="floatl mt4 ml10 fwnormal fntsmall">' +\
+                    ( '<a href="%s">MyTickets</a></div>' % h.url_mytickets )
+
+        charts = capture( elements.iconlink, h.url_usercharts,
+                          'barchart', title="Analytics on %s" % c.username
+                        )
+        tline  = capture( elements.iconlink, h.url_usertline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.pagebar( pagebartext, [ uhome, users, usersgmap, mytickets ], 
+                        rspans=[ charts, tline ],
+                        tooltips=page_tooltips )}
+    <div id="bdy">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div id="userpreference" class="fullpanel1">
+    % else :
+        <div id="userpreference" class="panel1">
+    % endif
+    <div class="m10">
+    <div name="preftabs">
+        <div id="accinfo" class="dispnone" name="preftab" title="AccountInfo"
+             selected="true">
+            <div name="photoattachs"></div>
+            <div name="iconattachs"></div>
+            <div class="disptable bclear ml50">
+            <div class="disptrow">
+                <div class="disptcell w50 vtop">
+                ${forms.form_accountinfo( c.authuser, h.suburl_accountinfo )}
+                </div>
+                <div class="disptcell" style="padding-left: 50px;">
+                    <div id="useringmap" class="fggray2 p5"
+                         style="border: 2px solid gray; width: 400px; height: 400px;">
+                         want to see you in google maps ? Enable `googlemaps` in
+                         site-admin->siteConfig
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+        <div id="chpass" class="dispnone" name="preftab" title="ChangePassword">
+            ${forms.form_updtpass( c.authuser, h.suburl_updtpass )}
+        </div>
+    </div>
+    </div>
+    </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    % if c.googlemaps :
+    <script
+        src="http://maps.google.com/maps?file=api&amp;v=2.x&amp;key=${c.googlemaps}"
+        type="text/javascript">
+    </script>
+
+    <script type="text/javascript">
+        var map         = null;
+        var geocoder    = null;
+        var fulladdress = "${c.fulladdress}"
+        var username    = "${c.authusername}"
+        function init_gmap() {
+            rc = creategmap( "useringmap", 400, 400 )
+            map      = rc[0];
+            geocoder = rc[1];
+            marker = showAddress( username, fulladdress, fulladdress );
+        }
+    </script>
+    % endif
+
+    <script type="text/javascript">
+        dojo.addOnLoad( preference_forms );
+        dojo.addOnLoad( initform_accountinfo );
+        dojo.addOnLoad( initform_updtpass );
+        dojoaddOnLoad( 'init_gmap' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

@@ -1,0 +1,363 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+[ 'Help',
+"""Review comments can be added interactively while viewing the reviewed item.
+If able to detect a previous version for reviewing file, you can find that
+modified lines are color-highlighted to indicate the difference from previous
+version. Color hightlighting are only indicative of changes made."""
+],
+[ 'Author',
+"""<em>Author</em> can add comments, comment's nature and also
+reponsible for taking actions on all review comments."""
+],
+[ 'Moderator',
+"""<em>Moderator</em> can add comments, comment's nature and is responsible
+for approving actions taken on review comments. Once all the comments are
+approve, the moderator can close the review."""
+],
+[ 'Participant',
+"""<em>Participants</em> can comment and reply to other paticipants
+comment."""
+],
+[ 'Timeline',
+"""Timeline gives a log of all updates done to Review(s)."""
+],
+
+]
+
+import xml.etree.cElementTree as et
+from   pygments.formatters    import HtmlFormatter
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+    <style type="text/css">
+        ${HtmlFormatter().get_style_defs('.highlight')}
+        ## The following are for current pygmentation. When pygmentation and
+        ## annotations are merged, take a relook.
+        .highlighttable td.linenos { padding : 3px }
+        .highlighttable td.code { padding : 3px }
+    </style>
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+</%def>
+
+## Confirm and Clean up this function !!
+<%def name="revwsourceline( position, line, cmtsatpos )">
+<% 
+    bg   = position in cmtsatpos and 'bgrevwcmts' or ''
+    esc  = line and '' or '&ensp;'
+    plus = c.revwcmtable and '+' or ''
+%>
+<tr><td class="hoverhighlight pointer"><div class="${bg}">&ensp;</div></td><td class="hoverhighlight fgblue pointer fntbold p2">${plus}</td><td class="fggray p2">${position}</td><td class="p2"><div class="mb5" style="font-family: monospace, fixed;">${line}${esc|n}</div><div class="addcmt mb5"></div><div class="cmts"><div></div></div></td></tr>
+</%def>
+
+<%def name="reviewsource()">
+    <%
+        closed = c.review.closed and 'strike' or ''
+    %>
+    <div id="prjrevwsource" class="mr5">
+        <div class="pb2 posr" style="border-bottom : 1px solid gray">
+            <span class="fntbold ml5">${c.cnt_comments}</span>
+            <span class="fntbold fggray">Comments</span> |
+            <span class="fntbold">${c.cnt_pending}</span>
+            <span class="fntbold fgcrimson">Pending</span>
+            <span class="posa" style="right : 0px">
+                <span>[ <a href="${h.url_review}">View-onlycomments</a> ]</span>
+            </span>
+        </div>
+        <div class="disptable w100">
+        <div class="disptrow">
+            <div class="disptcell vtop"
+                 style="width : 13%; border-right : 2px solid #f2f2f2;">
+                ${elements.showpeople()}
+                <div class="mr5">
+                    <div name="rattachblk"></div>
+                </div>
+                <div class="bclear mr5">
+                    <div name="rtagblk"></div>
+                </div>
+            </div>
+            <div class="disptcell">
+                <h3 class="${closed}" style="margin : 5px 0px 0px 10px">
+                    Review ${c.review.id} 
+                    <span class="fggray">
+                    ( ${"%s, ver:%s" % (c.review.resource_url, c.review.version) } )
+                    </span>
+                </h3>
+                <div class="pt10">
+                    <div id="creatercmt_cntnr" 
+                         class="bclear dispnone ml10 mr10 mb10 pt3">
+                        % if c.revwcmtable :
+                        <div class="ml10 bgwhite br4" style="border: 1px dotted gray">
+                            ${forms.form_creatercmt(
+                                    c.authuser, c.project, c.review,
+                                    h.suburl_creatercmt, c.naturenames 
+                            )}
+                        </div>
+                        % endif
+                    </div>
+                    <div id="replyrcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_replyrcmt( c.authuser, c.project, c.review,
+                                                h.suburl_replyrcmt )}
+                    </div>
+                    <div id="processrcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_processrcmt( c.authuser, c.project, c.review,
+                                                  h.suburl_processrcmt )}
+                    </div>
+                </div>
+                <div class="revwsource ml10">
+                    <% 
+                       import re
+                       cont     = '\n'.join([ l for l in c.revwsource ])
+                       conthtml = h.syntaxhl( cont, lexbyfile=c.review.resource_url )
+                       htmllines= re.search( r'<pre>((.|[\r\n])*)</pre>', conthtml 
+                                           ).groups()[0].splitlines()
+                       lineno   = 1
+                       bgcmtadd = c.revwcmtable and 'bgcmtadd' or ''
+                    %>
+                    <table class="highlight w100">
+                        % for l in htmllines :
+                        <% 
+                            bg = lineno in c.cmtsatpos and 'bgrevwcmts' or ''
+                            if c.diffpri == None :
+                                 lnobg = 'bgyellow1'
+                            elif lineno in c.diffpri :
+                                 lnobg = 'bgyellow1'
+                            elif c.diffsec and lineno in c.diffsec :
+                                 lnobg = 'bgred1'
+                            else :
+                                 lnobg = 'bgaliceblue'
+                        %>
+                        <tr class="w100">
+                            <td class="${bg} hoverhighlight pointer p2 calign vmiddle"
+                                style="width: 17px; padding-left: 17px;">
+                            </td>
+                            <td class="${bgcmtadd} hoverhighlight pointer p2 calign vmiddle"
+                                style="width: 17px; padding-left: 17px;">
+                            </td>
+                            <td class="pl5 pr5 ralign ${lnobg} p2"
+                                style="border-right: 1px solid gray;
+                                       border-bottom: 1px solid gray;">
+                                ${lineno}
+                            </td>
+                            <td class="pl5 pr5 pt2 pb2">
+                                <pre>${l | n}</pre>
+                                <div class="addcmt mb5 w100"></div>
+                                <div class="cmts"><div>
+                            </td>
+                        </tr>
+                        <% lineno += 1 %>
+                        % endfor
+                    </table>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    <script type="text/javascript">
+    <% review_id    = (c.review and c.review.id) or '' %>
+
+    w_rcontainers = {}
+    revwcmtable   = ${c.revwcmtable and 'true' or 'false'}
+    function setup_reviewsource() {
+        var div_prjrevwsource   = dojo.byId( 'prjrevwsource' );
+
+        new zeta.Form({ formid : 'processrcmt' });
+
+        /* Attachments */
+        new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'revwattachblk',
+                  addform: [ 'addrevattachs', '${h.suburl_addrevattachs | n}' ],
+                  delform: [ 'delrevattachs', '${h.suburl_delrevattachs | n}' ],
+                  attachon: [ '${str(review_id)}', 'review_id' ],
+                  editable: ${[0,1][c.att_editable == True]},
+                  url: '${h.url_revwattachments | n}',
+                  attachs: ${ h.json.dumps(c.attachs) | n },
+                  clsdisplayitem: "dispblk"
+                }, dojo.query( "div[name=rattachblk]" )[0]
+            )
+
+        /* Tags */
+        new zeta.Tags({ user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'revwtagblk',
+                  addform: [ 'addrevtags', '${h.suburl_addrevtags | n}' ],
+                  delform: [ 'delrevtags', '${h.suburl_delrevtags | n}' ],
+                  tagon: [ '${str(review_id)}', 'review_id' ],
+                  editable: ${[0,1][c.tag_editable == True]},
+                  url: '${h.url_revwtags | n}',
+                  tags: ${ h.json.dumps(c.tags) | n }
+                }, dojo.query( "div[name=rtagblk]" )[0]
+            )
+
+        // For each review line.
+        var tr_lines   = dojo.query( '.revwsource table tr', div_prjrevwsource )
+        var crcntnr    = dojo.query( '#creatercmt_cntnr' )[0];
+        var rpcntnr    = dojo.query( '#replyrcmt_cntnr' )[0];
+        if( crcntnr ) {
+            crcntnr.n_trig = null;
+            crcntnr.parentNode.removeChild( crcntnr )
+            rpcntnr.parentNode.removeChild( rpcntnr );
+        }
+
+        function wipe_crcntnr() {
+            crcntnr.parentNode ? 
+                crcntnr.parentNode.removeChild( crcntnr ) 
+                : null;
+        }
+        function commentforpos( position, n_trig, n_tr, e ) {
+            if( dojo.hasClass( n_trig, 'bgcmtadd' ) ) {
+                var i_pos   = dojo.query( 'input[name=position]', form_creatercmt 
+                                        )[0];
+                wipe_crcntnr();
+                dojo.place( crcntnr, n_tr.childNodes[7].childNodes[3], 'first' )
+                dojo.toggleClass( crcntnr, 'dispnone', false );
+                dojo.toggleClass( n_trig, 'bgcmtadd', false ); 
+                dojo.toggleClass( n_trig, 'bgcmtadd_hide', true ); 
+                i_pos.value = position;
+                crcntnr.n_trig = n_trig
+            } else if ( crcntnr ) {
+                wipe_crcntnr();
+                dojo.toggleClass( n_trig, 'bgcmtadd', true ); 
+                dojo.toggleClass( n_trig, 'bgcmtadd_hide', false ); 
+            }
+            dojo.stopEvent(e);
+        }
+        function onshow_cmts( position, n_tr, n_cmts ) {
+            if( w_rcontainers[position] ) {
+                w_rcontainers[position].ifrs_rcomments.store.close();
+                w_rcontainers[position].ifrs_rcomments.fetch();
+            } else {
+                make_ifrs_revwrcomments(
+                    '${h.url_revwrcomments | n}' + '&position='+position )
+                w = new zeta.RCommentContainer({
+                    ifrs_rcomments : revwrcomments,
+                    rpform: form_replyrcmt,
+                    prform: form_processrcmt,
+                    rpcntnr: rpcntnr,
+                    ref_nature: ${capture( forms.select_revwnature, c.naturenames ) |n},
+                    ref_action: ${capture( forms.select_revwaction, c.actionnames ) |n},
+                    moderated: ${[0,1][c.revwmoderated == True]},
+                    authored: ${[0,1][c.revwauthored == True]},
+                    revwcmtable: ${[0,1][c.revwcmtable == True]},
+                    sortby: 'review_comment_id',
+                    identity: 'review_comment_id'
+                    }, n_cmts.childNodes[0] );
+                w_rcontainers[position] = w;
+            }
+        }
+        for( i=0 ; i < tr_lines.length ; i++ ) {
+            var n_tr      = tr_lines[i];
+            var n_cmticon = n_tr.childNodes[1]
+            var n_cmts    = n_tr.childNodes[7].childNodes[5]; 
+            if( revwcmtable ) {
+                dojo.connect(
+                    n_tr.childNodes[3], 'onclick',
+                    dojo.partial( commentforpos, i+1, n_tr.childNodes[3], n_tr )
+                );
+            }
+
+            toggler( n_cmticon, n_cmts, 
+                     n_cmticon.innerHTML, 
+                     n_cmticon.innerHTML, true,
+                     dojo.partial( onshow_cmts, i+1, n_tr, n_cmts )
+                   );
+        }
+    }
+    </script>
+
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+
+        fav  = capture( elements.favoriteicon, 'favrevw' )
+
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchreview', 'Search-review',
+                        h.suburl_search, c.searchfaces
+                    )
+        if c.revweditable :
+            newrevw  = '<span class="ml10 fwnormal fntsmall">' +\
+                           '<a href="'+h.url_revwcreate+'">Create</a>' + '</span>'
+        else :
+            newrevw = ''
+
+        revwsets = '<span class="ml10 fwnormal fntsmall"> \
+                    <a href="%s" title="List of reviews sets"> \
+                    Reviewsets</a></span>' % h.url_reviewsets
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+        tline  = capture( elements.iconlink, h.url_revwtimeline,
+                          'timeline', title="Timeline" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ fav, searchbox, sel_revw, sel_rset,
+                             newrevw, revwsets ], rspans=[ charts, tline ],
+                           tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                % if c.authorized :
+                    ${forms.form_revwfav(
+                        c.authuser, c.project, c.review, h.suburl_revwfav,
+                        c.isuserfavorite and 'delfavuser' or 'addfavuser'
+                    )}
+                % endif
+                ${reviewsource()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_select = dojo.query( '#selectrevw' )[0];
+            n_select ? select_goto( n_select ) : null;
+        });
+        dojo.addOnLoad( setup_participants );
+        dojo.addOnLoad( setup_reviewsource );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

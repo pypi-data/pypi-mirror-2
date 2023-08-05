@@ -1,0 +1,112 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Track issues, bugs, features, tasks etc ... using tickets.
+The three main attributes of a ticket are <b>type, status, severity</b>.
+Type should give an idea about why? and what? of a ticket. Status
+tracks ticket workflow. Severity tells how severe the ticket is to the
+project (synonymous to priority).
+<br/>
+Users can move tickets from one status to another, also setting
+its due-date. <b>User who is changing the ticket status will become the new
+owner of the ticket</b>.
+<br/>
+If, in case a ticket expects a response from a user other than the ticket's
+owner, it can be indicated so using 'promptuser' attribute.
+<br/>
+Use ticket id, where ever the ticket needs to be referenced.
+"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="create_ticket()">
+    <div class="zticketcreate mr5">
+        ${forms.form_createticket( c.authuser, c.project, h.suburl_createtck,
+                                   c.tck_typenames, c.tck_severitynames,
+                                   c.projusers, c.pcomponents, c.pmilestones,
+                                   c.pversions 
+                                 )}
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchticket', 'Search-ticket',
+                        h.suburl_search, c.searchfaces
+                    )
+        sel_tck = capture( forms.form_selectticket, c.authuser,
+                           c.seltickets, c.ticket and str(c.ticket.id) or '' )
+        if c.tckeditable :
+            newtck  = '<span class="ml10 fwnormal fntsmall">' +\
+                           '<a href="'+h.url_ticketcreate+'">Create</a>' + '</span>'
+        else :
+            newtck = '<span></span>'
+
+        if c.ticket :
+            fav  = capture( elements.favoriteicon, 'favtck' )
+        else :
+            fav  = '<span></span>'
+
+        charts = capture( elements.iconlink, h.url_ticketcharts,
+                          'barchart', title="Ticket analytics" )
+        tline  = capture( elements.iconlink, h.url_tcktimeline,
+                          'timeline', title="Timeline of tickets" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ fav, searchbox, sel_tck ],
+                           rspans=[ charts, tline ],
+                           tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${create_ticket()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function () {
+            /* Setup the wiki goto list */
+            select_goto( dojo.query( '#selectticket' )[0] );
+        });
+        dojo.addOnLoad( initform_createtck );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

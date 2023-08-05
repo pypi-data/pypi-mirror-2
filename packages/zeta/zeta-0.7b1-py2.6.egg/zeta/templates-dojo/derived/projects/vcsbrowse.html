@@ -1,0 +1,141 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""
+Browsing the repository is provided in explorer style. By default the latest
+version of the repository is shown in the explorer widget. To explore a different
+revision use <b>< revno</b> and <b>revno ></b> links.
+"""
+],
+[ 'Repository-list',
+"""Integrate one or more repositories with projects by providing its
+<em>type</em> (like svn ...) and <em>root-url</em>. Make sure that
+<em>root-url</em> points to the same machine, or to a machine on the local network.
+<br/>
+Repositories integrated with this project are listed in grid-style. Edit them
+inline.
+"""
+],
+[ 'Files',
+"""
+Files in repository are viewable with syntax highlighting, annotation and
+changesets.
+"""
+],
+[ 'Revisions',
+"""Details about each repository revision listed in reverse chronological order.
+"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    <% vcseditable = c.vcseditable and 'true' or 'false' %>
+    function setup_vcs() {
+        var div_prjvcsbrowse = dojo.byId("prjvcsbrowse");
+
+        /* Setup the vcs goto list */
+        select_goto( dojo.query( '#selectvcs' )[0] );
+
+        w = new zeta.VcsExplorer({
+                vcstype: '${c.vcs.type.vcs_typename.upper()}',
+                rootpath: '${c.vcs.rooturl.rstrip('/')}',
+                revno_p: [ '${c.revno_p}', '${h.url_browseprev}' ],
+                revno: '${c.revno}',
+                revno_n: [ '${c.revno_n}', '${h.url_browsenext}' ],
+                rootdir: '${c.rootdir}',
+                listrootdir: '${h.list_rootdir}',
+                mountpoints: ${h.json.dumps(c.mountdirs) | n },
+                n_mountform: dojo.byId( 'createmount_e' ),
+                n_unmountform: dojo.byId( 'deletemount_e' ),
+                n_mountpopup: dojo.byId( 'mountpopup' ),
+                editable: ${vcseditable}
+            }, div_prjvcsbrowse );
+    }
+    </script>
+</%def>
+
+<%def name="browse()">
+    <div id="prjvcsbrowse" class="mt10 ml10 mr10" style="height: 500px">
+    </div>
+    ${forms.form_createmount_e( c.authuser, c.vcs, c.contents, 
+                                h.suburl_createmount_e )}
+    ${forms.form_deletemount_e( c.authuser, h.suburl_deletemount_e )}
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title     = '<a class="fntbold ml10">%s</a>' % c.vcs.name
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        vcsbrowse = '<a class="ml10" title="Browse latest version" \
+                     href="%s">Browser</a>' % h.url_vcsbrowse
+        revlist   = '<a class="ml10" title="List of repository revisions" \
+                     href="%s">Revisions</a>' % h.url_revlist
+        if c.vcseditable :
+            newvcs = '<span class="ml10 fwnormal fntsmall">' +\
+                     '<a href="%s" \
+                         title="Integrate a new repository">Integrate</a></span>' % \
+                              h.url_vcscreate
+        else :
+            newvcs = ''
+        tline = capture( elements.iconlink, h.url_vcstimeline,
+                         'timeline', title="Timeline of vcs-integration" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ title, sel_vcs, vcsbrowse, revlist, newvcs, ],
+                           rspans=[ tline ],
+                           tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${browse()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( initform_createmount_e );
+        dojo.addOnLoad( initform_deletemount_e );
+        dojo.addOnLoad( setup_vcs );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>
+

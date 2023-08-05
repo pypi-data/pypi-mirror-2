@@ -1,0 +1,255 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Review - documents, code and wiki pages. Every review created, has an
+<em>author</em>, a <em>moderator</em> and <em>participants</em>.
+"""
+],
+[ 'Author',
+"""<em>Author</em> can add comments, comment's nature and also
+reponsible for taking actions on all review comments."""
+],
+[ 'Moderator',
+"""<em>Moderator</em> can add comments, comment's nature and is responsible
+for approving actions taken on review comments. Once all the comments are
+approve, the moderator can close the review."""
+],
+[ 'Participant',
+"""<em>Participants</em> can comment and reply to other paticipants
+comment."""
+],
+[ 'View-withsource',
+"""Review comments can be added interactively while viewing the reviewed item."""
+],
+[ 'Timeline',
+"""Timeline gives a log of all updates done to Review(s)."""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="reviewcomments()">
+    <%
+        closed = c.review.closed and 'strike' or ''
+    %>
+    <div id="prjrevwcomments" class="mr5">
+        <div class="pb2 posr" style="border-bottom : 1px solid gray">
+            <span class="fntbold ml5">${c.cnt_comments}</span>
+            <span class="fntbold fggray">Comments</span> | 
+            <span class="fntbold">${c.cnt_pending}</span>
+            <span class="fntbold fgcrimson">Pending</span>
+            <span class="posa" style="right : 0px">
+                <span>[ <a href="${h.url_revwwithsource}">View-withsource</a> ]</span>
+            </span>
+        </div>
+        <div class="disptable w100">
+        <div class="disptrow">
+            <div class="disptcell vtop"
+                 style="width : 13%; border-right : 2px solid #f2f2f2;">
+                ${elements.showpeople()}
+                <div class="mr5">
+                    <div name="rattachblk"></div>
+                </div>
+                <div class="bclear mr5">
+                    <div name="rtagblk"></div>
+                </div>
+            </div>
+            <div class="disptcell">
+                <h3 id="revtitle" class="${closed}"
+                    style="margin : 5px 0px 0px 10px">
+                    Review ${c.review.id} 
+                    <span class="fggray">
+                    ( ${"%s, ver:%s" % (c.review.resource_url, c.review.version) } )
+                    </span>
+                </h3>
+                <div>
+                    <div id="creatercmt_cntnr" 
+                         class="bclear ml10 mt5 mb10 pt3 w80">
+                            % if c.revwcmtable :
+                            <div class="fgblue pointer">New review comment</div>
+                            <div class="dispnone ml10" style="border: 1px dotted gray">
+                                ${forms.form_creatercmt(
+                                        c.authuser, c.project, c.review,
+                                        h.suburl_creatercmt, c.naturenames 
+                                )}
+                            </div>
+                            % endif
+                    </div>
+                    <div id="replyrcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_replyrcmt( c.authuser, c.project, c.review,
+                                                h.suburl_replyrcmt )}
+                    </div>
+                    <div id="processrcmt_cntnr" style="border: 1px dotted gray"
+                         class="dispnone ml10 mr10 w80">
+                        ${forms.form_processrcmt( c.authuser, c.project, c.review,
+                                                  h.suburl_processrcmt )}
+                    </div>
+                </div>
+                <div class="revwcomments">
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+
+    <% review_id    = (c.review and c.review.id) or '' %>
+
+    items_revwrcomments  = ${c.items_revwrcomments | n }
+    revwcmtable          = ${[0,1][c.revwcmtable == True]}
+    function setup_revwcomments() {
+        var crcntnr          = dojo.query( '#creatercmt_cntnr' )[0];
+        var rpcntnr          = dojo.query( '#replyrcmt_cntnr' )[0];
+        var prcntnr          = dojo.query( '#processrcmt_cntnr' )[0];
+        var div_revwcomments = dojo.query( 'div.revwcomments' )[0];
+
+        if( revwcmtable ) {
+            toggler( crcntnr.childNodes[1], crcntnr.childNodes[3], 
+                     'cancel', 'New review comment', true )
+        }
+
+        make_ifrs_revwrcomments( '${h.url_revwrcomments | n}',
+                                 items_revwrcomments )
+
+        new zeta.Form({ formid : 'processrcmt' });
+
+        /* Attachments */
+        new zeta.Attachments(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'revwattachblk',
+                  addform: [ 'addrevattachs', '${h.suburl_addrevattachs | n}' ],
+                  delform: [ 'delrevattachs', '${h.suburl_delrevattachs | n}' ],
+                  attachon: [ '${str(review_id)}', 'review_id' ],
+                  editable: ${[0,1][c.att_editable == True]},
+                  url: '${h.url_revwattachments | n}',
+                  attachs: ${ h.json.dumps(c.attachs) | n },
+                  clsdisplayitem: "dispblk"
+                }, dojo.query( "div[name=rattachblk]" )[0]
+            )
+
+        /* Tags */
+        new zeta.Tags(
+                { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                  id: 'revwtagblk',
+                  addform: [ 'addrevtags', '${h.suburl_addrevtags | n}' ],
+                  delform: [ 'delrevtags', '${h.suburl_delrevtags | n}' ],
+                  tagon: [ '${str(review_id)}', 'review_id' ],
+                  editable: ${[0,1][c.tag_editable == True]},
+                  url: '${h.url_revwtags | n}',
+                  tags: ${ h.json.dumps(c.tags) | n }
+                }, dojo.query( "div[name=rtagblk]" )[0]
+            )
+
+        /* Comments */
+        // Setup adding comments.
+        new zeta.RCommentContainer({
+                ifrs_rcomments : revwrcomments,
+                rpform: form_replyrcmt,
+                prform: form_processrcmt,
+                rpcntnr: rpcntnr,
+                ref_nature: ${capture( forms.select_revwnature, c.naturenames ) |n},
+                ref_action: ${capture( forms.select_revwaction, c.actionnames ) |n},
+                moderated: ${[0,1][c.revwmoderated == True]},
+                authored: ${[0,1][c.revwauthored == True]},
+                revwcmtable: ${[0,1][c.revwcmtable == True]},
+                sortby: 'review_comment_id',
+                identity: 'review_comment_id'
+            }, div_revwcomments )
+    }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        sel_revw = capture( forms.form_selectrevw, c.authuser,
+                            c.revwlist, c.review and c.review.resource_url or '' )
+
+        sel_rset = capture( forms.form_selectrset, c.authuser,
+                            c.rsetlist, c.reviewset and c.reviewset.name or '' )
+
+        searchbox = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchreview', 'Search-review',
+                        h.suburl_search, c.searchfaces
+                    )
+        fav  = capture( elements.favoriteicon, 'favrevw' )
+
+        if c.revweditable :
+            newrevw  = '<span class="ml10 fwnormal fntsmall"> \
+                        <a href="%s" title="Create a new review"> \
+                        Create</a></span>' % h.url_revwcreate
+        else :
+            newrevw = ''
+
+        revwsets = '<span class="ml10 fwnormal fntsmall"> \
+                    <a href="%s" title="List of reviews sets"> \
+                    Reviewsets</a></span>' % h.url_reviewsets
+
+        charts = capture( elements.iconlink, h.url_revwcharts,
+                          'barchart', title="Review analytics" )
+        tline  = capture( elements.iconlink, h.url_revwtimeline,
+                          'timeline', title="Timeline of reviews" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav( [ fav, searchbox, sel_revw, sel_rset,
+                             newrevw, revwsets ], rspans=[ charts, tline ],
+                           tooltips=page_tooltips )}
+
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                % if c.authorized :
+                    ${forms.form_revwfav(
+                        c.authuser, c.project, c.review, h.suburl_revwfav,
+                        c.isuserfavorite and 'delfavuser' or 'addfavuser'
+                    )}
+                % endif
+                ${reviewcomments()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function() {
+            var n_select = dojo.query( '#selectrevw' )[0];
+            n_select ? select_goto( n_select ) : null;
+        });
+        dojo.addOnLoad( setup_participants );
+        dojo.addOnLoad( setup_revwcomments );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

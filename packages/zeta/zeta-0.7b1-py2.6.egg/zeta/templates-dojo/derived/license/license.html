@@ -1,0 +1,220 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""License can be associated with a project (via project's admin page).
+In the page bar, along with the license name, (license-id) will be displayed
+in paranthesis. Use this 'id' when referring to license via
+<a href="/help/zwiki/zetalink>zetalinks</a>
+"""
+],
+[ 'Attachments',
+"""Upload attachments by clicking on the iconized title. Clicking them
+once again will hide it. Delete attachments by clicking on the cross-wire.
+Upload any number of attachment files.
+<br</br>
+Every attached file, will have its "id" in paranthesis. Use the 'id' when
+refering to the attachment.
+"""
+],
+[ 'Tags',
+"""Tag license by clicking on the iconized title. Delete
+tags by clicking on the cross-wire. Tag names should be 2 or more characters.
+"""
+],
+[ 'Timeline',
+"""Timeline gives a log of all updates done to license."""
+],
+
+]
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+
+        <% license_id = (c.license and c.license.id) or '' %>
+
+        function setup_license() {
+            var div_view = dojo.query( "div[name=viewlic]" )[0];
+
+            // Setup the license goto list
+            select_goto( dojo.query( '#viewlicense' )[0] );
+            if( div_view ) {
+                var n1 = dojo.query( 'div[name=attachblk]', div_view )[0];
+                var n2 = dojo.query( 'div[name=tagblk]', div_view )[0];
+                // Attachments
+                new zeta.Attachments(
+                    { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                      id: 'licattachblk',
+                      addform: [ 'addlicattachs', '${h.suburl_addlicattachs | n}' ],
+                      delform: [ 'dellicattachs', '${h.suburl_dellicattachs | n}' ],
+                      attachon: [ '${str(license_id)}', 'license_id' ],
+                      editable: ${[0,1][c.att_editable == True]},
+                      url: '${h.url_licattachments | n}',
+                      attachs: ${ h.json.dumps(c.attachs) | n },
+                      clsdisplayitem: "dispblk"
+                    }, n1
+                )
+                // Tags
+                new zeta.Tags(
+                    { user: [ '${str(c.authuser.id)}', '${c.authuser.username}' ],
+                      id: 'lictagblk',
+                      addform: [ 'addlictags', '${h.suburl_addlictags | n}' ],
+                      delform: [ 'dellictags', '${h.suburl_dellictags | n}' ],
+                      tagon: [ '${str(license_id)}', 'license_id' ],
+                      editable: ${[0,1][c.tag_editable == True]},
+                      url: '${h.url_lictags | n}',
+                      tags: ${ h.json.dumps(c.tags) | n }
+                    }, n2
+                )
+            }
+        }
+    </script>
+</%def>
+
+<%def name="licdetail( license )">
+<div class="br4 ml10" style="border : 1px dotted gray;">
+    <div class="p3 fntbold">
+        ${license.summary}
+    </div>
+    <div class="p3" title="license source">
+        ${license.source}
+    </div>
+</div>
+</%def>
+
+<%def name="licprojects( projectnames )">
+<div class="br4 ml10 mt5" style="border : 1px dotted gray;">
+    <div class="p3 fntbold bggray1">
+        Projects
+    </div>
+    <div class="p3">
+        % if projectnames :
+            ${ ', '.join([ '<a href="%s">%s</a>' % ( href, p )
+                for p, href in projectnames ]) | n}
+        % else :
+            <span>-</span>
+        % endif
+    </div>
+</div>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+    if c.license :
+        pagebartext = "%s (%s)" % ( c.license.licensename, c.license.id )
+    else :
+        pagebartext = "License:"
+
+    searchbox   = capture(
+                    forms.form_searchbox,
+                    c.authuser, 'searchlic', 'Search-license',
+                    h.suburl_search, c.searchfaces
+                  )
+    vbar    = '<span class="fntsmall fwnormal">|</span>'
+
+    attachs  = '<span class="ml10 fwnormal fntsmall">' + \
+               ( '<a href="%s">Attachments</a></span>' % h.url_licattachs )
+
+    if c.license and c.liceditable :
+        editlic  = '<span name="editlic" ' +\
+                      'class="fgblue ml10 fwnormal fntsmall pointer">edit</span>'
+        creatlic = '<span name="crlic" class="ml10 fwnormal fntsmall">' +\
+                   ('<a title="Create a new license" href="%s">create</a></span>' \
+                          % h.url_crlic)
+        rmlic    = '<span name="rmlic" class="ml10 fwnormal fntsmall">' +\
+                   ('<a title="Remove this license" href="%s">remove</a></span>' \
+                          % h.suburl_rmlicid )
+        pbar_spans = [ editlic, rmlic, vbar, creatlic, vbar, attachs ]
+    else :
+        pbar_spans = [ attachs ]
+
+    charts  = capture( elements.iconlink, h.url_licensecharts,
+                       'barchart', title="Analytics on license" )
+    tline   = capture( elements.iconlink, h.url_lictimeline,
+                       'timeline', title="License Timeline" )
+    %>
+    ${elements.pagebar( 
+        pagebartext,
+        pbar_spans + \
+        [ capture( forms.form_licenselist, c.licenselist, 
+                   c.license and c.license.licensename ),
+          searchbox
+        ],
+        rspans=[ charts, tline ],
+        tooltips=page_tooltips,
+    )}
+    <div id="bdy" class="w100">
+    % if c.userpanes :
+    <div id="licensepage" class="panel1">
+    % else :
+    <div id="licensepage" class="fullpanel1">
+    % endif
+
+        % if c.license :
+            <div name="viewlic" class="mr10">
+                <div class="floatr" style="width : 250px;">
+                    ${licdetail( c.license )}
+                    ${licprojects( c.licprojects )}
+                    <div>
+                        <div name="attachblk"></div>
+                    </div>
+                    <div class="bclear">
+                        <div name="tagblk"></div>
+                    </div>
+                    <div class="ml10 fntbold bclear">
+                        <a href="${h.url_tagcloud}">Visit tag cloud ...</a>
+                    </div>
+                </div>
+                ## innerHTML for the following node must be exactly
+                ## what is represented by c.license.text
+                <div class="ml10" style="margin-right: 250px;">
+                    <div class="fnt110 fntbold"
+                         style="padding: 10px 0 10px 0;">
+                        ${c.license.licensename}
+                    </div>
+                    <div class="dispnone" name="text">${c.license.text}</div>
+                </div>
+            </div>
+            <div name="editlic" class="ml20 dispnone">
+                ${forms.form_updatelicense_h( c.authuser, c.license, h.suburl_uplic )}
+            </div>
+        % else :
+            <div id="licensetable">
+                ${elements.lictable1( c.licensetable, c.liceditable )}
+                <div name="rmlic" class="dispnone">
+                    ${forms.form_removelic_h( c.authuser, h.suburl_rmlic )}
+                </div>
+            </div>
+        % endif
+    </div>
+    % if c.userpanes :
+    <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_license );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

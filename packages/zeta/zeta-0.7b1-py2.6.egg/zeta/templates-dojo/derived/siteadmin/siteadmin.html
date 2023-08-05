@@ -1,0 +1,399 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+page_tooltips = [
+[ 'Help',
+"""All the site-level customization and configuration are done in this page.
+Even if these configurations where done via the '.ini' file while app-setup,
+it can be modified here.
+"""
+],
+[ 'Site-info',
+"""This tab contains read-only information about application deployment."""
+],
+[ 'Site-config',
+"""This tab contains global configuration fields. <b>Do not
+edit these fields if you don't know what you are doing. </b> Values entered
+here are applicable throughout the application"""
+],
+[ 'User-Management',
+"""Users can be assigned site level permissions. These permissions does not
+control access to project specific resources, instead it provides permission
+management to site resources like license, guest-wiki etc...
+To manage permissions for project resources, use the respective project's 
+admin tab. <a href="/help/pms">Know</a> more about Zeta's permission management
+system 
+<br/><br/>
+Disabling users doesn't allow them to logging into the site.
+"""
+],
+[ 'Project-Management',
+"""
+Enabling and disabling projects doesn't have any effect now. This option is 
+left to address future requirements.
+"""
+],
+[ 'Permissions',
+"""Application resources are catagorised (like ticket, wiki ...) and governed by
+their respective permission names. These permission names can be seen in
+ALL-CAPITALS. To help the administrators in adding and removing permissions,
+<b>permission grouping</b> feature is provided. Site-admin can add or remove
+permission names to permission groups. Permission groups should have names in
+all-small letters. <a href="/help/pms">Know</a> more about Zeta's permission
+management system 
+"""
+],
+]
+%>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+
+    // Refresh select-options for user permissions
+    function refresh_userperms() {
+        var seluser_addpg = dojo.query( 'form#adduserperms select#addtouser' )[0];
+        var seluser_delpg = dojo.query( 'form#deluserperms select#delfromuser' )[0];
+
+        // Refresh addable permissions for currently selected users.
+        var u = userperms.itembyID( seluser_addpg.value );
+        if( u ) {
+            var x_permissions = userperms.store.getValues( u, 'x_permissions').sort();
+            dojo.publish(
+                'adduserpg',
+                [ dojo.map( x_permissions, "return {val:item, txt:item}") ]
+            )
+        }
+
+        // Refresh removable permissions for currently selected users.
+        var u = userperms.itembyID( seluser_delpg.value );
+        if( u ) {
+            var permissions= userperms.store.getValues( u, 'permissions').sort();
+            dojo.publish(
+                'deluserpg',
+                [ dojo.map( permissions, "return {val:item, txt:item}") ]
+            )
+        }
+    }
+    // Data store fetch on-complete for `userperms`
+    function userperms_oncomplete( items, req ) {
+        this.items = items;
+        refresh_userperms();
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+
+    // Data store fetch on-complete for `userstatus`
+    function userstatus_oncomplete( items, req ) {
+        this.items = items;
+        this.items[0].usernames = 
+                this.store.getValues( this.items[0], 'usernames' ).sort();
+        this.items[1].usernames = 
+                this.store.getValues( this.items[1], 'usernames' ).sort();
+
+        /* Refresh the view */
+        var enb_usernames = this.store.getValues(
+                                    this.itembyID( 'enabled' ),
+                                    'usernames'
+                            );
+        var dis_usernames = this.store.getValues( 
+                                    this.itembyID( 'disabled' ),
+                                    'usernames'
+                            );
+        // ?? Seems to be a place holder ??
+        dojo.publish(
+            'disable_user',
+            [ dojo.map( enb_usernames, "return {val:item, txt:item}" ) ]
+        );
+        dojo.publish(
+            'enable_user',
+            [ dojo.map( dis_usernames, "return {val:item, txt:item}" ) ]
+        );
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+
+    // Data store fetch on-complete for `projectstatus`
+    function projectstatus_oncomplete( items, req ) {
+        this.items = items;
+        items[0].projectnames = this.store.getValues( items[0], 'projectnames' 
+                                                    ).sort();
+        items[1].projectnames = this.store.getValues( items[1], 'projectnames' 
+                                                    ).sort();
+
+        /* Refresh the view */
+        var enb_projnames = this.store.getValues(
+                                    this.itembyID( 'enabled' ),
+                                    'projectnames'
+                            );
+        var dis_projnames = this.store.getValues( 
+                                    this.itembyID( 'disabled' ),
+                                    'projectnames'
+                            );
+        // ?? Seems to be a place holder ??
+        dojo.publish(
+            'disable_project',
+            [ dojo.map( enb_projnames, "return {val:item, txt:item}" ) ]
+        );
+        dojo.publish(
+            'enable_project',
+            [ dojo.map( dis_projnames, "return {val:item, txt:item}" ) ]
+        );
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+
+    // Data store fetch on-complete for `pgmap`
+    function pgmap_oncomplete( refresh_pglist, items, req ) {
+        this.items = items;
+        if ( refresh_pglist ) {
+            options = dojo.map( this.itemValues(['perm_group', 'pg_id' ]).sort(),
+                                "return {val:item[1], txt:item[0]}" );
+            dojo.publish( 'pglist', [ options ] );
+        }
+        refresh_perms();
+        dojo.publish( 'flash', [ 'hide' ] );
+    }
+    function refresh_perms() {
+        var select_pglist= dojo.query( 'select#pglist' )[0];
+        var upg_id = dojo.query( 'form#updatepg input[name=perm_group_id]' )[0];
+        var upg_pg = dojo.query( 'form#updatepg input[name=perm_group]' )[0];
+        var apg_id = dojo.query( 'form#addpntopg input[name=perm_group_id]' )[0];
+        var dpg_id = dojo.query( 'form#delpnfrompg input[name=perm_group_id]' )[0];
+        var pg     = pgmap.itembyID( Number(select_pglist.value) );
+        if( pg ) {
+            var x_permnames = pgmap.store.getValues( pg, 'x_permnames' ).sort();
+            var permnames   = pgmap.store.getValues( pg, 'permnames' ).sort();
+            var pg_id    = pgmap.store.getValue( pg, 'pg_id');
+            upg_pg.value = pgmap.store.getValue( pg, 'perm_group');
+            upg_id.value = pg_id;
+            apg_id.value = pg_id;
+            dpg_id.value = pg_id;
+            dojo.publish(
+                'addpntopg',
+                [ dojo.map( x_permnames, "return {val:item, txt:item}" )]
+            );
+            dojo.publish(
+                'delpnfrompg',
+                [ dojo.map( permnames, "return {val:item, txt:item}" )]
+            );
+        }
+    }
+
+    function sadmin_forms() {
+        new zeta.ConfigTabs({
+                id: "satabs",
+                tabs: dojo.query( "div[name=satab]" )
+                }, dojo.query( "div[name=satabs]" )[0]
+            )
+        
+        userperms.fetch({
+            onComplete : userperms_oncomplete,
+            sort       : [{ attribute : 'username' }]
+        });
+        pgmap.fetch({
+             onComplete : dojo.partial( pgmap_oncomplete, true ),
+             sort       : [{ attribute : 'perm_group' }]
+        });
+    }
+    </script>
+</%def>
+
+<%def name="bd_body()">
+    <% 
+        sp_usernames = c.usernames[:]
+        'admin' in sp_usernames and sp_usernames.remove('admin')
+        'anonymous' in sp_usernames and sp_usernames.remove('anonymous')
+
+        pagebartext = "%s Site-Administration" % c.sitename 
+
+        tline       = capture( elements.iconlink, h.url_sitetline,
+                               'timeline', title="Site Timeline" )
+    %>
+    ${elements.pagebar( pagebartext, rspans=[ tline ], tooltips=page_tooltips )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div id="sadmintabs" class="fullpanel1">
+    % else :
+        <div id="sadmintabs" class="panel1">
+    % endif
+    <div class="m10">
+    <div class="pb5">
+        <a href="${h.url_uploadsitelogo}">Upload-sitelogo</a>
+    </div>
+    <div name="satabs">
+        <div id="siteinfo" class="dispnone" name="satab" title="SiteInfo"
+             selected="true">
+            ${forms.form_systeminfo( c.authuser, c.sysentries, h.suburl_system )}</div>
+        <div id="siteconfig" class="dispnone" name="satab" title="SiteConfig"
+             selected="true">
+            ${forms.form_systemconfig( c.authuser, c.sysentries, h.suburl_system )}</div>
+        <div id="usermng" class="dispnone" name="satab" title="Users">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 25em;">
+                    <b>Add permission groups to user : </b></div>
+                <div class="disptcell">
+                    ${forms.form_add_userpermissions(
+                                c.authuser, sp_usernames, h.suburl_adduserperms,
+                                c.defuserperms[0], c.defuserperms[2]
+                    )}
+                </div>
+                <div class="disptcell" style="padding-left: 50px; width: 15em;">
+                    ${elements.helpboard( """
+                        Manage site administration permissions for registered
+                        users. To know more about the purpose of each permissions
+                        <a href="/help/pms#Site-level%20Permissions">visit here</a>
+                    """)}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 25em;">
+                    <b>Delete permission groups from user : </b></div>
+                <div class="disptcell">
+                    ${forms.form_del_userpermissions(
+                                c.authuser, sp_usernames, h.suburl_deluserperms,
+                                c.defuserperms[0], c.defuserperms[1]
+                    )}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 25em;">
+                    <b>Enable users : </b></div>
+                <div class="disptcell">
+                    ${forms.form_user_enable(
+                                c.authuser, h.suburl_enusers,
+                                sorted(c.userstatus['disabled'])
+                    )}
+                </div>
+                <div class="disptcell" style="padding-left: 50px; width: 15em;">
+                    ${elements.helpboard( """
+                        By Disabling users site-administrators can prevent
+                        users from logging into the system. Enabling back,
+                        restores the user account
+                    """)}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 25em;">
+                    <b>Disable users : </b></div>
+                <div class="disptcell">
+                    ${forms.form_user_disable(
+                                c.authuser, h.suburl_disusers,
+                                sorted(c.userstatus['enabled'])
+                    )}
+                </div>
+            </div>
+        </div>
+        <div id="projectmng" class="dispnone" name="satab" title="Projects">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 15em;">
+                    <b>Enable Projects : </b></div>
+                <div class="disptcell">
+                    ${forms.form_project_enable(
+                                c.authuser, h.suburl_enprojects,
+                                sorted(c.projectstatus['disabled'])
+                    )}
+                </div>
+                <div class="disptcell" style="padding-left: 50px; width: 15em;">
+                    ${elements.helpboard( """
+                        Disabling / Enabling project does not have any effect,
+                        as of now. Watch
+                        <a href="mailto:support@discoverzeta.com"
+                            >support@discoverzeta.com</a> for latest
+                        updates.
+                    """)}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 15em;">
+                    <b>Disable Projects : </b></div>
+                <div class="disptcell">
+                    ${forms.form_project_disable(
+                                c.authuser, h.suburl_disprojects,
+                                sorted(c.projectstatus['enabled'])
+                    )}
+                </div>
+            </div>
+        </div>
+        <div id="userperms" class="dispnone" name="satab" title="Permissions">
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 17em;">
+                    <b>Create permission group : </b></div>
+                <div class="disptcell">
+                    ${forms.form_createpg(
+                            c.authuser, c.permnames, h.suburl_createpg)}
+                </div>
+                <div class="disptcell" style="padding-left: 50px; width: 15em;">
+                    ${elements.helpboard( """
+                        During installation time and subsequently when
+                        user base gets expanded, it might be convenient to
+                        logically group permissions and reduce the labour of
+                        adding or removing permissions from users / teams.
+                        Permission groups are merely a convenience feature.
+                    """)}
+                </div>
+            </div>
+            <hr class="bclear mt20"></hr>
+            <div class="disptrow w100 mt20">
+                <div class="disptcell ml10" style="width : 17em;">
+                    <b>Update Permission group : </b></div>
+                <div class="disptcell">
+                    ${forms.form_updatepg(
+                            c.authuser, h.suburl_updatepg, h.suburl_addpntopg,
+                            h.suburl_delpnfrompg 
+                    )}
+                </div>
+            </div>
+        </div>
+        <div id="license" class="dispnone" name="satab" title="License">
+            <div class="p5">
+                <a title="Create new license"
+                   href="${h.url_crlic}">New license</a>
+            </div>
+            ${elements.lictable1( c.licenselist, c.liceditable )}
+            <div name="rmlic" class="dispnone">
+                ${forms.form_removelic_h( c.authuser, h.suburl_rmlic )}
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+</%def>
+
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        make_ifrs_pgmap();
+        make_ifrs_userperms();
+        make_ifrs_userstatus();
+        make_ifrs_projectstatus();
+        dojo.addOnLoad( sadmin_forms );
+        dojo.addOnLoad( initform_system );
+        dojo.addOnLoad( initform_adduserperms );
+        dojo.addOnLoad( initform_deluserperms );
+        dojo.addOnLoad( initform_userenb );
+        dojo.addOnLoad( initform_userdis );
+        dojo.addOnLoad( initform_prjenb );
+        dojo.addOnLoad( initform_prjdis );
+        dojo.addOnLoad( initform_createpg );
+        dojo.addOnLoad( initform_perms );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

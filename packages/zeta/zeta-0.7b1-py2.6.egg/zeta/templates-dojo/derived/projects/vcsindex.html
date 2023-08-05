@@ -1,0 +1,295 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Integrate one or more repositories with projects by providing its
+<em>type</em> (like svn ...) and <em>root-url</em>. Make sure that
+<em>root-url</em> points to the same machine, or to a machine on the local network.
+<br/>
+Repositories integrated with this project are listed in grid-style. Edit them
+inline.
+"""
+],
+[ 'Browsing',
+"""
+Browsing the repository is provided in explorer style. By default the latest
+version of the repository is shown in the explorer widget. To explore a different
+revision use <b>< revno</b> and <b>revno ></b> links.
+"""
+],
+[ 'Files',
+"""
+Files in repository are viewable with syntax highlighting, annotation and
+changesets.
+"""
+],
+[ 'Revisions',
+"""Details about each repository revision listed in reverse chronological order.
+"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+    <link href="/zdojo/zdojoGrid.css" rel="stylesheet" type="text/css"></link>
+    <link href="/zdojo/zdojowikiGrid.css" rel="stylesheet" type="text/css"></link>
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+
+    <script type="text/javascript">
+    /********** Setup VCS Grid **************/
+    <%
+       vcseditable = c.vcseditable and 'true' or 'false' 
+       editcolor   = c.vcseditable and 'color : black;' or 'color : grey;'
+    %>
+    vcs_typenames = ${ h.json.dumps( c.vcs_typenames ) | n }
+
+    // Grid Columns
+    colnames    = { Id      : null,
+                    Name    : null,
+                    Type    : null,
+                    Rooturl : null,
+                  };
+    // Format ids.
+    function get_vcsids( rowindex, item ) {
+        if( ! grid_vindex ) { return; }
+        if( ! item ) { return; }
+        return [ vcslist.store.getValue( item, 'href' ),
+                 vcslist.store.getValue( item, 'id' ) ]
+    }
+    function format_vcsids( item, rowindex ) {
+        if( ! grid_vindex ) { return; }
+        if( ! item ) { return; }
+        return create_anchor( item[0], item[1] );
+    }
+
+    // GRID Title customization menu
+    function refresh_csmenu() {
+        // Refresh column labels
+        for( name in colnames ) {
+            var mitem = colnames[name];
+            var check = '<input type="checkbox" checked="checked"></input> &ensp;';
+            mitem.colhide ?
+                mitem.attr( 'label', '&ensp;&ensp;&ensp;' + mitem.orglabel )
+                : mitem.attr( 'label', check + mitem.orglabel )
+        }
+    }
+    function on_selectcolumns( name ) {
+        // Toggle the hidden attribute and refresh
+        var visibile = colnames[name].colhide;
+        colnames[name].colhide = colnames[name].colhide ? false : true;
+        refresh_csmenu();
+        // Refresh column hidden status in the layout
+        var cells = grid_vindex.layout.cells;
+        for( i=0 ; i < cells.length; i++ ) {
+            if ( name == cells[i].name ) {
+                grid_vindex.layout.setColumnVisibility( i, visibile );
+            }
+        }
+    }
+
+    function setup_csmenu() {
+        // Create Menu on the last column
+        var csmenu   = new dijit.Menu();
+        var mi_title = new dijit.MenuItem({ 
+                            label : 'Columns',
+                            iconClass:"dispnone",
+                            class: "calign"
+                       });
+
+        dojo.style( mi_title.domNode, { fontWeight: 'bold', color: 'black' });
+        dojo.style( csmenu.domNode, { fontSize: 'small', color: 'blue' });
+
+        csmenu.addChild( mi_title );
+        csmenu.addChild( new dijit.MenuSeparator() );
+
+        // Create menu items
+        for( name in colnames ) {
+            colnames[name] = new dijit.MenuItem({
+                                    label   : name,
+                                    iconClass: "dispnone",
+                                    onClick : dojo.hitch( null,
+                                                          on_selectcolumns,
+                                                          name
+                                                        )
+                             })
+            colnames[name].colhide  = false;
+            colnames[name].orglabel = name;
+            csmenu.addChild( colnames[name] );
+        }
+        dojo.setObject( 'csmenu', csmenu )
+    }
+
+    /* Data store Write handlers */
+    function vl_onset( item, attr_name, oldval, newval ) {
+        if( item ) {
+            var id          = vcslist.store.getValue( item, 'id' );
+            var name        = vcslist.store.getValue( item, 'name' );
+            var rooturl     = vcslist.store.getValue( item, 'rooturl' );
+            var vcs_typename= vcslist.store.getValue( item, 'vcs_typename' );
+
+            dojo.query( 'input[name=vcs_id]', form_configvcs 
+                      )[0].value = id;
+            dojo.query( 'input[name=name]', form_configvcs 
+                      )[0].value = name;
+            dojo.query( 'input[name=rooturl]', form_configvcs 
+                      )[0].value = rooturl;
+            dojo.query( 'input[name=vcs_typename]', form_configvcs 
+                      )[0].value = vcs_typename;
+            submitform( form_configvcs );
+        }
+    }
+
+    function setup_vcslist( div_prjvcslist ) {
+        make_ifws_vcslist( '${h.url_vcslist | n}', vl_onset );
+
+        var glayout_vindex = [
+                { // View is an array of cells
+                    cells: [
+                      { name : 'Id',
+                        field: 'id',
+                        width: '4em',
+                        hidden: false,
+                        get  : get_vcsids,
+                        formatter : format_vcsids,
+                        styles : "text-align : left;"
+                      },
+                      { name : 'Name',
+                        field: 'name',
+                        width: 'auto',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${vcseditable}
+                      },
+                      { name : 'Type',
+                        field: 'vcs_typename',
+                        width: '7em',
+                        hidden: false,
+                        editable: ${vcseditable},
+                        styles: '${ editcolor }',
+                        type: dojox.grid.cells.Select,
+                        options : ${ h.json.dumps( c.vcs_typenames ) | n }
+                      },
+                      { name : 'Root-url',
+                        field: 'rooturl',
+                        width: 'auto',
+                        hidden: false,
+                        styles: '${ editcolor }',
+                        editable: ${vcseditable},
+                      },
+                    ]
+                },
+            ];
+
+        /* Grid with Layout */
+        dojo.setObject(
+            'grid_vindex',
+            new dojox.grid.DataGrid({
+                            store: vcslist.store,
+                            clientSort: true,
+                            columnReordering: true,
+                            structure: glayout_vindex,
+                            headerMenu: csmenu
+             }, document.createElement( 'div' ))
+        );
+
+        /* Append the new grid */
+        div_prjvcslist.appendChild( grid_vindex.domNode );
+
+        /* Call startup, in order to render the grid: */
+        grid_vindex.startup();
+        refresh_csmenu();
+
+        /* Grid editing */
+        new zeta.Form({ normalsub: true, formid: 'configvcs' });
+
+        /* grid resizing */
+        grid_vindex.connect( window, 'onresize',
+                             function( e ) { this.resize() } );
+        dojo.subscribe( 'resize_upane', grid_vindex,
+                        function( collapsed ) { this.resize() } );
+    }
+
+    function setup_vcs() {
+        var div_prjvcslist = dojo.byId("prjvcslist");
+        /* Setup the vcs goto list */
+        select_goto( dojo.query( '#selectvcs' )[0] );
+        // VCS list
+        setup_csmenu();
+        setup_vcslist( div_prjvcslist );
+    }
+
+    </script>
+</%def>
+
+<%def name="vcslist()">
+    <div id="prjvcslist" class="mt10 ml10 mr10 br5"
+         style="height: 600px; border: 4px solid #B3CFB3;">
+    </div>
+    <div class="dispnone">
+        ${forms.form_configvcs( c.authuser, c.project, h.suburl_configvcs )}
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title   = 'Vcs list'
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        if c.vcseditable :
+            newvcs = '<span class="ml10 fwnormal fntsmall">' +\
+                     '<a href="%s" title="Integrate a new repository">\
+                      Integrate</a></span>' % h.url_vcscreate
+        else :
+            newvcs = ''
+        tline = capture( elements.iconlink, h.url_vcstimeline,
+                         'timeline', title="Timeline of vcs-integration" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title, sel_vcs, newvcs, ],
+                          rspans=[ tline ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${vcslist()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( setup_vcs );
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

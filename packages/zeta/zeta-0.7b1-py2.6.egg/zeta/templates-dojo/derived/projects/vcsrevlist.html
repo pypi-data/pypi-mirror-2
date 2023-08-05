@@ -1,0 +1,169 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""Details about each repository revision listed in reverse chronological order.
+"""
+],
+[ 'Repository-list',
+"""Integrate one or more repositories with projects by providing its
+<em>type</em> (like svn ...) and <em>root-url</em>. Make sure that
+<em>root-url</em> points to the same machine, or to a machine on the local network.
+<br/>
+Repositories integrated with this project are listed in grid-style. Edit them
+inline.
+"""
+],
+[ 'Browsing',
+"""
+Browsing the repository is provided in explorer style. By default the latest
+version of the repository is shown in the explorer widget. To explore a different
+revision use <b>< revno</b> and <b>revno ></b> links.
+"""
+],
+[ 'Files',
+"""
+Files in repository are viewable with syntax highlighting, annotation and
+changesets.
+"""
+],
+
+]
+
+%>
+
+<%def name="hd_links()">
+    ${parent.hd_links()}
+</%def>
+
+<%def name="hd_styles()">
+    ${parent.hd_styles()}
+</%def>
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="showrevlist()">
+    <div class="ml10 w100">
+        <div class="calign m10 w95 p5" 
+             style="overflow-x: auto; border: 1px solid #f2f2f2">
+            % for rp in c.revpages :
+                <a class="ml5" href=${rp[1]}>${rp[0]}</a>
+            % endfor
+        </div>
+        <div class="m10 w95 p5">
+            <div class="disptable w100">
+                <div class="disptrow w100 bggrn2 fntbold">
+                    <div class="disptcell p5" 
+                         style="width: 6em; border-left: 1px solid #d6d6d6;">
+                        Rev
+                    </div>
+                    <div class="disptcell p5"
+                         style="border-left: 1px solid #d6d6d6;">
+                         Log
+                    </div>
+                    <div class="disptcell p5" 
+                         style="border-left: 1px solid #d6d6d6;">
+                        Author
+                    </div>
+                    <div class="disptcell p5" 
+                         style="width: 12em; border-left: 1px solid #d6d6d6;">
+                        Date
+                    </div>
+                </div>
+                % for log in c.revlist:
+                <div class="disptrow" name="revitem">
+                    <div class="disptcell calign p5" 
+                         style="width: 6em; border-bottom: 1px solid #f2f2f2;">
+                        <a href="${log[4]}">${log[1]}</a>
+                    </div>
+                    <div class="disptcell p5" 
+                         style="border-bottom: 1px solid #f2f2f2;">
+                        <div style="font-family : Courier, Courier New">
+                            ${log[0].replace('\n', '<br></br>') | n}
+                        </div>
+                    </div>
+                    <div class="disptcell p5" 
+                         style="border-bottom: 1px solid #f2f2f2;">
+                        ${log[2]}
+                    </div>
+                    <div class="disptcell p5" 
+                         style="width: 12em; border-bottom: 1px solid #f2f2f2;">
+                        ${log[3].strftime('%a, %b %d, %Y')}
+                    </div>
+                </div>
+                % endfor
+            </table>
+        </div>
+    </div>
+</%def>
+
+<%def name="bd_body()">
+    <%
+        title   = '<a class="fntbold ml10">%s</a>' % c.vcs.name
+        sel_vcs = capture( forms.form_selectvcs, c.authuser,
+                           c.vcslist, c.vcs and c.vcs.name or '' )
+        vcsbrowse = '<a class="ml10" title="Browse latest version" \
+                     href="%s">Browser</a>' % h.url_vcsbrowse
+        revlist   = '<a class="ml10" title="List of repository revisions" \
+                     href="%s">Revisions</a>' % h.url_revlist
+        if c.vcseditable :
+            newvcs  = '<span class="ml10 fwnormal fntsmall">' +\
+                      '<a href="%s" \
+                          title="Integrate a new repository">Integrate</a></span>' % \
+                               h.url_vcscreate
+        else :
+            newvcs = ''
+        tline = capture( elements.iconlink, h.url_vcstimeline,
+                         'timeline', title="Timeline of vcs-integration" )
+    %>
+    ${elements.mainnav()}
+    ${elements.contextnav([ title, sel_vcs, vcsbrowse, revlist, newvcs, ],
+                          rspans=[ tline ],
+                          tooltips=page_tooltips)}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div>
+                ${showrevlist()}
+            </div>
+        </div> 
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+        dojo.addOnLoad( function () {
+            /* Setup the vcs goto list */
+            select_goto( dojo.query( '#selectvcs' )[0] );
+        });
+        dojo.addOnLoad( function() {
+            dojo.forEach(
+                dojo.query( "tr[name=revitem]" ),
+                function( n ) { highlightbyclass( n, 'bggray1' ) }
+            );
+        });
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>

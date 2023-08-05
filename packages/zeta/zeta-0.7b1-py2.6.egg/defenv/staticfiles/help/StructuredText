@@ -1,0 +1,336 @@
+[< <style type="text/css"> >]
+h1, h2, h3, h4, h5 { 
+    margin : 0px;
+    padding: 5px 0px 2px 3px;
+    background-color : #EAEAFC;
+    border-bottom: 1px solid #CCCCCC;
+}
+[< </style> >]
+
+{{ Toc( float='right' ) }}
+
+h2. How to write text consumable by Zeta application ?
+
+Zeta application is designed to interface with a host of developer tools and
+email applications. Two important interface points that are built into Zeta for
+this purpose are,
+  * XMLRPC web APIs
+  * Stuctured-text, formated text that are parsed and used to update the
+    database.
+
+This document will explain how to write text content with which to update the
+database.
+
+h3. Structured text
+
+''Structured text can be used in email, repository commit logs or even via text
+editor and IDEs''. When a structured text is interpreted by Zeta server, it will
+attempt to parse the text, collect data and if they are in expected format,
+will update the database.
+
+h2. General format of structured text
+
+The general format of structured text will look like,
+{{{ Code text
+<head>
+<delimiter>
+<body>
+}}}
+
+where,
+
+: head ::
+    Paragraph of lines, where each line will be parsed into (key, value)
+    pairs.
+: delimiter ::
+    A delimiting pattern that seperates the head paragraph from text-body.
+    This delimiter will further be used to name (`bodyname`) the text-body.
+: body ::
+    Text-body, that will be consumed as is and will not be parsed for semantic
+    meaning.
+
+Structured text can be used to create or update the following type of Zeta
+resource,
+  * Guest wiki pages
+  * Attachments
+  * Project wiki pages
+  * Project tickets
+  * Project review comments
+
+h3. Guest wiki
+
+General structure,
+
+{{{ Code text
+path : <guest wiki url>
+
+<Wiki content>
+}}}
+
+h4. Head paragraph for guest-wiki text
+
+: path ::
+    The only item that is parsed in head paragraph is //path// field. Leading
+    path separator will be pruned off.
+
+h4. Delimiter for guest-wiki text
+
+Delimiter can be an empty line, or a line that has one of the following pattern,
+  [<PRE
+    text :
+    page :
+    description : >]
+
+h4. Body-text for guest-wiki
+
+Body text will directly be interpreted as guest-wiki content and will be
+parsed using ZWiki.
+
+h3. Attachment
+
+General structure,
+
+{{{ Code text
+id: <attachment-id>
+summary: <attachment-summary> (optional)
+tags: <comma separated tagnames> (optional)
+}}}
+
+h4. Head paragraph for attachment
+
+: id ::
+    Attachment //id// for which //summary// or //tags// need to be updated.
+: summary ::
+    Update attachment's summary.
+: tags ::
+    Comma separated values of tagnames for attachment.
+
+* There are no text body (and hence delimiters) for attachment type.
+
+h3. Project Wiki
+
+General structure,
+
+{{{ Code text
+wikiurl: <wiki-url>
+type: <wiki-type>
+summary: <summary for wiki page>
+tags: <comma separated tagnames>
+favorite: <True or False>
+vote: <up or down>
+}}}
+
+h4. Head paragraph for project-wiki text
+
+: wikiurl ::
+    Wikiurl with its full path. For example, if the application is mounted at
+    the site http://dev.discoverzeta.com, to refer to a wiki page by name
+    //StructuredText// under the project //zeta//, wiki-url should be,
+    [[ /p/zeta/wiki/StructuredText | /p/zeta/wiki/StructuredText ]]. Use
+    [[ #Alternate methods to refer to a wiki page | alternate ways ]]
+    for refering wiki pages.
+: type ::
+    Wiki page type.
+: summary ::
+    Wiki page's summary.
+: tags ::
+    Comma separated tagnames for wiki page
+: favorite ::
+    Can either be //True// or //False//. Marking a wiki page as favorite will
+    add the user in the watch list, who will be notified on any updates to
+    wiki page.
+: vote ::
+    Can either be //up// or //down//.
+
+h4. Delimiter for project-wiki text
+
+Delimiter can be an empty line, or a line that has one of the following pattern,
+  [<PRE
+    text :
+    comment : >]
+
+: text ::
+    Body text will be interpreted as wiki page content and will be parsed
+    using ZWiki.
+: comment ::
+    Body text will be interpreted as wiki page comment by the user and will be
+    parsed using ZWiki.
+: $empty-line$ ::
+    Empty lines will default to wiki page comment, and will be parsed using
+    ZWiki.
+
+h4. Body-text for project-wiki
+
+Expected as ZWiki text.
+
+h3. Project Ticket
+
+General structure,
+
+{{{ Code text
+ticket: <ticket -id>
+projectname: <project-name> (optional)
+summary: <ticket-summary>
+type: <ticket-type>
+severity: <ticket-severity>
+status: <ticket-status>
+duedate: <ticket-status-duedate>
+promptuser: <username>
+component: <project-component-name>
+milestone: <project-milestone-name>
+version: <project-version-name>
+blocking: <blocking-ticket-ids>
+blockedby: <blocking-ticket-ids>
+parent: <blocking-ticket-ids>
+tags: <comma separated tagnames>
+favorite: <True or False>
+vote: <up or down>
+}}}
+
+h4. Head paragraph for project-ticket text
+
+: ticket ::
+    Ticket id
+: projectname ::
+    If //ticket// field is not specified, it will be assumed that a new ticket
+    is to be created. In which case //projectname//, //type//, //severity//,
+    //summary// fields are mandatory.
+: summary ::
+    Ticket summary.
+: type ::
+    Ticket type.
+: severity ::
+    Ticket severity.
+: status ::
+    Ticket status to which the ticket must to be moved.
+: duedate ::
+    Duedate for current ticket status.
+: promptuser ::
+    User (username) to be prompted.
+: component ::
+    Project component name.
+: milestone ::
+    Project milestone name.
+: version ::
+    Project version name.
+: blocking ::
+    Comma separated ticket ids, that this ticket is blocking.
+: blockedby ::
+    Comma separated ticket ids, that are blocking this ticket.
+: parent ::
+    Parent Ticket id for this ticket.
+: tags ::
+    Comma separated tagnames for ticket.
+: favorite ::
+    Can either be //True// or //False//. Marking ticket as favorite will
+    add the user in the watch list, who will be notified on any updates to
+    the ticket.
+: vote ::
+    Can either be //up// or //down//.
+
+* When //ticket// field is missing, it is assumed that the user is trying to
+  create a new ticket, in which case the following fields are mandatory,
+  [<PRE projectname, type, severity, status >]
+
+h4. Delimiter for project-ticket text
+
+Delimiter can be an empty line, or a line that has one of the following pattern,
+  [<PRE
+    description :
+    comment : >]
+
+: description ::
+    Body text will be interpreted as ticket description and will be parsed
+    using ZWiki.
+: comment ::
+    Body text will be interpreted as ticket comment by the user and will be
+    parsed using ZWiki.
+: $empty-line$ ::
+    Empty lines will default to ticket comment, and will be parsed using
+    ZWiki.
+
+h4. Body-text for project-ticket
+
+Expected as ZWiki text.
+
+h3. Project review
+
+General structure,
+
+{{{ Code text
+review: <reiview -id>
+rcmtid: <review-comment-id>
+position: <comment for source line-number>
+nature: <nature of review comment>
+action: <action taken on review comment>
+approved: <approved review comment
+tags: <comma separated tagnames>
+favorite: <True or False>
+}}}
+
+h4. Head paragraph for project-review text
+
+: review ::
+    If //rcmtid// field is not present, it is assumed that a new review
+    comment is being added, in which case, //review// and //position// field
+    are mandatory.
+: rcmtid ::
+    If //rcmtid// field is present, it is assumed that a review
+    comment is being updated. If //rcmtid// is not present, it is assumed that
+    a new review comment is being added, in which case, //review// and
+    //position// field are mandatory.
+: position ::
+    If //rcmtid// field is not present, it is assumed that a new review
+    comment is being added, in which case, //review// and //position// field
+    are mandatory.
+: nature ::
+    Nature of review comment
+: action ::
+    Action taken on review comment
+: approved ::
+    Approve review comment and action taken on the comment.
+: tags ::
+    Comma separated tagnames for review
+: favorite ::
+    Can either be //True// or //False//. Marking review as favorite will
+    add the user in the watch list, who will be notified on any updates to
+    the review.
+
+h4. Delimiter for project-review text
+
+Delimiter can be an empty line, or a line that has one of the following pattern,
+  [<PRE
+    comment : >]
+
+: comment ::
+    Body text will be interpreted as review comment by the user and will be
+    parsed using ZWiki.
+: $empty-line$ ::
+    Empty lines will default to review comment, and will be parsed using
+    ZWiki.
+
+h4. Body-text for project-review
+
+Expected as ZWiki text.
+
+h3. Alternate methods to refer to a wiki page
+
+{{{ Code text 
+wikiid : <wiki page's database id>
+}}}
+
+or
+
+{{{ Code text 
+projectname : <wiki page's project name>
+pagename    : <wiki page name, excluding the prefix // /p/<projectname>/wiki //
+}}}
+
+or
+
+{{{ Code text 
+projectid : <wiki page's project id>
+pagename  : <wiki page name, excluding the prefix // /p/<projectname>/wiki //
+}}}
+
+/* vim: set filetype=zwiki : */

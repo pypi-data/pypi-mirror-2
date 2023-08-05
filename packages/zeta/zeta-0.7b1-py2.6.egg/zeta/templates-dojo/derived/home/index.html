@@ -1,0 +1,143 @@
+## This file is subject to the terms and conditions defined in
+## file 'LICENSE', which is part of this source code package.
+##       Copyright (c) 2009 SKR Farms (P) LTD.
+
+<%inherit file="/base/basic1.html"/>
+<%namespace name="elements" file="/component/elements.html"/>
+<%namespace name="forms" file="/component/forms.html"/>
+
+<%!
+
+page_tooltips = [
+
+[ 'Help',
+"""
+<div>While navigating to a page, use this <b>Tool-Tip</b> widget to get a
+quick help on how to interact with the page.
+<a href="help/">Detailed help</a></div>
+"""
+],
+[ 'Project',
+"""Instantiate projects under this site, where every instance of a project
+will have its own wiki, ticketing, review, and version control.
+"""
+],
+[ 'Metanav',
+"""The top-most tool bar, available in all pages."""
+],
+[ 'Header',
+"""
+Each page's header has a <b>site-logo</b> (configurable in site-admin) on the left
+and <b>project-logo</b> (if the page is under a project's context) on the right.
+"""
+],
+[ 'Page-Layout',
+"""Apart from <b>meta-nav</b> tool bar, a page has the following layout,
+<b>header</b>, <b>bread crumbs</b>, <b>main-nav</b> tab bar, <b>context-nav</b>
+tool bar and <b>footer</b>. Only project-pages have <b>main-nav</b> and
+<b>context-nav</b> elements. For non project pages, they are replaced with a
+<b>page-bar</b>, like the one in this page.
+"""
+],
+[ 'Guest Wiki',
+"""Guest wiki, is non version controlled wiki documents that are independant
+of any project, like for example the <a href="/help/">help</a> pages. If the url
+does not map to an application function, it is freely available to create
+a guest wiki page. <a href="/help/GuestWiki">Learn more</a>
+<div class="calign w100 fntbold">
+    To create a new guest wiki page, enter the url in the address bar and ENTER
+</div>
+"""
+],
+
+]
+
+%>
+
+
+<%def name="hd_script()">
+    ${parent.hd_script()}
+</%def>
+
+<%def name="swiki_edit()">
+    <div class="zeditsw mr5">
+        <div class="pb2 posr ralign" style="border-bottom : 1px solid gray">
+            <span><a href="${h.url_swpage}">Back-to-Page</a></span>
+        </div>
+        <div class="dispnone mt10 ml10 mr10">
+            <fieldset style="background: #F4F4F4 url(/preview_bg.png) repeat scroll 0">
+                <legend>Preview( <a href="#edit">edit</a> )</legend>
+                <div class="ml10 mr10 swpreview"></div>
+            </fieldset>
+            <br></br>
+            <hr></hr>
+        </div>
+        <div class="mt10">
+            <a name="edit"></a>
+            ${forms.form_editsw( c.authuser, c.swiki, h.suburl_editsw )}
+        </div>
+    </div>
+</%def>
+
+<%def name="bd_body()" >
+    <%
+        pagebartext = c.swurl and str(c.swurl) or str(c.welcomestring) 
+        searchbox   = capture(
+                        forms.form_searchbox,
+                        c.authuser, 'searchswiki', 'Search-GuestWiki-pages',
+                        h.suburl_search, c.searchfaces
+                      )
+        if c.sweditable and not c.urldir :
+            editsw = '<span name="editsw" class="ml10 fwnormal fntsmall">' +\
+                     ( '<a href="%s" title="Edit this page">edit</a></span' % \
+                       h.url_editsw )
+        else :
+            editsw = '<span></span>'
+
+        refr = ''
+        if c.swhtml :
+            refr = capture(
+                    elements.iconlink, h.url_refreshsw,
+                    'refresh',
+                    title='Fresh translation of this guest-wiki page'
+                  )
+
+    %>
+    ${elements.pagebar( pagebartext, spans=[ searchbox, editsw, ],
+                        rspans=[ refr ],
+                        tooltips=page_tooltips
+    )}
+    <div id="bdy" class="w100">
+    % if c.authusername == 'anonymous' or not c.userpanes :
+        <div class="fullpanel1">
+    % else :
+        <div class="panel1">
+    % endif
+            <div class="ml20 mr20">
+            % if c.swikis :
+                ${elements.titleindex( c.swikis, h.url_forswiki )}
+            % elif c.swhtml :
+                ${c.swhtml | n}
+            % elif c.editsw and not c.urldir :
+                ${swiki_edit()}
+            % endif
+            </div>
+        </div>
+    % if c.authusername != 'anonymous' and c.userpanes :
+        <div class="panel2">${elements.user_panes( c.userpanes )}</div>
+    % endif
+    </div>
+</%def>
+
+
+<%def name="bd_script()">
+    ${parent.bd_script()}
+
+    <script type="text/javascript">
+
+        dojoaddOnLoad( 'initform_editsw' );
+
+        dojo.addOnLoad( setup_userpanes );
+        dojo.addOnLoad( adjust_upheight );
+    </script>
+</%def>
