@@ -1,0 +1,165 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>ToscaWidgets History &mdash; ToscaWidgets 2 v2.0b4 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '2.0b4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ToscaWidgets 2 v2.0b4 documentation" href="index.html" />
+    <link rel="prev" title="tw2.devtools" href="devtools.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="devtools.html" title="tw2.devtools"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="toscawidgets-history">
+<h1>ToscaWidgets History<a class="headerlink" href="#toscawidgets-history" title="Permalink to this headline">¶</a></h1>
+<p>Python web widgets were pioneered in TurboGears and many of the key ideas remain. Once the value of widgets was realised, a move was made to create a separate library, this is ToscaWidgets. The key differences are:</p>
+<blockquote>
+<ul class="simple">
+<li>ToscaWidget is framework independent.</li>
+<li>Multiple template engines are supported.</li>
+<li>Resource links are injected by rewriting the page on output.</li>
+<li>The forms library is separate from the core widget library.</li>
+<li>The tw namespace exists for widget libraries to be located in.</li>
+</ul>
+</blockquote>
+<p>ToscaWidgets had some success, but did not gain as much usage as hoped, in part due to a lack of documentation in the beginning. Over time, several moves were made to simplify the library. ToscaWidgets 2 is an attempt to simplify widgets even further - at the cost of breaking backward-compatibility. The key differences are:</p>
+<blockquote>
+<ul class="simple">
+<li>A widget instance is now created for each request.</li>
+<li>In widget libraries, parameters are defined declaratively.</li>
+<li>In widget templates, the widget is available as <tt class="docutils literal"><span class="pre">$w</span></tt>. By default, parameters must be accessed as <tt class="docutils literal"><span class="pre">$w.param</span></tt> although the <em>params_as_vars</em> config option allows <tt class="docutils literal"><span class="pre">$param</span></tt> as in ToscaWidgets 0.9.</li>
+<li>Validation is done in the core widget library, and no longer relies on FormEncode.</li>
+<li>Declarative instantiation of widgets has been made more concise.</li>
+<li>Framework interfaces are almost completely removed; ToscaWidgets is just a piece of WSGI middleware.</li>
+<li>The namespace is now tw2</li>
+</ul>
+</blockquote>
+<p>Some minor differences to be aware of:</p>
+<blockquote>
+<ul class="simple">
+<li>There is no automatic calling of parameters; you must explicitly use <tt class="xref py py-class docutils literal"><span class="pre">tw2.core.Deferred</span></tt> for this.</li>
+<li>A widget does not automatically get the <tt class="docutils literal"><span class="pre">resources</span></tt> from its base class.</li>
+<li>The <em>id</em> is always the short id; <em>compound_id</em> has the full id.</li>
+<li>The compound ID separator is now a colon (:) and IDs may not contain colons.</li>
+<li>ToscaWidgets 2 requires Python 2.5, 2.6 or 2.7.</li>
+<li>tw.api has been removed; just use tw2.core</li>
+<li>The toscasidgets simple template engine has been removed.</li>
+<li>Widget.__call__ is no longer an alias for display, as this causes problems for Cheetah.</li>
+</ul>
+</blockquote>
+<p><strong>tw2.forms</strong></p>
+<blockquote>
+<ul class="simple">
+<li>Layouts are separated, so for a TableForm, you have a Form which contains a TableLayout.</li>
+<li>name is always identical to id</li>
+<li>CalendarDatePicker is moved to tw2.dynforms</li>
+</ul>
+</blockquote>
+<p><strong>tw2.dynforms</strong></p>
+<blockquote>
+<ul class="simple">
+<li>WriteOnlyTextField is removed; tw2.forms PasswordField has similar functionality</li>
+<li>AjaxLookupField is removed; there are better widgets like this in libraries like YUI</li>
+<li>Growing - the main widget is GrowingGridLayout, instead of GrowingTableFieldSet, etc.</li>
+</ul>
+</blockquote>
+<div class="section" id="dynamic-parameters">
+<h2>Dynamic Parameters<a class="headerlink" href="#dynamic-parameters" title="Permalink to this headline">¶</a></h2>
+<p>One of the main challenges for a widget framework is that some widget parameters are fixed for the life of the app, while some change with each request.</p>
+<p>In ToscaWidgets 0.9, widget instances existed for the life of the app. It was important to never update a widget parameter within a request, as this would break thread-safety. Instead, per-request parameters were stored in a dictionary. However, this is inconvenient, particularly when setting parameters on widgets deep within a nested hierarchy. It requires the user to create a singleton instance of every widget. It is also a potential performance problem.</p>
+<p>The first attempt at ToscaWidgets 2 also had widget instances exist for the life of the app. However, instrumentation of the class made some parameters request local. This makes accessing parameters much more convenient. However, you still needed to create singleton instances of every widget, and it was still a potential peformance problem.</p>
+<p>The second attempt at ToscaWidgets 2 has widget instances exist only for the life of a request. All fixed parameters are set by subclassing widgets. This keeps parameters easy to access, and avoids the need to create singletons. Initial performance testing suggests this gives around a two-fold performance improvement.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">ToscaWidgets History</a><ul>
+<li><a class="reference internal" href="#dynamic-parameters">Dynamic Parameters</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="devtools.html"
+                        title="previous chapter">tw2.devtools</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/history.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="devtools.html" title="tw2.devtools"
+             >previous</a> |</li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Paul Johnston, Alberto Valverde &amp; Contributors.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0b2.
+    </div>
+  </body>
+</html>
