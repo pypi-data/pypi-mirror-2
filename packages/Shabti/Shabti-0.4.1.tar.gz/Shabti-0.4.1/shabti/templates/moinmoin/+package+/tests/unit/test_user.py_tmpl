@@ -1,0 +1,26 @@
+from {{package}}.tests import *
+from {{package}} import model as model
+
+class TestUser(TestModel):
+    def setUp(self):
+        TestModel.setUp(self)
+        self.group = model.Group(name = u'Subscription Members')
+        self.group.permissions.append(model.Permission(name = u'add_users'))
+        model.Session.commit()
+
+    def tearDown(self):
+        TestModel.tearDown(self)
+    
+    def test_authenticate(self):
+        self.user = model.Session.query(model.User).get(1)
+        assert model.User.authenticate(u'admin', 'admin')
+        self.user.password = 'admin_again'
+        model.Session.commit()
+        assert model.User.authenticate(u'admin', 'admin_again')
+    
+    def test_permissions(self):
+        self.user = model.Session.query(model.User).get(1)
+        assert not self.user.has_permission(u'add_users')
+        self.group.users.append(self.user)
+        model.Session.commit()
+        assert self.user.has_permission(u'add_users')

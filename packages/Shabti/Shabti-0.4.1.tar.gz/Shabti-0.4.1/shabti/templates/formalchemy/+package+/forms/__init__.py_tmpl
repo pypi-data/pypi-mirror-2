@@ -1,0 +1,109 @@
+# -*- coding: utf-8 -*-
+from pylons import config, url
+from {{package}} import model
+from {{package}}.lib.base import render
+from formalchemy import config as fa_config
+from formalchemy import validators
+from formalchemy import fields
+{{if shabti_couchdbkit}}
+from formalchemy.ext.couchdb import FieldSet as BaseFieldSet
+from formalchemy.ext.couchdb import Grid as BaseGrid
+{{else}}
+from formalchemy.forms import FieldSet as BaseFieldSet
+from formalchemy.tables import Grid as BaseGrid
+{{endif}}
+from formalchemy.ext.fsblob import FileFieldRenderer
+from formalchemy.ext.fsblob import ImageFieldRenderer
+import fa.jquery as jq
+
+if config.get('storage_path'):
+    # set the storage_path if we can find its setting
+    FileFieldRenderer.storage_path = config.get('storage_path')
+    ImageFieldRenderer.storage_path = config.get('storage_path')
+
+# Images are stored as Upload entity and served via UploadController
+def get_upload_url(self, relative_path):
+    return url('upload', path_info=relative_path)
+ImageFieldRenderer.get_url = get_upload_url
+
+fa_config.encoding = 'utf-8'
+fa_config.engine = jq.TemplateEngine()
+
+# use jquery renderers
+BaseFieldSet.default_renderers.update(jq.default_renderers)
+BaseFieldSet.default_renderers['dropdown'] = jq.relations()
+
+# allow lightweight markup in textareas
+BaseFieldSet.default_renderers[jq.HTML] = jq.markdown()
+
+
+class FieldSet(BaseFieldSet):
+    pass
+
+
+class Grid(BaseGrid):
+    pass
+
+
+## Initialize fieldsets
+## Model is used for edit form
+## ModelAdd for add form
+## ModelGrid for listing
+
+User = FieldSet(model.User)
+User.configure(
+        exclude=[User.password_check],
+        options=[User.created.readonly()])
+
+UserAdd = User.copy('username', 'email', 'password')
+
+User = jq.Tabs('user',
+            ('infos', 'Infos', User),
+            ('groups', 'Groups', User.copy('groups')),
+            )
+del User.infos.groups
+
+UserGrid = Grid(model.User)
+UserGrid.configure(include=[
+        UserGrid.username,
+        UserGrid.email,
+        UserGrid.active,
+        UserGrid.groups,
+    ])
+
+
+Group = FieldSet(model.Group)
+Group.configure(options=[
+    Group.created.readonly(),
+  ])
+Group.configure(options=[Group.created.readonly()])
+
+GroupAdd = Group.copy('name')
+
+Group = jq.Tabs('groups',
+            ('infos', 'Infos', Group),
+{{if not shabti_couchdbkit}}
+            ('users', 'Users', Group.copy(Group.users)),
+{{endif}}
+            ('permissions', 'permissions', Group.copy(Group.permissions)),
+        )
+{{if not shabti_couchdbkit}}
+del Group.infos.users
+{{endif}}
+del Group.infos.permissions
+
+GroupGrid = Grid(model.Group)
+GroupGrid.configure(exclude=[GroupGrid.created])
+
+Permission = FieldSet(model.Permission)
+Permission.configure()
+{{if not shabti_couchdbkit}}
+Permission = jq.Tabs('permissions',
+            ('infos', 'Infos', Permission),
+            ('groups', 'Groups', Permission.copy(Permission.groups)),
+        )
+del Permission.infos.groups
+{{endif}}
+
+
+

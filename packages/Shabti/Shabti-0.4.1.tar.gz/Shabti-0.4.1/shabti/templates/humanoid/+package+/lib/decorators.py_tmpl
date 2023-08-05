@@ -1,0 +1,51 @@
+# -*- coding: utf-8 -*-
+import pylons
+from decorator import decorator
+from {{package}}.lib.auth import redirect_to_login
+from pylons.controllers.util import abort
+
+import logging
+log = logging.getLogger(__name__)
+
+# Approach #1: "authorize" decorator, inherited from tesla-pylons-elixir:
+# http://bit.ly/8PplKF
+
+def authorize(permission):
+    
+    """Decorator for authenticating individual actions. Takes a permission 
+    instance as argument(see lib/permissions.py for examples)"""
+    def wrapper(func, self, *args, **kw):
+        if permission.check():
+            return func(self, *args, **kw)
+        pylons.session['redirect'] = \
+                pylons.request.environ['pylons.routes_dict']
+        pylons.session.save()
+        redirect_to_login()
+    return decorator(wrapper)
+
+# Approach #2, "Solon decorators", copied over from kai, 
+# the Pylons app that implements PylonsHQ: 
+# http://bitbucket.org/bbangert/kai/src/tip/kai/lib/decorators.py
+
+def in_group(group):
+    """Requires a user to be logged in, and the group specified"""
+    def wrapper(func, *args, **kwargs):
+        user = pylons.tmpl_context.user
+        if not user:
+            log.debug("No user logged in for permission restricted function")
+            abort(401, "Not Authorized")
+        if user.in_group(group):
+            log.debug("User %s verified in group %s", user, group)
+            return func(*args, **kwargs)
+        else:
+            log.debug("User %s not in group %s", user, group)
+            abort(401, "Not Authorized")
+    return decorator(wrapper)
+
+@decorator
+def logged_in(func, *args, **kwargs):
+    if not pylons.tmpl_context.user:
+        abort(401, "Not Authorized")
+    else:
+        return func(*args, **kwargs)
+
