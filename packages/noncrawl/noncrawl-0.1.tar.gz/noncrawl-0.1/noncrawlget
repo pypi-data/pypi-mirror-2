@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# noncrawl: a web crawler creating link soups
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of noncrawl.
+#
+# noncrawl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# noncrawl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with noncrawl.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## noncrawlget
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Script for parsing crawl results
+##[ Start date  ]## 2010 August 1
+
+import sys
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = lambda x: None
+
+import noncrawl.various as various
+import noncrawl.parser
+import noncrawl.generalinformation as ginfo
+
+
+parser = various.NewOptionParser(
+    prog='noncrawlget',
+    usage='Usage: %prog [OPTION]... EXPRESSION',
+    description='parse link soups',
+    version=ginfo.version_text,
+    epilog='''This can be used to extract meaningful data from
+whatever has been crawled by noncrawler. By default, it will see what
+links the websites matched by the PATTERN contains. It is also
+possible to find out which pages link to the pages that matches
+PATTERN. This is done using the --find-referrers option. See the
+documentation included with noncrawl for general information
+regarding the syntax of EXPRESSION.''')
+parser.add_option('-p', '--project-path', dest='project_path',
+                  metavar='DIRECTORY', default='.',
+                  help='set the project path (defaults to current directory)')
+parser.add_option('-r', '--find-referrers', dest='find_links',
+                  action='store_false', default=True,
+                  help='find links to PATTERN instead of links from PATTERN')
+parser.add_option('-A', '--no-aliases', dest='use_aliases',
+                  action='store_false', default=True,
+                  help='do not use url aliases')
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false', default=True,
+                  help='don\'t print error messages')
+parser.add_option('-E', '--nocolorerrors', dest='term_colorerrors',
+                  action='store_false', default=True,
+                  help='''do not attempt to print error messages in the
+                  terminal in a red color''')
+options, args = parser.parse_args()
+
+if options.term_colorerrors:
+    try:
+        from termcolor import colored
+    except ImportError:
+        colored = lambda x, *y: x
+    class ColoredErrors:
+        def write(self, msg):
+            sys.__stderr__.write(colored(msg, 'red'))
+    sys.stderr = ColoredErrors()
+
+options.expression = ' '.join(args)
+if not options.expression:
+    parser.error('no EXPRESSION specified, quitting', False)
+
+setproctitle(parser.prog)
+
+# Now it's time to actually parse the data
+data_container = noncrawl.parser.Parser(
+    options.project_path, error=parser.error,
+    use_aliases=options.use_aliases)
+
+try:
+    if options.find_links:
+        for x in data_container.find_links(options.expression):
+            print 'on %s:' % x[0], ', '.join(x[1:])
+            print
+    else:
+        for x in data_container.find_referrers(options.expression):
+            print '%s from %s' % x
+            print
+except KeyboardInterrupt:
+    pass

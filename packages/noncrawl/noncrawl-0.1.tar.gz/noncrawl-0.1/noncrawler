@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# noncrawl: a web crawler creating link soups
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of noncrawl.
+#
+# noncrawl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# noncrawl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with noncrawl.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## noncrawler
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Main script starting the crawling system
+##[ Start date  ]## 2010 July 27
+
+import sys
+from optparse import OptionParser
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = lambda x: None
+
+import noncrawl.various as various
+from noncrawl.system import System
+import noncrawl.generalinformation as ginfo
+
+parser = various.NewOptionParser(
+    prog='noncrawler',
+    usage='Usage: %prog [OPTION]... [STARTPAGE]...',
+    description='a web crawler creating link soups',
+    version=ginfo.version_text,
+    epilog='A link soup is a collection of web addresses and links.')
+parser.add_option('-l', '--load', dest='load_from', metavar='STRING',
+                  help='load an existing project')
+parser.add_option('-n', '--name', dest='project_name', metavar='STRING',
+                  help='''name of directory to save data to; leave
+                  empty to have a name automatically picked based on
+                  the specified startpages''')
+parser.add_option('-m', '--max-visits', dest='max_visits',
+                  type='int', metavar='NUMBER', default=10000,
+                  help='''noncrawl will stop creating new crawls after
+                  this number has been reached (defaults to 10000)''')
+parser.add_option('-T', '--no-threads', dest='use_threads',
+                  action='store_false', default=True,
+                  help='don\'t use threads')
+parser.add_option('-t', '--thread-limit', dest='thread_limit',
+                  type='int', metavar='NUMBER', default=100,
+                  help='''set a limit to the number of running threads
+                  (defaults to 100)''')
+parser.add_option('-R', '--not-recursive', dest='is_recursive',
+                  action='store_false', default=True,
+                  help='''only check the links from the specified
+                  startpages, and print them''')
+parser.add_option('-c', '--whiteblacklist', dest='whiteblacklist', metavar='FILE',
+                  help='''load file with line-separated
+                  entries consisting of two keywords and a url, with
+                  the purpose of blacklisting some urls and
+                  whitelisting others (the syntax can be found in the
+                  documentation for noncrawl)''')
+parser.add_option('-L', '--no-base-list', dest='use_base_list',
+                  action='store_false', default=True,
+                  help='''do not use the built-in inclusion/exclusion
+                  white-and-black-list (by default, this is used even
+                  if you specify a file)''')
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false', default=True,
+                  help='don\'t print status messages')
+parser.add_option('-C', '--nocolorprint', dest='term_colorprint',
+                  action='store_false', default=True,
+                  help='don\'t attempt to color status messages in the terminal')
+parser.add_option('-S', '--simpleprint', dest='term_simpleprint',
+                  action='store_true', default=False,
+                  help='simplify the design of status messages in the terminal')
+parser.add_option('-E', '--nocolorerrors', dest='term_colorerrors',
+                  action='store_false', default=True,
+                  help='''do not attempt to print error messages in the
+                  terminal in a red color''')
+(options, args) = parser.parse_args()
+
+options.startpages = args
+
+if options.term_colorerrors:
+    try:
+        from termcolor import colored
+    except ImportError:
+        colored = lambda x, *y: x
+    class ColoredErrors:
+        def write(self, msg):
+            sys.__stderr__.write(colored(msg, 'red'))
+    sys.stderr = ColoredErrors()
+
+setproctitle(parser.prog)
+
+s = System(options, parser.error)
+try:
+    s.start()
+except KeyboardInterrupt:
+    pass
+finally:
+    s.end()
