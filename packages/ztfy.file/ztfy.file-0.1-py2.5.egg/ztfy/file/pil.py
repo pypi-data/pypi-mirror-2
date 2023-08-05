@@ -1,0 +1,67 @@
+### -*- coding: utf-8 -*- ####################################################
+##############################################################################
+#
+# Copyright (c) 2008 Thierry Florac <tflorac AT ulthar.net>
+# All Rights Reserved.
+#
+# This software is subject to the provisions of the Zope Public License,
+# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
+# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
+# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
+# FOR A PARTICULAR PURPOSE.
+#
+##############################################################################
+
+
+# import standard packages
+from cStringIO import StringIO
+from PIL import Image
+
+# import Zope3 interfaces
+
+# import local interfaces
+from interfaces import IImageDisplay, IThumbnailGeometry, IThumbnailer, DefaultDisplays
+
+# import Zope3 packages
+from zope.interface import implements
+
+# import local packages
+
+from ztfy.file import _
+
+
+class PILThumbnailer(object):
+
+    implements(IThumbnailer)
+
+    order = 50
+
+    def createThumbnail(self, image, size):
+        img = Image.open(StringIO(image.data))
+        new = StringIO()
+        if img.format in ('GIF','JPEG','PNG'):
+            format = img.format
+        else:
+            format = 'JPEG'
+        img.resize(size, Image.ANTIALIAS).save(new, format)
+        return new.getvalue()
+
+    def createSquareThumbnail(self, image, size, source=None):
+        img = Image.open(StringIO(image.data))
+        if img.format in ('GIF','JPEG','PNG'):
+            format = img.format
+        else:
+            format = 'JPEG'
+        img_width,img_height = img.size
+        thu_width,thu_height = size,size
+        ratio = max(img_width * 1.0 / thu_width, img_height * 1.0 / thu_height)
+        if source:
+            x,y,w,h = source
+        else:
+            geometry = IThumbnailGeometry(image)
+            (x,y),(w,h) = geometry.position,geometry.size
+        box = (int(x*ratio), int(y*ratio), int((x+w)*ratio), int((y+h)*ratio))
+        new = StringIO()
+        img.crop(box).resize((DefaultDisplays['cthumb'],DefaultDisplays['cthumb']), Image.ANTIALIAS).save(new, format)
+        return new.getvalue()
