@@ -1,0 +1,1 @@
+DOPEN is a module to open a file by looking at it extension/shebang and select the right program. It's library will update on frequent base on launchpad. The next version will introduce a smart-update system, to save configuration of users and only add/change those that are not in use yet
