@@ -1,0 +1,233 @@
+#!/usr/bin/env python
+
+"""
+YARS - yet another RSS downloader
+
+    by W-Mark Kubacki; wmark@hurrikane.de
+    licensed under the terms of the RPL for non-commercial usage
+"""
+
+import sys
+import os.path
+import random
+from getpass import getuser
+import argparse
+
+from redis import Redis
+from configobj import ConfigObj
+
+from yars import YARS
+
+__all__ = ['yars_add_feed', 'yars_remove_feed', 'yars_list_feeds',
+	   'yars_add_item', 'yars_remove_item', 'yars_list_items',
+	   'yars_run', 'yars_reset_feeds', 'yars_cleansweep',
+	   'yars_setup']
+__author__ = "W-Mark Kubacki; wmark@hurrikane.de"
+__version__ = "1.0"
+
+def with_yars(func):
+	def f(prefix, redis_db, verbose, args):
+		y = YARS(redis=Redis(db=redis_db), prefix=prefix, verbose=verbose)
+		return func(y, args)
+	return f
+
+@with_yars
+def yars_add_feed(y, args):
+	if y.add_feed(args.caption, args.url):
+		print "Feed has been added."
+	else:
+		print "Feed has not been added."
+		sys.exit(10)
+
+@with_yars
+def yars_remove_feed(y, args):
+	if y.remove_feed(args.feed_n):
+		print "Feed has been removed."
+	else:
+		print "Feed has not been removed."
+		sys.exit(11)
+
+@with_yars
+def yars_list_feeds(y, args):
+	fd = y.get_feed_list()
+	fl = [(int(n), fd[n]['caption'], fd[n]['url']) for n in fd]
+	fl.sort(key=lambda e: e[0])
+	for n, c, u in fl:
+		print n, "|", c, "|", u
+	if args.verbose and len(fl) <= 0:
+		print "Feeds' list is empty."
+
+@with_yars
+def yars_add_item(y, args):
+	search_words = args.search_words.split(",")
+	exclude_words = args.exclude_words.split(",") if args.exclude_words else set()
+	if y.add_item(args.caption, search_words, exclude_words):
+		print "Item has been added."
+	else:
+		print "Item has not been added."
+		sys.exit(20)
+
+@with_yars
+def yars_remove_item(y, args):
+	if y.remove_item(args.item_n):
+		print "Item has been removed."
+	else:
+		print "Item has not been removed."
+		sys.exit(21)
+
+@with_yars
+def yars_list_items(y, args):
+	id = y.get_item_list()
+	il = [(int(n), id[n]['caption'], id[n]['search_words'], id[n]['exclude_words']) for n in id]
+	il.sort(key=lambda e: e[0])
+	for n, c, sw, ew in il:
+		print n, "-->", c
+		print " * search_words: \t", sw
+		print " * exclude_words: \t", ew
+	if args.verbose and len(il) <= 0:
+		print "Items' list is empty."
+
+@with_yars
+def yars_run(y, args):
+	if not y.get_desired_items_from_feeds(args.summary, args.dry_run):
+		sys.exit(2)
+
+@with_yars
+def yars_reset_feeds(y, args):
+	y.reset_lastpos_marks()
+	print "Cleared last position markers of all feeds."
+
+@with_yars
+def yars_cleansweep(y, args):
+	random.seed()
+	confirm = random.choice(["Nuke it.", "dokey!", "jaja", "banzai!", "youpi!", "Evviva!"])
+	if confirm == raw_input("Please confirm by \"%s\": " % confirm):
+		y.cleansweep()
+		print "Everything for this prefix has been removed from database."
+	else:
+		print "Action not confirmed. Aborting."
+		sys.exit(4)
+
+def yars_setup():
+	configfile = os.path.expanduser('~/.yars.cfg')
+	if os.path.exists(configfile) and os.path.isfile(configfile):
+		print "Configuration file %s exists. Using its values as defaults." % configfile
+		config = ConfigObj(configfile)
+	else:
+		config = ConfigObj()
+		config.filename = configfile
+		config['redis_db'] = '3'
+		config['prefix'] = getuser()
+	print "You can cancel configuration at any time pressing Ctrl+C.\n"
+	try:
+		for key, question, default in [
+			('redis_db', "Number of Redis database to use", config['redis_db']),
+			('prefix', "Prefix to use for database entries", config['prefix']),
+		]:
+			v = raw_input("%s [%s]: " % (question, default))
+			config[key] = v if v != "" else default
+		config['database'] = "redis://127.0.0.1:6379/" + config['redis_db']
+	except KeyboardInterrupt:
+		print "Configuration has been aborted."
+		sys.exit(4)
+	print "\nThank you. Writing configuration file...",
+	config.write()
+	print "OK"
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(prog='yars',
+					 formatter_class=argparse.RawDescriptionHelpFormatter,
+					 description="""\
+Finds new files (called 'items') on a set of RSS feeds.
+
+You can get help pages for every command by appending -h. I.e.:
+  # yars add feed -h
+
+example usages:
+  Download everything:
+  # yars run | xargs -r wget
+
+  Display images from referenced pages:
+  # yars run | xargs -r wget -q -O - | grep -o -E 'http[^"]*\.jpeg'
+
+  Download torrents, get files by ctorrent, finally delete torrents:
+  # yars run | grep -F '.torrent' | tee newfiles | xargs -r wget \\
+    && cat newfiles | xargs -r -L 1 ctorrent -E 1.5 -a \\
+    && cat newfiles | xargs -r rm && rm newfiles
+
+example scenario for quickstart:
+  Add a new feed:
+  # yars add feed \\
+    "Dilbert Strips" "http://feeds.dilbert.com/DilbertDailyStrip"
+
+  Add a new item:
+  # yars add item --search-words "Comic for" "part of comics' caption"
+
+  Download images from the feeds' summary:
+  # yars run --summary | grep -o -E 'http[^"]*\.gif' | xargs -r wget
+
+  Most probably you will want to use --prefix "comics" for all
+  these commands to separate them i.e., from podcasts.
+
+""",
+					 epilog="by W-Mark Kubacki; wmark@hurrikane.de\nhttp://mark.ossdl.de/tags/yars")
+	parser.add_argument('--verbose', dest='verbose', action='store_true', help="display messages for debugging")
+	parser.add_argument('-p', '--prefix', default=None, help="prefix to YARS database entries")
+	subparsers = parser.add_subparsers(help='YARS actions')
+
+	parser_add = subparsers.add_parser('add', help="Add feeds or items.")
+	subparsers_add = parser_add.add_subparsers()
+	parser_add_feed = subparsers_add.add_parser('feed', help="Add a feed to search for items in it.")
+	parser_add_feed.add_argument('caption', metavar="CAPTION", help="a brief caption for the feed, used in the listing")
+	parser_add_feed.add_argument('url', metavar="URL", help="URL of the RSS feed")
+	parser_add_feed.set_defaults(func=yars_add_feed)
+	parser_add_item = subparsers_add.add_parser('item', help="Program an item to be found on the feeds.\n"
+						    "Will reset 'last position' markers of all feeds.")
+	parser_add_item.add_argument('caption', metavar="CAPTION", help="a brief caption for the item, used in the listing")
+	parser_add_item.add_argument('--search-words', required=True, help="comma-delimited list of search words")
+	parser_add_item.add_argument('--exclude-words', default=None, required=False,
+				     help="comma-delimited list of words which will always falsify a match")
+	parser_add_item.set_defaults(func=yars_add_item)
+
+	parser_remove = subparsers.add_parser('remove', help="Remove feeds or items.")
+	subparsers_remove = parser_remove.add_subparsers(help="these commands require a number, which can be obtained by the 'list' action")
+	parser_remove_feed = subparsers_remove.add_parser('feed', help="Remove a programmed feed.")
+	parser_remove_feed.add_argument('feed_n', metavar="FEED_N", type=int, help="number of the feed to be removed")
+	parser_remove_feed.set_defaults(func=yars_remove_feed)
+	parser_remove_item = subparsers_remove.add_parser('item', help="Removes the item from YARS' lists.")
+	parser_remove_item.add_argument('item_n', metavar="ITEM_N", help="the number of the item to be removed")
+	parser_remove_item.set_defaults(func=yars_remove_item)
+
+	parser_list = subparsers.add_parser('list', help="List programmed feeds and items.")
+	subparsers_list = parser_list.add_subparsers()
+	parser_list_feed = subparsers_list.add_parser('feeds', help="List all programmed feeds.")
+	parser_list_feed.set_defaults(func=yars_list_feeds)
+	parser_list_item = subparsers_list.add_parser('items', help="Display an overview of all configured items.")
+	parser_list_item.set_defaults(func=yars_list_items)
+
+	parser_run = subparsers.add_parser('run', help="Display (new) found items from the feeds.")
+	parser_run.add_argument('--summary', action='store_true', help="show feed entry's summary instead of link")
+	parser_run.add_argument('--dry-run', action='store_true', help="don't mark as read")
+	parser_run.set_defaults(func=yars_run)
+
+	parser_setup = subparsers.add_parser('setup', help="Invoke interactive (re)configuration tool.")
+	parser_setup.set_defaults(func=yars_setup)
+
+	parser_reset = subparsers.add_parser('reset', help="Reset read states.").add_subparsers().add_parser('feeds')
+	parser_reset.set_defaults(func=yars_reset_feeds)
+
+	parser_cs = subparsers.add_parser('cleansweep', help="Delete all items and feeds, including counters and states.")
+	parser_cs.set_defaults(func=yars_cleansweep)
+
+	args = parser.parse_args()
+	configfile = os.path.expanduser('~/.yars.cfg')
+	if args.func == yars_setup:
+		yars_setup()
+	elif os.path.exists(configfile) and os.path.isfile(configfile):
+		config = ConfigObj(configfile)
+		prefix = config['prefix'] if not args.prefix else args.prefix.lower().replace(" ", "_")
+		args.func(prefix, int(config['redis_db']), args.verbose, args)
+	else:
+		print "No configuration file has been found. Exiting.\n"
+		print "Please run: yars setup"
+		sys.exit(5)
