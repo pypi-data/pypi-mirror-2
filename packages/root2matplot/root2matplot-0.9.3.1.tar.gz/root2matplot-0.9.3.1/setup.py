@@ -1,0 +1,38 @@
+try:
+    import setuptools
+except ImportError:
+    from distribute_setup import use_setuptools
+    use_setuptools()
+from setuptools import setup, find_packages
+
+import sys, os
+
+setup(
+    name         = 'root2matplot',
+    version      = '0.9.3.1',
+    description  = 'Tools for use with ROOT; deprecated in favor of rootplot',
+    long_description = '',
+    author       = 'Jeff Klukas',
+    author_email = 'klukas@wisc.edu',
+    url          = 'http://packages.python.org/root2matplot/',
+    download_url = '',
+##     install_requires = ['matplotlib',
+##                         'numpy'],
+    packages = find_packages('lib'),
+    package_dir = {'': 'lib'},
+    include_package_data=True,
+    entry_points = {
+        'console_scripts': [
+            'overlayHists = root2matplot.overlayHists:main',
+            'tree2hists = root2matplot.tree2hists:main'
+            ]
+        },
+    classifiers  = [
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: Free for non-commercial use',
+        'Natural Language :: English',
+        'Topic :: Scientific/Engineering :: Visualization',
+        'Topic :: Utilities',
+        ],
+    )
