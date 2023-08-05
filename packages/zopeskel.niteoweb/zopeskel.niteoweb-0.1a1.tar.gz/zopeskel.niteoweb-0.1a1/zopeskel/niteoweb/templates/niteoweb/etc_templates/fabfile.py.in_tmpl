@@ -1,0 +1,262 @@
+import os
+from fabric.api import *
+from getpass import getpass
+from fabric.contrib.console import confirm
+from fabric.contrib.files import comment, upload_template, exists
+
+
+cwd = os.getcwd()
+
+env.hosts = ['\${config:ip}:\${ports:ssh}']
+env.user = 'nzupan' #TODO: how to ask for this at runtime?
+
+maintenance_users = [
+        dict(id = 'zupo', key = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAgEA0D7/9zIE3uv/iPcViMblslCuz4k/QVG7pMbMnwSzdtSuRxk7YzSGUZXIIHfpe4cfODtuDp1jUUq9fYq+UFrsU+HMEPSeREtNljjUhM/ahYQlMZQum2o4FS/9arUn3RsN89A25zpPec0vL39iDFmJKq5Sq3gQ0mHEpzKF8OuKQqEHyEY67WtbPpc+GBOmQZBalwjYa9SJK6kWPklYwVoe/z4D0316ipsxSMfEQOoy4GDtzti4Al850hCAlAikt8AE9vWUFMmDD4Dzhx3Ri+eTdcwB2A6CaPkqJ8Ex3ep1JnAXCiMogb5S+myX0GjRBK7txgZrboOti+ubYPaUNe9ee0+t0jJ1p2VWqAzCmX+eQyGi/Il5InsxUUn+8pg091Aa+grxnTgF9Q26jq60DsugMxZOGCHejUwgqKm1bVT58tsGchw8F41ULappdJGGkVSwUmphioxLPEK1LqwVE4vZdeT1YgRu2CcKxJkKi5JeolY1DsN8UwqhYlUTK0OIo/6P4AQUkzDvhSwDAmp46BZJyvXDTBBoG0TJqLMDsme/50mrdICtlWc0Rud/YPV/qN8xyLlAFVTk81q59e5jaRSQmlGm4Eug+Wk/uccL83AA/jis/EhJhHU4rUGQ43OhKxzeMWyA5ZlZRpHZ8wpJIQNft8dyfW7CbjlPe3ZJyMNmEFk= zupo@nejc-zupans-macbook.local'),
+        dict(id = 'Kunta', key = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAuYtOcOOWE0PjxX1prN3u5jO4U3/R8swkb6iRaVxCrbLQ8w98LLrof7qcp09oTUDLR5sEVeWJnAOeOE0T8x8mApmvR1vtDb7tZ2KGC/NP01twpv06KhEEDs1LeLmB5R81vcsF3nqQt6rCUhrRKfsF44q4U2xtgHRURBuB9dMbCwNWs7r7xfPbn3H+7r/1jUW9KhZgybuPIPH0Hsa3/HchahLaOLBnZ/OYTMFhNS9g9Z/xDITqNKu1sC3rKxdns0Mz3iwVA94KlYzppLhsY+7r4/9FbIso7m+StrwUWK7Molo1ztYUkwVpAxunl+9kgWDWUbUYmuuN572UrQiYT5aPlw== peter@benderbuntu'),
+        dict(id = 'iElectric', key = 'ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAgEAxTmmsB5g2qg/rlpdtGd17SK3r8zIrUL5zM05WBMwLYeN/TP1dV4zl1Ap5+z6vnT1qIK7TxQzqBXj/h6/v4zUUPm9X7kPguaJJ7/Ls9BTgrbuLJhX4YG29imG3UlQWvWk7uQ5/UhB8jcRhWcgWAuL1Vk5mEi6xLT1SCWPki/gptBrJR+s6eirGqiQVy7iRmeCDLtCCOYpE6bjPaczzJuhI2sqNaeGbUDnPkGBEmGHdItxZZLiKExfStQg+07sikPKSEWjovodQSPiK0xdqh4S/djHZHdlgVFjWlcS06h5VD8AIYIhM8L7icNclukYJU33SyiKODhdYf+njkGJzueDVmceUJVzwqOyQLAKqFobxI6SOGJbHW5PNkcpTjVePem29mIfgApuORGHHVhref8/GD66jCNVylOmAkvdFhKk3jbdrBATQzKWoEPkFKE0aEV0qBPkzSYZyaBDgwJrrWw/nGVn2Et0y4FkFP6/AuOzueAlVUK4mjX6XkOH2PqdHK/pz/qTN94ZFx9i+o31/jt6SHiLbSBk7sedUjmUEGMPUjjYJzUGKZX7DH2ElSIFm9SIcirqxD0NrPLDpkFU5fmAZZ8i76Ew1tX2FRBDLjaBQix1AahM4wawZVSwlyO5RZ7HBRUxNlVRHqx1x7dpGXZAXR+CLP09Seewu6+vKwuFBBM= ielectric@elite-fe'),
+        ]
+
+def configure_ssh():
+    with settings(port=22):
+        # TODO: rather do this with replacing text with REGEX, not uploading a whole config file
+        put('%(cwd)s/etc/sshd_config' %locals(), '/etc/ssh/sshd_config')
+        run('/etc/init.d/sshd restart')
+
+def configure_iptables():
+    put('%(cwd)s/etc/iptables' %locals(), '/etc/sysconfig/iptables')
+    run('iptables-restore < /etc/sysconfig/iptables')
+
+def enable_sudo():
+    # comment this out to enable usage of fabric.api.sudo
+    comment('/etc/sudoers', 'Defaults    requiretty')
+
+def create_maintenance_users():
+    """Create maintenance accounts, so we don't access server with root account."""
+                
+    for user in maintenance_users:
+        id = user['id']
+        key = user['key']
+        
+        # create user
+        run('grep %(id)s /etc/passwd || /usr/sbin/adduser %(id)s' %locals())
+        
+        # set password
+        password = getpass("Enter sudo password for user %(id)s: " %locals())
+        run('echo "%(id)s:%(password)s" | chpasswd' %(id, password))
+        
+        # add public key for SSH access
+        run('ls -a /home/%(id)s | grep .ssh || mkdir /home/%(id)s/.ssh' %locals())
+        run("echo '%(key)s' > /home/%(id)s/.ssh/authorized_keys" %locals())
+        
+        # add bash_logout for maintenance user
+        put('%(cwd)s/etc/bash_logout' %locals(), '/home/%(id)s/.bash_logout' %locals(), mode=661)
+        
+        # allow sudo for maintenance user
+        run("echo '%(id)s	ALL=(ALL) 	ALL' >> /etc/sudoers" %locals())
+    
+    # confirm that maintenance accounts are active
+    if not confirm("I am now ready to deny SSH for root. \
+                    Please confirm you can login with your maintenance account! \
+                    Proceed?"): 
+        abort("Aborting at user request.")
+        
+def disable_root_login():
+    # set root password to something random and do not remember it
+    password = getpass("Enter a very strong password for root and do not remember it: ")
+    sudo('echo "root:%(password)s" | chpasswd' %locals())
+    # TODO: passwd --delete root
+
+def configure_root_user():            
+    add_bash_login()
+    add_bash_logout()
+
+def add_bash_login():
+    # add bash_login for root
+    sudo("echo 'echo \"Latest 5 records in /var/log/bash_logout.log:\" >> /root/.bash_profile'")
+    sudo("echo 'echo \"tail -5 /var/log/bash_logout.log\" >> /root/.bash_profile'")
+
+def add_bash_logout():
+    # add bash_logout for maintenance users
+    upload_template('%(cwd)s/etc/bash_logout.py' %locals(), '/etc/.bash_logout.py', use_sudo=True)
+    sudo('chmod 665 /etc/.bash_logout.py')
+    sudo('touch /var/log/bash_logout.log')
+    sudo('chmod 662 /var/log/bash_logout.log')
+
+def create_dedicated_users():
+    
+    # user for running nginx webproxy in isolated environment   
+    sudo('grep nginx /etc/passwd || /usr/sbin/adduser nginx')
+    
+    # a user that will hold actual production environments (buildout, code, cronjobs, etc. )
+    sudo('grep production /etc/passwd || /usr/sbin/adduser production')
+
+def set_system_time():
+    
+    # set timezone
+    sudo('cp /usr/share/zoneinfo/GMT /etc/localtime')
+    
+    # install NTP
+    sudo('yum -y install ntp')
+    sudo('chkconfig ntpd on')
+    sudo('ntpdate pool.ntp.org')
+    sudo('/etc/init.d/ntpd start')
+
+def install_system_libs():
+    # install bunch of stuff we need
+    sudo('yum -y install '
+             # tools
+             'vim-enhanced '
+             'curl '
+             'lynx '
+             'rsync '
+             'which '
+             'gcc-c++ '
+             'make '
+             'subversion '
+             
+             # pretty fonts
+             'xorg-x11-fonts-truetype.noarch '
+             'freetype-devel '
+             
+             # image formats
+             'libpng-devel '
+             'libjpeg-devel '
+             
+             # other libs
+             'zlib-devel '
+             'pcre-devel '
+             'openssl-devel '
+             )
+
+def enable_epel_repositories():
+    
+    # enable EPEL repositories (we need them for installing python2.6, nginx, munin, etc.)
+    sudo('rpm -Uvh http://download.fedora.redhat.com/pub/epel/5Server/x86_64/epel-release-5-3.noarch.rpm')
+
+def install_python():
+    
+    sudo('yum -y install python26 python26-devel')
+
+    install_distribute()
+    install_virtualenv()
+
+def install_distribute():
+    
+    sudo('wget http://python-distribute.org/distribute_setup.py')
+    sudo('python distribute_setup.py')
+    sudo('rm -f distribute_setup.py')
+    sudo('rm -f distribute-0.6.10.tar.gz')
+
+def install_virtualenv():
+    
+    sudo('easy_install virtualenv')
+
+def install_munin():
+    
+    # install munin
+    sudo('yum -y install munin-node')
+    
+    # TODO: use regex to patch iostat plugin
+    
+    # install config file 
+    upload_template('%(cwd)s/etc/munin-node.conf' %locals(), '/etc/munin/munin-node.conf', use_sudo=True)
+    
+    # start munin-node
+    sudo('chkconfig munin-node on')
+    sudo('/etc/init.d/munin-node start')
+    
+    # add node to munin-master
+    confirm('Now you have to add this node to munin-master on Puzzle in file /etc/munin/munin.conf. Once done, press Y to continue.')
+
+def install_nginx():
+    
+    # install
+    sudo('yum -y install nginx')
+    
+    # start
+    sudo('chkconfig nginx on')
+    sudo('/etc/init.d/nginx start')
+
+def clean_yum():
+    
+    # During its normal use yum creates a cache of metadata and packages. 
+    # This cache can take up a lot of space. The yum clean command allows you 
+    # to clean up these files. All the files yum clean will act on are 
+    # normally stored in /var/cache/yum.
+    sudo('yum clean all')
+
+def checkout_code():
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    sudo('svn co --no-auth-cache --username %(username)s --password %(password)s \
+          https://\${config:namespace}.unfuddle.com/svn/\${config:namespace}_\${config:package}/\${config:namespace}.\${config:package}/trunk \${config:version}' 
+          %(username, password))
+    sudo('chown -R production:production /home/production/\${config:version}')
+
+def create_buildout_environment():
+    with cd('/home/production'):
+        checkout_code()
+        with cd('/home/production/\${config:version}'):
+            sudo('virtualenv -p python2.6 --no-site-packages ./', user='production')
+            sudo('bin/python bootstrap.py -c production.cfg', user='production')
+            sudo('bin/buildout -c production.cfg', user='production')    
+
+def bootstrap_ssh():
+    # run SSH on custom port
+    with settings(user='root', password='\${config:temp_root_pass}', hosts = ['\${config:ip}:22']):
+        configure_ssh()
+        configure_iptables()
+
+def bootstrap_maintenance_accounts():
+    # create maintenance accounts
+    with settings(user='root', password='\${config:temp_root_pass}'):
+        enable_sudo()
+        create_maintenance_users()
+
+def bootstrap_root_environment():
+    # configure root user environment and dedicated users
+    disable_root_login()
+    configure_root_user()
+    create_dedicated_users()
+    set_system_time()
+
+def bootstrap_software_stack():
+    # build software stack
+    install_system_libs()
+    enable_epel_repositories()
+    install_python()
+    install_munin()
+    install_nginx()
+    clean_yum()
+    
+def bootstrap():
+    bootstrap_ssh()
+    bootstrap_maintenance_accounts()
+    bootstrap_root_environment()
+    bootstrap_software_stack()
+    
+    # deploy application
+    create_buildout_environment()
+
+def update_static_files():
+    """Update static HTML/CSS files served directly by Nginx."""
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    sudo('rm -rf /home/nginx/static/')
+    sudo('svn export --no-auth-cache --username %(username)s --password %(password)s \
+        https://\${config:namespace}.unfuddle.com/svn/\${config:namespace}_\${config:package}/\${config:namespace}.\${config:package}/trunk/src/\${config:namespace}/\${config:package}/static /home/nginx/static'
+        %(username, password))
+        
+def download_Datafs():
+    """Download Zope's Data.fs from the server."""
+    
+    cwd = os.getcwd()
+    
+    if os.path.exists('%(cwd)s/var/filestorage/Data.fs' %locals()):
+        local('mv %(cwd)s/var/filestorage/Data.fs %(cwd)s/var/filestorage/Data.fs_bak' %locals())
+    
+    if exists('~/Data.fs', use_sudo=True):
+        sudo('mv ~/Data.fs ~/Data.fs_bak')
+    
+    sudo('rsync -avhP /home/production/\${config:version}/var/filestorage/Data.fs ~/Data.fs')
+    get('~/Data.fs', '%(cwd)s/var/filestorage/Data.fs' %locals())
