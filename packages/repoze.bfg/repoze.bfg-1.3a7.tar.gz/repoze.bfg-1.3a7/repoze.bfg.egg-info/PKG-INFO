@@ -1,0 +1,707 @@
+Metadata-Version: 1.0
+Name: repoze.bfg
+Version: 1.3a7
+Summary: The repoze.bfg web application framework
+Home-page: http://bfg.repoze.org
+Author: Chris McDonough, Agendaless Consulting
+Author-email: repoze-dev@lists.repoze.org
+License: BSD-derived (http://www.repoze.org/LICENSE.txt)
+Description: repoze.bfg
+        ==========
+        
+        ``repoze.bfg`` is a small, fast, down-to-earth, open source Python web
+        development framework. It makes real-world web application development
+        and deployment more fun, more predictable, and more productive.
+        
+        Support and Documentation
+        -------------------------
+        
+        See the `repoze.bfg website <http://bfg.repoze.org>`_ to view
+        documentation, report bugs, and obtain support.
+        
+        License
+        -------
+        
+        ``repoze.bfg`` is offered under the BSD-derived `Repoze Public License
+        <http://repoze.org/license.html>`_.
+        
+        Authors
+        -------
+        
+        ``repoze.bfg`` is made available by `Agendaless Consulting
+        <http://agendaless.com>`_ and a team of contributors.
+        
+        
+        
+        1.3a7 (2010-08-01)
+        ==================
+        
+        Features
+        --------
+        
+        - The ``repoze.bfg.configuration.Configurator.add_route`` API now
+        returns the route object that was added.
+        
+        - A ``repoze.bfg.events.subscriber`` decorator was added.  This
+        decorator decorates module-scope functions, which are then treated
+        as event listeners after a scan() is performed.  See the Events
+        narrative documentation chapter and the ``repoze.bfg.events`` module
+        documentation for more information.
+        
+        Bug Fixes
+        ---------
+        
+        - When adding a view for a route which did not yet exist ("did not yet
+        exist" meaning, temporally, a view was added with a route name for a
+        route which had not yet been added via add_route), the value of the
+        ``custom_predicate`` argument to ``add_view`` was lost.  Symptom:
+        wrong view matches when using URL dispatch and custom view
+        predicates together.
+        
+        - Pattern matches for a ``:segment`` marker in a URL dispatch route
+        pattern now always match at least one character.  See "Backwards
+        Incompatibilities" below in this changelog.
+        
+        Backwards Incompatibilities
+        ---------------------------
+        
+        - A bug existed in the regular expression to do URL matching.  As an
+        example, the URL matching machinery would cause the pattern
+        ``/{foo}`` to match the root URL ``/`` resulting in a match
+        dictionary of ``{'foo':u''}`` or the pattern ``/{fud}/edit might
+        match the URL ``//edit`` resulting in a match dictionary of
+        ``{'fud':u''}``.  It was always the intent that ``:segment`` markers
+        in the pattern would need to match *at least one* character, and
+        never match the empty string.  This, however, means that in certain
+        circumstances, a routing match which your application inadvertently
+        depended upon may no longer happen.
+        
+        Documentation
+        --------------
+        
+        - Added description of the ``repoze.bfg.events.subscriber`` decorator
+        to the Events narrative chapter.
+        
+        - Added ``repoze.bfg.events.subscriber`` API documentation to
+        ``repoze.bfg.events`` API docs.
+        
+        - Added a section named "Zope 3 Enforces 'TTW' Authorization Checks By
+        Default; BFG Does Not" to the "Design Defense" chapter.
+        
+        1.3a6 (2010-07-25)
+        ==================
+        
+        Features
+        --------
+        
+        - New argument to ``repoze.bfg.configuration.Configurator.add_route``
+        and the ``route`` ZCML directive: ``traverse``.  If you would like
+        to cause the ``context`` to be something other than the ``root``
+        object when this route matches, you can spell a traversal pattern as
+        the ``traverse`` argument.  This traversal pattern will be used as
+        the traversal path: traversal will begin at the root object implied
+        by this route (either the global root, or the object returned by the
+        ``factory`` associated with this route).
+        
+        The syntax of the ``traverse`` argument is the same as it is for
+        ``path``. For example, if the ``path`` provided is
+        ``articles/:article/edit``, and the ``traverse`` argument provided
+        is ``/:article``, when a request comes in that causes the route to
+        match in such a way that the ``article`` match value is '1' (when
+        the request URI is ``/articles/1/edit``), the traversal path will be
+        generated as ``/1``.  This means that the root object's
+        ``__getitem__`` will be called with the name ``1`` during the
+        traversal phase.  If the ``1`` object exists, it will become the
+        ``context`` of the request.  The Traversal narrative has more
+        information about traversal.
+        
+        If the traversal path contains segment marker names which are not
+        present in the path argument, a runtime error will occur.  The
+        ``traverse`` pattern should not contain segment markers that do not
+        exist in the ``path``.
+        
+        A similar combining of routing and traversal is available when a
+        route is matched which contains a ``*traverse`` remainder marker in
+        its path.  The ``traverse`` argument allows you to associate route
+        patterns with an arbitrary traversal path without using a a
+        ``*traverse`` remainder marker; instead you can use other match
+        information.
+        
+        Note that the ``traverse`` argument is ignored when attached to a
+        route that has a ``*traverse`` remainder marker in its path.
+        
+        - A new method of the ``Configurator`` exists:
+        ``set_request_factory``.  If used, this method will set the factory
+        used by the ``repoze.bfg`` router to create all request objects.
+        
+        - The ``Configurator`` constructor takes an additional argument:
+        ``request_factory``.  If used, this argument will set the factory
+        used by the ``repoze.bfg`` router to create all request objects.
+        
+        - The ``Configurator`` constructor takes an additional argument:
+        ``request_factory``.  If used, this argument will set the factory
+        used by the ``repoze.bfg`` router to create all request objects.
+        
+        - A new method of the ``Configurator`` exists:
+        ``set_renderer_globals_factory``.  If used, this method will set the
+        factory used by the ``repoze.bfg`` router to create renderer
+        globals.
+        
+        - A new method of the ``Configurator`` exists: ``get_settings``.  If
+        used, this method will return the current settings object (performs
+        the same job as the ``repoze.bfg.settings.get_settings`` API).
+        
+        - The ``Configurator`` constructor takes an additional argument:
+        ``renderer_globals_factory``.  If used, this argument will set the
+        factory used by the ``repoze.bfg`` router to create renderer
+        globals.
+        
+        - Add ``repoze.bfg.renderers.render``,
+        ``repoze.bfg.renderers.render_to_response`` and
+        ``repoze.bfg.renderers.get_renderer`` functions.  These are
+        imperative APIs which will use the same rendering machinery used by
+        view configurations with a ``renderer=`` attribute/argument to
+        produce a rendering or renderer.  Because these APIs provide a
+        central API for all rendering, they now form the preferred way to
+        perform imperative template rendering.  Using functions named
+        ``render_*`` from modules such as ``repoze.bfg.chameleon_zpt`` and
+        ``repoze.bfg.chameleon_text`` is now discouraged (although not
+        deprecated).  The code the backing older templating-system-specific
+        APIs now calls into the newer ``repoze.bfg.renderer`` code.
+        
+        - The ``repoze.bfg.configuration.Configurator.testing_add_template``
+        has been renamed to ``testing_add_renderer``.  A backwards
+        compatibility alias is present using the old name.
+        
+        Documentation
+        -------------
+        
+        - The ``Hybrid`` narrative chapter now contains a description of the
+        ``traverse`` route argument.
+        
+        - The ``Hooks`` narrative chapter now contains sections about
+        changing the request factory and adding a renderer globals factory.
+        
+        - The API documentation includes a new module:
+        ``repoze.bfg.renderers``.
+        
+        - The ``Templates`` chapter was updated; all narrative that used
+        templating-specific APIs within examples to perform rendering (such
+        as the ``repoze.bfg.chameleon_zpt.render_template_to_response``
+        method) was changed to use ``repoze.bfg.renderers.render_*``
+        functions.
+        
+        Bug Fixes
+        ---------
+        
+        - The ``header`` predicate (when used as either a view predicate or a
+        route predicate) had a problem when specified with a name/regex
+        pair.  When the header did not exist in the headers dictionary, the
+        regex match could be fed ``None``, causing it to throw a
+        ``TypeError: expected string or buffer`` exception.  Now, the
+        predicate returns False as intended.
+        
+        Deprecations
+        ------------
+        
+        - The ``repoze.bfg.renderers.rendered_response`` function was never an
+        official API, but may have been imported by extensions in the wild.
+        It is officially deprecated in this release.  Use
+        ``repoze.bfg.renderers.render_to_response`` instead.
+        
+        - The following APIs are *documentation* deprecated (meaning they are
+        officially deprecated in documentation but do not raise a
+        deprecation error upon their usage, and may continue to work for an
+        indefinite period of time):
+        
+        In the ``repoze.bfg.chameleon_zpt`` module: ``get_renderer``,
+        ``get_template``, ``render_template``,
+        ``render_template_to_response``.  The suggested alternatives are
+        documented within the docstrings of those methods (which are still
+        present in the documentation).
+        
+        In the ``repoze.bfg.chameleon_text`` module: ``get_renderer``,
+        ``get_template``, ``render_template``,
+        ``render_template_to_response``.  The suggested alternatives are
+        documented within the docstrings of those methods (which are still
+        present in the documentation).
+        
+        In general, to perform template-related functions, one should now
+        use the various methods in the ``repoze.bfg.renderers`` module.
+        
+        Backwards Incompatibilities
+        ---------------------------
+        
+        - A new internal exception class (*not* an API) named
+        ``repoze.bfg.exceptions.PredicateMismatch`` now exists.  This
+        exception is currently raised when no constituent view of a
+        multiview can be called (due to no predicate match).  Previously, in
+        this situation, a ``repoze.bfg.exceptions.NotFound`` was raised.  We
+        provide backwards compatibility for code that expected a
+        ``NotFound`` to be raised when no predicates match by causing
+        ``repoze.bfg.exceptions.PredicateMismatch`` to inherit from
+        ``NotFound``.  This will cause any exception view registered for
+        ``NotFound`` to be called when a predicate mismatch occurs, as was
+        the previous behavior.
+        
+        There is however, one perverse case that will expose a backwards
+        incompatibility.  If 1) you had a view that was registered as a
+        member of a multiview 2) this view explicitly raised a ``NotFound``
+        exception *in order to* proceed to the next predicate check in the
+        multiview, that code will now behave differently: rather than
+        skipping to the next view match, a NotFound will be raised to the
+        top-level exception handling machinery instead.  For code to be
+        depending upon the behavior of a view raising ``NotFound`` to
+        proceed to the next predicate match, would be tragic, but not
+        impossible, given that ``NotFound`` is a public interface.
+        ``repoze.bfg.exceptions.PredicateMismatch`` is not a public API and
+        cannot be depended upon by application code, so you should not
+        change your view code to raise ``PredicateMismatch``.  Instead, move
+        the logic which raised the ``NotFound`` exception in the view out
+        into a custom view predicate.
+        
+        - If, when you run your application's unit test suite under BFG 1.3, a
+        ``KeyError`` naming a template or a ``ValueError`` indicating that a
+        'renderer factory' is not registered may is raised
+        (e.g. ``ValueError: No factory for renderer named '.pt' when looking
+        up karl.views:templates/snippets.pt``), you may need to perform some
+        extra setup in your test code.
+        
+        The best solution is to use the
+        ``repoze.bfg.configuration.Configurator.testing_add_renderer`` (or,
+        alternately the deprecated
+        ``repoze.bfg.testing.registerTemplateRenderer`` or
+        ``registerDummyRenderer``) API within the code comprising each
+        individual unit test suite to register a "dummy" renderer for each
+        of the templates and renderers used by code under test.  For
+        example::
+        
+        config = Configurator()
+        config.testing_add_renderer('karl.views:templates/snippets.pt')
+        
+        This will register a basic dummy renderer for this particular
+        missing template.  The ``testing_add_renderer`` API actually
+        *returns* the renderer, but if you don't care about how the render
+        is used, you don't care about having a reference to it either.
+        
+        A more rough way to solve the issue exists.  It causes the "real"
+        template implementations to be used while the system is under test,
+        which is suboptimal, because tests will run slower, and unit tests
+        won't actually *be* unit tests, but it is easier.  Always ensure you
+        call the ``setup_registry()`` method of the Configurator .  Eg::
+        
+        reg = MyRegistry()
+        config = Configurator(registry=reg)
+        config.setup_registry()
+        
+        Calling ``setup_registry`` only has an effect if you're *passing in*
+        a ``registry`` argument to the Configurator constructor.
+        ``setup_registry`` is called by the course of normal operations
+        anyway if you do not pass in a ``registry``.
+        
+        If your test suite isn't using a Configurator yet, and is still
+        using the older ``repoze.bfg.testing`` APIs name ``setUp`` or
+        ``cleanUp``, these will register the renderers on your behalf.
+        
+        A variant on the symptom for this theme exists: you may already be
+        dutifully registering a dummy template or renderer for a template
+        used by the code you're testing using ``testing_register_renderer``
+        or ``registerTemplateRenderer``, but (perhaps unbeknownst to you)
+        the code under test expects to be able to use a "real" template
+        renderer implementation to retrieve or render *another* template
+        that you forgot was being rendered as a side effect of calling the
+        code you're testing.  This happened to work because it found the
+        *real* template while the system was under test previously, and now
+        it cannot.  The solution is the same.
+        
+        It may also help reduce confusion to use a *resource specification*
+        to specify the template path in the test suite and code rather than
+        a relative path in either.  A resource specification is unambiguous,
+        while a relative path needs to be relative to "here", where "here"
+        isn't always well-defined ("here" in a test suite may or may not be
+        the same as "here" in the code under test).
+        
+        1.3a5 (2010-07-14)
+        ==================
+        
+        Features
+        --------
+        
+        - New internal exception: ``repoze.bfg.exceptions.URLDecodeError``.
+        This URL is a subclass of the built-in Python exception named
+        ``UnicodeDecodeError``.
+        
+        - When decoding a URL segment to Unicode fails, the exception raised
+        is now ``repoze.bfg.exceptions.URLDecodeError`` instead of
+        ``UnicodeDecodeError``.  This makes it possible to register an
+        exception view invoked specifically when ``repoze.bfg`` cannot
+        decode a URL.
+        
+        Bug Fixes
+        ---------
+        
+        - Fix regression in
+        ``repoze.bfg.configuration.Configurator.add_static_view``.  Before
+        1.3a4, view names that contained a slash were supported as route
+        prefixes. 1.3a4 broke this by trying to treat them as full URLs.
+        
+        Documentation
+        -------------
+        
+        - The ``repoze.bfg.exceptions.URLDecodeError`` exception was added to
+        the exceptions chapter of the API documentation.
+        
+        Backwards Incompatibilities
+        ----------------------------
+        
+        - in previous releases, when a URL could not be decoded from UTF-8
+        during traversal, a ``TypeError`` was raised.  Now the error which
+        is raised is a ``repoze.bfg.exceptions.URLDecodeError``.
+        
+        1.3a4 (2010-07-03)
+        ==================
+        
+        Features
+        --------
+        
+        - Undocumented hook: make ``get_app`` and ``get_root`` of the
+        ``repoze.bfg.paster.BFGShellCommand`` hookable in cases where
+        endware may interfere with the default versions.
+        
+        - In earlier versions, a custom route predicate associated with a url
+        dispatch route (each of the predicate functions fed to the
+        ``custom_predicates`` argument of
+        ``repoze.bfg.configuration.Configurator.add_route``) has always
+        required a 2-positional argument signature, e.g. ``(context,
+        request)``.  Before this release, the ``context`` argument was
+        always ``None``.
+        
+        As of this release, the first argument passed to a predicate is now
+        a dictionary conventionally named ``info`` consisting of ``route``,
+        and ``match``.  ``match`` is a dictionary: it represents the
+        arguments matched in the URL by the route.  ``route`` is an object
+        representing the route which was matched.
+        
+        This is useful when predicates need access to the route match.  For
+        example::
+        
+        def any_of(segment_name, *args):
+        def predicate(info, request):
+        if info['match'][segment_name] in args:
+        return True
+        return predicate
+        
+        num_one_two_or_three = any_of('num, 'one', 'two', 'three')
+        
+        add_route('num', '/:num', custom_predicates=(num_one_two_or_three,))
+        
+        The ``route`` object is an object that has two useful attributes:
+        ``name`` and ``path``.  The ``name`` attribute is the route name.
+        The ``path`` attribute is the route pattern.  An example of using
+        the route in a set of route predicates::
+        
+        def twenty_ten(info, request):
+        if info['route'].name in ('ymd', 'ym', 'y'):
+        return info['match']['year'] == '2010'
+        
+        add_route('y', '/:year', custom_predicates=(twenty_ten,))
+        add_route('ym', '/:year/:month', custom_predicates=(twenty_ten,))
+        add_route('ymd', '/:year/:month:/day', custom_predicates=(twenty_ten,))
+        
+        - The ``repoze.bfg.url.route_url`` API has changed.  If a keyword
+        ``_app_url`` is present in the arguments passed to ``route_url``,
+        this value will be used as the protocol/hostname/port/leading path
+        prefix of the generated URL.  For example, using an ``_app_url`` of
+        ``http://example.com:8080/foo`` would cause the URL
+        ``http://example.com:8080/foo/fleeb/flub`` to be returned from this
+        function if the expansion of the route pattern associated with the
+        ``route_name`` expanded to ``/fleeb/flub``.
+        
+        - It is now possible to use a URL as the ``name`` argument fed to
+        ``repoze.bfg.configuration.Configurator.add_static_view``.  When the
+        name argument is a URL, the ``repoze.bfg.url.static_url`` API will
+        generate join this URL (as a prefix) to a path including the static
+        file name.  This makes it more possible to put static media on a
+        separate webserver for production, while keeping static media
+        package-internal and served by the development webserver during
+        development.
+        
+        Documentation
+        -------------
+        
+        - The authorization chapter of the ZODB Wiki Tutorial
+        (docs/tutorials/bfgwiki) was changed to demonstrate authorization
+        via a group rather than via a direct username (thanks to Alex
+        Marandon).
+        
+        - The authorization chapter of the SQLAlchemy Wiki Tutorial
+        (docs/tutorials/bfgwiki2) was changed to demonstrate authorization
+        via a group rather than via a direct username.
+        
+        - Redirect requests for tutorial sources to
+        http://docs.repoze.org/bfgwiki-1.3 and
+        http://docs.repoze.org/bfgwiki2-1.3/ respectively.
+        
+        - A section named ``Custom Route Predicates`` was added to the URL
+        Dispatch narrative chapter.
+        
+        - The Static Resources chapter has been updated to mention using
+        ``static_url`` to generate URLs to external webservers.
+        
+        Internal
+        --------
+        
+        - Removed ``repoze.bfg.static.StaticURLFactory`` in favor of a new
+        abstraction revolving around the (still-internal)
+        ``repoze.bfg.static.StaticURLInfo`` helper class.
+        
+        1.3a3 (2010-05-01)
+        ==================
+        
+        Paster Templates
+        ----------------
+        
+        - The ``bfg_alchemy`` and ``bfg_routesalchemy`` templates no longer
+        register a ``handle_teardown`` event listener which calls
+        ``DBSession.remove``.  This was found by Chris Withers to be
+        unnecessary.
+        
+        Documentation
+        -------------
+        
+        - The "bfgwiki2" (URL dispatch wiki) tutorial code and documentation
+        was changed to remove the ``handle_teardown`` event listener which
+        calls ``DBSession.remove``.
+        
+        - Any mention of the ``handle_teardown`` event listener as used by the
+        paster templates was removed from the URL Dispatch narrative chapter.
+        
+        - A section entitled Detecting Available Languages was added to the
+        i18n narrative docs chapter.
+        
+        1.3a2 (2010-04-28)
+        ==================
+        
+        Features
+        --------
+        
+        - A locale negotiator no longer needs to be registered explicitly. The
+        default locale negotiator at
+        ``repoze.bfg.i18n.default_locale_negotiator`` is now used
+        unconditionally as... um, the default locale negotiator.
+        
+        - The default locale negotiator has become more complex.
+        
+        * First, the negotiator looks for the ``_LOCALE_`` attribute of
+        the request object (possibly set by a view or an event listener).
+        
+        * Then it looks for the ``request.params['_LOCALE_']`` value.
+        
+        * Then it looks for the ``request.cookies['_LOCALE_']`` value.
+        
+        Backwards Incompatibilities
+        ---------------------------
+        
+        - The default locale negotiator now looks for the parameter named
+        ``_LOCALE_`` rather than a parameter named ``locale`` in
+        ``request.params``.
+        
+        Behavior Changes
+        ----------------
+        
+        - A locale negotiator may now return ``None``, signifying that the
+        default locale should be used.
+        
+        Documentation
+        -------------
+        
+        - Documentation concerning locale negotiation in the
+        Internationalizationa and Localization chapter was updated.
+        
+        - Expanded portion of i18n narrative chapter docs which discuss
+        working with gettext files.
+        
+        1.3a1 (2010-04-26)
+        ==================
+        
+        Features
+        --------
+        
+        - Added "exception views".  When you use an exception (anything that
+        inherits from the Python ``Exception`` builtin) as view context
+        argument, e.g.::
+        
+        from repoze.bfg.view import bfg_view
+        from repoze.bfg.exceptions import NotFound
+        from webob.exc import HTTPNotFound
+        
+        @bfg_view(context=NotFound)
+        def notfound_view(request):
+        return HTTPNotFound()
+        
+        For the above example, when the ``repoze.bfg.exceptions.NotFound``
+        exception is raised by any view or any root factory, the
+        ``notfound_view`` view callable will be invoked and its response
+        returned.
+        
+        Other normal view predicates can also be used in combination with an
+        exception view registration::
+        
+        from repoze.bfg.view import bfg_view
+        from repoze.bfg.exceptions import NotFound
+        from webob.exc import HTTPNotFound
+        
+        @bfg_view(context=NotFound, route_name='home')
+        def notfound_view(request):
+        return HTTPNotFound()
+        
+        The above exception view names the ``route_name`` of ``home``,
+        meaning that it will only be called when the route matched has a
+        name of ``home``.  You can therefore have more than one exception
+        view for any given exception in the system: the "most specific" one
+        will be called when the set of request circumstances which match the
+        view registration.  The only predicate that cannot be not be used
+        successfully is ``name``.  The name used to look up an exception
+        view is always the empty string.
+        
+        Existing (pre-1.3) normal views registered against objects
+        inheriting from ``Exception`` will continue to work.  Exception
+        views used for user-defined exceptions and system exceptions used as
+        contexts will also work.
+        
+        The feature can be used with any view registration mechanism
+        (``@bfg_view`` decorator, ZCML, or imperative ``config.add_view``
+        styles).
+        
+        This feature was kindly contributed by Andrey Popp.
+        
+        - Use "Venusian" (`http://docs.repoze.org/venusian
+        <http://docs.repoze.org/venusian>`_) to perform ``bfg_view``
+        decorator scanning rather than relying on a BFG-internal decorator
+        scanner.  (Truth be told, Venusian is really just a generalization
+        of the BFG-internal decorator scanner).
+        
+        - Internationalization and localization features as documented in the
+        narrative documentation chapter entitled ``Internationalization and
+        Localization``.
+        
+        - A new deployment setting named ``default_locale_name`` was added.
+        If this string is present as a Paster ``.ini`` file option, it will
+        be considered the default locale name.  The default locale name is
+        used during locale-related operations such as language translation.
+        
+        - It is now possible to turn on Chameleon template "debugging mode"
+        for all Chameleon BFG templates by setting a BFG-related Paster
+        ``.ini`` file setting named ``debug_templates``. The exceptions
+        raised by Chameleon templates when a rendering fails are sometimes
+        less than helpful.  ``debug_templates`` allows you to configure your
+        application development environment so that exceptions generated by
+        Chameleon during template compilation and execution will contain
+        more helpful debugging information.  This mode is on by default in
+        all new projects.
+        
+        - Add a new method of the Configurator named ``derive_view`` which can
+        be used to generate a BFG view callable from a user-supplied
+        function, instance, or class. This useful for external framework and
+        plugin authors wishing to wrap callables supplied by their users
+        which follow the same calling conventions and response conventions
+        as objects that can be supplied directly to BFG as a view callable.
+        See the ``derive_view`` method in the
+        ``repoze.bfg.configuration.Configurator`` docs.
+        
+        ZCML
+        ----
+        
+        - Add a ``translationdir`` ZCML directive to support localization.
+        
+        - Add a ``localenegotiator`` ZCML directive to support localization.
+        
+        Deprecations
+        ------------
+        
+        -  The exception views feature replaces the need for the
+        ``set_notfound_view`` and ``set_forbidden_view`` methods of the
+        ``Configurator`` as well as the ``notfound`` and ``forbidden`` ZCML
+        directives.  Those methods and directives will continue to work for
+        the foreseeable future, but they are deprecated in the
+        documentation.
+        
+        Dependencies
+        ------------
+        
+        - A new install-time dependency on the ``venusian`` distribution was
+        added.
+        
+        - A new install-time dependency on the ``translationstring``
+        distribution was added.
+        
+        - Chameleon 1.2.3 or better is now required (internationalization and
+        per-template debug settings).
+        
+        Internal
+        --------
+        
+        - View registrations and lookups are now done with three "requires"
+        arguments instead of two to accomodate orthogonality of exception
+        views.
+        
+        - The ``repoze.bfg.interfaces.IForbiddenView`` and
+        ``repoze.bfg.interfaces.INotFoundView`` interfaces were removed;
+        they weren't APIs and they became vestigial with the addition of
+        exception views.
+        
+        - Remove ``repoze.bfg.compat.pkgutil_26.py`` and import alias
+        ``repoze.bfg.compat.walk_packages``.  These were only required by
+        internal scanning machinery; Venusian replaced the internal scanning
+        machinery, so these are no longer required.
+        
+        Documentation
+        -------------
+        
+        - Exception view documentation was added to the ``Hooks`` narrative
+        chapter.
+        
+        - A new narrative chapter entitled ``Internationalization and
+        Localization`` was added.
+        
+        - The "Environment Variables and ``ini`` File Settings" chapter was
+        changed: documentation about the ``default_locale_name`` setting was
+        added.
+        
+        - A new API chapter for the ``repoze.bfg.i18n`` module was added.
+        
+        - Documentation for the new ``translationdir`` and
+        ``localenegotiator`` ZCML directives were added.
+        
+        - A section was added to the Templates chapter entitled "Nicer
+        Exceptions in Templates" describing the result of setting
+        ``debug_templates = true``.
+        
+        Paster Templates
+        ----------------
+        
+        - All paster templates now create a ``setup.cfg`` which includes
+        commands related to nose testing and Babel message catalog
+        extraction/compilation.
+        
+        - A ``default_locale_name = en`` setting was added to each existing paster
+        template.
+        
+        - A ``debug_templates = true`` setting was added to each existing
+        paster template.
+        
+        Licensing
+        ---------
+        
+        - The Edgewall (BSD) license was added to the LICENSES.txt file, as
+        some code in the ``repoze.bfg.i18n`` derives from Babel source.
+        
+        
+Keywords: web wsgi bfg
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Framework :: BFG
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI
+Classifier: License :: Repoze Public License
