@@ -1,0 +1,295 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The Collector in-depth &mdash; Collectors v0.2 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.2',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Collectors v0.2 documentation" href="index.html" />
+    <link rel="next" title="How to use the storage backends" href="storages.html" />
+    <link rel="prev" title="Quickstart Guide" href="quickstart.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="modindex.html" title="Global Module Index"
+             accesskey="M">modules</a> |</li>
+        <li class="right" >
+          <a href="storages.html" title="How to use the storage backends"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart Guide"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Collectors v0.2 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-collector-in-depth">
+<span id="collector"></span><h1>The Collector in-depth<a class="headerlink" href="#the-collector-in-depth" title="Permalink to this headline">¶</a></h1>
+<p>This sections provides a more in-depth description of the
+<a title="collectors.core.Collector" class="reference external" href="ref/core.html#collectors.core.Collector"><tt class="xref docutils literal"><span class="pre">Collector</span></tt></a> class and some of the shortcut functions.</p>
+<div class="section" id="how-collector-works">
+<h2>How <tt class="docutils literal"><span class="pre">Collector</span></tt> works<a class="headerlink" href="#how-collector-works" title="Permalink to this headline">¶</a></h2>
+<p>The Collector needs two things to monitor a variable:</p>
+<ol class="arabic simple">
+<li>A <em>name</em> that identifies the variable and its series within the collector</li>
+<li>A <em>collector function</em> that gets the current value of the variable each time
+the collector is called.</li>
+</ol>
+<p>When you create a new collector, you must pass a tuple <tt class="docutils literal"><span class="pre">(name,</span>
+<span class="pre">collector_func)</span></tt> for each variable you want to monitor:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">Collector</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">b</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">get_b</span><span class="p">(</span><span class="n">factor</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">b</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">c</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">(</span><span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">a</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="p">(</span><span class="s">&#39;b&#39;</span><span class="p">,</span> <span class="n">get_b</span><span class="p">)</span>
+<span class="gp">... </span><span class="p">)</span>
+</pre></div>
+</div>
+<p>A variable’s <em>name</em> must be a string and should also be a valid <a class="reference external" href="http://docs.python.org/reference/lexical_analysis.html#identifiers">Python
+identifier</a>. The
+<em>collector function</em> can be anything that’s callable—it might even take a
+parameter.</p>
+<p>By default, the Collector creates a Python list for each variable which will
+hold all monitored values. We will call this list <em>series</em> here.</p>
+<p>The series for a variable is accessible either by index or as an attribute (this
+is why <em>name</em> should be a valid identifier):</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">c</span>
+<span class="go">([], [])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="o">.</span><span class="n">a</span><span class="p">,</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">c</span><span class="o">.</span><span class="n">b</span>
+<span class="go">(True, True)</span>
+</pre></div>
+</div>
+<p>Each time the Collector (or its <a title="collectors.core.Collector.collect" class="reference external" href="ref/core.html#collectors.core.Collector.collect"><tt class="xref docutils literal"><span class="pre">collect()</span></tt></a>
+method) is called, it calls every <em>collector function</em> in the order they were
+initially passed to it and appends their return value to each variable’s
+<em>series</em>. If a <em>collector function</em> needs a parameter, you must pass it as
+keyword argument:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">c</span>
+<span class="go">([], [])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">c</span><span class="p">(</span><span class="n">b</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="c"># c.collect(b=4) would do the same</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">c</span>
+<span class="go">([1], [8])</span>
+</pre></div>
+</div>
+<div class="section" id="take-away">
+<h3>Take-away<a class="headerlink" href="#take-away" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>Each variable is described by a <em>name</em>, a <em>collector function</em> and a <em>series</em>.</li>
+<li>The <em>series</em> are ordered in the same way the <tt class="docutils literal"><span class="pre">(name,</span> <span class="pre">col_func)</span></tt> tuples were
+passed to the Collector’s constructor.</li>
+<li>A <em>collector function</em> can optionally have (exactly) one argument.</li>
+<li>Each call to the Collector or its <tt class="docutils literal"><span class="pre">collect</span></tt> method collects the current
+values of all monitored variables.</li>
+<li>If a <em>collector functions</em> needs an argument, it must be passed as keyword
+argument to <tt class="docutils literal"><span class="pre">__call__</span></tt> or <tt class="docutils literal"><span class="pre">collect</span></tt> and the key must be the same as
+<em>name</em>.</li>
+</ul>
+</div>
+</div>
+<div class="section" id="shortcut-functions">
+<h2>Shortcut functions<a class="headerlink" href="#shortcut-functions" title="Permalink to this headline">¶</a></h2>
+<p><em>Collectors</em> has some shortcut functions included that help you save typing.
+They are defined in <a title="" class="reference external" href="ref/shortcuts.html#module-collectors.shortcuts"><tt class="xref docutils literal"><span class="pre">collectors.shortcuts</span></tt></a> but can also be import directly
+from <a title="" class="reference external" href="ref/index.html#module-collectors"><tt class="xref docutils literal"><span class="pre">collectors</span></tt></a> for even less typing. ;-)</p>
+<div class="section" id="monitor-several-attributes-of-one-object">
+<h3>Monitor several attributes of one object<a class="headerlink" href="#monitor-several-attributes-of-one-object" title="Permalink to this headline">¶</a></h3>
+<p>In most cases you’ll probably end up using <em>Collectors</em> like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Spam</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="n">a</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">b</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="n">c</span>
+<span class="gp">...</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span><span class="p">),</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;b&#39;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">),</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;c&#39;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span><span class="p">),</span>
+<span class="gp">... </span>        <span class="p">)</span>
+</pre></div>
+</div>
+<p>Setting up a Collector like this is very tedious and repetitive. The shortcut
+<a title="collectors.shortcuts.get" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get"><tt class="xref docutils literal"><span class="pre">get()</span></tt></a> allows you to create these tuples much faster:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">get</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Spam</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="n">a</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">b</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="n">c</span>
+<span class="gp">...</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">,</span> <span class="s">&#39;c&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>You must pass an object and the names of attributes to <a title="collectors.shortcuts.get" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get"><tt class="xref docutils literal"><span class="pre">get()</span></tt></a>. For each
+attribute, it generates a tuple <tt class="docutils literal"><span class="pre">('attr',</span> <span class="pre">lambda:</span> <span class="pre">getattr(obj,</span> <span class="pre">'attr'))</span></tt> for
+you.</p>
+</div>
+<div class="section" id="monitor-many-objects-with-one-collector">
+<h3>Monitor many objects with one Collector<a class="headerlink" href="#monitor-many-objects-with-one-collector" title="Permalink to this headline">¶</a></h3>
+<p>If you want to monitor the same attributes for many <tt class="docutils literal"><span class="pre">Spam</span></tt> instances with only
+one Collector, there is another shortcut called <a title="collectors.shortcuts.get_objects" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get_objects"><tt class="xref docutils literal"><span class="pre">get_objects()</span></tt></a> that works
+in a similar way:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">get_objects</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">Spam</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="s">&#39;_</span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="nb">id</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">a</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spams</span> <span class="o">=</span> <span class="p">[</span><span class="n">Spam</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span><span class="n">get_objects</span><span class="p">(</span><span class="n">spams</span><span class="p">,</span> <span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Similarly to <a title="collectors.shortcuts.get" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get"><tt class="xref docutils literal"><span class="pre">get()</span></tt></a>, <a title="collectors.shortcuts.get_objects" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get_objects"><tt class="xref docutils literal"><span class="pre">get_objects()</span></tt></a> creates a <tt class="docutils literal"><span class="pre">(name,</span> <span class="pre">func)</span></tt> tuple
+for the attributes of all passed objects. In contrast to <a title="collectors.shortcuts.get" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.get"><tt class="xref docutils literal"><span class="pre">get()</span></tt></a> you must
+also define an <tt class="docutils literal"><span class="pre">id</span></tt> attribute which will be prefixed to each <em>name</em> in order
+to make them distinguishable. Since the names become attributes of the Collector
+instance, they must not be pure integers.</p>
+<p>In the above example, <tt class="docutils literal"><span class="pre">collector</span></tt> would have the attributes <tt class="docutils literal"><span class="pre">_0_a</span></tt>,
+<tt class="docutils literal"><span class="pre">_0_b</span></tt>, <tt class="docutils literal"><span class="pre">_1_a</span></tt> and so forth.</p>
+</div>
+<div class="section" id="manually-passing-values">
+<h3>Manually passing values<a class="headerlink" href="#manually-passing-values" title="Permalink to this headline">¶</a></h3>
+<p>Sometimes you might want to save some calculation results on-the-fly, were you
+would use <tt class="docutils literal"><span class="pre">lambda</span> <span class="pre">x:</span> <span class="pre">x</span></tt> as a <em>collector function</em>. A shortcut for that is
+<a title="collectors.shortcuts.manual" class="reference external" href="ref/shortcuts.html#collectors.shortcuts.manual"><tt class="xref docutils literal"><span class="pre">manual()</span></tt></a>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">Collector</span><span class="p">,</span> <span class="n">manual</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">((</span><span class="s">&#39;val&#39;</span><span class="p">,</span> <span class="n">manual</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">collector</span><span class="p">(</span><span class="n">val</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">collector</span><span class="o">.</span><span class="n">val</span>
+<span class="go">[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mixing-shortcut-functions">
+<h3>Mixing shortcut functions<a class="headerlink" href="#mixing-shortcut-functions" title="Permalink to this headline">¶</a></h3>
+<p>You can of course freely mix shortcut functions and “normal” tuples:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">foo</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">spam</span><span class="o">.</span><span class="n">a</span> <span class="o">+</span> <span class="n">spam</span><span class="o">.</span><span class="n">b</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">collector</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="p">(</span><span class="s">&#39;foo&#39;</span><span class="p">,</span> <span class="n">foo</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="p">(</span><span class="s">&#39;bar&#39;</span><span class="p">,</span> <span class="n">manual</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">get</span><span class="p">(</span><span class="n">spams</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">get_objects</span><span class="p">(</span><span class="n">spams</span><span class="p">,</span> <span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="s">&#39;a&#39;</span><span class="p">),</span>
+<span class="gp">... </span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="whats-next">
+<h2>What’s next?<a class="headerlink" href="#whats-next" title="Permalink to this headline">¶</a></h2>
+<p>By default, <a title="collectors.core.Collector" class="reference external" href="ref/core.html#collectors.core.Collector"><tt class="xref docutils literal"><span class="pre">Collector</span></tt></a> stores all collected values in
+plain Python lists, but it is also able to store them in various other formats
+like <a class="reference external" href="http://www.pytables.org/">PyTables/HDF5</a> or <a class="reference external" href="http://office.microsoft.com/de-at/excel/default.aspx">MS Excel</a>. The next section
+explains the various storage classes and how you can create your own.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">The Collector in-depth</a><ul>
+<li><a class="reference external" href="#how-collector-works">How <tt class="docutils literal"><span class="pre">Collector</span></tt> works</a><ul>
+<li><a class="reference external" href="#take-away">Take-away</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#shortcut-functions">Shortcut functions</a><ul>
+<li><a class="reference external" href="#monitor-several-attributes-of-one-object">Monitor several attributes of one object</a></li>
+<li><a class="reference external" href="#monitor-many-objects-with-one-collector">Monitor many objects with one Collector</a></li>
+<li><a class="reference external" href="#manually-passing-values">Manually passing values</a></li>
+<li><a class="reference external" href="#mixing-shortcut-functions">Mixing shortcut functions</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#whats-next">What’s next?</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="quickstart.html"
+                                  title="previous chapter">Quickstart Guide</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="storages.html"
+                                  title="next chapter">How to use the storage backends</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/collector.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="modindex.html" title="Global Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="storages.html" title="How to use the storage backends"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart Guide"
+             >previous</a> |</li>
+        <li><a href="index.html">Collectors v0.2 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2010, Stefan Scherfke and Ontje Lünsdorf.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.3.
+    </div>
+  </body>
+</html>

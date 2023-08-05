@@ -1,0 +1,185 @@
+.. _collector:
+
+The Collector in-depth
+======================
+
+This sections provides a more in-depth description of the
+:class:`~collectors.core.Collector` class and some of the shortcut functions.
+
+
+How ``Collector`` works
+-----------------------
+
+The Collector needs two things to monitor a variable:
+
+1. A *name* that identifies the variable and its series within the collector
+2. A *collector function* that gets the current value of the variable each time
+   the collector is called.
+
+When you create a new collector, you must pass a tuple ``(name,
+collector_func)`` for each variable you want to monitor::
+
+    >>> from collectors import Collector
+    >>> a = 1
+    >>> b = 2
+    >>>
+    >>> def get_b(factor):
+    ...     return factor * b
+    ...
+    >>> c = Collector(
+    ...     ('a', lambda: a),
+    ...     ('b', get_b)
+    ... )
+
+A variable’s *name* must be a string and should also be a valid `Python
+identifier
+<http://docs.python.org/reference/lexical_analysis.html#identifiers>`_. The
+*collector function* can be anything that’s callable—it might even take a
+parameter.
+
+By default, the Collector creates a Python list for each variable which will
+hold all monitored values. We will call this list *series* here.
+
+The series for a variable is accessible either by index or as an attribute (this
+is why *name* should be a valid identifier)::
+
+    >>> c
+    ([], [])
+    >>> c[0] == c.a, c[1] == c.b
+    (True, True)
+
+Each time the Collector (or its :meth:`~collectors.core.Collector.collect`
+method) is called, it calls every *collector function* in the order they were
+initially passed to it and appends their return value to each variable’s
+*series*. If a *collector function* needs a parameter, you must pass it as
+keyword argument::
+
+    >>> c
+    ([], [])
+    >>> c(b=4) # c.collect(b=4) would do the same
+    >>> c
+    ([1], [8])
+
+
+Take-away
+^^^^^^^^^
+
+* Each variable is described by a *name*, a *collector function* and a *series*.
+* The *series* are ordered in the same way the ``(name, col_func)`` tuples were
+  passed to the Collector’s constructor.
+* A *collector function* can optionally have (exactly) one argument.
+* Each call to the Collector or its ``collect`` method collects the current
+  values of all monitored variables.
+* If a *collector functions* needs an argument, it must be passed as keyword
+  argument to ``__call__`` or ``collect`` and the key must be the same as
+  *name*.
+
+
+Shortcut functions
+------------------
+
+.. currentmodule:: collectors.shortcuts
+
+*Collectors* has some shortcut functions included that help you save typing.
+They are defined in :mod:`collectors.shortcuts` but can also be import directly
+from :mod:`collectors` for even less typing. ;-)
+
+Monitor several attributes of one object
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In most cases you’ll probably end up using *Collectors* like this::
+
+    >>> class Spam(object):
+    ...     def __init__(self, a, b, c):
+    ...         self.a = a
+    ...         self.b = b
+    ...         self.c = c
+    ...
+    ...         self.collector = Collector(
+    ...             ('a', lambda: self.a),
+    ...             ('b', lambda: self.b),
+    ...             ('c', lambda: self.c),
+    ...         )
+
+Setting up a Collector like this is very tedious and repetitive. The shortcut
+:func:`get` allows you to create these tuples much faster:
+
+    >>> from collectors import get
+    >>> class Spam(object):
+    ...     def __init__(self, a, b, c):
+    ...         self.a = a
+    ...         self.b = b
+    ...         self.c = c
+    ...
+    ...         self.collector = Collector(get(self, 'a', 'b', 'c'))
+
+You must pass an object and the names of attributes to :func:`get`. For each
+attribute, it generates a tuple ``('attr', lambda: getattr(obj, 'attr'))`` for
+you.
+
+Monitor many objects with one Collector
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you want to monitor the same attributes for many ``Spam`` instances with only
+one Collector, there is another shortcut called :func:`get_objects` that works
+in a similar way:
+
+    >>> from collectors import get_objects
+    >>> class Spam(object):
+    ...     def __init__(self, id):
+    ...         self.id = '_%d' % id
+    ...         self.a, self.b = 0, 0
+    ...
+    >>> spams = [Spam(i) for i in range(10)]
+    >>> collector = Collector(get_objects(spams, 'id', 'a', 'b'))
+
+Similarly to :func:`get`, :func:`get_objects` creates a ``(name, func)`` tuple
+for the attributes of all passed objects. In contrast to :func:`get` you must
+also define an ``id`` attribute which will be prefixed to each *name* in order
+to make them distinguishable. Since the names become attributes of the Collector
+instance, they must not be pure integers.
+
+In the above example, ``collector`` would have the attributes ``_0_a``,
+``_0_b``, ``_1_a`` and so forth.
+
+
+Manually passing values
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Sometimes you might want to save some calculation results on-the-fly, were you
+would use ``lambda x: x`` as a *collector function*. A shortcut for that is
+:func:`manual`::
+
+    >>> from collectors import Collector, manual
+    >>> collector = Collector(('val', manual))
+    >>> for i in range(10):
+    ...     collector(val=i)
+    ...
+    >>> collector.val
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+Mixing shortcut functions
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can of course freely mix shortcut functions and “normal” tuples::
+
+    >>> def foo():
+    ...     return spam.a + spam.b
+    ...
+    >>> collector = Collector(
+    ...     ('foo', foo),
+    ...     ('bar', manual),
+    ...     get(spams[0], 'a', 'b'),
+    ...     get_objects(spams, 'id', 'a'),
+    ... )
+
+
+What’s next?
+------------
+
+By default, :class:`~collectors.core.Collector` stores all collected values in
+plain Python lists, but it is also able to store them in various other formats
+like `PyTables/HDF5 <http://www.pytables.org/>`_ or `MS Excel
+<http://office.microsoft.com/de-at/excel/default.aspx>`_. The next section
+explains the various storage classes and how you can create your own.

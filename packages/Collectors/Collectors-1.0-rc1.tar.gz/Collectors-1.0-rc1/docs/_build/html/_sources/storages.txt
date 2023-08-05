@@ -1,0 +1,165 @@
+.. _storages:
+
+How to use the storage backends
+===============================
+
+By default, *Collectors* uses a simple python :class:`list` for each series. You
+can use other storage backends to handle very large amounts of data or to get a
+simple *MS Excel* export. You can also add your own storage classes very easily.
+
+All storage classes can be found in submodules of :mod:`collectors.storage`
+(e.g. :class:`collectors.storage.pytables.PyTables`) but you can also import
+:class:`~collectors.storage.pytables.PyTables` and
+:class:`~collectors.storage.excel.Excel` directly from
+:mod:`collectors.storage`.
+
+You must pass an instance of the storage as keyword argument ``backend`` to a
+new Collector. Each storage instance should only be used with one Collector
+instance. ::
+
+    from collectors import Collector
+    from collectors.storage import MyStorage
+    c = Collector(..., backend=MyStorage())
+
+
+PyTables/HDF5
+-------------
+
+`PyTables <http://www.pytables.org/>`_ is not bundled with this package.
+Instructions follow:
+
+**Mac OS X (10.6 Snow Leopard)**
+
+You should not use the precompiled version of *HDF5* because it’s linked against
+*szip*, which is not bundled with *HDF5* and available under a license you might
+not want. So you need to compile it yourself:
+
+1. Download the source from ftp://ftp.hdfgroup.org/HDF5/current/src/
+2. Build and install (*PyTables* will auto detect it if you install it under 
+   ``/usr/local``):
+
+.. sourcecode:: bash
+
+    $ ./configure --prefix=/usr/local
+    $ make
+    $ sudo make install
+    
+3. Finally install *PyTables:*
+
+.. sourcecode:: bash
+
+    $ sudo pip install tables
+
+**Ubuntu (9.10 Karmic Koala)**
+
+Ubuntu’s package for PyTables is somehow broken, so you need to build your own.
+If *gcc* is already installed, you just need to add the development files for
+python and HDF5 before you can build and install PyTables from `PyPI
+<http://pypi.python.org/pypi/tables>`_:
+
+.. sourcecode:: bash
+
+    $ sudo aptitude install python-dev libhdf5-serial-dev
+    $ sudo pip install tables
+
+**Windows**
+
+Download the installer from `here <http://www.pytables.org/download/stable/>`_
+and execute it. Further information can be found in the `PyTables manual
+<http://www.pytables.org/docs/manual/ch02.html#binaryInstallationDescr>`_.
+
+Example
+^^^^^^^
+
+    >>> import tables
+    >>> from collectors import Collector, get, storage
+    >>>
+    >>> class Spam(object):
+    ...     a = 1
+    ...     b = 2
+    ...
+    >>> spam = Spam()
+    >>> h5file = tables.openFile('/tmp/example.h5', mode='w')
+    >>>
+    >>> collector = Collector(get(spam, 'a', 'b'),
+    ...         backend=storage.PyTables(h5file, 'spamgroup', ('int', 'int'))
+    ... )
+    >>>
+    >>> for values in zip(range(10), reversed(range(10))):
+    ...     spam.a, spam.b = values
+    ...     collector()
+    ...
+    >>> print collector.a.read(), collector.b.read()
+    [0 1 2 3 4 5 6 7 8 9] [9 8 7 6 5 4 3 2 1 0]
+    >>> print collector.a.read().mean(), collector.b.read().max()
+    4.5 9
+    >>> h5file.close()
+
+The :class:`~collectors.storage.pytables.PyTables` storage stores the results
+for multiple Collector instances in one file. For each Collector, a new group
+will be create and each observed variable will have its own array within that
+group, so the group name musst be unique among all collectors that use the same
+HDF5 file.
+
+You also need to specifiy the data types of the observed variables. They must be
+passed as list of strings (like e.g. ``'int'``, ``'float'`` or ``'bool'``, see
+the `NumPy Docs <http://docs.scipy.org/doc/numpy/reference/arrays.scalars.html
+#built-in-scalar-types>`_ for more details).
+
+The *series* are now `EArrays
+<http://www.pytables.org/docs/manual/ch04.html#EArrayClassDescr>`_ instead of
+simple lists. The ``read`` function returns the complete series for that
+variable as a NumPy array so you can do further calculations on them very fast.
+
+
+MS Excel
+--------
+
+The :class:`~collectors.storage.excel.Excel` storage allows you to store your
+data directly in an Excel file.
+
+To use this storage backend, you need to install ``xlwt`` (like “Excel
+Write”—``xlrd`` (“Excel Read”) can be used to read from an Excel file):
+
+.. sourcecode:: bash
+
+    $ sudo pip install xlwt
+    
+Example
+^^^^^^^
+
+    >>> from xlwt import Workbook
+    >>> from collectors import Collector, get, storage
+    >>> 
+    >>> w = Workbook()
+    >>> 
+    >>> class ObserveMe(object):
+    ...     pass
+    ... 
+    >>> obj = ObserveMe()
+    >>> c = Collector(get(obj, 'value_a', 'value_b'), 
+    ...         backend=storage.Excel(w, 'my collected data'))
+    >>> 
+    >>> for a, b in zip(range(10), reversed(range(10))):
+    ...     obj.value_a, obj.value_b = a, b
+    ...     c()
+    ... 
+    >>> w.save('/tmp/example.xls')
+
+Using the the Excel storage is quite easy. Just create a new ``Workbook`` and
+pass it with a name for the sheet to :class:`~collectors.storage.excel.Excel`
+constructor. Alternatively, you can create a sheet with
+``workbook.add_sheet('name')`` and pass the sheet instance instead of a string
+with the sheet’s name.
+
+When you are done collecting data, save the Workbook to a file by calling its
+``save()`` method.
+
+
+What’s next?
+------------
+
+*Collectors* was originally developed to use it with `SimPy
+<http://simpy.sourceforge.net/>`_, so we’ll show how both packages can be used
+together in the next section.
+

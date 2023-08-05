@@ -1,0 +1,241 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>How to use Collectors with SimPy &mdash; Collectors v0.2 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.2',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Collectors v0.2 documentation" href="index.html" />
+    <link rel="next" title="API-Reference" href="ref/index.html" />
+    <link rel="prev" title="How to use the storage backends" href="storages.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="modindex.html" title="Global Module Index"
+             accesskey="M">modules</a> |</li>
+        <li class="right" >
+          <a href="ref/index.html" title="API-Reference"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="storages.html" title="How to use the storage backends"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Collectors v0.2 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="how-to-use-collectors-with-simpy">
+<span id="simpy"></span><h1>How to use <em>Collectors</em> with <em>SimPy</em><a class="headerlink" href="#how-to-use-collectors-with-simpy" title="Permalink to this headline">¶</a></h1>
+<p>If you have read and understood the previous sections, you won’t have any trouble using <em>Collectors</em> to monitor your simulation processes.</p>
+<p>We’ll now discuss two examples that show different ways <em>Collectors</em> can be used: You can either use one collector instance per process or let one instance monitor multiple processes at once.</p>
+<p>You should one collector per process if each process belongs to another class or if each process collects its data at another time. If your processes are all instances of the same class and if each instance collects data at the same time, you only need to use one collector instance. That might save you some memory.</p>
+<div class="section" id="one-collector-per-process">
+<h2>One collector per process<a class="headerlink" href="#one-collector-per-process" title="Permalink to this headline">¶</a></h2>
+<p>In the following example a <tt class="xref docutils literal"><span class="pre">Process</span></tt> is created. In
+each step, it generates some random numbers and then holds for a random amount
+of time (that’s why we need one collector per process here).</p>
+<p>The process also creates one collector (<tt class="docutils literal"><span class="pre">self.monitor</span></tt>) which will collect the
+simulation time, the values for <tt class="docutils literal"><span class="pre">a</span></tt> and <tt class="docutils literal"><span class="pre">b</span></tt>, the manually passed values for
+<tt class="docutils literal"><span class="pre">diff</span></tt> and finally the square of <tt class="docutils literal"><span class="pre">c</span></tt>. The resulting collector instance will
+thus have the attributes <tt class="docutils literal"><span class="pre">time</span></tt>, <tt class="docutils literal"><span class="pre">a</span></tt>, <tt class="docutils literal"><span class="pre">b</span></tt>, <tt class="docutils literal"><span class="pre">diff</span></tt> and <tt class="docutils literal"><span class="pre">square</span></tt>.</p>
+<p>After the simulation has finished, <a class="reference external" href="http://numpy.scipy.org/">NumPy</a> arrays
+will be created and show how you can easily work with them or create some charts
+using <a class="reference external" href="http://matplotlib.sourceforge.net/">Matplotlib</a>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">random</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">array</span><span class="p">,</span> <span class="n">float64</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">SimPy.Simulation</span> <span class="kn">import</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">Process</span><span class="p">,</span> <span class="n">hold</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">Collector</span><span class="p">,</span> <span class="n">get</span><span class="p">,</span> <span class="n">manual</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">MyProc</span><span class="p">(</span><span class="n">Process</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sim</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">Process</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sim</span><span class="o">=</span><span class="n">sim</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">...</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">(</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;time&#39;</span><span class="p">,</span> <span class="n">sim</span><span class="o">.</span><span class="n">now</span><span class="p">),</span>
+<span class="gp">... </span>            <span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;a&#39;</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">),</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;diff&#39;</span><span class="p">,</span> <span class="n">manual</span><span class="p">),</span>
+<span class="gp">... </span>            <span class="p">(</span><span class="s">&#39;square&#39;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">**</span> <span class="mi">2</span><span class="p">),</span>
+<span class="gp">... </span>        <span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+<span class="gp">... </span>            <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">... </span>            <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">... </span>            <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="p">(</span><span class="n">diff</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">c</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">... </span>            <span class="k">yield</span> <span class="n">hold</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Run the simulation</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sim</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">proc</span> <span class="o">=</span> <span class="n">MyProc</span><span class="p">(</span><span class="n">sim</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sim</span><span class="o">.</span><span class="n">activate</span><span class="p">(</span><span class="n">proc</span><span class="p">,</span> <span class="n">proc</span><span class="o">.</span><span class="n">run</span><span class="p">())</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sim</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">until</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="go">&#39;SimPy: Normal exit&#39;</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># NumPy helps you with the statistics and other calculations.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Note: specification of dtype gives you a massive speed-up!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">a</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">float64</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># NumPy: average, std. deviation, variance</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;a stats:&#39;</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">a</span><span class="o">.</span><span class="n">std</span><span class="p">(),</span> <span class="n">a</span><span class="o">.</span><span class="n">var</span><span class="p">()</span>
+<span class="go">a stats: 2.04867732762 0.947900129333 0.898514655189</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># This one creates a multi-dimensional array</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np_mon</span> <span class="o">=</span> <span class="n">array</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">monitor</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">float64</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Get the average of all monitored proc.b</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;b stats:&#39;</span><span class="p">,</span> <span class="n">np_mon</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="go">b stats: 5.57142857143</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Get the std. deviation of all monitored proc.c</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;c stats:&#39;</span><span class="p">,</span> <span class="n">np_mon</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+<span class="go">c stats: 3.09047252183</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Matplotlib plots your data:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Either directly from a monitor ...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">proc</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">a</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># ... or the NumPy array</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np_mon</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np_mon</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s">&#39;r&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="one-collector-for-multiple-processes">
+<h2>One collector for multiple processes<a class="headerlink" href="#one-collector-for-multiple-processes" title="Permalink to this headline">¶</a></h2>
+<p>This example shows a very simple process whose PEM will be executed each time
+step. This enables us to use one collector instance to monitor the attribute
+<tt class="docutils literal"><span class="pre">a</span></tt> of all processes and the simulation time.</p>
+<p>We also use SimPy’s brand-new <tt class="xref docutils literal"><span class="pre">peek()</span></tt> and
+<tt class="xref docutils literal"><span class="pre">step()</span></tt> methods here which will be introduced
+with version 2.1.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">SimPy.Simulation</span> <span class="kn">import</span> <span class="n">Simulation</span><span class="p">,</span> <span class="n">Process</span><span class="p">,</span> <span class="n">hold</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">collectors</span> <span class="kn">import</span> <span class="n">Collector</span><span class="p">,</span> <span class="n">get_objects</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">MyProc</span><span class="p">(</span><span class="n">Process</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="sd">&quot;&quot;&quot;docstring for MyProc2&quot;&quot;&quot;</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sim</span><span class="p">,</span> <span class="n">pid</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">Process</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sim</span><span class="o">=</span><span class="n">sim</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_pid</span> <span class="o">=</span> <span class="s">&#39;p</span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">pid</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">...</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">+=</span> <span class="mi">1</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sim</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">procs</span> <span class="o">=</span> <span class="p">[</span><span class="n">MyProc</span><span class="p">(</span><span class="n">sim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">proc</span> <span class="ow">in</span> <span class="n">procs</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">sim</span><span class="o">.</span><span class="n">activate</span><span class="p">(</span><span class="n">proc</span><span class="p">,</span> <span class="n">proc</span><span class="o">.</span><span class="n">run</span><span class="p">())</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># This coll. will have the attributes &quot;t&quot;, &quot;p0_a&quot;, &quot;p1_a&quot;, ..., &quot;p9_a&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># and monitor the simulation time as well as the values of &quot;a&quot; for each</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># process.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">monitor</span> <span class="o">=</span> <span class="n">Collector</span><span class="p">((</span><span class="s">&#39;t&#39;</span><span class="p">,</span> <span class="n">sim</span><span class="o">.</span><span class="n">now</span><span class="p">),</span> <span class="n">get_objects</span><span class="p">(</span><span class="n">procs</span><span class="p">,</span> <span class="s">&#39;pid&#39;</span><span class="p">,</span> <span class="s">&#39;a&#39;</span><span class="p">))</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Run the simulation by using the band-new &quot;peek()&quot; and &quot;step()&quot;.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">while</span> <span class="n">sim</span><span class="o">.</span><span class="n">peek</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">sim</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">monitor</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">How to use <em>Collectors</em> with <em>SimPy</em></a><ul>
+<li><a class="reference external" href="#one-collector-per-process">One collector per process</a></li>
+<li><a class="reference external" href="#one-collector-for-multiple-processes">One collector for multiple processes</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="storages.html"
+                                  title="previous chapter">How to use the storage backends</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="ref/index.html"
+                                  title="next chapter">API-Reference</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/simpy.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="modindex.html" title="Global Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="ref/index.html" title="API-Reference"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="storages.html" title="How to use the storage backends"
+             >previous</a> |</li>
+        <li><a href="index.html">Collectors v0.2 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2010, Stefan Scherfke and Ontje Lünsdorf.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.3.
+    </div>
+  </body>
+</html>
