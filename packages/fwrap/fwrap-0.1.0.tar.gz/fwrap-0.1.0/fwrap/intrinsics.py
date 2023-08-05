@@ -1,0 +1,164 @@
+#------------------------------------------------------------------------------
+# Copyright (c) 2010, Kurt W. Smith
+# 
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 
+#     * Redistributions of source code must retain the above copyright notice,
+#       this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the Fwrap project nor the names of its contributors
+#       may be used to endorse or promote products derived from this software
+#       without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#------------------------------------------------------------------------------
+
+intrinsics = """\
+ABS
+ACHAR
+ACOS
+ADJUSTL
+ADJUSTR
+AIMAG
+AINT
+ALL
+ALLOCATED
+ANINT
+ANY
+ASIN
+ASSOCIATED
+ATAN
+ATAN2
+BIT_SIZE
+BTEST
+CEILING
+CHAR
+CHARACTER
+CMPLX
+COMMAND_ARGUMENT_COUNT
+COMPLEX
+CONJG
+COS
+COSH
+COUNT
+CPU_TIME
+CSHIFT
+DATE_AND_TIME
+DBLE
+DIGITS
+DIM
+DOT_PRODUCT
+DPROD
+EOSHIFT
+EPSILON
+EXP
+EXPONENT
+EXTENDS
+FLOOR
+FRACTION
+GET_COMMAND
+GET_COMMAND_ARGUMENT
+GET_ENVIRONMENT_VARIABLE
+HUGE
+IACHAR
+IAND
+IBCLR
+IBITS
+IBSET
+ICHAR
+IEOR
+INDEX
+INT
+INTEGER
+IOR
+ISHFT
+ISHFTC
+IS_IOSTAT_END
+IS_IOSTAT_EOR
+KIND
+LBOUND
+LEN
+LEN_TRIM
+LGE
+LGT
+LLE
+LLT
+LOG
+LOG10
+LOGICAL
+MATMUL
+MAX
+MAXEXPONENT
+MAXLOC
+MAXVAL
+MERGE
+MIN
+MINEXPONENT
+MINLOC
+MINVAL
+MOD
+MODULO
+MOVE_ALLOC
+MVBITS
+NEAREST
+NEW_LINE
+NINT
+NOT
+NULL
+PACK
+PRECISION
+PRESENT
+PRODUCT
+RADIX
+RANDOM_NUMBER
+RANDOM_SEED
+RANGE
+REAL
+REPEAT
+RESHAPE
+RRSPACING
+SAME_TYPE_AS
+SCALE
+SCAN
+SELECTED_CHAR_KIND
+SELECTED_INT_KIND
+SELECTED_REAL_KIND
+SET
+SHAPE
+SIGN
+SIN
+SINH
+SIZE
+SPACING
+SPREAD
+SQRT
+SUM
+SYSTEM_CLOCK
+TAN
+TANH
+TINY
+TRANSFER
+TRANSPOSE
+TRIM
+UBOUND
+UNPACK
+VERIFY\
+"""
+
+intrinsics = set(intrinsics.split('\n'))
+intrinsics = set([intrins.lower() for intrins in intrinsics])
