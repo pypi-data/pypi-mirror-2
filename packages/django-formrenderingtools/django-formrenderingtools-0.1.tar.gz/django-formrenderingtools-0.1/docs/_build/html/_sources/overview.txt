@@ -1,0 +1,190 @@
+########
+Overview
+########
+
+This Django application provides tools for the web designer to customize 
+the rendering of forms in templates.
+
+**************************************************
+The problem: rendering forms with Django is boring
+**************************************************
+
+For an introduction to Django forms, see the `Django documentation about forms 
+<http://docs.djangoproject.com/en/dev/ref/forms/>`_.
+
+The following section will point out some limitations of the Django's standard 
+way to display forms in templates. Here is a short list of common problems:
+
+* how to add CSS classes to the form elements?
+* how to display the fields in a different order than specified in the form's
+  python class definition?
+* how to display only a subset of the form? How to display fieldsets?
+* how to customize only a few fields in the form?
+
+If you are already aware of these problems, you can read about
+:ref:`the form_layouts template tag library <form_layouts_overview>` in the next 
+section.
+
+Otherwise, let's begin by considering the following Django form:
+
+.. code-block:: python
+
+  from django import forms
+
+  class ContactForm(forms.Form):
+      subject = forms.CharField(max_length=100)
+      message = forms.CharField()
+      sender = forms.EmailField()
+      cc_myself = forms.BooleanField(required=False)
+
+Django's standard way to render forms is to use the form.as_p() method or
+similar:
+
+.. code-block:: django
+
+  {{ my_form.as_p }}
+
+You get something like this:
+
+.. code-block:: html
+
+  <p>
+    <label for="id_subject">Subject:</label>
+    <input id="id_subject" type="text" name="subject" maxlength="100" />
+  </p>
+  <p>
+    <label for="id_message">Message:</label>
+    <input type="text" name="message" id="id_message" />
+  </p>
+  <p>
+    <label for="id_sender">Sender:</label>
+    <input type="text" name="sender" id="id_sender" />
+  </p>
+  <p>
+    <label for="id_cc_myself">Cc myself:</label>
+    <input type="checkbox" name="cc_myself" id="id_cc_myself" />
+  </p>
+
+Seems magic...
+HTML output is fully controlled by Python scripts. This is efficient, but the 
+template designer does not have control on it. This does not participate to 
+the separation of logic from design.
+
+Now, what if the template designer wants to add a "required" CSS class attribute 
+to the required fields in a form? He has to write code by hand.
+As explained in the the `Django documentation about form templates
+<http://docs.djangoproject.com/en/dev/topics/forms/#customizing-the-form-template>`_,
+you can write a loop:
+
+.. code-block:: django
+
+  {% for field in form %}
+  <div class="fieldWrapper{% if field.field.required %} required{% endif %}">
+    {{ field.errors }}
+    {{ field.label_tag }}: {{ field }}
+  </div>
+  {% endfor %}
+
+Now what if the template designer want to customize only one field in the form?
+He has to write down the complete form. Here is an example where subject's
+help text is displayed before field, and message help text is displayed after
+field:
+
+.. code-block:: django
+
+  <div class="fieldWrapper">
+    {{ form.subject.errors }}
+    <label for="id_subject">E-mail subject:</label>
+    <p class="help">{{ form.subject.help_text }}</p>
+    {{ form.subject }}
+  </div>
+  <div class="fieldWrapper">
+    {{ form.message.errors }}
+    <label for="id_message">Your message:</label>
+    {{ form.message }}
+    <p class="help">{{ form.message.help_text }}</p>
+  </div>
+  <div class="fieldWrapper">
+    {{ form.sender.errors }}
+    <label for="id_sender">Your email address:</label>
+    {{ form.sender }}
+  </div>
+  <div class="fieldWrapper">
+    {{ form.cc_myself.errors }}
+    <label for="id_cc_myself">CC yourself?</label>
+    {{ form.cc_myself }}
+  </div>
+
+And what if you want to customize many fields in many forms? Then it gets really
+boring, isn't it?
+
+The `Django documentation about reusable form templates
+<http://docs.djangoproject.com/en/dev/topics/forms/#reusable-form-templates>`_
+says::
+
+  If you find yourself doing this often, you might consider creating a custom 
+  inclusion tag.
+
+So, here comes django-formrenderingtools.
+This application uses templates to render forms, wherever it is possible.
+Default templates can be reused, and specific templates can be created if 
+necessary.
+
+.. _form_layouts_overview:
+
+***************************************************
+A solution: the "form_layouts" template tag library
+***************************************************
+
+Consider the form used in the previous section.
+
+Here is how you can use django-formrenderingtools to display it:
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  {% form form=form %}
+
+Have a look at the templates in formrenderingtools/templates/form_layouts/ and
+you will see what templates are used to render the form.
+
+Now, if you want to customize the "subject" field, create a template called
+/form_layouts/contact/fields/subject.html.
+You may copy the default field template for this purpose:
+
+.. code-block:: bash
+  
+  $ cd /path/to/your/template/dir
+  $ mkdir form_layouts
+  $ mkdir form_layouts/contact
+  $ mkdir form_layouts/contact/fields
+  $ cp /path/to/formrenderingtools/templates/form_layouts/default/fields/default.html form_layouts/contact/fields/subject.html
+
+Then you can edit the template and customize it as you want.
+
+By doing this, you have created a "contact" form layout (the directory name).
+So the new template code is:
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  {% form form=form layout="contact" %}
+
+That's all.
+
+Notice that the template name is important. If the template does not have
+the "good" name, then the template tag will not be able to find it.
+
+Have a look on the "formrenderingtools/templates/form_layouts/default/"
+directory to get the default templates used by the "form_layouts" 
+template tags.
+
+You can customize more fields, forms, labels by creating templates.
+
+You can reuse the "contact" form layout for other forms.
+
+You can override the default form layout so that it uses your own best
+practices.
+
+Learn more by reading the :doc:`/reference/index` and :doc:`/examples/index` 
+sections of this documentation.

@@ -1,0 +1,228 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Tutorial &mdash; django-formrenderingtools v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="django-formrenderingtools v0.1 documentation" href="index.html" />
+    <link rel="next" title="Reference" href="reference/index.html" />
+    <link rel="prev" title="Installation" href="install.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="reference/index.html" title="Reference"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="install.html" title="Installation"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">django-formrenderingtools v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
+<p>Here is a step-by-step recipe to start working with django-formrenderingtools.</p>
+<div class="section" id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>You have a Django project</li>
+<li>You have installed the django-formrenderingtools application in your project.
+See <a class="reference external" href="./install.html">installation instructions</a> if necessary.</li>
+</ul>
+</div>
+<div class="section" id="python-code-create-a-form">
+<h2>Python code: create a form<a class="headerlink" href="#python-code-create-a-form" title="Permalink to this headline">¶</a></h2>
+<p>In Python code, do as always: create a form class, use it in a view and pass
+it to a template as a template context variable.</p>
+<div class="section" id="a-form">
+<h3>A form<a class="headerlink" href="#a-form" title="Permalink to this headline">¶</a></h3>
+<p>In the examples below, we will use the following form class:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django</span> <span class="kn">import</span> <span class="n">forms</span>
+
+<span class="k">class</span> <span class="nc">ContactForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A sample form, for use in test cases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">subject</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span>
+        <span class="n">label</span><span class="o">=</span><span class="s">&#39;Subject&#39;</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="o">=</span><span class="mf">100</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">()</span>
+    <span class="n">sender</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">EmailField</span><span class="p">()</span>
+    <span class="n">cc_myself</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">BooleanField</span><span class="p">(</span>
+        <span class="n">required</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+        <span class="n">help_text</span><span class="o">=</span><span class="s">&#39;Send a copy of the message to the sender.&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;This sample form never validates!&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="n">forms</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">(</span><span class="s">&#39;Sorry, but this sample form never validates!&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is a quite simple form. If you call is_valid(), then a &#8220;non field error&#8221;
+is always generated.</p>
+</div>
+<div class="section" id="a-view">
+<h3>A view<a class="headerlink" href="#a-view" title="Permalink to this headline">¶</a></h3>
+<p>In the examples below, we suppose you use the form in a view that looks like
+the following:</p>
+<div class="highlight-python"><pre>from django.shortcuts import render_to_response
+from django.template import RequestContext
+
+def my_view(request):
+        if not request.method == 'POST':
+                form = ContactForm()
+        else:
+            form = ContactForm(request.POST)
+    template_data = {'my_form': form}
+    render_to_response('my_template.html',
+                                       template_data,
+                                       context_instance=RequestContext(request))</pre>
+</div>
+<p>Do not forget to add the view in your URL conf.</p>
+</div>
+</div>
+<div class="section" id="template-code">
+<h2>Template code<a class="headerlink" href="#template-code" title="Permalink to this headline">¶</a></h2>
+<p>You can test your view and template by rendering the form the old way.</p>
+<p>Here is what you may used to write in my_template.html:</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="x">&lt;form action=&quot;./&quot; method=&quot;post&quot;&gt;</span>
+<span class="x">  </span><span class="cp">{{</span> <span class="nv">form.as_p</span> <span class="cp">}}</span><span class="x"></span>
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+<p>Here is the code required to start using django-formrenderingtools, so replace
+the previous template code by the following:</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="cp">{%</span> <span class="k">load</span> <span class="nv">form_layouts</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">&lt;form action=&quot;./&quot; method=&quot;post&quot;&gt;</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">my_form</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="to-be-continued">
+<h2>To be continued...<a class="headerlink" href="#to-be-continued" title="Permalink to this headline">¶</a></h2>
+<p>Unfortunately this tutorial is not complete yet.</p>
+<p>However, here are some additional notes:</p>
+<ul class="simple">
+<li>in Python code, do as always: create a form class, use it in a view and pass
+it to a template as a template context variable</li>
+<li>load the &#8220;form_layouts&#8221; template tag library in your template with
+{% load form_layouts %}</li>
+<li>insert your form in template with {% form form=your_form_variable %}
+instead of using {{ your_form_variable.as_p }}</li>
+<li>you can test the output and customize CSS. The default layout covers the
+general case.</li>
+<li>if you want more customization, use the &#8220;layout&#8221; parameter:
+{% form form=your_form_variable layout=&#8221;your_layout&#8221; %}</li>
+<li>copy the default form layout folder (defaults to
+/formrenderingtools/templates/form_layouts/default) to a folder of yours and
+rename it &#8220;your_layout&#8221;. You get something like
+&#8220;/your_project_template_dir/templates/form_layouts/your_layout&#8221; which
+contains a   form.html file, a &#8220;fields&#8221; folder and a &#8220;labels&#8221; folder.</li>
+<li>customize the templates in the &#8220;your_layout&#8221; folder</li>
+<li>if you want to customize the layout of a particular field called &#8220;your_field&#8221;,
+then create a specific &#8220;/your_layout/fields/your_field.html&#8221; template.
+You can do the same thing with a label.</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Tutorial</a><ul>
+<li><a class="reference external" href="#prerequisites">Prerequisites</a></li>
+<li><a class="reference external" href="#python-code-create-a-form">Python code: create a form</a><ul>
+<li><a class="reference external" href="#a-form">A form</a></li>
+<li><a class="reference external" href="#a-view">A view</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#template-code">Template code</a></li>
+<li><a class="reference external" href="#to-be-continued">To be continued...</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="install.html"
+                                  title="previous chapter">Installation</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="reference/index.html"
+                                  title="next chapter">Reference</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/tutorial.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="reference/index.html" title="Reference"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="install.html" title="Installation"
+             >previous</a> |</li>
+        <li><a href="index.html">django-formrenderingtools v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2010, Benoit Bryon.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

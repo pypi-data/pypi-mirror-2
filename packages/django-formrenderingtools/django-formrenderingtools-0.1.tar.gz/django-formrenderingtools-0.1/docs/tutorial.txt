@@ -1,0 +1,128 @@
+########
+Tutorial
+########
+
+Here is a step-by-step recipe to start working with django-formrenderingtools.
+
+*************
+Prerequisites
+*************
+
+* You have a Django project
+* You have installed the django-formrenderingtools application in your project.
+  See `installation instructions <./install.html>`_ if necessary.
+
+**************************
+Python code: create a form
+**************************
+
+In Python code, do as always: create a form class, use it in a view and pass 
+it to a template as a template context variable.
+
+A form
+======
+
+In the examples below, we will use the following form class:
+
+.. code-block:: python
+
+  from django import forms
+  
+  class ContactForm(forms.Form):
+      """
+      A sample form, for use in test cases.
+      """
+      subject = forms.CharField(
+          label='Subject',
+          max_length=100,
+      )
+      message = forms.CharField()
+      sender = forms.EmailField()
+      cc_myself = forms.BooleanField(
+          required=False,
+          help_text='Send a copy of the message to the sender.',
+      )
+    
+      def clean(self):
+          """This sample form never validates!"""
+          raise forms.ValidationError('Sorry, but this sample form never validates!')
+
+This is a quite simple form. If you call is_valid(), then a "non field error"
+is always generated.
+
+A view
+======
+
+In the examples below, we suppose you use the form in a view that looks like 
+the following:
+
+.. code-block:: python
+
+  from django.shortcuts import render_to_response
+  from django.template import RequestContext
+
+  def my_view(request):
+  	  if not request.method == 'POST':
+	  	  form = ContactForm()
+	  else:
+	      form = ContactForm(request.POST)
+      template_data = {'my_form': form}
+      render_to_response('my_template.html',
+      					 template_data,
+      					 context_instance=RequestContext(request))
+
+Do not forget to add the view in your URL conf.
+
+*************
+Template code
+*************
+
+You can test your view and template by rendering the form the old way.
+
+Here is what you may used to write in my_template.html:
+
+.. code-block:: django
+
+  <form action="./" method="post">
+    {{ form.as_p }}
+    <input type="submit">
+  </form>
+
+Here is the code required to start using django-formrenderingtools, so replace
+the previous template code by the following:
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  <form action="./" method="post">
+    {% form form=my_form %}
+    <input type="submit">
+  </form>
+
+******************
+To be continued...
+******************
+
+Unfortunately this tutorial is not complete yet.
+
+However, here are some additional notes:
+
+* in Python code, do as always: create a form class, use it in a view and pass 
+  it to a template as a template context variable
+* load the "form_layouts" template tag library in your template with
+  {% load form_layouts %}
+* insert your form in template with {% form form=your_form_variable %}
+  instead of using {{ your_form_variable.as_p }}
+* you can test the output and customize CSS. The default layout covers the
+  general case.
+* if you want more customization, use the "layout" parameter:
+  {% form form=your_form_variable layout="your_layout" %}
+* copy the default form layout folder (defaults to 
+  /formrenderingtools/templates/form_layouts/default) to a folder of yours and 
+  rename it "your_layout". You get something like 
+  "/your_project_template_dir/templates/form_layouts/your_layout" which 
+  contains a   form.html file, a "fields" folder and a "labels" folder.
+* customize the templates in the "your_layout" folder
+* if you want to customize the layout of a particular field called "your_field",
+  then create a specific "/your_layout/fields/your_field.html" template.
+  You can do the same thing with a label.

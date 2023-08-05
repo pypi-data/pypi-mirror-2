@@ -1,0 +1,346 @@
+##################
+{% form %} example
+##################
+
+The examples below are valid if you do not change the 
+FORMRENDERINGTOOLS_TEMPLATE_DIR setting and do not override the "default"
+layout. If you make some changes, you will get results reflecting the changes!
+
+Examples are taken from formrenderingtools.tests.FormLayoutsTestCase.
+
+***************
+The sample form
+***************
+
+The examples below use the following form definition:
+
+.. code-block:: python
+
+  from django import forms
+  
+  class ContactForm(forms.Form):
+      """
+      A sample form, for use in test cases.
+      """
+      subject = forms.CharField(
+          label='Subject',
+          max_length=100,
+      )
+      message = forms.CharField()
+      sender = forms.EmailField()
+      cc_myself = forms.BooleanField(
+          required=False,
+          help_text='Send a copy of the message to the sender.',
+      )
+    
+      def clean(self):
+          """This sample form never validates!"""
+          raise forms.ValidationError('Sorry, but this sample form never validates!')
+
+This is a quite simple form. If you call is_valid(), then a "non field error"
+is always generated. 
+
+************************************
+The default layout with a valid form
+************************************
+
+This example demonstrates the use of {% form %} with a valid form and
+the default layout.
+
+Python code
+===========
+
+Let's
+
+* instanciate the form (no validation)
+* render it through "my_template.html"
+
+.. code-block:: python
+
+  from django.template.loader import render_to_string
+  
+  default_form = ContactForm() # an empty form, no validation
+  context = {'default_form': default_form}
+  print render_to_string('my_template.html', context)
+
+Template code
+=============
+
+Here is the code of "my_template.html".
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  <form>
+    {% form form=default_form %}
+    <input type="submit">
+  </form>
+
+Output
+======
+
+Here is the generated output (there could be whitespace differences).
+
+.. code-block:: html
+
+  <form>
+    <div class="formItem required subject">
+      <label for="id_subject" class=" required">Subject</label>
+      <input id="id_subject" type="text" name="subject" maxlength="100" />
+    </div>
+    
+    <div class="formItem required message">
+      <label for="id_message" class=" required">Message</label>
+      <input type="text" name="message" id="id_message" />
+    </div>
+    
+    <div class="formItem required sender">
+      <label for="id_sender" class=" required">Sender</label>
+      <input type="text" name="sender" id="id_sender" />
+    </div>
+    
+    <div class="formItem cc_myself">
+      <label for="id_cc_myself" class="">Cc myself</label>
+      <input type="checkbox" name="cc_myself" id="id_cc_myself" />
+      <p class="help">Send a copy of the message to the sender.</p>
+    </div>
+    
+    <input type="submit">
+  </form>
+
+***************************************
+The default layout with an invalid form
+***************************************
+
+This example demonstrates the use of {% form %} with an invalid form and
+the default layout. So there will be error messages.
+
+Python code
+===========
+
+Let's
+
+* instanciate the form with validation
+* render it through "my_template.html"
+
+.. code-block:: python
+
+  from django.template.loader import render_to_string
+  
+  error_form = ContactForm({}) # the same form, with validation (invalid form)
+  context = {'error_form': error_form}
+  print render_to_string('my_template.html', context)
+
+Template code
+=============
+
+Here is the code of "my_template.html".
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  <form>
+    {% form form=error_form %}
+    <input type="submit">
+  </form>
+
+Output
+======
+
+Here is the generated output (there could be whitespace differences).
+
+.. code-block:: html
+
+  <form>
+    <div class="nonFieldErrors">
+      <ul class="errorlist">
+        <li>Sorry, but this sample form never validates!</li>
+      </ul>
+    </div>
+  
+    <div class="formItem hasErrors required subject">
+      <ul class="errorlist">
+        <li>This field is required.</li>
+      </ul>
+      <label for="id_subject" class=" required">Subject</label>
+      <input id="id_subject" type="text" name="subject" maxlength="100" />
+    </div>
+    
+    <div class="formItem hasErrors required message">
+      <ul class="errorlist">
+        <li>This field is required.</li>
+      </ul>
+      <label for="id_message" class=" required">Message</label>
+      <input type="text" name="message" id="id_message" />
+    </div>
+    
+    <div class="formItem hasErrors required sender">
+      <ul class="errorlist">
+        <li>This field is required.</li>
+      </ul>
+      <label for="id_sender" class=" required">Sender</label>
+      <input type="text" name="sender" id="id_sender" />
+    </div>
+    
+    <div class="formItem cc_myself">
+      <label for="id_cc_myself" class="">Cc myself</label>
+      <input type="checkbox" name="cc_myself" id="id_cc_myself" />
+      <p class="help">Send a copy of the message to the sender.</p>
+    </div>
+    
+    <input type="submit">
+  </form>
+
+***********************
+Using an invalid layout
+***********************
+
+The example below demonstrates that if you specify a layout that does not exist,
+then the {% form %} template tag is not able to load it, and finally 
+fallbacks to the default layout.
+
+Python code
+===========
+
+The code is the same as in the first example.
+
+.. code-block:: python
+
+  from django.template.loader import render_to_string
+  
+  default_form = ContactForm() # an empty form, no validation
+  context = {'default_form': default_form}
+  print render_to_string('my_template.html', context)
+
+Template code
+=============
+
+Here is the code of "my_template.html". Let's use a layout which does not 
+exist.
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  <form>
+    {% form form=default_form layout="a_layout_which_does_not_exist" %}
+    <input type="submit">
+  </form>
+
+Output
+======
+
+Here is the generated output. It is the same as in the first example, since the
+default layout has been used.
+
+.. code-block:: html
+
+  <form>
+    <div class="formItem required subject">
+      <label for="id_subject" class=" required">Subject</label>
+      <input id="id_subject" type="text" name="subject" maxlength="100" />
+    </div>
+    
+    <div class="formItem required message">
+      <label for="id_message" class=" required">Message</label>
+      <input type="text" name="message" id="id_message" />
+    </div>
+    
+    <div class="formItem required sender">
+      <label for="id_sender" class=" required">Sender</label>
+      <input type="text" name="sender" id="id_sender" />
+    </div>
+    
+    <div class="formItem cc_myself">
+      <label for="id_cc_myself" class="">Cc myself</label>
+      <input type="checkbox" name="cc_myself" id="id_cc_myself" />
+      <p class="help">Send a copy of the message to the sender.</p>
+    </div>
+    
+    <input type="submit">
+  </form>
+
+**************************************************
+Reordering fields and displaying subsets of fields
+**************************************************
+
+The example below demonstrates how to use the "fields" and "exclude_fields"
+parameters of the {% form %} template tag in order to render subsets of 
+fields and reorder them.
+
+You can combine the "fields" and "exclude_fields" parameters. The latter has
+higher priority (i.e. an excluded field won't be displayed even if in "fields").
+
+Python code
+===========
+
+The code is the same as in the first example.
+
+.. code-block:: python
+
+  from django.template.loader import render_to_string
+  
+  default_form = ContactForm() # an empty form, no validation
+  context = {'default_form': default_form}
+  print render_to_string('my_template.html', context)
+
+Template code
+=============
+
+Here is the code of "my_template.html". Let's display the form in two fieldsets.
+
+.. code-block:: django
+
+  {% load form_layouts %}
+  <form>
+    <fieldset>
+      <legend>First subset of fields: not message nor sender</legend>
+      {% form form=default_form exclude_fields="message,sender" %}
+    </fieldset>
+    
+    <fieldset>
+      <legend>Second subset of fields: sender then message (the order matters)</legend>
+      {% form form=default_form fields="sender,message" %}
+    </fieldset>
+    
+    <input type="submit">
+  </form>
+
+Output
+======
+
+Here is the generated output.
+
+.. code-block:: html
+
+  <form>
+    <fieldset>
+      <legend>First subset of fields: not message nor sender</legend>
+      
+      <div class="formItem required subject">
+        <label for="id_subject" class=" required">Subject</label>
+        <input id="id_subject" type="text" name="subject" maxlength="100" />
+      </div>
+      
+      <div class="formItem cc_myself">
+        <label for="id_cc_myself" class="">Cc myself</label>
+        <input type="checkbox" name="cc_myself" id="id_cc_myself" />
+        <p class="help">Send a copy of the message to the sender.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Second subset of fields: sender then message (the order matters)</legend>
+ 
+      <div class="formItem required sender">
+        <label for="id_sender" class=" required">Sender</label>
+        <input type="text" name="sender" id="id_sender" />
+      </div>
+
+      <div class="formItem required message">
+        <label for="id_message" class=" required">Message</label>
+        <input type="text" name="message" id="id_message" />
+      </div>
+    </fieldset>
+    
+    <input type="submit">
+  </form>

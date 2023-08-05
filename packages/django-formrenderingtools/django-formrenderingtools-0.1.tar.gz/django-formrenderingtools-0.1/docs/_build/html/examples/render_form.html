@@ -1,0 +1,437 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>{% form %} example &mdash; django-formrenderingtools v0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="django-formrenderingtools v0.1 documentation" href="../index.html" />
+    <link rel="up" title="Examples" href="index.html" />
+    <link rel="prev" title="Examples" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Examples"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">django-formrenderingtools v0.1 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Examples</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="form-example">
+<h1>{% form %} example<a class="headerlink" href="#form-example" title="Permalink to this headline">¶</a></h1>
+<p>The examples below are valid if you do not change the
+FORMRENDERINGTOOLS_TEMPLATE_DIR setting and do not override the &#8220;default&#8221;
+layout. If you make some changes, you will get results reflecting the changes!</p>
+<p>Examples are taken from formrenderingtools.tests.FormLayoutsTestCase.</p>
+<div class="section" id="the-sample-form">
+<h2>The sample form<a class="headerlink" href="#the-sample-form" title="Permalink to this headline">¶</a></h2>
+<p>The examples below use the following form definition:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django</span> <span class="kn">import</span> <span class="n">forms</span>
+
+<span class="k">class</span> <span class="nc">ContactForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A sample form, for use in test cases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">subject</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span>
+        <span class="n">label</span><span class="o">=</span><span class="s">&#39;Subject&#39;</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="o">=</span><span class="mf">100</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">()</span>
+    <span class="n">sender</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">EmailField</span><span class="p">()</span>
+    <span class="n">cc_myself</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">BooleanField</span><span class="p">(</span>
+        <span class="n">required</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+        <span class="n">help_text</span><span class="o">=</span><span class="s">&#39;Send a copy of the message to the sender.&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;This sample form never validates!&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="n">forms</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">(</span><span class="s">&#39;Sorry, but this sample form never validates!&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is a quite simple form. If you call is_valid(), then a &#8220;non field error&#8221;
+is always generated.</p>
+</div>
+<div class="section" id="the-default-layout-with-a-valid-form">
+<h2>The default layout with a valid form<a class="headerlink" href="#the-default-layout-with-a-valid-form" title="Permalink to this headline">¶</a></h2>
+<p>This example demonstrates the use of {% form %} with a valid form and
+the default layout.</p>
+<div class="section" id="python-code">
+<h3>Python code<a class="headerlink" href="#python-code" title="Permalink to this headline">¶</a></h3>
+<p>Let&#8217;s</p>
+<ul class="simple">
+<li>instanciate the form (no validation)</li>
+<li>render it through &#8220;my_template.html&#8221;</li>
+</ul>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django.template.loader</span> <span class="kn">import</span> <span class="n">render_to_string</span>
+
+<span class="n">default_form</span> <span class="o">=</span> <span class="n">ContactForm</span><span class="p">()</span> <span class="c"># an empty form, no validation</span>
+<span class="n">context</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;default_form&#39;</span><span class="p">:</span> <span class="n">default_form</span><span class="p">}</span>
+<span class="k">print</span> <span class="n">render_to_string</span><span class="p">(</span><span class="s">&#39;my_template.html&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="template-code">
+<h3>Template code<a class="headerlink" href="#template-code" title="Permalink to this headline">¶</a></h3>
+<p>Here is the code of &#8220;my_template.html&#8221;.</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="cp">{%</span> <span class="k">load</span> <span class="nv">form_layouts</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">&lt;form&gt;</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">default_form</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="output">
+<h3>Output<a class="headerlink" href="#output" title="Permalink to this headline">¶</a></h3>
+<p>Here is the generated output (there could be whitespace differences).</p>
+<div class="highlight-html"><div class="highlight"><pre><span class="nt">&lt;form&gt;</span>
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required subject&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Subject<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;subject&quot;</span> <span class="na">maxlength=</span><span class="s">&quot;100&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required message&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_message&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Message<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;message&quot;</span> <span class="na">id=</span><span class="s">&quot;id_message&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required sender&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_sender&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Sender<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;sender&quot;</span> <span class="na">id=</span><span class="s">&quot;id_sender&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem cc_myself&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="na">class=</span><span class="s">&quot;&quot;</span><span class="nt">&gt;</span>Cc myself<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;checkbox&quot;</span> <span class="na">name=</span><span class="s">&quot;cc_myself&quot;</span> <span class="na">id=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;help&quot;</span><span class="nt">&gt;</span>Send a copy of the message to the sender.<span class="nt">&lt;/p&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;submit&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="the-default-layout-with-an-invalid-form">
+<h2>The default layout with an invalid form<a class="headerlink" href="#the-default-layout-with-an-invalid-form" title="Permalink to this headline">¶</a></h2>
+<p>This example demonstrates the use of {% form %} with an invalid form and
+the default layout. So there will be error messages.</p>
+<div class="section" id="id1">
+<h3>Python code<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>Let&#8217;s</p>
+<ul class="simple">
+<li>instanciate the form with validation</li>
+<li>render it through &#8220;my_template.html&#8221;</li>
+</ul>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django.template.loader</span> <span class="kn">import</span> <span class="n">render_to_string</span>
+
+<span class="n">error_form</span> <span class="o">=</span> <span class="n">ContactForm</span><span class="p">({})</span> <span class="c"># the same form, with validation (invalid form)</span>
+<span class="n">context</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;error_form&#39;</span><span class="p">:</span> <span class="n">error_form</span><span class="p">}</span>
+<span class="k">print</span> <span class="n">render_to_string</span><span class="p">(</span><span class="s">&#39;my_template.html&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id2">
+<h3>Template code<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<p>Here is the code of &#8220;my_template.html&#8221;.</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="cp">{%</span> <span class="k">load</span> <span class="nv">form_layouts</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">&lt;form&gt;</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">error_form</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h3>Output<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<p>Here is the generated output (there could be whitespace differences).</p>
+<div class="highlight-html"><div class="highlight"><pre><span class="nt">&lt;form&gt;</span>
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;nonFieldErrors&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;ul</span> <span class="na">class=</span><span class="s">&quot;errorlist&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;li&gt;</span>Sorry, but this sample form never validates!<span class="nt">&lt;/li&gt;</span>
+    <span class="nt">&lt;/ul&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem hasErrors required subject&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;ul</span> <span class="na">class=</span><span class="s">&quot;errorlist&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;li&gt;</span>This field is required.<span class="nt">&lt;/li&gt;</span>
+    <span class="nt">&lt;/ul&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Subject<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;subject&quot;</span> <span class="na">maxlength=</span><span class="s">&quot;100&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem hasErrors required message&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;ul</span> <span class="na">class=</span><span class="s">&quot;errorlist&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;li&gt;</span>This field is required.<span class="nt">&lt;/li&gt;</span>
+    <span class="nt">&lt;/ul&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_message&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Message<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;message&quot;</span> <span class="na">id=</span><span class="s">&quot;id_message&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem hasErrors required sender&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;ul</span> <span class="na">class=</span><span class="s">&quot;errorlist&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;li&gt;</span>This field is required.<span class="nt">&lt;/li&gt;</span>
+    <span class="nt">&lt;/ul&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_sender&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Sender<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;sender&quot;</span> <span class="na">id=</span><span class="s">&quot;id_sender&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem cc_myself&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="na">class=</span><span class="s">&quot;&quot;</span><span class="nt">&gt;</span>Cc myself<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;checkbox&quot;</span> <span class="na">name=</span><span class="s">&quot;cc_myself&quot;</span> <span class="na">id=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;help&quot;</span><span class="nt">&gt;</span>Send a copy of the message to the sender.<span class="nt">&lt;/p&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;submit&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="using-an-invalid-layout">
+<h2>Using an invalid layout<a class="headerlink" href="#using-an-invalid-layout" title="Permalink to this headline">¶</a></h2>
+<p>The example below demonstrates that if you specify a layout that does not exist,
+then the {% form %} template tag is not able to load it, and finally
+fallbacks to the default layout.</p>
+<div class="section" id="id4">
+<h3>Python code<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<p>The code is the same as in the first example.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django.template.loader</span> <span class="kn">import</span> <span class="n">render_to_string</span>
+
+<span class="n">default_form</span> <span class="o">=</span> <span class="n">ContactForm</span><span class="p">()</span> <span class="c"># an empty form, no validation</span>
+<span class="n">context</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;default_form&#39;</span><span class="p">:</span> <span class="n">default_form</span><span class="p">}</span>
+<span class="k">print</span> <span class="n">render_to_string</span><span class="p">(</span><span class="s">&#39;my_template.html&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id5">
+<h3>Template code<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<p>Here is the code of &#8220;my_template.html&#8221;. Let&#8217;s use a layout which does not
+exist.</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="cp">{%</span> <span class="k">load</span> <span class="nv">form_layouts</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">&lt;form&gt;</span>
+<span class="x">  </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">default_form</span> <span class="nv">layout</span><span class="o">=</span><span class="s2">&quot;a_layout_which_does_not_exist&quot;</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id6">
+<h3>Output<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<p>Here is the generated output. It is the same as in the first example, since the
+default layout has been used.</p>
+<div class="highlight-html"><div class="highlight"><pre><span class="nt">&lt;form&gt;</span>
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required subject&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Subject<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;subject&quot;</span> <span class="na">maxlength=</span><span class="s">&quot;100&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required message&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_message&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Message<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;message&quot;</span> <span class="na">id=</span><span class="s">&quot;id_message&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required sender&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_sender&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Sender<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;sender&quot;</span> <span class="na">id=</span><span class="s">&quot;id_sender&quot;</span> <span class="nt">/&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem cc_myself&quot;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="na">class=</span><span class="s">&quot;&quot;</span><span class="nt">&gt;</span>Cc myself<span class="nt">&lt;/label&gt;</span>
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;checkbox&quot;</span> <span class="na">name=</span><span class="s">&quot;cc_myself&quot;</span> <span class="na">id=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;help&quot;</span><span class="nt">&gt;</span>Send a copy of the message to the sender.<span class="nt">&lt;/p&gt;</span>
+  <span class="nt">&lt;/div&gt;</span>
+
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;submit&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="reordering-fields-and-displaying-subsets-of-fields">
+<h2>Reordering fields and displaying subsets of fields<a class="headerlink" href="#reordering-fields-and-displaying-subsets-of-fields" title="Permalink to this headline">¶</a></h2>
+<p>The example below demonstrates how to use the &#8220;fields&#8221; and &#8220;exclude_fields&#8221;
+parameters of the {% form %} template tag in order to render subsets of
+fields and reorder them.</p>
+<p>You can combine the &#8220;fields&#8221; and &#8220;exclude_fields&#8221; parameters. The latter has
+higher priority (i.e. an excluded field won&#8217;t be displayed even if in &#8220;fields&#8221;).</p>
+<div class="section" id="id7">
+<h3>Python code<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<p>The code is the same as in the first example.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">django.template.loader</span> <span class="kn">import</span> <span class="n">render_to_string</span>
+
+<span class="n">default_form</span> <span class="o">=</span> <span class="n">ContactForm</span><span class="p">()</span> <span class="c"># an empty form, no validation</span>
+<span class="n">context</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;default_form&#39;</span><span class="p">:</span> <span class="n">default_form</span><span class="p">}</span>
+<span class="k">print</span> <span class="n">render_to_string</span><span class="p">(</span><span class="s">&#39;my_template.html&#39;</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id8">
+<h3>Template code<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<p>Here is the code of &#8220;my_template.html&#8221;. Let&#8217;s display the form in two fieldsets.</p>
+<div class="highlight-django"><div class="highlight"><pre><span class="cp">{%</span> <span class="k">load</span> <span class="nv">form_layouts</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">&lt;form&gt;</span>
+<span class="x">  &lt;fieldset&gt;</span>
+<span class="x">    &lt;legend&gt;First subset of fields: not message nor sender&lt;/legend&gt;</span>
+<span class="x">    </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">default_form</span> <span class="nv">exclude_fields</span><span class="o">=</span><span class="s2">&quot;message,sender&quot;</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;/fieldset&gt;</span>
+
+<span class="x">  &lt;fieldset&gt;</span>
+<span class="x">    &lt;legend&gt;Second subset of fields: sender then message (the order matters)&lt;/legend&gt;</span>
+<span class="x">    </span><span class="cp">{%</span> <span class="k">form</span> <span class="nv">form</span><span class="o">=</span><span class="nv">default_form</span> <span class="nv">fields</span><span class="o">=</span><span class="s2">&quot;sender,message&quot;</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x">  &lt;/fieldset&gt;</span>
+
+<span class="x">  &lt;input type=&quot;submit&quot;&gt;</span>
+<span class="x">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id9">
+<h3>Output<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<p>Here is the generated output.</p>
+<div class="highlight-html"><div class="highlight"><pre><span class="nt">&lt;form&gt;</span>
+  <span class="nt">&lt;fieldset&gt;</span>
+    <span class="nt">&lt;legend&gt;</span>First subset of fields: not message nor sender<span class="nt">&lt;/legend&gt;</span>
+
+    <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required subject&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Subject<span class="nt">&lt;/label&gt;</span>
+      <span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">&quot;id_subject&quot;</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;subject&quot;</span> <span class="na">maxlength=</span><span class="s">&quot;100&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;/div&gt;</span>
+
+    <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem cc_myself&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="na">class=</span><span class="s">&quot;&quot;</span><span class="nt">&gt;</span>Cc myself<span class="nt">&lt;/label&gt;</span>
+      <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;checkbox&quot;</span> <span class="na">name=</span><span class="s">&quot;cc_myself&quot;</span> <span class="na">id=</span><span class="s">&quot;id_cc_myself&quot;</span> <span class="nt">/&gt;</span>
+      <span class="nt">&lt;p</span> <span class="na">class=</span><span class="s">&quot;help&quot;</span><span class="nt">&gt;</span>Send a copy of the message to the sender.<span class="nt">&lt;/p&gt;</span>
+    <span class="nt">&lt;/div&gt;</span>
+  <span class="nt">&lt;/fieldset&gt;</span>
+
+  <span class="nt">&lt;fieldset&gt;</span>
+    <span class="nt">&lt;legend&gt;</span>Second subset of fields: sender then message (the order matters)<span class="nt">&lt;/legend&gt;</span>
+
+    <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required sender&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_sender&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Sender<span class="nt">&lt;/label&gt;</span>
+      <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;sender&quot;</span> <span class="na">id=</span><span class="s">&quot;id_sender&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;/div&gt;</span>
+
+    <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;formItem required message&quot;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;label</span> <span class="na">for=</span><span class="s">&quot;id_message&quot;</span> <span class="na">class=</span><span class="s">&quot; required&quot;</span><span class="nt">&gt;</span>Message<span class="nt">&lt;/label&gt;</span>
+      <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;text&quot;</span> <span class="na">name=</span><span class="s">&quot;message&quot;</span> <span class="na">id=</span><span class="s">&quot;id_message&quot;</span> <span class="nt">/&gt;</span>
+    <span class="nt">&lt;/div&gt;</span>
+  <span class="nt">&lt;/fieldset&gt;</span>
+
+  <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&quot;submit&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/form&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">{% form %} example</a><ul>
+<li><a class="reference external" href="#the-sample-form">The sample form</a></li>
+<li><a class="reference external" href="#the-default-layout-with-a-valid-form">The default layout with a valid form</a><ul>
+<li><a class="reference external" href="#python-code">Python code</a></li>
+<li><a class="reference external" href="#template-code">Template code</a></li>
+<li><a class="reference external" href="#output">Output</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#the-default-layout-with-an-invalid-form">The default layout with an invalid form</a><ul>
+<li><a class="reference external" href="#id1">Python code</a></li>
+<li><a class="reference external" href="#id2">Template code</a></li>
+<li><a class="reference external" href="#id3">Output</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#using-an-invalid-layout">Using an invalid layout</a><ul>
+<li><a class="reference external" href="#id4">Python code</a></li>
+<li><a class="reference external" href="#id5">Template code</a></li>
+<li><a class="reference external" href="#id6">Output</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#reordering-fields-and-displaying-subsets-of-fields">Reordering fields and displaying subsets of fields</a><ul>
+<li><a class="reference external" href="#id7">Python code</a></li>
+<li><a class="reference external" href="#id8">Template code</a></li>
+<li><a class="reference external" href="#id9">Output</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="index.html"
+                                  title="previous chapter">Examples</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/examples/render_form.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="../search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Examples"
+             >previous</a> |</li>
+        <li><a href="../index.html">django-formrenderingtools v0.1 documentation</a> &raquo;</li>
+          <li><a href="index.html" >Examples</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2010, Benoit Bryon.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>
