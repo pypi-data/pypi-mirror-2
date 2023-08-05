@@ -1,0 +1,372 @@
+Metadata-Version: 1.0
+Name: alm.solrindex
+Version: 1.0
+Summary: A ZCatalog multi-index that uses Solr
+
+
+Home-page: UNKNOWN
+Author: Six Feet Up, Inc.
+Author-email: info@sixfeetup.com
+License: BSD
+Description: Introduction
+        ============
+        
+        .. image:: http://www.sixfeetup.com/logos/solr-index.png
+        :height: 111
+        :width: 327
+        :alt: SolrIndex
+        :align: left
+        
+        SolrIndex is a product for Plone/Zope that provides enhanced searching capabilities by leveraging Solr, the popular open source enterprise search platform from the Apache Lucene project.
+        
+        Out of the box, SolrIndex brings in more relevant search results by replacing Plone's default full-text indexing with Solr-based search features, and including the ability to assign weights to certain fields.
+        
+        Leveraging Solr's advanced search algorithms, SolrIndex comes with exciting features, such as the ability to use stopwords and synonyms. Stopwords allow to control which words the search mechanism should ignore, and synonyms make it possible to extend a query by including additional matches.
+        
+        SolrIndex also comes with blazing fast and highly scalable search capabilities. SolrIndex is extensible by design, which means it has the ability to integrate with other indexes and catalogs. This is good news for sites that need to provide search capabilities across multiple repositories.
+        
+        With additional customization, SolrIndex also has the ability to provide faceted search, highlighting of query terms, spelling suggestions and "more like this" suggestions.
+        
+        Thanks to SolrIndex, Plone and Zope-powered sites now benefit from truly enterprise search capabilities.
+        
+        Useful Links
+        ============
+        
+        - Solr: http://lucene.apache.org/solr/
+        - pypi: http://pypi.python.org/pypi/alm.solrindex
+        - Plone: http://plone.org/products/alm-solrindex
+        - issue tracker: http://plone.org/products/alm-solrindex/issues
+        - svn repository: http://dev.plone.org/collective/browser/alm.solrindex
+        
+        
+        Special Thanks
+        ==============
+        
+        Six Feet Up would especially like to thank Shane Hathaway for his key contribution to  SolrIndex.
+        
+        
+        Detailed Documentation
+        ======================
+        
+        
+        Installation
+        ------------
+        
+        Include this package in your Zope 2 or Plone buildout. If you are using
+        the ``plone.recipe.zope2instance`` recipe, add ``alm.solrindex`` to the
+        ``eggs`` parameter and the ``zcml`` parameter. See the ``buildout.cfg``
+        in this package for an example. The example also shows how to use the
+        ``collective.recipe.solrinstance`` recipe to build a working Solr
+        instance with little extra effort.
+        
+        Once Zope is running with this package installed, you can visit a
+        ZCatalog and add ``SolrIndex`` as an index. You should only add one
+        SolrIndex to a ZCatalog, but a single SolrIndex can take the place of
+        multiple ZCatalog indexes.
+        
+        
+        The Solr Schema
+        ---------------
+        
+        Configure the Solr schema to store an integer unique key.  Add fields
+        with names matching the attributes of objects you want to index in Solr.
+        You should avoid creating a Solr field that will index the same data
+        as what will be indexed in ZODB by another ZCatalog index.  In other
+        words, if you add a ``Description`` field to Solr, you probably ought
+        to remove the index named ``Description`` from ZCatalog, so that you
+        don't force your system to index descriptions twice.
+        
+        Once the SolrIndex is installed, you can query all of the fields
+        described by the Solr schema, even if there is no ZCatalog index with
+        a matching name.  For example, if you have configured a ``Description``
+        field in the Solr schema, then you can issue catalog queries against
+        the ``Description`` field using the same syntax you would use with
+        other ZCatalog indexes.  For example::
+        
+        results = portal.portal_catalog(Description={'query': 'waldo'})
+        
+        Queries of this form pass through a configurable translation layer made
+        of field handler objects. When you need more flexibility than the field
+        handlers provide, you can either write your own field handlers (see the
+        "Writing Your Own Field Handlers" section) or you can provide Solr
+        parameters that do not get translated (see the "Translucent Solr
+        Queries" section).
+        
+        
+        Translucent Solr Queries
+        ------------------------
+        
+        You can issue a Solr query through a ZCatalog containing a SolrIndex by
+        providing a ``solr_params`` dictionary in the ZCatalog query. For
+        example, if you have a SolrIndex installed in portal_catalog, this call
+        will query Solr::
+        
+        results = portal.portal_catalog(solr_params={'q': 'waldo'})
+        
+        The SolrIndex in the catalog will issue the query parameters specified
+        in ``solr_params`` to Solr. Each parameter value can be a string
+        (including unicode) or a list of strings. If you provide query
+        parameters for other Solr fields, the parameters passed to Solr will be
+        mixed with parameters generated for the other fields.  Note that Solr
+        requires some value for the '``q``' parameter, so if you provide Solr
+        parameters but no value for '``q``', SolrIndex will supply '``*:*``' as the
+        value for '``q``'.
+        
+        Solr will return to the SolrIndex a list of matching document IDs and
+        scores, then the SolrIndex will pass the document IDs and scores to
+        ZCatalog, then ZCatalog will intersect the document IDs with results
+        from other indexes. Finally, ZCatalog will return a sorted list of
+        result objects ("brain" objects) to application code.
+        
+        If you need access to the Solr response object, provide a
+        ``solr_callback`` function in the catalog query. After Solr sends its
+        response, the SolrIndex will call the callback function with the parsed
+        Solr response object. The response object conforms with the
+        documentation of the ``solrpy`` package.
+        
+        
+        Sorting
+        -------
+        
+        SolrIndex only provides document IDs and scores, while ZCatalog retains
+        the responsibility for sorting the results. To sort the results from a
+        query involving SolrIndex, use the ``sort_on`` parameter like you
+        normally would with ZCatalog. At this time, you can not use a SolrIndex
+        as the index to sort on, but that could change in the future.
+        
+        
+        Writing Your Own Field Handlers
+        -------------------------------
+        
+        Field handlers serve two functions. They parse object attributes for
+        indexing, and they translate field-specific catalog queries to Solr
+        queries. They are registered as utilities, so you can write your own
+        handlers and register them using ZCML.
+        
+        To determine the field handler for a Solr field, ``alm.solrindex`` first
+        looks for an ``ISolrFieldHandler`` utility with a name matching the field
+        name. If it doesn't find one, it looks for an ``ISolrFieldHandler`` utility
+        with a name matching the name of the Java class that handles the field
+        in Solr. If that also fails, it retrieves the ``ISolrFieldHandler`` with no
+        name.
+        
+        See the documentation of the ``ISolrFieldHandler`` interface and the examples
+        in handlers.py.
+        
+        
+        Integration with ZCatalog
+        -------------------------
+        
+        One ``SolrIndex`` can take the place of several ZCatalog indexes. In
+        theory, you could replace all of the catalog indexes with just a single
+        ``SolrIndex``. Don't do that yet, though, because this package needs
+        more maturity before it's ready to take on that many responsibilities.
+        
+        Furthermore, replacing all ZCatalog indexes might not be the right
+        goal. ZCatalog indexes are under appreciated. ZCatalog indexes are built
+        on the excellent transaction-aware object cache provided by ZODB. This
+        gives them certain inherent performance advantages over network bound
+        search engines like Solr. Any communication with Solr incurs a delay on
+        the order of a millisecond, while a ZCatalog index can often answer a
+        query in a few microseconds. ZCatalog indexes also simplify cluster
+        design. The ZODB cache allows cluster nodes to perform searches without
+        relying on a large central search engine.
+        
+        Where ZCatalog indexes currently fall short, however, is in the realm
+        of indexing text. None of the text indexes available for ZCatalog match
+        the features and performance of text search engines like Solr.
+        
+        Therefore, one good way to use this package is to move all text indexes
+        to Solr. That way, queries that don't need the text engine will avoid
+        the expense of invoking Solr. You can also move other kinds of indexes
+        to Solr.
+        
+        
+        How This Package Maintains Persistent Connections
+        -------------------------------------------------
+        
+        This package uses a new method of maintaining an external database
+        connection from a ZODB object. Previous approaches included storing
+        ``_v_`` (volatile) attributes, keeping connections in a thread local
+        variable, and reusing the multi-database support inside ZODB, but
+        those approaches each have significant drawbacks.
+        
+        The new method is to add dictionary called ``foreign_connections`` to
+        the ZODB Connection object (the ``_p_jar`` attribute of any persisted
+        object). Each key in the dictionary is the OID of the object that needs
+        to maintain a persistent connection. Each value is an
+        implementation-dependent database connection or connection wrapper. If
+        it is possible to write to the external database, the database
+        connection or connection wrapper should implement the ``IDataManager``
+        interface so that it can be included in transaction commit or abort.
+        
+        When a SolrIndex needs a connection to Solr, it first looks in the
+        ``foreign_connections`` dictionary to see if a connection has already
+        been made. If no connection has been made, the SolrIndex makes the
+        connection immediately. Each ZODB connection has its own
+        ``foreign_connections`` attribute, so database connections are not
+        shared by concurrent threads, making this a thread safe solution.
+        
+        This solution is better than ``_v_`` attributes because connections will
+        not be dropped due to ordinary object deactivation. This solution is
+        better than thread local variables because it allows the object
+        database to hold any number of external connections and it does not
+        break when you pass control between threads. This solution is better
+        than using multi-database support because participants in a
+        multi-database are required to fulfill a complex contract that is
+        irrelevant to databases other than ZODB.
+        
+        Other packages that maintain an external database connection should try
+        out this scheme to see if it improves reliability or readability. Other
+        packages should use the same ZODB Connection attribute name,
+        ``foreign_connections``, which should not cause any clashes, since
+        OIDs can not be shared.
+        
+        An implementation note: when ZODB objects are first created, they are
+        not stored in any database, so there is no simple way for the object to
+        get a ``foreign_connections`` dictionary. During that time, one way to hold
+        a database connection is to temporarily fall back to the volatile
+        attribute solution. That is what SolrIndex does (see the ``_v_temp_cm``
+        attribute).
+        
+        
+        Troubleshooting
+        ---------------
+        
+        If the Solr index is preventing you from accessing Zope for some reason,
+        you can set ``DISABLE_SOLR=YES`` in the environment, causing the SolrIndex
+        class to bypass Solr for all queries and updates.
+        
+        
+        Changelog
+        =========
+        1.0 (2010-05-27)
+        ----------------
+        
+        - Initial public release
+        
+        - Clean up docs in prep for release.
+        [claytron]
+        
+        - Fix up reST errors.
+        [claytron]
+        
+        0.14 (2010-05-11)
+        -----------------
+        
+        - Updated SolrConnectionManager to have a dummy savepoint
+        implementation, refs #2451.
+        [davidb]
+        
+        0.13 (2010-03-01)
+        -----------------
+        
+        - commit to cleanup version #'s
+        
+        0.12 (2010-03-01)
+        -----------------
+        
+        - PEP8 cleanup
+        [clayton]
+        
+        0.11 (2009-11-27)
+        -----------------
+        
+        - A commit after an aborted index update no longer breaks with an
+        assertion error.  Refs #1340
+        
+        0.10 (2009-10-15)
+        -----------------
+        
+        - Filter out invalid XML characters from indexed documents.
+        
+        0.9 (2009-10-14)
+        ----------------
+        
+        - Fixed test failure by going to the login_form to log in, instead of
+        the front page, where we get ambiguity errors.
+        [maurits]
+        
+        - Fixed the catalog object information page.  Solr was unable to parse
+        a negative number in the query.
+        
+        
+        0.8 (2009-09-18)
+        ----------------
+        
+        - Added support for Solr boolean fields.
+        
+        - GenericSetup profiles now have the option of clearing the
+        index.
+        
+        - Made the waituri script wait up to 90 seconds by default,
+        pause a little more between polls, and accept a timeout
+        parameter.
+        
+        0.7 (2009-09-13)
+        ----------------
+        
+        - The Solr URI can now be provided by an environment variable,
+        so that catalog.xml does not need to hard code the URI.
+        
+        0.6 (2009-09-11)
+        ----------------
+        
+        - Added narrative documentation.
+        
+        - Don't clear the index when running GenericSetup.  Clearing
+        indexes turns out to be a long-standing problem with GenericSetup;
+        in this case the easy solution is to just not clear it.
+        
+        0.5 (2009-09-10)
+        ----------------
+        
+        - Added a script that waits for Solr to start up.
+        
+        - Brought in a private copy of solrpy to fix some bugs:
+        
+        - The connection retry code reconnected, but wasn't
+        actually retrying the request.
+        
+        - The raw_query method should not assume the parameter
+        values are unicode (they could be lists of unicode).
+        
+        0.4 (2009-09-10)
+        ----------------
+        
+        - Purge Solr when importing a SolrIndex via GenericSetup.
+        
+        0.3 (2009-09-10)
+        ----------------
+        
+        - Made field handlers more flexible.  Now they can add any
+        kind of query parameter to the Solr query.
+        
+        - The default field handler now generates "fq" parameters
+        instead of "q" parameters.  This seems to fit the intent of
+        the Solr authors much better.
+        
+        - Renamed "solr_additional" to "solr_params".
+        
+        0.2 (2009-09-09)
+        ----------------
+        
+        - Added a GenericSetup profile that replaces SearchableText
+        with a SolrIndex.
+        
+        - Renamed the catalog parameter for passing extra args to Solr
+        "solr_additional".  Also renamed the response callback
+        parameter to "solr_callback".
+        
+        0.1 (2009-09-09)
+        ----------------
+        
+        - First release
+        
+        
+Keywords: zope zcatalog solr plone
+Platform: UNKNOWN
+Classifier: Framework :: Zope2
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
