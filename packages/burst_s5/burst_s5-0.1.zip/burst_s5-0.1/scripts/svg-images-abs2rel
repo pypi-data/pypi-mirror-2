@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+import os, re, sys, tempfile, shutil, hashlib
+
+re_link1 = re.compile( 
+    r'xlink:href="(?P<uri_prefix>file:///)(?P<fname>.+)"')
+re_link2 = re.compile( 
+    r'xlink:href="(?P<slash>/)(?P<fname>.+)"')
+
+sodipodi_link = re.compile( 
+    r'(sodipodi:absref=".*")')
+
+def relpath(path, start=os.path.curdir):
+    """Return a relative version of a path"""
+
+    if not path:
+        raise ValueError("no path specified")
+    
+    start_list = os.path.abspath(start).split(os.path.sep)
+    path_list = os.path.abspath(path).split(os.path.sep)
+    
+    # Work out how much of the filepath is shared by start and path.
+    i = len(os.path.commonprefix([start_list, path_list]))
+
+    rel_list = [os.path.pardir] * (len(start_list)-i) + path_list[i:]
+    return os.path.join(*rel_list)
+
+
+class Replacer:
+    def __init__(self, source_fname):
+        self.source_dir = os.path.split(os.path.abspath(source_fname))[0]
+    def abs_repl(self,matchobj):
+        abs_fname = '/' + matchobj.group('fname')
+        rel_fname = relpath(abs_fname, self.source_dir)
+        result='xlink:href="%s"'%rel_fname
+        return result
+    def sodipodi_repl(self,matchobj):
+        return ''
+
+def convert_file(input_fname):
+    replacer = Replacer( input_fname )
+    try:
+        fd = tempfile.NamedTemporaryFile(suffix='.svg',delete=False)
+    except TypeError, err:
+        # pre Python 2.6: no delete parameter
+        fd = tempfile.NamedTemporaryFile(suffix='.svg')
+        tmp_fname = fd.name
+        fd.close()
+        fd = open(tmp_fname,mode='w+b')
+
+    new_checksum = hashlib.md5()
+    orig_checksum = hashlib.md5()
+    for orig_line in open(input_fname).readlines():
+        orig_checksum.update( orig_line )
+
+        new_line1 = re_link1.sub( replacer.abs_repl, orig_line)
+        new_line2 = re_link2.sub( replacer.abs_repl, new_line1)
+        new_line3 = sodipodi_link.sub( replacer.sodipodi_repl, new_line2)
+        new_checksum.update(new_line3)
+        fd.write(new_line3)
+
+    fd.close()
+
+    if orig_checksum.digest() != new_checksum.digest():
+        # file changed, replace it
+        os.unlink(input_fname)
+        shutil.move( fd.name, input_fname )
+    else:
+        # unchanged, remove new temporary file
+        os.unlink( fd.name )
+
+if __name__=='__main__':
+    fnames = sys.argv[1:]
+    for fname in fnames:
+        convert_file(fname)
