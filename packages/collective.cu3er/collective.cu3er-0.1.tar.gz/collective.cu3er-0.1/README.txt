@@ -1,0 +1,167 @@
+Introduction
+============
+
+CU3ER – flash 3D image slider you will love! CU3ER is:
+
+* FREE
+
+* EASY to set up
+
+* CUSTOMIZABLE via XML
+
+* TAILORED to provide a UNIQUE look & feel
+
+* INSPIRING
+
+* FUN-to-USE
+
+`collective.cu3er` integrates CU3ER 0.9.2 into Plone. If JavaScript is disabled in the browser nothing is shown (so no wasted space).
+
+
+Installing
+==========
+
+This package requires Plone 3.x or later (tested on 3.3.5 and 4.0b3) and archetypes.schemaextender.
+
+Installing without buildout
+---------------------------
+
+Install this package in either your system path packages or in the lib/python directory of your Zope instance. You can do this using either easy_install or via the setup.py script.
+
+Installing with buildout
+------------------------
+
+If you are using `buildout`_ to manage your instance installing collective.cu3er is even simpler. You can install collective.cu3er by adding it to the eggs line for your instance::
+
+    [instance]
+    eggs = collective.cu3er
+
+After updating the configuration you need to run the ''bin/buildout'', which will take care of updating your system.
+
+.. _buildout: http://pypi.python.org/pypi/zc.buildout
+
+
+Usage
+=====
+
+CU3ER \kju:bər\, an image slider initially conceived to create 3D transitions between slides, turned out to be a convenient and multifunction solution that can be applied in a range of website building areas, from content slider to feature slider and image & banner rotator. Consider using it when you want to grab the user’s attention, and you’ll be delighted by the results!
+
+If you’d like to experience more creativity in web development, are striving to more visually appealing content, and prefer to have even more unique image transitions on your websites, try the CU3ER! Its magic is astonishing!
+
+Requirements
+------------
+
+There are no special requirements for setting it up and running other than a limited knowledge of web authoring:
+
+* Flash Player 9+,
+
+* XML Basics,
+
+* SWFObject (embedding .swf files into web pages),
+
+* Applications for image editing (especially for creating & exporting slides).
+
+
+Add slider
+----------
+
+To add a new slider just edit your Archetype based content item and go to the 'Cu3er' tab. Add the values for height and width and your CU3ER XML config (a sample is provided, see the link in the description text or the sample below). Finally enable your CU3ER slider and press save.
+
+
+Sample config.xml
+-----------------
+
+This XML configuration works out of the box in with collective.cu3er. You can paste it into the configuration field::
+
+    <?xml version="1.0" encoding="utf-8" ?>
+    <cu3er>
+    	<settings>
+
+            <auto_play>
+                <defaults symbol="circular" time="5" />
+                <tweenIn x="500" y="50" width="35" height="35" tint="0xFFFFFF" />
+            </auto_play>
+
+        	<prev_button>
+    			<defaults round_corners="5,5,5,5"/>
+    			<tweenOver tint="0xFFFFFF" scaleX="1.1" scaleY="1.1"/>
+    			<tweenOut tint="0x000000" />
+    		</prev_button>
+
+        	<prev_symbol>
+    			<tweenOver tint="0x000000" />
+    		</prev_symbol>
+
+        	<next_button>
+    			<defaults round_corners="5,5,5,5"/>
+    			<tweenOver tint="0xFFFFFF"  scaleX="1.1" scaleY="1.1"/>
+    			<tweenOut tint="0x000000" />
+    		</next_button>
+
+        	<next_symbol>
+    			<tweenOver tint="0x000000" />
+    		</next_symbol>
+
+    	</settings>
+
+    	<slides>
+
+            <slide>
+                <url>++resource++cu3er.images/slide_1.jpg</url>
+            </slide>
+    		<!-- changing transition between first & second slide -->
+            <transition num="3" slicing="vertical" direction="down"/>
+            <slide>
+           		<url>++resource++cu3er.images/slide_2.jpg</url>
+            </slide>
+    		<!-- changing transition between second & third slide -->
+            <transition num="4" direction="right" shader="flat" />
+    		<slide>
+                <url>++resource++cu3er.images/slide_3.jpg</url>
+            </slide>
+            <!-- transitions properties defined in transitions template -->
+    		<slide>
+           		<url>++resource++cu3er.images/slide_4.jpg</url>
+            </slide>
+    		<transition num="6" slicing="vertical" direction="up" shader="flat" delay="0.05" z_multiplier="4" />
+            <slide>
+           		<url>++resource++cu3er.images/slide_5.jpg</url>
+            </slide>
+
+    	</slides>
+    </cu3er>
+
+
+Copyright and Credits
+=====================
+
+Author of collective.cu3er: Thomas Massmann (thomas.massmann@inqbus.de).
+
+License
+-------
+
+Copyright (c) 2010, Stefan Kovac. All rights reserved.
+
+By downloading CU3ER v0.9.2 - flash 3D slider, you agree to the following:
+
+Stefan Kovac grants you the non-exclusive, non-transferable license to use CU3ER subject to the restrictions defined below.
+
+* You may use CU3ER in personal and / or commercial projects.
+
+* You may implement CU3ER in an unlimited number of websites and offline presentations, as long as you are acting as the administrator and / or developer for those websites and / or presentations.
+
+* You may deploy SWFs containing CU3ER as part of hired work for a third party as long as the SWF is unique to said party and not replicated / resold / redistributed as part of a template, application or service to additional parties.
+
+* SWF containing CU3ER may not be embedded as part of a template, application, and/or web site where stated template, application, and/or web site is re-sold and/or re-distributed for independent use by third parties, without specific prior written permission.
+
+* SWFs containing CU3ER may not be embedded in a template, content management system, and / or online web service in a manner where the SWF is replicated and used as a slideshow viewer for photos contributed by more than one party.
+
+* CU3ER may not be sub-licensed or resold.
+
+* You agree not to decompile, reverse engineer, disassemble, or otherwise determine or attempt to determine source code for the executable code of CU3ER, and agrees not to permit or authorize anyone else to do so.
+
+* CU3ER redistribution must reproduce the above copyright notice, this list of conditions and the disclaimer in the documentation and/or other materials provided with the distribution.
+
+* Neither the name of CU3ER nor the name of it contributor (Stefan Kovac) may be used to endorse or promote products associated with CU3ER without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY STEFAN KOVAC ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL STEFAN KOVAC BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
