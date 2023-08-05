@@ -1,0 +1,117 @@
+# -*- coding: utf-8 -*-
+
+import zope.i18n
+import dolmen.content as content
+import zeam.form.ztk as form
+import grokcore.component as grok
+
+from dolmen.forms.base import ApplicationForm
+from dolmen.forms.crud import actions as formactions
+from dolmen.forms.crud.interfaces import IFactoryAdding, IFieldsCustomization
+from dolmen.forms.crud.utils import queryClassMultiAdapter
+
+from zeam.form.base import Fields, Actions
+from zope.cachedescriptors.property import CachedProperty
+from zope.component import queryMultiAdapter
+from zope.i18nmessageid import MessageFactory
+
+_ = MessageFactory("dolmen.forms.crud")
+
+
+class Add(ApplicationForm):
+    """The add form itself is not protected. The security is checked on
+    'update'. It checks if the 'require' directive of the factored item
+    is respected on the context.
+    """
+    grok.baseclass()
+    grok.title(_(u"Add"))
+    grok.name('dolmen.add')
+    grok.context(IFactoryAdding)
+
+    @property
+    def label(self):
+        return zope.i18n.translate(self.context.factory.title,
+                                   context=self.request)
+
+    @CachedProperty
+    def fields(self):
+        ifaces = self.context.factory.getSchema()
+        fields = Fields(*ifaces).omit('__parent__')
+
+        modifier = queryClassMultiAdapter(
+            (self.context.factory.factory, self, self.request),
+            self.context, IFieldsCustomization)
+
+        if modifier is not None:
+            return modifier(fields)
+        return fields
+
+    @CachedProperty
+    def actions(self):
+        add = formactions.Add(_("Add"), self.context.factory)
+        return Actions(add)
+
+
+class Edit(ApplicationForm):
+    grok.baseclass()
+    grok.name('edit')
+    grok.title(_(u"Edit"))
+    grok.context(content.IBaseContent)
+
+    ignoreContent = False
+    ignoreRequest = False
+    actions = Actions(formactions.Update(_("Update")))
+
+    @property
+    def label(self):
+        label = _(u"edit_action", default=u"Edit: $name",
+                 mapping={"name": self.context.title})
+        return zope.i18n.translate(label, context=self.request)
+
+    @CachedProperty
+    def fields(self):
+        iface = content.schema.bind().get(self.context)
+        fields = Fields(*iface).omit('__parent__')
+        modifier = queryMultiAdapter(
+            (self.context, self, self.request), IFieldsCustomization)
+
+        if modifier is not None:
+            return modifier(fields)
+        return fields
+
+
+class Display(ApplicationForm):
+    grok.baseclass()
+    grok.title(_(u"View"))
+    grok.context(content.IBaseContent)
+
+    mode = "display"
+    ignoreRequest = True
+    ignoreContent = False
+
+    @property
+    def label(self):
+        return self.context.title
+
+    @CachedProperty
+    def fields(self):
+        iface = content.schema.bind().get(self.context)
+        fields = form.Fields(*iface).omit('__parent__', 'title')
+        modifier = queryMultiAdapter(
+            (self.context, self, self.request), IFieldsCustomization)
+
+        if modifier is not None:
+            return modifier(fields)
+        return fields
+
+
+class Delete(ApplicationForm):
+    """A confirmation for to delete an object.
+    """
+    grok.baseclass()
+    grok.title(_(u"Delete"))
+    grok.context(content.IBaseContent)
+
+    label = _(u"Delete")
+    description = _(u"Are you really sure ?")
+    actions = Actions(formactions.Delete(_("Delete")))
