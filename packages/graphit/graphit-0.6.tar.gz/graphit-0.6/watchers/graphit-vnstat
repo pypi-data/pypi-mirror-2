@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+from subprocess import Popen, PIPE
+from graphit.client import GraphITWatcher
+
+class Watcher(GraphITWatcher):
+	
+	__name__ = 'Network trafic'
+	__version__ = '1.0'
+	__wid__ = 'vnstat'
+	__author__ = 'Antoine Millet <antoine@inaps.org>'
+		
+	def init_options(self, op):
+		op.add_option('-i', '--interface', 
+			default='eth0',
+			help=('The name of the interface to monitor. '
+				'Default to eth0')
+		)
+	
+		op.add_option('-p', '--packets', 
+			action='store_true',
+			default=False,
+			help='submit packets/s and not trafic speed.'
+		)
+	
+		op.add_option('--secs',
+			type='int',
+			default=60,
+			help=('Runtime of vnstat. Default to 60 secs.')
+		)
+	
+	def check_options(self, op, args):
+		if self._options.secs < 2:
+			op.error('--secs must by >= 2')
+		
+	def run(self):
+		
+		vnstat_pipe = Popen('vnstat -i %s -tr %s' % (
+			self._options.interface,
+			self._options.secs,
+		), shell=True, stdout=PIPE)
+
+		vnstat_pipe.wait()
+		
+		if vnstat_pipe.returncode:
+			print vnstat_pipe.stdout.read()
+		else:
+			data = vnstat_pipe.stdout.read().split('\n')
+
+			rx = int(data[3].split()[1])
+			rx_pkt = int(data[3].split()[3])
+			tx = int(data[4].split()[1])
+			tx_pkt = int(data[4].split()[3])
+
+			if self._options.packets:
+				self.submit('rx', rx_pkt, unit='pkt/s')
+				self.submit('tx', tx_pkt, unit='pkt/s')
+			else:
+				self.submit('rx', rx, unit='kb/s')
+				self.submit('tx', tx, unit='kb/s')
+
+if __name__ == '__main__':
+	Watcher()
+
