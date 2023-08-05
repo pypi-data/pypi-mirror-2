@@ -1,0 +1,99 @@
+[buildout]
+extends = base.cfg
+
+parts +=
+    lxml
+    zope
+    test
+    coverage-test
+    coverage-report
+    sphinxbuilder
+
+eggs +=
+# development tools
+     plone.reload
+     Products.PrintingMailHost
+     Products.DocFinderTab
+
+zcml +=
+# debugging tools' slugs
+     plone.reload
+
+
+################################
+# Develop third party packages #
+################################
+extensions += mr.developer
+sources = sources
+auto-checkout = *
+
+[sources]
+# niteoweb.clickbank = svn https://svn.plone.org/svn/collective/niteoweb.clickbank/trunk
+
+
+#######################################################################
+# For collective.xdv to work properly, we need a static build of lxml #
+# and it's dependencies on OS X and x86_64 Linux                      #
+#######################################################################
+[lxml]
+recipe = z3c.recipe.staticlxml
+egg = lxml
+
+
+######################################
+# Create a development Zope instance #
+######################################
+[zope]
+recipe = plone.recipe.zope2instance
+user = admin:admin
+debug-mode = off
+verbose-security = on
+environment-vars =
+    zope_i18n_compile_mo_files = true
+eggs =
+    \${buildout:eggs}
+zcml =
+    \${buildout:zcml}
+
+    
+##############################################
+# Prepare test-runner for running unit tests #
+##############################################
+[test]
+recipe = zc.recipe.testrunner
+defaults = ['--exit-with-status', '--auto-color', '--auto-progress']
+eggs =
+    \${buildout:eggs}
+
+
+#####################################################
+# Prepare test-runner for calculating test coverage #
+#####################################################
+[coverage-test]
+recipe = zc.recipe.testrunner
+eggs = \${test:eggs}
+defaults = ['--coverage', '../../coverage', '-v', '--auto-progress']
+
+[coverage-report]
+recipe = zc.recipe.egg
+eggs = z3c.coverage
+scripts = coverage=coverage-report
+arguments = ('coverage', 'report')
+
+
+###########################################
+# Prepare Sphinx documentation generator. #
+###########################################
+[sphinxbuilder]
+recipe = collective.recipe.sphinxbuilder
+interpreter = \${buildout:directory}/bin/zopepy
+
+
+##################################################################
+# Prepare a python interpreter with all buildout eggs installed. #
+##################################################################    
+[zopepy]
+recipe = zc.recipe.egg
+eggs = \${buildout:eggs}
+interpreter = zopepy
+scripts = zopepy
