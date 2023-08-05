@@ -1,0 +1,218 @@
+.. contents ::
+
+Introduction
+------------
+
+mfabrik.behaviorutilities is plone.behavior support and helper package for Plone 3 and Archetypes.
+
+About Behavior pattern
+-----------------------
+
+Behavior pattern is a way to provide extensible behavior for content objects,
+without touching the actual content object class source code and
+so that behaviors can be turned on and off.
+
+First read plone.behavior tutorial
+
+* http://plone.org/products/dexterity/documentation/manual/behaviors
+
+Note that the tutorial does not describe how to use behavior objects
+with Archetypes based content and this Python module tries to fill
+in some gaps there.
+
+Features
+--------
+
+* Create plone.behavior behaviors for Archetypes objects and make them assignable
+
+* On-demand behavior object creation - do not make saves or Zope transactions
+  if behavior defaults are not changed
+
+* z3c.form support to make behavior objects context aware and thus selection widget vocabulary resolving working
+
+* Traversing tools
+
+Example products
+-----------------
+
+The following Plone add-ons have been created based on this code
+
+* https://svn.plone.org/svn/collective/mfabrik.trafficsigns/trunk/mfabrik/trafficsigns/behaviors.py
+
+* http://plonegomobile.googlecode.com/svn/trunk/gomobile/gomobile.mobile/gomobile/mobile/behaviors.py
+
+* http://plonegomobile.googlecode.com/svn/trunk/gomobile/gomobile.convergence/gomobile/convergence/behaviors.py
+
+* http://svn.plone.org/svn/collective/plone.app.headeranimation/trunk/README.txt
+
+Sample code walkthrough
+-----------------------
+
+*Note*: Code here is only for example purposes and probably does not work as is.
+Proper usage documentation will be done after the framework has taken more shape.
+Refer to existing code users for more help.
+
+Behavior is defined as an interface, which also defines form options
+which user can edit for this behavior. Schema is defined using *plone.directives.form* package::
+
+        class IMultiChannelBehavior(form.Schema):
+            """ How content and its children react to differt medias """
+                
+            contentMedias = schema.Choice(title=u"Content medias",
+                                          description=u"Does this content appear on web, mobile or both",
+                                          default=ContentMediaOption.USE_PARENT,
+                                          required=True)
+        
+             # More form fields here
+        
+        alsoProvides(IMultiChannelBehavior, form.IFormFieldProvider)
+
+The behavior implementation is persistent Zope object,
+which knowns its *context* i.e. object for which behavior is assigned
+by using mfabrik.beahviorutilities.volatilecontext.VolatileContext base class,
+which is a subclass of Zope Persistent class. 
+
+Implementation maps behavior interface fields itself as
+class attributes using FieldProperties.
+
+We use AnnotationPersistentFactory to store behavior.
+This means that when behavior is once saved on your content object, 
+you can access by directly by traversing::
+
+        context.__annotations__["your_annotation_key_name"] 
+
+Example::
+
+        class MobileBehaviorStorage(VolatileContext):
+        
+            # Implement your behavior
+            implements(IMobileBehavior)
+        
+            mobileFolderListing = FieldProperty(IMobileBehavior["mobileFolderListing"])
+        
+            appearInFolderListing = FieldProperty(IMobileBehavior["appearInFolderListing"])
+        
+
+        # This defines a behavior factoty method        
+        mobile_behavior_factory = AnnotationPersistentFactory(MobileBehaviorStorage, "mobile")
+
+Now you can create and query behaviors.
+
+First we check that the behavior is assignable. Currently it is hardcoded
+that all behaviors are assignable to all Archetypes content objects::
+
+        self.loginAsPortalOwner()
+        self.portal.invokeFactory("Document", "doc")
+        doc = self.portal.doc
+        
+        # Check assignable works
+        from plone.behavior.interfaces import IBehaviorAssignable
+        assignable = IBehaviorAssignable(doc, None)
+
+        self.assertTrue(assignable.supports(IMobileBehavior))
+        self.assertNotEqual(assignable, None)
+
+When we query the behavior it is created on the fly if it does
+not already exist on the content. If the behavior is created,
+then its attributes are populated with the default values specific in the schema::
+
+        behavior = IMobileBehavior(doc)
+
+Behavior knowns on which content it belongs. 
+This is implemented as volatile reference, so no circular
+pointers are stored to ZODB.
+
+        doc == behavior.context
+        
+You can edit the behavior parameters by using properties defined 
+on the storage class::
+
+        behavior.mobileFolderListing = True
+
+If you do any changes to the behavior you need to call save()
+method of the VolatileContext class. This makes sure that 
+if the behavior is not the default behavior, you need to 
+actually save persistent parameters in the annotations::
+
+        behavior.save()
+
+        # Recreate behavior from the scratch 
+        # and see it is persistent
+        behavior = IMobileBehavior(doc)
+        assert behavior.behavior.mobileFolderListing == True
+        
+Each behavior also needs edit form - you can easily do this using z3c.form::
+
+        class MobileForm(z3c.form.form.EditForm):
+            """ Folder/page specific mobile publishing options """
+        
+            fields = field.Fields(IMobileBehavior)
+            
+            prefix = "mobile"
+            label = u"Mobile navigation options"
+        
+            def update(self):
+                return z3c.form.form.EditForm.update(self)
+            
+            def getContent(self):
+                """
+                Return the object which the form should edit.
+                """
+                behavior = IMobileBehavior(self.context)
+                return behavior
+        
+            def applyChanges(self, data):
+                # Call super
+                content = self.getContent() 
+                val = z3c.form.form.EditForm.applyChanges(self, data)
+                
+                # Write behavior to database
+                content = self.getContent() 
+                content.save()
+                
+                return val
+       
+       MobileFormView = wrap_form(MobileForm)
+
+It is easiest to link this form to your object using document_actions 
+link. actions.xml snippet::
+
+        <?xml version="1.0"?>
+        <object name="portal_actions" meta_type="Plone Actions Tool"
+           xmlns:i18n="http://xml.zope.org/namespaces/i18n">
+        
+         <object name="document_actions" meta_type="CMF Action Category">
+        
+          <object name="mobile_options" meta_type="CMF Action" i18n:domain="plone">
+           <property name="title" i18n:translate="">Mobile settings</property>
+           <property name="description"
+              i18n:translate="">Set mobile publishing options</property>
+           <property
+              name="url_expr">string:$object_url/@@mobile_options</property>
+           <property name="icon_expr"></property>
+           <property name="available_expr"></property>
+           <property name="permissions">
+            <element value="Modify portal content"/>
+           </property>
+           <property name="visible">True</property>
+          </object>
+          
+         </object>
+        
+        </object>
+
+Author
+------
+
+`mFabrik Research Oy <mailto:info@mfabrik.com>`_ - Python and Plone professionals for hire.
+
+* `mFabrik web site <http://mfabrik.com>`_ 
+
+* `mFabrik mobile site <http://mfabrik.mobi>`_ 
+
+* `Blog <http://blog.mfabrik.com>`_
+
+* `More about Plone <http://mfabrik.com/technology/technologies/content-management-cms/plone>`_ 
+
+       
+      
