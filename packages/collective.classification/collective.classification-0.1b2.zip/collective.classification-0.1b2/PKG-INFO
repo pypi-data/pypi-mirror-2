@@ -1,0 +1,328 @@
+Metadata-Version: 1.0
+Name: collective.classification
+Version: 0.1b2
+Summary: Content classification/clustering through language processing
+Home-page: http://github.org/ggozad/collective.classification
+Author: Yiorgis Gozadinos
+Author-email: ggozad@jarn.com
+License: GPL
+Download-URL: http://pypi.python.org/pypi/collective.classification/
+Description: Introduction
+        ============
+        
+        *collective.classification* aims to provide a set of tools for automatic
+        document classification. Currently it makes use of the
+        `Natural Language Toolkit`_ and features a trainable document classifier based
+        on Part Of Speech (POS) tagging, heavily influenced by `topia.termextract`_.
+        This product is mostly intended to be used for experimentation and
+        development. Currently english and dutch are supported.
+        
+          .. _`Natural Language Toolkit`: http://www.nltk.org
+          .. _`topia.termextract`: http://pypi.python.org/pypi/topia.termextract/
+        
+        What is this all about?
+        =======================
+        
+        It's mostly about having fun! The package is in a very early experimental
+        stage and awaits eagerly contributions. You will get a good understanding of
+        what works or not by looking at the tests. You might also be able to do some
+        useful things with it:
+        
+            1) Term extraction can be performed to provide quick insight on what a
+            document is about.
+            2) On a large site with a lot of content and tags (or subjects in the
+            plone lingo) it might be difficult to assign tags to new content. In this
+            case, a trained classifier could provide useful suggestions to an editor
+            responsible for tagging content.
+            3) Similar documents can be found based on term similarity.
+            4) Clustering can help you organize unclassified content into groups.
+        
+        How it works?
+        =============
+        
+        At the moment there exist the following type of utilities:
+        
+          * *POS taggers*, utilities for classifying words in a document
+            as `Parts Of Speech`_. Two are provided at the moment, a Penn TreeBank
+            tagger and a trigram tagger. Both can be trained with some other language
+            than english which is what we do here.
+          * *Term extractors*, utilities responsible for extracting the important
+            terms from some document. The extractor we use here, assumes that in a
+            document only nouns matter and uses a POS tagger to find those mostly used
+            in a document. For details please look at the code and the tests.
+          * *Content classifiers*, utilities that can tag content in predefined
+            categories. Here, a `naive Bayes`_ classifier is used. Basically, the
+            classifier looks at already tagged content, performs term extraction and
+            trains itself using the terms and tags as an input. Then, for new content,
+            the classifier will provide suggestions for tags according to the
+            extracted terms of the content.
+          * Utilities that find *similar content* based on the extracted terms.
+          * *Clusterers*, utilities that without prior knowledge of content
+            classification can group content into groups according to feature
+            similarity. At the moment NLTK's `k-means`_ clusterer is used.
+        
+        
+          .. _`Parts Of Speech`: http://en.wikipedia.org/wiki/Part-of-speech_tagging
+          .. _`naive Bayes`: http://en.wikipedia.org/wiki/Naive_Bayes_classifier
+          .. _`k-means`: http://en.wikipedia.org/wiki/K-means_clustering
+        
+        Installation & Setup
+        ====================
+        
+        Before running buildout, make sure you have yaml and its python bindings
+        installed (use macports on osx, or your package installer on linux). If nltk
+        exists for your OS you might as well install that, otherwise it will be
+        fetched when you run buildout.
+        
+        To get started you will simply need to add the package to your "eggs" section
+        and run buildout, restart your Plone instance and install the
+        "collective.classification" package using the quick-installer or via the
+        "Add-on Products" section in "Site Setup".
+        
+        **WARNING: Upon first time installation linguistic data will be fetched from
+        NLTK's repository and stored locally on your filesystem. It's not big (about 400kb) but you need the plone user to have access to its "home". Running the
+        tests will also fetch more data from nltk bringing the total to about 225Mb, so not for the faint at disk space.**
+        
+        How to use it?
+        ==============
+          * For a parsed document you can call the term view to display the identified
+            terms (just append *@@terms* to the url of the content to call the view).
+          * In order to use the classifier and get suggested tags for some content,
+            you can call *@@suggest-categories* on the content. This comes down to
+            appending @@suggest-categories to the url in your browser. A form will
+            come up with suggestions, choose the ones that seem appropriate and apply.
+            You will need to have the right to edit the document in order to call the
+            view.
+          * You can find similar content for some content based on its terms by
+            calling the *@@similar-items* view. 
+          * For clustering you can just call the *@@clusterize* view from anywhere.
+            The result is not deterministic but hopefully helpful;). You need manager
+            rights for this so as to not allow your users to DOS your site!
+        
+        
+        Integration test
+        ================
+        
+        Here, we'll test the classifier using a sample of the Brown corpus. The Brown
+        corpus has a list of POS-tagged english articles which are also conveniently
+        categorized. The test consists of training the classifier using 20 documents
+        from each of the categories 'news','editorial' and 'hobbies'. Then we'll ask
+        the classifier to classify 5 more documents from each category and see what
+        happens.
+        
+        We can now start adding documents, starting with the first 20 documents in the
+        Brown corpus categorized as 'news'.
+        
+            >>> from nltk.corpus import brown
+            >>> for articleid in brown.fileids(categories='news')[:20]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    title=articleid,
+            ...                                    text=text,
+            ...                                    subject='news')
+        
+        Continuing with 20 documents categorized as 'editorial':
+        
+            >>> for articleid in brown.fileids(categories='editorial')[:20]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    title=articleid,
+            ...                                    text=text,
+            ...                                    subject='editorial')
+        
+        And finally 20 documents categorized as 'hobbies':
+        
+            >>> for articleid in brown.fileids(categories='hobbies')[:20]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    title=articleid,
+            ...                                    text=text,
+            ...                                    subject='hobbies')
+        
+        All these documents should have been parsed and indexed:
+        
+            >>> catalog = self.folder.portal_catalog
+            >>> sr = catalog.searchResults(noun_terms='state')
+            >>> len(sr) > 5
+            True
+        
+        Let's see what terms we get for the first 'editorial' content:
+        
+            >>> browser = self.getBrowser()
+            >>> browser.open(self.folder.absolute_url()+'/cb01/@@terms')
+            >>> browser.contents
+            '...state...year...budget...war...danger...nuclear war...united states...'
+        
+        Nuclear war and United States? Scary stuff... Time to train the classifier:
+        
+            >>> from zope.component import getUtility
+            >>> from collective.classification.interfaces import IContentClassifier
+            >>> classifier = getUtility(IContentClassifier)
+            >>> classifier.train()
+            >>> classifier.tags()
+            ['editorial', 'hobbies', 'news']
+        
+        For a start, the classifier should be pretty certain when asked about text
+        already classified:
+        
+            >>> browser.open(self.folder.absolute_url()+'/ca01/@@suggest-categories')
+            >>> browser.contents
+            '...news 100.0%...editorial 0.0%...hobbies 0.0%...'
+        
+        So let's see where this gets us, by asking the classifier to categorize 5 more
+        documents for which we know the category. We will use the classifier's
+        functions directly this time instead of adding the documents to plone and
+        calling the *@@suggest-categories* view. 'News' first:
+        
+            >>> classificationResult = []
+            >>> for articleid in brown.fileids(categories='news')[20:25]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    text=text)
+            ...     uid = self.folder[id].UID()
+            ...     classificationResult.append(classifier.classify(uid))
+            >>> classificationResult
+            ['news', 'news', 'news', 'news', 'news']
+        
+        Let's see how we do with 'editorials'
+        
+            >>> classificationResult = []
+            >>> for articleid in brown.fileids(categories='editorial')[20:25]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    text=text)
+            ...     uid = self.folder[id].UID()
+            ...     classificationResult.append(classifier.classify(uid))
+            >>> classificationResult
+            ['editorial', 'editorial', 'editorial', 'editorial', 'editorial']
+        
+        That's excellent! What about 'hobbies'?
+        
+            >>> classificationResult = []
+            >>> for articleid in brown.fileids(categories='hobbies')[20:25]:
+            ...     text = " ".join(brown.words(articleid))
+            ...     id = self.folder.invokeFactory('Document',articleid,
+            ...                                    text=text)
+            ...     uid = self.folder[id].UID()
+            ...     classificationResult.append(classifier.classify(uid))
+            >>> classificationResult
+            ['hobbies', 'hobbies', 'editorial', 'hobbies', 'hobbies']
+        
+        Not so bad! Overall: we got 14/15 right...
+        
+        Let's now pick again the first editorial item and see which documents are
+        similar to it based on the terms we extracted:
+        
+            >>> browser.open(self.folder['cb01'].absolute_url()+'/@@similar-items')
+        
+        The most similar item (a Jaccard index of ~0.2) is
+        cb15:
+        
+            >>> browser.contents
+            '...cb15...0.212121212121...'
+        
+        Let's see what their common terms are:
+        
+            >>> cb01terms = catalog.searchResults(
+            ... UID=self.folder['cb01'].UID())[0].noun_terms[:20]
+            >>> cb15terms = catalog.searchResults(
+            ... UID=self.folder['cb15'].UID())[0].noun_terms[:20]
+            >>> set(cb01terms).intersection(set(cb15terms))
+            set(['development', 'state', 'planning', 'year', 'area'])
+        
+        which is fine, since both documents talk about development and budget
+        planning...
+        
+        What about stats? We can call the *@@stats* view to find out...
+        
+            >>> self.setRoles('Manager')
+            >>> browser.open(self.folder.absolute_url()+'/@@classification-stats')
+            >>> browser.contents
+            '...state...True...editorial:hobbies...5.0...'
+        
+        which basically tells us, that if the word 'state' is present the classifier
+        gives 5 to 1 for the content to be in the 'editorial' category rather than the
+        'hobbies' category
+        Changelog
+        =========
+        
+        0.1b2
+        -------------------
+        
+        - Removed the persistent noun storage altogether. Now noun and noun-phrase
+          terms are stored directly in the catalog using plone.indexer.
+          [ggozad, stefan]
+        - Using BTrees instead of PersistenDict. Should make writes to ZODB lighter.
+          [ggozad]
+        - Noun-phrase grammar and normalization is now a property of the
+          language-dependent tagger.
+          [ggozad]
+        - Removed a lot of the control panel functionality. Not need for confusion.
+          [ggozad]
+        - Fixed Dutch language support.
+          [ggozad]
+        
+        0.1b1
+        -------------------
+        
+        - Speed gain by not utilizing the PenTreeBank tagger anymore. [ggozad]
+        - Added multi-lingual support, starting with dutch! [ggozad]
+        - No need to download all the coprora anymore. [ggozad]
+        - A lot of refactoring. Things got moved around and a lot of unnecessary code
+          was removed. [ggozad]
+        - We now use a Brill/Trigram/Affix tagger that is pre-trained. This
+          allows collective.classification to ship without all the corpora. The user
+          can still supply a different tagger if necessary. [ggozad]
+        - The default nltk PenTreeBank tagger is no longer used. Too slow. [ggozad]
+        - npextractor is no longer a local persistent utility. Opted for a global
+          non-persisted object. [ggozad]
+        - zope.lifecycle events are now used. [ggozad]
+        - Gained compatibility with plone 4. [ggozad]
+        
+        0.1a3
+        -------------------
+        
+        - Introduced IClassifiable interface. ATContentTypes are now adapted to it,
+          and it should be easier to add other non-AT content types or customize the
+          adapter. [ggozad]
+        - Handling of IObjectRemovedEvent event. [ggozad]
+        - Added a form to import sample content from the brown corpus, for debugging
+          and testing. [ggozad]
+        - Added some statistics information with @@classification-stats.
+          Displays the number of parsed documents, as well as the most useful terms.
+          [ggozad]
+        - Added @@terms view, allowing a user to inspect the identified terms for some
+          content. [ggozad]
+        - Have to specify corpus categories when training n-gram tagger. Fixes #3
+          [ggozad]
+        
+        0.1a2
+        -------------------
+        
+        - Made control panel more sane. Fixes #1. [ggozad]
+        - NP-extractor has become a local persistent utility. [ggozad]
+        - Renamed @@subjectsuggest to @@suggest-categories. Fixes #2. [ggozad]
+        - "memoized" term extractor. [ggozad]
+        - Added friendly types to the control panel. [ggozad]
+        - Updated documentation and dependencies to warn about yaml. [ggozad]
+        
+        0.1a1
+        -------------------
+        
+        - First public release. [ggozad]
+        
+Keywords: term-extract,semantic,classification,Parts-Of-Speech,tagging,plone
+Platform: Any
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Plone
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Classifier: Topic :: Text Processing :: Filters
+Classifier: Topic :: Text Processing :: General
+Classifier: Topic :: Text Processing :: Indexing
