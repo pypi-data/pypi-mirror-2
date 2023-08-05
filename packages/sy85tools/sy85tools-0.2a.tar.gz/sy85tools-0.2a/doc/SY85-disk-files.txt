@@ -1,0 +1,104 @@
+Yamaha SY85 Disk File Format
+============================
+
+:Author: Christopher Arndt
+:Date: 2009-05-08
+
+
+Type "All" Files
+----------------
+
+
+Extension:``G??``
+
+Where ``??`` is a two-digit number starting from 01. Saves bigger than 720kb
+can be spread accross several disks and should be numbered consecutively, i.e.
+the second disk would have the extension ``.G02`` and so on.
+
+Filenames: filenames must be ALL UPPER CASE, 8 chars plus extension.
+
+
+General File Layout
+~~~~~~~~~~~~~~~~~~~
+
+Hex Index   Length      Data                    Repeat
+(bytes)     (bytes)
+
+0x0000      7           "SY85ALL"               1
+0x0007      23 (?)      0-byte padding          1
+0x001E (?)  300         Synth Setup data (?)    1
+0x014A      168         Performance A1 (I1)     64
+                        .
+                        .
+                        .
+                        Performance H8 (I1)
+0x2B4A      160         0-byte padding          1
+0x2BEA      162         Voice A1 (I1)           63
+                        .
+                        .
+                        .
+                        Voice H7 (I1)
+0x53C8      552         DR Voice H8 (I1)        1
+0x55F0      162         Voice A1 (I2)           63
+                        .
+                        .
+                        .
+                        Voice H7 (I2)
+0x7DCE      552         DR Voice H8 (I2)        1
+0x0FF6      340         0-byte padding          1
+0x814A      32428       Performance A1-H8 (I2)  64 --+
+                        Padding                 1    |
+                        Voice A1-H7 (I3)        63   |- 1x
+                        DR Voice H8 (I3)        1    |
+                        Voice A1-H7 (I4)        63   |
+                        DR Voice H8 (I4)        1  --+
+0xFFF6      10          0-byte padding          1
+0x10000     7           "SY85SEQ"               1
+0x10007     25 (?)      0-byte padding          1
+0x10020 (?) 32          Sequencer setup data    1
+0x10040     198         Multi 1                 10
+                        .
+                        .
+                        .
+                        Multi 10
+0x107FC     4           0-byte padding          1
+0x10800     422         Drum Pattern data (?)   1
+0x109A6     8           Drum Pattern name       100
+0x10CCC     9002        Sequencer data (?)      1
+0x13000                 0-byte padding          1
+0x13400                 F8-byte padding         1
+0x13800                 0-byte padding          1
+0x?????     9           "SY85WVALL" or EOF      1        (1)
++ 0x09      23          0-byte padding          1
++ 0x20      8           Waveform name           64
++ 0x220     64          Sample flags            1
++ 0x260     128         Waveform settings       1
+
+
+Waveforms and Sample Data
+-------------------------
+
+The waveforms (if any) begin at a variable offset after the seqencer data, the
+beginning seems to be aligned to the beginning of a 16-byte block and is marked
+with "SY85WVALL" (1). Usual offsets are 0x14000 or 0x1A000.
+
+After 23 bytes of 0-byte padding comes the list of 64 waveform names. Even if
+there are no samples for all waveforms, all 64 waveforms are name. The ones
+which are not used are usually called "InitWave".
+
+After the waveforms names come 64 sample 1-byte flags. For ach byte that is set
+to 0x01, there will be a sample, the other bytes are zero.
+
+This then followed by two bytes of wavform settings for each waveform, i.e 128
+bytes in total. The very first byte is usually 0xab and the first byte of each
+pair is at least 0xab or higher than the previous one (XXX: haven't figured out
+what these are for: number of samples? sample offset?). For waveforms which are
+not used the settings are zero.
+
+Then follows some variable length data blocks, probably more waveform settings.
+
+The actual sample data begins begins at 0x1000 bytes after the "SY85WVALL"
+marker. The format seems to be always PCM 16 bit, signed, MSB first, mono
+and the sample frequency is often 22050 Hz but can be up to 44100 Hz.
+
+In a "SY80 WAVE" file, the sample data starts at offset 0x00400.

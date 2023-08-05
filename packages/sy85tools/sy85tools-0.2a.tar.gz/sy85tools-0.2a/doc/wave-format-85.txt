@@ -1,0 +1,152 @@
+
+        ==================
+        wave-format-85.txt
+        ==================
+
+The following is a description of the SY-85 wave format.
+
+SY80 WAVE1 - FORMAT
+===================
+
+Version 0.0 / 14.06.93 (by T.Gruen)
+Version 0.1 / 21.02.94 (new items A & x; thanks to D.Loebner)
+Version 0.2 / 30.12.97 (added items f,g & h by K.Hemberger)
+
+
+The header contains 1024 bytes. It is followed by the sampling
+data in 16 bit (Hi-Lo) Format. The explicit data values in the
+following header are from `samp.w02' (the noisy sample from
+the demonstration disk). All values are hexadecimal.
+
+00: 5359 3830 2057 4156 4531 0000 0000 0020
+     S Y  8 0    W  A V  E 1             ~~
+     seems to be the introduction
+10: aa00 3c00 19c2 0000 0000 573f 5780 0000
+    ...g .1~~ ...A ~~~~ .2.3 ...4 ...5 .6.7
+20: 577f 0001 3f00 0000 283f 3fff 0c60 5403
+    ...8 .9~~ ~~~~ ~~~~ ~~~~ ~~~~ .x......a
+30: 002f 0140 2e01 002f 017f 0176 002c 0617
+    ......b......c ......d~~ qqqq ...e ...f
+40: 0000 0000 0000 0000 0000 0000 0000 0000
+    ...h
+0042 - 03FF: filled with 00
+
+Position $3a/$3b (qqqq) seems to be the only unexplained values.
+I never saw wave files with other values than the above, marked
+with a tilde (~).
+
+1) Original note: decimal(3c)=60=5*12="C3" on keyboard
+A) Pitch (format see below)
+2) Sample loop type
+     00, 01: forward one shot
+  02: forward normal
+  03: forward alternate
+    (04),05: backward one shot
+       (06): backward normal
+       (07): backward alternate
+   I didn't try the values in parentheses.
+
+For the next points the notation for values > 16 bit will be:
+L for bit 7 to 0  // M for 15 to 8  // H for 23 to 16
+l for bit 6 to 0  // m for 13 to 7  // h for 20 to 14
+
+4) Loop start position (ML)
+5) Sample length (ML)
+8) Loop end (ML)
+3,6,7) The H bits for 3,4 and 7; but i don't remember in what order.
+9) Volume: (127 - this value) is the samples volume
+
+The next values appear also in the MIDI standard sample dump
+
+x) Sample format: (here 12 Bit Samples )
+a) Sample period: lmh (here 60000, i.e. 16667 Hz sampling rate )
+b) Sample length (lmh)
+c) Loop start position (lmh)
+d) Loop end position (lmh)
+e) Number of disk blocks occupied by sample data (1 block = 1024 Bytes)
+f) Offset for pitch calculation
+g) High note (format see below)
+h) Low note (format see below)
+
+
+
+Format of Low note and High note :
+
+There are 128 notes between "C-2" and "G8" from 0 to $7f,
+i.e. note "C3" = $3c = 60 ( = 12 * 5)
+This representation of values is used for 1) (Orgininal note)
+The representation for Low note, High note and the Pitch value
+differs (!)
+The value for i.e. "C3" = $13ab, "C#-2" = $0000 or G8 = $2a00
+The following table solve the problem :
+
+       HiByte (binary)
+
+LoByte (hex)
+
+    ! bxxxxxx00 ! bxxxxxx01 ! bxxxxxx10 ! bxxxxxx11 ! offset
+----!-----------!-----------!-----------!-----------!--------
+$00 !     c#    !     e     !     g     !     a#    !   +2
+----!-----------!-----------!-----------!-----------!--------
+$55 !     d     !     f     !     g#    !     b     !   +1
+----!-----------!-----------!-----------!-----------!--------
+$ab !     d#    !     f#    !     a     !     c     !    0
+
+I.e. the note "c" can be $03ab (c-1), $07ab (c0), $0bab (c1), etc.
+
+What's the value for note "d#1" ?
+
+The note value for "d#1" is 39 (3 * 12 + 3).
+To find the correct value there is an offset (right column in table
+above).
+Note value 39 + 0 (offset) = 39 / 3 = 13 - 1 = 12 = $0c (HiByte).
+The LoByte for "d#" is $ab; the answer for "d#1" is $0cab.
+
+Another example : "a#6" ; note value 106 (8 * 12 + 10).
+
+106 + 2 (offset) = 108 / 3 = 36 - 1 = 35 = $23 (HiByte); result is
+$2300.
+(division by 3; result minus 1 is a must !)
+
+You can also calculate in reverse order, i.e. $1cab : LoByte $ab could
+be
+d#, f#, a or c. HiByte and $03 = $00 -> must be a "d#"
+Now you have to find the correct octave in reverse order of calculation
+:
+$1c = 28 + 1 = 29 * 3 = 87 - 0 (offset) = 87 = "d#5" (87 div 12 / 7  ;
+                                                       7 -> octave 5)
+
+Pitch calculation :
+
+If you understand the format of High note and Low note, the calculation
+of the
+current Pitch value and the possible Pitch range is easy.
+The Value 1) Original note in the format of High/Low note is the basis.
+I.e. note "c3" is represented by $13ab; this is normaly the value for
+Pitch +0
+But there is an offset f) which must be added to the Original note value
+to
+get the Pitch +0 value.
+In the File above, the Original note is "c3" = $13ab; the offset is
+$0617
+$13ab + $0617 = $19c2. $19c2 is the value for Pitch +0. The current
+Pitch is
+the difference between $19c2 and the value A). In the File above A) is
+$19c2.
+So, the difference is zero -> current Pitch is +0.
+If the value of A) is $2056, current Pitch is $2056 - $19c2 = $0694 =
++1684.
+
+
+I don't know the benefit of my adds one day before 1998. if anybody
+have a benefit (my reason to solve the lacking parts of Version 0.1)
+or more adds please give a short message via email.
+
+Greetings,
+Kai
+
+Email : kai.hemberger@wiesbaden-online.de
+
+
+
+
