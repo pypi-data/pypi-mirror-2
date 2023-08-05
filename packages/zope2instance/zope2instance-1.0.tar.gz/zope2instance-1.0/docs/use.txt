@@ -1,0 +1,191 @@
+=====================
+Using Zope 2 Instance
+=====================
+
+The use of Zope 2 Instance is best demonstrated by example. The
+:file:`buildout.cfg` below shows all the elements of the recipe you
+are likely to need:
+
+- You should lock down the versions of packages used to those in the
+  "known good set" for the Zope version you are targetting using an
+  `extends` key pointing at the configuration containing the
+  relevent "known good set". 
+
+- You specify the name of the deployment section the instance should
+  use with the `deployment` key.
+
+- Any extension packages you wish to use in your instance, such as
+  those containing Zope Products, should be specified in the `eggs`
+  key.
+
+- The full contents of the :file:`zope.conf` you require should be put
+  in the key of the same name. You should use buildout's templating to
+  define the paths required within :file:`zope.conf`. In particular,
+  you should use the locations provided by the deployment section to
+  build the paths for the relevent resources, as shown in he example
+  below.
+
+.. topic:: buildout.cfg
+ :class: write-file
+
+ ::
+
+  [buildout]
+  parts = instance
+  # if you want to use a particular zope version, include a line
+  # such as:
+  # extends = http://download.zope.org/Zope2/index/2.12.7/versions.cfg
+
+  [instance]
+  recipe = zope2instance:server
+  deployment = demo
+  eggs = 
+    mailinglogger
+  zope.conf =
+    instancehome ${buildout:directory}
+   <http-server>
+     address 8080
+   </http-server>
+   %import mailinglogger
+   <eventlog> 
+     level info
+     <logfile>
+       path  ${demo:log-directory}/${demo:name}-event.log
+       level info
+     </logfile>
+     <mailing-logger>
+       level   critical
+       from    support@example.com
+       to      monkeys@example.com
+     </mailing-logger>
+   </eventlog>
+   <logger access>
+     level WARN
+     <logfile>
+       path ${demo:log-directory}/${demo:name}-Z2.log
+       format %(message)s
+     </logfile>
+   </logger>
+
+   <zodb_db main>
+     <filestorage main>
+        path ${buildout:directory}/Data.fs
+     </filestorage>
+     mount-point /
+   </zodb_db>
+
+   <zodb_db temporary>
+     <temporarystorage>
+       name temporary storage for sessioning
+     </temporarystorage>
+     mount-point /temp_folder
+     container-class Products.TemporaryFolder.TemporaryContainer
+   </zodb_db>
+
+  [demo]
+  recipe = gocept.recipe.deploymentsandbox
+
+Running the buildout will show you the locations of the normal
+:file:`zopectl` and :file:`runzope` scripts::
+
+  Installing demo.
+  Installing instance.
+  Generated script '/sample-buildout/parts/demo/etc/init.d/demo-instance-zopectl'.
+  Generated interpreter '/sample-buildout/parts/demo/etc/init.d/demo-instance-py'.
+  Generated script '/sample-buildout/parts/demo/etc/init.d/demo-instance-runzope'.
+
+.. -> output
+
+A python interpreter with
+a name ending in :file:`-py` will also be created. This is required
+for :file:`runzope` to work but can also be a handy way of getting a
+python prompt with all your packages available but without the
+overhead of start up a `zopectl debug` session.
+
+A :file:`zope.conf` will also de created in the `etc-directory`
+defined by the deployment. For the above example, it would contain::
+
+   instancehome /sample-buildout
+   <http-server>
+   address 8080
+   </http-server>
+   %import mailinglogger
+   <eventlog>
+   level info
+   <logfile>
+   path  /sample-buildout/parts/demo/var/log/demo/demo-event.log
+   level info
+   </logfile>
+   <mailing-logger>
+   level   critical
+   from    support@example.com
+   to      monkeys@example.com
+   </mailing-logger>
+   </eventlog>
+   <logger access>
+   level WARN
+   <logfile>
+   path /sample-buildout/parts/demo/var/log/demo/demo-Z2.log
+   format %(message)s
+   </logfile>
+   </logger>
+   <zodb_db main>
+   <filestorage main>
+   path /sample-buildout/Data.fs
+   </filestorage>
+   mount-point /
+   </zodb_db>
+   <zodb_db temporary>
+   <temporarystorage>
+   name temporary storage for sessioning
+   </temporarystorage>
+   mount-point /temp_folder
+   container-class Products.TemporaryFolder.TemporaryContainer
+   </zodb_db>
+
+.. -> zope_conf
+
+
+.. invisible-code-block: python
+
+  # check the buildout worked
+  check(output,system(buildout))
+
+  # check the contents of zope.conf
+  check(zope_conf.strip(),
+        td.read('parts/demo/etc/demo/demo-instance-zope.conf').strip())
+
+  # fix the port to the one we know is free
+  replace('parts/demo/etc/demo/demo-instance-zope.conf',
+          '8080',port)
+
+  # Mac OS has funny ideas about how long socket paths can be
+  replace(
+      'parts/demo/etc/init.d/demo-instance-zopectl',
+      td.path+'/parts/demo/var/run/demo/demo-instance-zdaemon.sock',
+      dir+'/z.sock'
+      )
+
+.. some tests:
+
+  Check the instance starts:
+
+  >>> print system(td.path+'/parts/demo/etc/init.d/demo-instance-zopectl start')
+  . 
+  daemon process started, pid=...
+  <BLANKLINE>
+
+  >>> wait_for_started('parts/demo/var/log/demo/demo-event.log')
+
+  Check we can connect to it:
+
+  >>> from urllib import urlopen
+  >>> 'Welcome to <strong>Zope</strong>' in urlopen('http://127.0.0.1:'+port).read()
+  True
+
+  Check the instance stops:
+
+  >>> print system(td.path+'/parts/demo/etc/init.d/demo-instance-zopectl stop')
+  . 
+  daemon process stopped
+  <BLANKLINE>
