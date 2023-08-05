@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (C) 2010 Tobi Vollebregt
+
+import os, sys
+import logging
+from optparse import OptionParser
+from rapid.main import *
+from rapid.unitsync.api import get_writable_data_directory
+
+
+USAGE = """Usage: %prog [options] <verb> [<argument>]
+
+Where verb is one of:
+ * upgrade: Install the latest package for all pinned tags.
+ * clean-upgrade: Equivalent to 'upgrade' followed by 'uninstall-unpinned'.
+ * pin: Pins a tag and installs the latest package for that tag.
+ * unpin: Unpins a tag. Does not uninstall any packages.
+ * install: Install a package. Does not pin any tags.
+ * uninstall: Uninstall a package. Unpin its tag if any.
+ * list-tags: List all tags that contain <argument>.
+ * list-pinned-tags: Idem, but only pinned tags.
+ * list-packages: List all packages whose name contains <argument>.
+ * list-installed-packages: Idem, but only installed packages.
+ * uninstall-unpinned: Keep only the pinned tags and all dependencies.
+ * collect-pool: Remove pool files not needed by any installed package.
+ * make-sdd: Extract pool files into a .sdd archive.
+
+Examples:
+%prog pin xta:latest   # installs latest XTA
+%prog pin s44:latest   # installs latest Spring: 1944
+%prog upgrade          # upgrade all pinned tags"""
+
+
+def main():
+	""" Commandline interface entry point."""
+	logging.basicConfig(level = logging.INFO, stream = sys.stdout, format = '%(message)s')
+	parser = OptionParser(usage=USAGE)
+
+	parser.add_option('--datadir',
+		action='store', dest='datadir',
+		help='Override the default data directory. '
+			'(~/.spring on Linux or the one reported by unitsync on Windows)')
+	parser.add_option('--unitsync',
+		action='store_true', dest='unitsync',
+		help='Use unitsync to locate the data directory Spring uses.',
+		default = (os.name == 'nt'))
+	parser.add_option('--no-unitsync',
+		action='store_false', dest='unitsync',
+		help='Do not use unitsync.')
+
+	(options, args) = parser.parse_args()
+
+	def usage():
+		""" Display usage and exit."""
+		parser.print_usage()
+		sys.exit(1)
+
+	def req_arg():
+		""" Returns the next positional argument or
+		displays an error and exits if there are no arguments left."""
+		if len(args) < 1:
+			print 'Not enough arguments to operation.'
+			print
+			usage()
+		return args.pop(0)
+
+	def opt_arg():
+		""" Returns the next positional argument or
+		the empty string if there are no arguments left."""
+		if len(args) >= 1:
+			return args.pop(0)
+		return ''
+
+	if len(args) < 1:
+		usage()
+
+	verb = args.pop(0)
+
+	if options.datadir:
+		init(options.datadir)
+	elif options.unitsync:
+		init(get_writable_data_directory())
+	elif os.name == 'posix':
+		init(os.path.expanduser('~/.spring'))
+	else:
+		print 'No data directory specified. Specify one using either --datadir or --unitsync.'
+		print
+		usage()
+
+	if verb == 'pin':
+		pin(req_arg())
+	elif verb == 'unpin':
+		unpin(req_arg())
+	elif verb == 'install':
+		install(req_arg())
+	elif verb == 'uninstall':
+		uninstall(req_arg())
+	elif verb == 'list-packages':
+		list_packages(opt_arg(), True)
+	elif verb == 'list-installed-packages':
+		list_packages(opt_arg(), False)
+	elif verb == 'list-tags':
+		list_tags(opt_arg(), True)
+	elif verb == 'list-pinned-tags':
+		list_tags(opt_arg(), False)
+	elif verb == 'update' or verb == 'upgrade':
+		upgrade()
+	elif verb == 'clean-update' or verb == 'clean-upgrade':
+		clean_upgrade()
+	elif verb == 'uninstall-unpinned':
+		uninstall_unpinned()
+	elif verb == 'collect-pool':
+		collect_pool()
+	elif verb == 'make-sdd':
+		make_sdd(req_arg(), req_arg())
+	else:
+		print 'Unknown operation: ' + verb
+		print
+		usage()
+
+
+if __name__ == '__main__':
+	main()
