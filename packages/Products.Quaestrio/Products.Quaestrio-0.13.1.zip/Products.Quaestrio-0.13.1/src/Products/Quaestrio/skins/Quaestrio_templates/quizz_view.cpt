@@ -1,0 +1,75 @@
+<html
+  xmlns="http://www.w3.org/1999/xhtml"
+  xml:lang="fr" lang="fr"
+  metal:use-macro="here/main_template/macros/master"
+  i18n:domain="plone">
+  <body >
+     <metal:main fill-slot="main">
+     <metal:quizz define-macro="quizz">
+      <table>
+        <tr>
+          <td class="quizzContent" >
+            <tal:main-macro
+              tal:define="view here/@@quizz_browserview"
+              i18n:domain="quaestrio">
+              <tal:comment condition="nothing">
+                template_id: redéfinition nécessaire pour le bon fonctionnement des commentaires
+                Apparemment l'utilisation d'une browser view pose un problème pour le calcul de cette variable globale.
+              </tal:comment>
+              <tal:vars define="global template_id string:@@quizz_view;
+                view_template_id plone_view/getViewTemplateId;
+                global isViewTemplate python:template_id == view_template_id;"> </tal:vars>
+              <div metal:use-macro="here/document_actions/macros/document_actions" >
+                Document actions (print, sendto etc)
+              </div>
+              <tal:defines tal:define="scores view/getScores;
+                questions view/getQuestions;
+                answers view/getAnswers;
+                filled python:not ( 0==len(questions) and 0==len(scores));
+                completed python:len(scores)>0 and len(questions) == len(answers);
+                ">
+                <div class="titre" tal:content="here/Title|nothing">Titre Quizz</div>
+                <p><strong tal:content="here/Description|nothing"> Simple description Quizz </strong></p>
+                <div class="desc"  tal:content="structure here/Quizz|nothing">Desc Quizz</div>
+                
+                <tal:comment condition="nothing"> Slot for external modules who want to add additional informations </tal:comment>
+                <metal:slot define-slot="additionnal_informations"></metal:slot> 
+                
+                <hr/>
+                <div class="noitem">
+                  <p tal:condition="not:questions" class="QuaestrioNoItem" i18n:translate="noquestions">il n'y a pas de questions</p>
+                  <p tal:condition="not:scores" class="QuaestrioNoItem" i18n:translate="noscores">il n'y a pas de scores</p>
+                </div>
+                <form tal:define="errors options/state/getErrors" method="post">
+                  <input type="hidden" name="form.submitted" value="1" />
+                  <input type="hidden" name="quizz_name" tal:attributes="value here/UID" />
+                  <tal:questions tal:condition="python: len(questions)>0 and not completed">
+                    <tal:for tal:repeat="mytuple python:enumerate(questions)">
+                      <div class="QuaestrioQuestion"
+                        tal:define="qname python:'q%s'%(mytuple[0]);error python:errors.get(qname,None)"
+                        tal:attributes="id python:mytuple[1].getId">
+                        <tal:question metal:use-macro="here/question_view/macros/light">Affichage d'une question</tal:question>
+                      </div>
+                    </tal:for>
+                    <input name="form.button.send" type="submit" i18n:attributes="value send"/>
+                  </tal:questions>
+                  <tal:scores tal:condition="python: len(scores)>0 and completed">
+                    <h1 i18n:translate="resquizz">resquizz</h1><br />
+                    <tal:for tal:repeat="mytuple python:enumerate(scores)">
+                      <div class="QuaestrioScore"
+                        tal:define="qname python:'q%s'%(mytuple[0]);error python:errors.get(qname,None)">
+                        <tal:score metal:use-macro="here/score_view/macros/light">Affichage d'un score</tal:score>
+                      </div>
+                    </tal:for>
+                  </tal:scores>
+                  <input name="form.button.redo" type="submit" i18n:attributes="value redo" tal:condition="filled"/>
+                </form>
+              </tal:defines>
+            </tal:main-macro>
+          </td>
+        </tr>
+      </table>
+      </metal:quizz>
+      </metal:main>
+  </body>
+</html>

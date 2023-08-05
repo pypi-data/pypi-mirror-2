@@ -1,0 +1,116 @@
+<metal:index metal:define-macro="inaadex">
+  <html xmlns="http://www.w3.org/1999/xhtml"
+    xml:lang="en" lang="en" i18n:domain="plone"
+    metal:use-macro="here/main_template/macros/master"
+    >
+    <body>
+      <metal:main metal:define-macro="main">
+        <div metal:fill-slot="main" tal:omit-tag="">
+          <table>
+            <tr>
+              <td class="questionContent" >
+                <tal:main-macro metal:define-macro="main"
+                  i18n:domain="AntiCancerDocuments">
+                  <tal:comment condition="nothing">
+                    template_id: redéfinition nécessaire pour le bon fonctionnement des commentaires
+                    Apparemment l'utilisation d'une browser view pose un problème pour le calcul de cette variable globale.
+                  </tal:comment>
+                  <tal:vars define="global template_id string:@@recipe_view;
+                    view_template_id plone_view/getViewTemplateId;
+                    global isViewTemplate python:template_id == view_template_id;"> </tal:vars>
+                  <div metal:use-macro="here/document_actions/macros/document_actions" >
+                    Document actions (print, sendto etc)
+                  </div>
+                </tal:main-macro>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </metal:main>
+    </body>
+  </html>
+</metal:index>
+<!--
+here -> QuaestrioQuizz
+obj[0] -> question index
+obj[1] -> the QuaestrioQuestion
+-->
+<metal:light metal:define-macro="light"
+  tal:define="obj python: mytuple[1].getObject();
+  isInversed python:obj.Valmin>obj.Valmax;
+  step python:test(isInversed,-1,1);" >
+  <div class="QuaestrioQuestion titre" tal:content="obj/Title|nothing">Title </div>
+  <div class="QuaestrioQuestion desc" ><div tal:content="structure obj/Question|nothing">Question</div></div>
+  <tal:buttons tal:condition="python:'radioButtons'==here.questions_widget()">
+    <div class="field"
+      tal:define="name python:'questions.%s:record:ignore_empty' % (qname);"
+      tal:attributes="class python:test(error, 'field error', 'field')">
+      <div i18n:translate="" tal:content="error">Validation error output</div>
+      <table>
+        <tr>
+          <td rowspan="2" class="quaestrio-labels min" ><p tal:content="obj/DescValmin">Valeur Minimale</p></td>
+          <tal:for tal:repeat="i python:enumerate(range(obj.Valmin,obj.Valmax+step,step))">
+            <td class="widget">
+              <tal:defines
+                tal:define="value python:i[1];
+                text python:test(isInversed,obj.Valmax+i[0],obj.Valmin+i[0]);
+                isChecked python:value==view.getAnswer(qname);
+                ">
+                <input class="quaestrio-inputs-radio"
+                tal:attributes="name name;title python:text;value python:value"
+                type="radio" name="" value=""
+                tal:condition="not: isChecked">
+                <input class="quaestrio-inputs-radio"
+                tal:attributes="name name;title python:text;value python:value"
+                type="radio" name="" value="" checked="checked"
+                tal:condition="isChecked">
+              </tal:defines>
+            </td>
+          </tal:for>
+          <td rowspan="2" class="quaestrio-labels max" ><p tal:content="obj/DescValmax">Valeur Maximale</p></td>
+        </tr>
+        <tr>
+          <tal:for tal:repeat="i python:enumerate(range(obj.Valmin,obj.Valmax+step,step))">
+          <td class="widget" tal:define="text  python:test(isInversed,obj.Valmax+i[0],obj.Valmin+i[0]);" ><tal:text tal:content="text">VALUE</tal:text></td>
+          </tal:for>
+        </tr>
+      </table>
+    </div>
+  </tal:buttons>
+  <tal:select tal:condition="python:'selectList'==here.questions_widget()">
+    <div class="field"
+      tal:define="name python:'questions.%s:record:ignore_empty' % (qname);
+      hasAnswer python:view.hasAnswer(qname);
+      answer python:view.getAnswer(qname);"
+      tal:attributes="class python:test(error, 'field error', 'field')">
+      <div i18n:translate="" tal:content="error">Validation error output</div>
+      <select tal:attributes="name name">
+        <option i18n:translate="">Select...</option>
+        <tal:for tal:repeat="i python:enumerate(range(obj.Valmin,obj.Valmax+step,step))">
+          <tal:defines
+            tal:define="value python:i[1];
+            text python:test(isInversed,obj.Valmax+i[0],obj.Valmin+i[0]);
+            isChecked python:value==view.getAnswer(qname);">
+            <option tal:attributes="value value;
+                                    selected isChecked">
+            <tal:comment tal:condition="nothing">valeurs extremes</tal:comment>
+            <tal:for tal:repeat="optionComposant python:[(obj.DescValmin,obj.Valmin),(obj.DescValmax,obj.Valmax)]">
+              <tal:text
+                tal:condition="python:text==optionComposant[1]"
+                tal:content="python: '%s %s' % (text,test(optionComposant[0],' : %s' %( optionComposant[0]),''))">
+                min
+              </tal:text>
+            </tal:for>
+            <tal:comment tal:condition="nothing">----------------------</tal:comment>
+            <tal:text tal:condition="python:text not in[obj.Valmin,obj.Valmax]"
+              tal:content="python:text">
+              intermediate
+            </tal:text>
+            </option>
+          </tal:defines>
+        </tal:for>
+      </select>
+    </div>
+  </tal:select>
+  <hr/>
+</metal:light>
