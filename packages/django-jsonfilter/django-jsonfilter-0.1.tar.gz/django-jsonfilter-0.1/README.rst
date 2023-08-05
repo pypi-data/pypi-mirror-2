@@ -1,0 +1,22 @@
+=================
+django-jsonfilter
+=================
+
+Django's dumpdata management command allows you to dump objects from a given
+application, but sometimes you'll want to extract all objects of a given
+*model* from a much larger file containing objects from many models.
+
+This package provides the jsonfilter.py commandline utility, which will 
+allow you to do just that.
+
+Ultimately the idea would be to also add options to be able to search on
+different model fields to extract the objects you want before importing
+them again into the database.
+
+Although it loads the entire json in memory, it's actually quite fast. On a
+41.6MB json file containing 131515 objects, it takes about 3s to extract 
+10341 objects of a given type. The 3s is actually fairly constant, however
+many objects there are of the model it's extracting.
+
+See ``jsonfilter.py --help`` for usage.
+

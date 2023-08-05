@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+"""Read django-exported JSON data and output only objects of the specified
+model type.
+"""
+from optparse import OptionParser
+import re
+import sys
+
+from jsonfilter import JSONModelFilter
+
+if __name__=="__main__":
+    usage = "usage: %prog [options] modelname"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-f", "--file", dest="filename",
+                      help="read data from FILE (default: read from stdin)", 
+                      metavar="FILE", default='-')
+    parser.add_option("-o", "--ofile", dest="ofilename",
+                      help="write data to FILE (default: write to stdout)", 
+                      metavar="FILE", default='-')
+    (options, args) = parser.parse_args()
+    if options.filename == '-':
+        fin = sys.stdin
+    else:
+        fin = open(options.filename, 'r')
+    if options.ofilename == '-':
+        fout = sys.stdout
+    else:
+        fout = open(options.ofilename, 'r')
+
+    if not args:
+        parser.print_help()
+        sys.exit(1)
+
+    previous = m = None
+    fout.write('[\n')
+    for m in JSONModelFilter(args[0]).filteriter(fin):
+        if previous:
+            fout.write(previous + ',\n')
+        fout.flush()
+        previous = m
+    if m:
+        fout.write(m + '\n]\n')
+
+
