@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+"""
+Command line interface to Python Package Index
+"""
+from xmlrpclib import ServerProxy
+from optparse import OptionParser, OptionGroup
+import sys
+
+FILTERS = (
+    'name', 'version', 'author', 'author_email', 'maintainer',
+    'maintainer_email', 'home_page', 'license', 'summary',
+    'description', 'keywords', 'platform', 'download_url')
+
+PACKAGE_FIELDS = (
+    'name', 'summary',
+    'version', 'stable_version', 'author', 'author_email', 'maintainer',
+    'maintainer_email', 'license', 'description',
+    'keywords', 'platform', 'download_url', 'classifiers',
+    'requires', 'requires_dist', 'provides', 'provides_dist', 'requires_external',
+    'requires_python', 'obsoletes', 'obsoletes_dist', 'project_url',
+    'home_page', 'package_url', 'release_url',
+    '_pypi_hidden', '_pypi_ordering')
+
+USAGE = """%prog [OPTION] [SEARCH_QUERY] - to search in PyPI database
+       %prog -s <package_name> - to show package details
+Try `%prog -h` for full option list"""
+
+def main():
+    parser = OptionParser(usage=USAGE)
+    parser.add_option('-s', dest='show', action='store_true', default=False,
+                      help='Show package info')
+    group = OptionGroup(parser, 'Search mode options')
+    for fname in FILTERS:
+        group.add_option('--%s' % fname)
+    parser.add_option_group(group)
+    #parser.add_option('-V', dest='show_version', action='store_true', default=False,
+                      #help='Show pypi util version')
+    kwargs, args = parser.parse_args()
+    if kwargs.show:
+        action = 'show'
+    #elif kwargs.show_version:
+        #action = 'version'
+    else:
+        action = 'search'
+
+
+    if action == 'search':
+        client = ServerProxy('http://pypi.python.org/pypi')
+        query = {}
+        for key in FILTERS:
+            value = getattr(kwargs, key)
+            if value:
+                query[key] = value
+        mode = 'and'
+        if args:
+            query['name'] = query.get('name', '') + ' '.join(args)
+            query['summary'] = query.get('summary', '') + ' '.join(args)
+            mode = 'or'
+        if not query:
+            parser.print_usage()
+            sys.exit()
+        resp = client.search(query, mode)
+        for item in resp:
+            print '%-30s - %s' % (item['name'], item['summary'])
+
+    if action == 'show':
+        client = ServerProxy('http://pypi.python.org/pypi')
+        package = args[0]
+        version = client.package_releases(package)[0]
+        data = client.release_data(package, version)
+        def key_func(x):
+            try:
+                return PACKAGE_FIELDS.index(x[0])
+            except ValueError:
+                return 100
+        for key, value in sorted(data.items(), key=key_func):
+            if value is not None and not key.startswith('_') and value != 'UNKNOWN':
+                if key == 'description':
+                    # Ignore, becouse it is too big sometims
+                    continue
+                if isinstance(value, bool):
+                    value =  'yes' if value else 'no'
+                if isinstance(value, int):
+                    value = str(value)
+                if isinstance(value, list):
+                    value = '\n'.join(value)
+                value = value.splitlines()
+                value = '\n'.join(value[:1] + [' ' * 22 + x for x in value[1:]])
+                print ' %-20s %s' % ('%s:' % key, value)
+
+    #if action == 'version':
+        #print VERSION
+
+
+if __name__ == '__main__':
+    main()
