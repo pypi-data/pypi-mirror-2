@@ -1,0 +1,104 @@
+Computing Skein hashes
+======================
+
+The interface for hashing with Skein is conveniently similar to the
+:mod:`hashlib` module of Python's standard library. A new hash object is
+created by one of the following three functions:
+
+.. function:: skein.skein256(init=b"", digest_bits=256, mac=b"")
+.. function:: skein.skein512(init=b"", digest_bits=512, mac=b"")
+.. function:: skein.skein1024(init=b"", digest_bits=1024, mac=b"")
+
+    These constructor functions return a corresponding hash object
+    for Skein-256, Skein-512, or Skein-1024 (i.e. 256, 512, or 1024 bits
+    internal state).  They optionally take an initial chunk of data to hash,
+    the desired digest length in bits (must be a multiple of 8),
+    and a message authentication code to hash into the digest
+    (as defined in the Skein specification).
+
+
+A hash object has the following methods:
+
+.. method:: update(data)
+
+   Hash the given chunk of (bytes) data into the internal state.
+   (String data has to be encoded to bytes first.)
+   Repeated calls are equivalent to a single call with the concatenation
+   of all the arguments.
+
+.. method:: digest
+
+   Return the digest of all data processed so far. This is a bytes object
+   of length :attr:`digest_size`.
+
+.. method:: hexdigest
+
+   Like :meth:`digest`, but returning the digest as a string
+   of hexadecimal digits.
+
+.. method:: copy
+
+   Return a clone of the hash object, e.g. to efficiently compute hashes of
+   data sharing a common prefix.
+
+
+In addition each hash object has the following attributes:
+
+.. attribute:: name
+
+   Name of the algorithm, i.e. ``"Skein-256"``, ``"Skein-512"``, or
+   ``"Skein-1024"``.
+
+.. attribute:: block_bits
+
+   Internal state size in bits, i.e. ``256``, ``512``, or ``1024``.
+
+.. attribute:: block_size
+
+   Internal state size in bytes (conforming to :mod:`hashlib`),
+   i.e. ``32``, ``64``, or ``128``.
+
+.. attribute:: digest_bits
+
+   Output digest length in bits, i.e. the value given to the constructor
+   function (or default).
+
+.. attribute:: digest_size
+
+   Digest size in bytes.
+
+
+Examples
+--------
+
+Make a Skein-512 hash object with default digest length (512 bits)
+and hash some data::
+
+    >>> from skein import skein256, skein512, skein1024
+    >>> h = skein512()
+    >>> h.update(b"Nobody inspects")
+    >>> h.update(b" the spammish repetition")
+    >>> h.digest()
+    b'r\xac\xe9\xb5R\xc8\x82b\x1d[\xfa\xe1*/\x86\x91\xa4\xf1Wk\xb4~3\xf3B\xc3\xc0\x1dV\x94>\x00\xd3\xdb\x7f\xed1\xe3#\xc1\x00a^\xc2\x1d1\xdc?\xdb\x16`\xf7\xda\xcb1b5,\xa0\xf5W"\x1fX'
+    >>> h.digest_size, h.digest_bits
+    (64, 512)
+    >>> h.block_size, h.block_bits
+    (64, 512)
+
+Similarly for Skein-1024-384::
+
+    >>> h = skein1024(b"Nobody inspects the spammish repetition", digest_bits=384)
+    >>> h.hexdigest()
+    'd97af1a979016051a38e00f53fa56e683d6c4796860c2819c4f3eb8d49a5e844216b7fdadbac636e95fd69b5f1b98427'
+    >>> h.digest_size, h.digest_bits
+    (48, 384)
+    >>> h.block_size, h.block_bits
+    (128, 1024)
+
+Hashing with or without message authentication code (MAC)::
+
+    >>> skein256(b"foo", mac=b"bar").hexdigest()
+    '267daea2fd2ff91611e7d6a162dd4927df549a4aaa2adfa78b49339a91f10bcb'
+    >>> skein256(b"foo").hexdigest()
+    '7c3181538a0b56933ae51e88d938308eaef834b6a27eaa7ea7e60efb2d83c700'
+
