@@ -1,0 +1,50 @@
+#!/usr/bin/python
+
+import re
+from graphit.client import GraphITWatcher
+
+class Watcher(GraphITWatcher):
+	
+	__name__ = 'Used memory'
+	__version__ = '1.0'
+	__wid__ = 'mem'
+	__author__ = 'Antoine Millet <antoine@inaps.org>'
+	
+	TYPES = ('used', 'free')
+	
+	def init_options(self, op):
+		op.add_option('--types', 
+			default='used',
+			help=('What piece of data to submit, can be multiple, '
+			'separated by a comma.'
+			'Types are: used, free.'
+			'Default is used only.')
+		)
+	
+	def check_options(self, op, args):
+		types = re.split(r'[, ;][ ]*', self._options.types)
+		if not all((t in self.TYPES for t in types)):
+			op.error('--types takes only %s values.' 
+												% ', '.join(self.TYPES))
+		
+		self._options.types = types
+		
+	def run(self):
+		meminfo = open('/proc/meminfo', 'r')
+		memmap = dict()
+		for memitem in meminfo:
+			memitem = memitem.strip().split()
+			memmap[memitem[0][:-1]] = int(memitem[1])
+		
+		used = (memmap['MemTotal'] - memmap['MemFree'] 
+					- memmap['Buffers'] - memmap['Cached']) / 1024.0
+
+
+		if 'free' in self._options.types:
+			self.submit('free', memmap['MemFree'] / 1024.0 , unit='Mb')
+		if 'used' in self._options.types:
+			self.submit('used', used, unit='Mb')
+
+if __name__ == '__main__':
+	Watcher()
+
