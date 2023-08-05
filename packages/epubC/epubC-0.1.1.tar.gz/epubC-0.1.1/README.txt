@@ -1,0 +1,62 @@
+epubC - .epub file creator
+==========================
+
+Creates .epub files according to idpf standards.
+
+- Requires lxml - checked with 2.2.6
+- Works with Python 3.1.2 and 2.6.5
+
+Installation
+============
+
+Packaged using distutils, install using
+
+python setup.py install
+
+Usage
+=====
+
+Example of use:
+import epubC
+
+ep = epubC.Epub("Title", "Author", "ID")
+
+As specifed, ID should be a unique identifier such as an ISBN. Attribs are set on the object
+for easy change.
+
+Add to file:
+
+ep.add("content.html", "application/xhtml+xml", io.StringIO(html), "Chapter 1")
+ep.add("test.css", "text/css", io.StringIO(css))
+
+- arcname will be given to the file internally, in case other files reference it.
+- media_type is also added internally, here set as valid XHTML
+- data is a file-like object to with data to be added
+- content_title is used for constructing markers in the file
+
+At present, epubC doesn't understand hierarchical directory structures, so arcname must be
+a simple name. Otherwise, results are undefined ;) Best to format the input so it only references
+other files in a 'flat' way.
+
+media_type is required internally. Mostly contents are required to be valid XHTML if in the
+main reading order.
+
+If content_title is omitted, content is added as a resource to the file. Will not appear
+in the main reading order.
+	
+ep.write("test.epub")
+
+Creates the final file in name specified. No extensions are added, so specify full path.
+	
+ep.close()
+
+Frees up temporary files made in the process. Call this unless you want your storage
+littered with files.
+
+Known Issues/Improvements
+=========================
+
+- No way of setting depth within an epub file instead of one flat sectioning.
+- No support for Python's context manager and with statement.
+
+and probably many more!
