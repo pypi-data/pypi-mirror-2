@@ -1,0 +1,63 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:gs="http://namespaces.zope.org/genericsetup"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    xmlns:i18n="http://namespaces.zope.org/i18n"
+    i18n_domain="collective.xdv">
+
+    <i18n:registerTranslations directory="locales"/>
+
+    <include package="plone.app.registry" />
+    <include package="plone.transformchain" />
+    <include package="five.globalrequest" />
+
+    <gs:registerProfile
+        name="default"
+        title="XDV theme support"
+        description="Installs a control panel to allow on-the-fly theming with xdv"
+        directory="profiles/default"
+        for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+        provides="Products.GenericSetup.interfaces.EXTENSION"
+        />
+    
+    <!-- Transform order 8850 - apply XDV transform -->
+    <adapter
+        name="collective.xdv.transform"
+        factory=".transform.XDVTransform"
+        />
+
+    <subscriber
+        for=".interfaces.ITransformSettings
+              plone.registry.interfaces.IRecordModifiedEvent"
+        handler=".transform.invalidateCache"
+        />
+
+    <browser:page 
+        name="xdv-settings"
+        for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+        class=".browser.TransformSettingsControlPanel"
+        permission="cmf.ManagePortal"
+        />
+    
+    <!-- Set X-XDV header in the request if XDV is enabled -->
+    <subscriber
+        for="ZPublisher.interfaces.IPubAfterTraversal"
+        handler=".header.setHeader"
+        />
+    
+    <!-- Utility view - use in portal_css or similar as portal/@@xdv-check/enabled" -->
+    <browser:page
+        name="xdv-check"
+        for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+        class=".browser.Utility"
+        permission="zope.Public"
+        allowed_attributes="enabled domain_enabled"
+        />
+    
+    <browser:resource
+        name="collective.xdv.gif"
+        image="icon.gif"
+        />
+    
+</configure>
