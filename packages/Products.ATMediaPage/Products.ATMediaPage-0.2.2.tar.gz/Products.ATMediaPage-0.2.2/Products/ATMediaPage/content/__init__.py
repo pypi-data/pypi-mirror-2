@@ -1,0 +1,1 @@
+from mediapage import MediaPage
