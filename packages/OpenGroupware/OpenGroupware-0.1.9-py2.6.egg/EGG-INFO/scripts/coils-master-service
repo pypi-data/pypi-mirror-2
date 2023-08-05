@@ -1,0 +1,84 @@
+#!/usr/bin/python
+# Copyright (c) 2009, 2010 Adam Tauno Williams <awilliam@whitemice.org>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+import getopt, sys, os
+from coils.foundation import change_to_backend_usergroup
+from coils.core       import MasterService, initialize_COILS, BundleManager
+from coils.net        import HTTPService
+
+def usage():
+    print """
+        Start OpenGroupware Coils service components
+        --help            Display this message.
+        --store=          Set the BLOB store root; defaults to "/var/lib/opengroupware.org"
+        --group=          Set the group to run services as; defaults to "skyrix"
+        --user=           Set the user to run services as; defaults to "ogo".
+    """
+    return
+
+
+def main(argv):
+
+    username   = 'ogo'
+    groupname  = 'skyrix'
+    storeroot  = '/var/lib/opengroupware.org'
+    changeuser = True
+
+    try:
+        opts, args = getopt.getopt(argv, "hag:u:s", ["help", "asuser", "user=", "group=", "store="])
+    except getopt.GetoptError, e:
+        print e
+        usage()
+        sys.exit(2)
+    else:
+        for opt, arg in opts:
+            if opt in ("-h", "--help"):
+                usage()
+                sys.exit(0)
+            elif opt in ("-a", "--asuser"):
+                changeuser = False
+            elif opt in ("-u", "--user"):
+                username = arg
+            elif opt in ("-g", "--group"):
+                groupname = arg
+            elif opt in ("-s", "--store"):
+                storeroot = arg
+
+    if (changeuser):
+        change_to_backend_usergroup(username, groupname)
+
+    initialize_COILS({'store_root': storeroot})
+
+    master = MasterService()
+
+    for name in BundleManager.list_services():
+        if (name != 'coils.master'):
+            master.append_service(name, BundleManager.get_service(name))
+
+    master.append_service('coils.http', HTTPService())
+
+    master.start()
+    master.run()
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
