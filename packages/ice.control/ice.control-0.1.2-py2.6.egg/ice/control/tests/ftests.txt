@@ -1,0 +1,613 @@
+===========
+ice.control
+===========
+
+:doctest:
+:functional-zcml-layer: ftesting.zcml
+
+Boilerplates::
+
+  >>> import transaction
+  >>> import zope.component
+  >>> from zope.testbrowser.testing import Browser
+  >>> from zope.publisher.browser import TestRequest
+  >>> from zope.interface.verify import verifyObject
+
+  >>> root_url = 'http://localhost'
+  >>> control_url = root_url + '/++etc++control'
+  >>> browser = Browser()
+
+
+Skin resources
+--------------
+
+  >>> browser.open(root_url)
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> 'http://localhost/++resource++default.css' in browser.contents
+  True
+
+  >>> browser.open('http://localhost/++resource++default.css')
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.open('http://localhost/++resource++img/bluebream_logo.png')
+  >>> browser.headers['status']
+  '200 Ok'
+
+
+System control panel
+--------------------
+
+  >>> browser.open(root_url + "/++etc++control/tree.html")
+  Traceback (most recent call last):
+  ...
+  HTTPError: HTTP Error 401: Unauthorized
+
+  >>> browser.addHeader('Authorization','Basic mgr:mgrpw')
+  >>> browser.handleErrors = False
+
+Generations
+-----------
+
+  >>> browser.open(control_url + '/tree.html')
+
+  >>> browser.getLink('Generations').click()
+  >>> browser.url == control_url + '/generations.html'
+  True
+
+  >>> 'Generations' in browser.contents
+  True
+
+  >>> 'Application' in browser.contents
+  True
+
+  >>> 'Minimum Generation' in browser.contents
+  True
+
+  >>> 'Maximum Generation' in browser.contents
+  True
+
+  >>> 'Current Database Generation' in browser.contents
+  True
+
+  >>> 'Evolve?' in browser.contents
+  True
+
+  >>> 'ice.control' in browser.contents
+  True
+
+  >>> browser.getLink(text='ice.control').click()
+  >>> browser.url == control_url + '/generations_managerdetails.html?id=ice.control'
+  True
+
+  >>> 'This is test generation' in browser.contents
+  True
+
+
+Contents tree
+-------------
+
+  >>> browser.open(root_url)
+  >>> browser.getLink(text='System control').click()
+
+  >>> browser.url == control_url + '/tree.html'
+  True
+
+Resources loaded::
+
+  >>> 'script src="http://localhost/@@/ice.control.tree.js/tree.js"' in browser.contents
+  True
+
+  >>> 'script src="http://localhost/@@/ice.control.tree.js/jquery-1.4.2.min.js"' in browser.contents
+  True
+
+  >>> '@import url("http://localhost/@@/ice.control.tree.css/tree.css");' in browser.contents
+  True
+
+Selected menu item::
+
+  >>> '<td class="selected">\n      <a href="tree.html">Tree</a>\n    </td>' in browser.contents
+  True
+
+Create sample content::
+
+  >>> root = getRootFolder()
+  >>> root
+  <zope.site.folder.Folder object at ...>
+
+  >>> list(root)
+  []
+
+  >>> from zope.site.folder import Folder
+
+  >>> root['first'] = Folder()
+  >>> root['second'] = Folder()
+  >>> root['third'] = Folder()
+  >>> root['fourth'] = Folder()
+  >>> root['fifth'] = Folder()
+
+Verify xml presentation protocol staff::
+
+  >>> from ice.control.controls.tree.interfaces import IXML
+  >>> request = TestRequest()
+
+  >>> x = zope.component.getMultiAdapter((root, request), IXML)
+
+  >>> verifyObject(IXML, x)
+  True
+
+  >>> x.name()
+  u''
+
+  >>> x.path()
+  'http://127.0.0.1'
+
+  >>> x.title()
+  u''
+
+  >>> x.icon_url()
+  'http://127.0.0.1/@@/zope-component-interfaces-ISite-control_icon.png'
+
+  >>> x.size()
+  5
+
+  >>> x.is_container()
+  True
+
+  >>> x.length()
+  5
+
+  >>> x.sort_key() is None
+  True
+
+  >>> print x.to_xml()
+  <node name="" path="http://127.0.0.1/" title=""
+        icon_url="http://127.0.0.1/@@/zope-component-interfaces-ISite-control_icon.png"
+        size="5" length="5" is_container="true" />
+
+  >>> print x.node_xmldoc()
+  <?xml version="1.0" ?>
+  <document>
+  <node name="" path="http://127.0.0.1/" title=""
+	icon_url="http://127.0.0.1/@@/zope-component-interfaces-ISite-control_icon.png"
+        size="5" length="5" is_container="true" />
+  </document>
+
+  >>> print x.children_xmldoc()
+  <?xml version="1.0" ?>
+  <document>
+  <node name="fifth" path="http://127.0.0.1/fifth/" title=""
+        icon_url="http://127.0.0.1/@@/zope-site-interfaces-IFolder-control_icon.png"
+	size="0" length="0" is_container="true" />
+  <BLANKLINE>
+  <node name="first" path="http://127.0.0.1/first/" title=""
+        icon_url="http://127.0.0.1/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <BLANKLINE>
+  <node name="fourth" path="http://127.0.0.1/fourth/" title=""
+        icon_url="http://127.0.0.1/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <BLANKLINE>
+  <node name="second" path="http://127.0.0.1/second/" title=""
+        icon_url="http://127.0.0.1/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <BLANKLINE>
+  <node name="third" path="http://127.0.0.1/third/" title=""
+        icon_url="http://127.0.0.1/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <BLANKLINE>
+  <node name="++etc++site" path="http://127.0.0.1/++etc++site/" title="" icon_url=""
+        size="1" length="1" is_container="true" />
+  </document>
+
+Ajax view::
+
+  >>> browser.open(root_url + '/@@getControlTreeNode.xml')
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <document>
+  <node name="" path="http://localhost/" title=""
+        icon_url="http://localhost/@@/zope-component-interfaces-ISite-control_icon.png"
+	size="5" length="5" is_container="true" />
+  </document>
+
+  >>> browser.open(root_url + '/second/@@getControlTreeNode.xml')
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <document>
+  <node name="second" path="http://localhost/second/" title=""
+        icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+	size="0" length="0" is_container="true" />
+  </document>
+
+  >>> browser.open(root_url + '/@@getControlTreeChildren.xml')
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <document>
+  <node name="fifth" path="http://localhost/fifth/" title=""
+       icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+       size="0" length="0" is_container="true" />
+  <node name="first" path="http://localhost/first/" title=""
+       icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+       size="0" length="0" is_container="true" />
+  <node name="fourth" path="http://localhost/fourth/" title=""
+        icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <node name="second" path="http://localhost/second/" title=""
+        icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <node name="third" path="http://localhost/third/" title=""
+        icon_url="http://localhost/@@/zope-site-interfaces-IFolder-control_icon.png"
+        size="0" length="0" is_container="true" />
+  <node name="++etc++site" path="http://localhost/++etc++site/" title="" icon_url=""
+        size="1" length="1" is_container="true" />
+  </document>
+
+
+Details
+-------
+
+Base details view
++++++++++++++++++
+
+  >>> browser.open(root_url + "/@@getControlDetailsDefaultInfo");
+  >>> '[ base information ]' in browser.contents
+  True
+
+
+Contents
+++++++++
+
+  >>> browser.open(root_url + "/@@getControlDetailsContents");
+
+  >>> browser.getForm(action="http://localhost/@@getControlDetailsContents")
+  <zope.testbrowser.browser.Form object at ...>
+
+  >>> browser.getControl(name="search.widgets.searchterm")
+  <Control name='search.widgets.searchterm' type='text'>
+
+  >>> browser.getControl(name="contents-checkBoxColumn-0-selectedItems")
+  <ListControl name='contents-checkBoxColumn-0-selectedItems' type='checkbox'>
+
+  >>> browser.getControl(name="contents.buttons.delete")
+  <SubmitControl name='contents.buttons.delete' type='submit'>
+
+  >>> browser.getControl(name="contents.buttons.rename")
+  <SubmitControl name='contents.buttons.rename' type='submit'>
+
+
+Dublin Core metadata
+++++++++++++++++++++
+
+  >>> browser.open(root_url + '/@@getControlDetailsDublinCore')
+
+  >>> browser.getForm(action="http://localhost/@@getControlDetailsDublinCore")
+  <zope.testbrowser.browser.Form object at ...>
+
+  >>> browser.getControl(name="dctitle");
+  <Control name='dctitle' type='text'>
+
+  >>> browser.getControl(name="dcdescription")
+  <Control name='dcdescription' type='textarea'>  
+
+  >>> browser.getControl(name="save")
+  <SubmitControl name='save' type='submit'>
+
+
+Introspector
+++++++++++++
+
+  >>> browser.open(root_url + '/@@getControlDetailsIntrospector')
+
+  >>> browser.getLink(text="zope.site.folder.Folder").url
+  'http://localhost/++apidoc++/Code/zope/site/folder/Folder/index.html'
+
+  >>> browser.getLink(text="zope.site.interfaces.IRootFolder").url
+  'http://localhost/++apidoc++/Interface/zope.site.interfaces.IRootFolder/index.html'
+
+
+Configuration plugin
+++++++++++++++++++++
+
+  >>> browser.open(root_url + '/@@getControlDetailsConfigurators')
+  >>> browser.getControl(name="form.actions.update")
+  <SubmitControl name='form.actions.update' type='submit'>
+
+
+Registrations
++++++++++++++
+
+  >>> browser.open(root_url + '/++etc++site/@@getControlDetailsLocalRegistrations')
+  >>> browser.getControl(name="deactivate")
+  <SubmitControl name='deactivate' type='submit'>
+
+  >>> 'CookieClientIdManager' in browser.contents
+  True
+
+  >>> 'RootErrorReportingUtility' in browser.contents
+  True
+
+  >>> 'PrincipalAnnotation' in browser.contents
+  True
+
+  >>> 'PersistentSessionDataContainer' in browser.contents
+  True
+
+
+BlueBream REPL console in JavaScript
+++++++++++++++++++++++++++++++++++++
+
+  >>> browser.open(root_url + '/@@getControlDetailsREPL')
+  >>> browser.headers['status']
+  '200 Ok'
+
+Post to console not valid data::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract', 'source=foo')
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.headers['content-type']
+  'text/xml;charset=utf-8'
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[Traceback (most recent call last):]]></line>
+  <line><![CDATA[  File "&lt;input&gt;", line 1, in &lt;module&gt;]]></line>
+  <line><![CDATA[NameError: name 'foo' is not defined]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+Post valid data.
+
+1::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',	
+  ...              'source=zope.interface.Interface')
+
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.headers['content-type']
+  'text/xml;charset=utf-8'
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[Traceback (most recent call last):]]></line>
+  <line><![CDATA[  File "&lt;input&gt;", line 1, in &lt;module&gt;]]></line>
+  <line><![CDATA[NameError: name 'zope' is not defined]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+2::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',	
+  ...              'source=import+zope.interface')
+
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.headers['content-type']
+  'text/xml;charset=utf-8'
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+3::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',	
+  ...              'source=zope.interface.Interface')
+
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.headers['content-type']
+  'text/xml;charset=utf-8'
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[&lt;InterfaceClass zope.interface.Interface&gt;]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+
+4::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=import+foo')
+
+  >>> browser.headers['status']
+  '200 Ok'
+
+  >>> browser.headers['content-type']
+  'text/xml;charset=utf-8'
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[Traceback (most recent call last):]]></line>
+  <line><![CDATA[  File "&lt;input&gt;", line 1, in &lt;module&gt;]]></line>
+  <line><![CDATA[ImportError: No module named foo]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+IndentationError: unexpected indent::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++print+7')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[  File "&lt;input&gt;", line 1]]></line>
+  <line><![CDATA[    print 7]]></line>
+  <line><![CDATA[   ^]]></line>
+  <line><![CDATA[IndentationError: unexpected indent]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+
+Incomplete Python input. Let's execute follow source code, line by line:
+
+def foo(x):
+   """Comment"""
+   print x
+   if x > 10:
+       print "> 10"
+   # return x + 100
+   return x + 100
+
+<result>1</result> - incomplete interpreter input
+<result>0</result> - complete
+
+
+1::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=def+foo(x):')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+2::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++"""Comment"""')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+3::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++print+x')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+4::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++if+x+>+10%3A')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+5::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++++++print+">+10"')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+6::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++%23+return+x+%2B+100')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+7::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=++++return+x+%2B+100')
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output></output>
+  <result>1</result>
+  </doc>
+
+
+At this momment, the input is accumulated in buffer. Let's inspect input
+buffer in REPL session::
+
+  >>> from ice.control.repl.interfaces import IDispatcher
+  >>> dispatcher = zope.component.getUtility(IDispatcher)
+  >>> session = dispatcher._sessions.values()[0]
+  >>> print session.input_buffer
+  def foo(x):
+      """Comment"""
+      print x
+      if x > 10:
+          print "> 10"
+      # return x + 100
+      return x + 100
+
+
+8 (complete input)::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=')
+
+  >>> session.input_buffer is ''
+  True
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+Let's exec that function::
+
+  >>> browser.post(root_url + '/@@getControlDetailsREPLInteract',
+  ...              'source=foo(1)')
+
+  >>> session.input_buffer is ''
+  True
+
+  >>> print browser.contents
+  <?xml version="1.0" ?>
+  <doc>
+  <output><line><![CDATA[1
+  101]]></line>
+  </output>
+  <result>0</result>
+  </doc>
+
+It's OK.
