@@ -1,0 +1,146 @@
+================
+Portlet assignment
+================
+
+Based on tests/content.txt but focusing on assigning portlets for 
+the various portlet managers of the portlet page.
+
+The portlet pages are simple Archetypes content. Let's ensure that they can
+be created, using a test-browser test.
+
+First, some set-up.
+
+    >>> from Products.Five.testbrowser import Browser
+    >>> browser = Browser()
+    >>> portal_url = self.portal.absolute_url()
+    
+    >>> browser.handleErrors = False
+    >>> self.portal.error_log._ignored_exceptions = ()
+    
+We will log authorise as the portal owner.
+    
+    >>> from Testing.ZopeTestCase import user_password
+    >>> browser.addHeader('Authorization',
+    ...                   'Basic %s:%s' % ('portal_owner', user_password))
+    
+Start on the portal root.
+    
+    >>> browser.open(portal_url)
+    
+Now add a portlet page.
+
+    >>> browser.getLink(id='portlet-page').click()
+    
+Make sure we're in the factory:
+
+    >>> 'portal_factory' in browser.url
+    True
+    
+Fill in the form and submit.
+    
+    >>> browser.getControl(name='title').value = "Portlet page"
+    >>> browser.getControl(name='description').value = "Portlet page description"
+    >>> browser.getControl(name='text').value = "<b>Portlet page body text</b>"
+    >>> browser.getControl(name='form_submit').click()    
+    
+Lets publish the portlet page.
+
+    >>> browser.getLink(id='workflow-transition-publish').click()
+
+We focus on the content column. So lets disable the left and right column
+
+    >>> from zope.component import getMultiAdapter, getUtility
+    >>> from plone.portlets.interfaces import IPortletManager
+    >>> from plone.portlets.interfaces import IPortletAssignmentMapping
+
+    >>> left_column = getUtility(IPortletManager, name=u"plone.leftcolumn")
+    >>> left_assignable = getMultiAdapter((self.portal, left_column), IPortletAssignmentMapping)
+    >>> for name in left_assignable.keys():
+    ...     del left_assignable[name]
+
+    >>> right_column = getUtility(IPortletManager, name=u"plone.rightcolumn")
+    >>> right_assignable = getMultiAdapter((self.portal, right_column), IPortletAssignmentMapping)
+    >>> for name in right_assignable.keys():
+    ...     del right_assignable[name]
+
+Check if the columns are turned off.
+
+    >>> url = '%s/portlet-page' % portal_url
+
+    >>> browser.open(url)
+    >>> '<td id="portal-column-one">' in browser.contents
+    False
+
+    >>> browser.open(url)
+    >>> '<td id="portal-column-two">' in browser.contents
+    False
+
+The portlet page package provides the following portlet managers according to 
+collective.portletpage/collective/portletpage/profiles/default/portlets.xml:
+    
+    collective.portletpage.toprow
+    collective.portletpage.firstcolumn
+    collective.portletpage.secondcolumn
+    collective.portletpage.bottomrow
+    
+All these portlet managers are bound up to the collective.portletpage.interfaces.IPortletPageColumn 
+which is a sub class of plone.app.portlets.interfaces.IColumn
+
+So lets have a look at the markup / output for the whole page. 
+
+    >>> browser = Browser()
+    >>> browser.open(url)
+
+The markup for the portlet page looks at least like this, even if no portlets are assigned yet.
+
+    >>> browser.contents
+    '...<div id="portletPageColumns">...<div id="portletPageTopRow">...</div>......<div id="portletPageSecondColumn">...</div>...<div id="portletPageFirstColumn">...</div>...<div id="portletPageBottomRow">...</div>...</div>...'
+
+
+Ok lets try to assign the navigation portlet for the collective.portletpage.firstcolumn. Remember to set
+toplevel=0 to ensure navigation portlet getting showed. 
+
+TODO: Change this part into a more proper functional test approach doing the assignment "through the browser".
+
+    >>> from zope.component import getUtility, getMultiAdapter
+    >>> from plone.portlets.interfaces import IPortletManager
+    >>> from plone.portlets.interfaces import IPortletAssignmentMapping
+    >>> from plone.app.portlets import portlets
+    >>> context = self.portal.unrestrictedTraverse('portlet-page')
+    >>> portlet_manager = getUtility(IPortletManager, name=u'collective.portletpage.firstcolumn', context=context)
+    >>> firstcolumn = getMultiAdapter((context, portlet_manager,), IPortletAssignmentMapping, context=context)
+    >>> u'navigation' not in firstcolumn
+    True
+
+    >>> if u'navigation' not in firstcolumn:
+    ...     firstcolumn[u'navigation'] = portlets.navigation.Assignment(root='/', topLevel=0, name='Navigation in portlet page' ,)
+
+    >>> firstcolumn = getMultiAdapter((context, portlet_manager,), IPortletAssignmentMapping, context=context)
+    >>> u'navigation' in firstcolumn
+    True
+
+Lets also add the login portlet.
+
+    >>> u'login' not in firstcolumn
+    True
+
+    >>> if u'login' not in firstcolumn:
+    ...     firstcolumn[u'login'] = portlets.login.Assignment()
+
+    >>> firstcolumn = getMultiAdapter((context, portlet_manager,), IPortletAssignmentMapping, context=context)
+    >>> u'login' in firstcolumn
+    True
+
+Lets do a roughly check with the portlet assignment. The login portlet should be visible.
+
+    >>> browser = Browser()
+    >>> browser.open(url)
+    >>> '<dl class="portlet portletLogin">' in browser.contents
+    True
+
+Lets also check for the custom / local navigation that was added to the portlet page.
+
+    >>> '<a href="http://nohost/plone/sitemap" class="tile">Navigation in portlet page</a>' in browser.contents
+    True
+
+
