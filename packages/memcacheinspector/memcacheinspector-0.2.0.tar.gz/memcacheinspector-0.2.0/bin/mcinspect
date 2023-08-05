@@ -1,0 +1,233 @@
+#!/usr/bin/env python
+
+import re
+import sys
+from optparse import OptionParser, IndentedHelpFormatter
+
+import memcache
+import memcacheinspector
+
+
+def do_list(servers, max_value_size=0):
+    mci = memcacheinspector.MemcacheInspector(servers)
+    for server, items in mci.get_items(max_value_size=max_value_size).iteritems():
+        for item in items:
+            print '%s|%s|%s|%s' % (server, item.expiration.isoformat(), item.size, item.key)
+
+
+def do_dump(servers, max_value_size=0):
+    mci = memcacheinspector.MemcacheInspector(servers)
+    for server, items in mci.get_items(include_values=True, max_value_size=max_value_size).iteritems():
+        for item in items:
+            print '%s|%s|%s|%s' % (server, item.expiration.isoformat(), item.size, item.key)
+            print item.value
+
+
+def do_grep(servers, pattern, ignore_case=False, invert_match=False):
+    if ignore_case:
+        regex = re.compile(pattern, flags=re.IGNORECASE)
+    else:
+        regex = re.compile(pattern)
+    mci = memcacheinspector.MemcacheInspector(servers)
+    for server, items in mci.get_items(include_values=True).iteritems():
+        for item in items:
+            match = regex.search(item.key) or (isinstance(item.value, basestring) and regex.search(item.value))
+            if bool(match) != invert_match:
+                print '%s|%s|%s|%s' % (server, item.expiration.isoformat(), item.size, item.key)
+                print item.value
+
+
+def do_get(servers, keys):
+    for server in servers:
+        mc = memcache.Client([server])
+        for key, val in mc.get_multi(keys).iteritems():
+            print '%s|%s' % (server, key)
+            print val
+
+
+def do_set(servers, key, value):
+    for server in servers:
+        mc = memcache.Client([server])
+        if mc.set(key, value):
+            print '%s|%s' % (server, key)
+            print value
+
+
+def do_incr(servers, keys, delta):
+    for server in servers:
+        mc = memcache.Client([server])
+        for key in keys:
+            try:
+                val = mc.incr(key, delta)
+            except:
+                pass
+            else:
+                print '%s|%s' % (server, key)
+                print val
+
+
+def do_decr(servers, keys, delta):
+    for server in servers:
+        mc = memcache.Client([server])
+        for key in keys:
+            try:
+                val = mc.decr(key, delta)
+            except:
+                pass
+            else:
+                print '%s|%s' % (server, key)
+                print val
+
+
+def do_delete(servers, keys):
+    for server in servers:
+        mc = memcache.Client([server])
+        if mc.delete_multi(keys):
+            for key in keys:
+                print '%s|%s' % (server, key)
+
+
+def do_flush(servers):
+    for server in servers:
+        mc = memcache.Client([server])
+        mc.flush_all()
+        print server
+
+
+def do_stats(servers):
+    for server in servers:
+        mc = memcache.Client([server])
+        for host, stats in mc.get_stats():
+            for key, val in stats.iteritems():
+                print '%s|%s|%s' % (host.split()[0], key, val)
+
+
+class _CustomHelpFormatter(IndentedHelpFormatter):
+    def format_description(self, description):
+        return description if description else ''
+    def format_epilog(self, epilog):
+        return epilog if epilog else ''
+
+
+if __name__ == '__main__':
+    opt = OptionParser(
+            usage='Usage: %prog [options] <action> [<arguments>]',
+            version='%%prog %s' % (memcacheinspector.__version__,),
+            formatter=_CustomHelpFormatter(),
+            description='''Actions:
+  list                     Lists all items stored in the server(s).
+  dump                     Dumps all items (including values) stored in the
+                           server(s).
+  grep <pattern>           Dumps all items (including values) whose key or value
+                           matches the specified search pattern.
+  get <key> [<key> ...]    Retrieves the items with the specified key(s).
+  set <key> <value>        Sets the item with the specified key and value.
+  incr key                 Increments the value of the items with the specified
+                           key(s).
+  decr key                 Decrements the value of the items with the specified
+                           key(s).
+  delete <key> [<key> ...] Deletes the items with the specified key(s).
+  flush                    Expires all items in the server(s).
+  stats                    Retrieves statistics from the server(s).
+''',
+            epilog='''
+Output Format:
+  list:
+    <server connection string>|<expiration date>|<size in bytes>|<key>
+
+  dump, grep:
+    <server connection string>|<expiration date>|<size in bytes>|<key>
+    <value>
+
+  get, set, incr, decr:
+    <server connection string>|<key>
+    <value>
+
+  delete:
+    <server connection string>|<key>
+
+  flush:
+    <server connection string>
+
+  stats:
+    <server connection string>|<statistic key>|<value>
+
+'''
+    )
+    opt.add_option(
+            '-s', '--server',
+            dest='server', action='append', type='string',
+            help='Specifies a server to connect to. Can be used multiple times. Defaults to \'127.0.0.1:11211\'.'
+    )
+    opt.add_option(
+            '-z', '--max-value-size',
+            dest='max_value_size', action='store', type='int', default=0,
+            help='The maximum size (in bytes) of a value can be when performing a list or dump action. Zero or lower is interpreted as no limit. Defaults to 0.'
+    )
+    opt.add_option(
+            '-d', '--delta',
+            dest='delta', action='store', type='int', default=1,
+            help='The amount to change the value when using the incr or decr actions. Defaults to 1.'
+    )
+    opt.add_option(
+            '-i', '--ignore-case',
+            dest='ignore_case', action='store_true', default=False,
+            help='Ignore case distinctions in both the pattern and the items during the grep action.'
+    )
+    opt.add_option(
+            '-v', '--invert-match',
+            dest='invert_match', action='store_true', default=False,
+            help='Inverts the sense of matching, to select non-matching items during the grep action.'
+    )
+    options, args = opt.parse_args(sys.argv[1:])
+
+
+    def usage():
+        opt.print_help()
+        sys.exit(1)
+
+    def ensure_args(args, min_num):
+        if len(args) < min_num:
+            usage()
+
+
+    if not args:
+        usage()
+    else:
+        action = args[0]
+        del args[0]
+
+    if options.server:
+        servers = options.server
+    else:
+        servers = ['127.0.0.1:11211']
+
+
+    if action == 'list':
+        do_list(servers, max_value_size=options.max_value_size)
+    elif action == 'dump':
+        do_dump(servers, max_value_size=options.max_value_size)
+    elif action == 'grep':
+        ensure_args(args, 1)
+        do_grep(servers, args[0], ignore_case=options.ignore_case, invert_match=options.invert_match)
+    elif action == 'get':
+        ensure_args(args, 1)
+        do_get(servers, args)
+    elif action == 'set':
+        ensure_args(args, 2)
+        do_set(servers, args[0], args[1])
+    elif action == 'incr':
+        ensure_args(args, 1)
+        do_incr(servers, args, options.delta)
+    elif action == 'decr':
+        ensure_args(args, 1)
+        do_decr(servers, args, options.delta)
+    elif action == 'stats':
+        do_stats(servers)
+    elif action == 'delete':
+        ensure_args(args, 1)
+        do_delete(servers, args)
+    elif action == 'flush':
+        do_flush(servers)
+    else:
+        usage()
