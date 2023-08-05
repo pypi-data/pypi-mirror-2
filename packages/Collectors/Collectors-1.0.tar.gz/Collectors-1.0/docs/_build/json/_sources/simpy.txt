@@ -1,0 +1,132 @@
+.. _simpy:
+
+How to use *Collectors* with *SimPy*
+====================================
+
+If you have read and understood the previous sections, you won’t have any trouble using *Collectors* to monitor your simulation processes.
+
+We’ll now discuss two examples that show different ways *Collectors* can be used: You can either use one collector instance per process or let one instance monitor multiple processes at once.
+
+You should one collector per process if each process belongs to another class or if each process collects its data at another time. If your processes are all instances of the same class and if each instance collects data at the same time, you only need to use one collector instance. That might save you some memory.
+
+
+One collector per process
+-------------------------
+
+In the following example a :class:`~SimPy.Simulation.Process` is created. In
+each step, it generates some random numbers and then holds for a random amount
+of time (that’s why we need one collector per process here).
+
+The process also creates one collector (``self.monitor``) which will collect the
+simulation time, the values for ``a`` and ``b``, the manually passed values for
+``diff`` and finally the square of ``c``. The resulting collector instance will
+thus have the attributes ``time``, ``a``, ``b``, ``diff`` and ``square``.
+
+After the simulation has finished, `NumPy <http://numpy.scipy.org/>`_ arrays
+will be created and show how you can easily work with them or create some charts
+using `Matplotlib <http://matplotlib.sourceforge.net/>`_.
+
+    >>> import random
+    >>> 
+    >>> import matplotlib.pyplot as plt
+    >>> from numpy import array, float64
+    >>> from SimPy.Simulation import Simulation, Process, hold
+    >>> 
+    >>> from collectors import Collector, get, manual
+    >>> 
+    >>> 
+    >>> class MyProc(Process):
+    ...     def __init__(self, sim):
+    ...         Process.__init__(self, sim=sim)
+    ...         self.a = 0
+    ...         self.b = 0
+    ...         self.c = 0
+    ...
+    ...         self.monitor = Collector(
+    ...             ('time', sim.now),
+    ...             get(self, 'a', 'b'),
+    ...             ('diff', manual),
+    ...             ('square', lambda: self.c ** 2),
+    ...         )
+    ...
+    ...     def run(self):
+    ...         while True:
+    ...             self.a += random.random()
+    ...             self.b += random.randint(1, 2)
+    ...             self.c += random.randint(2, 4)
+    ...
+    ...             self.monitor(diff=self.c-self.b)
+    ...
+    ...             yield hold, self, random.randint(1, 4)
+    ... 
+    >>> # Run the simulation
+    >>> random.seed(42)
+    >>> sim = Simulation()
+    >>> proc = MyProc(sim)
+    >>> sim.activate(proc, proc.run())
+    >>> sim.simulate(until=10)
+    'SimPy: Normal exit'
+    >>> 
+    >>> # NumPy helps you with the statistics and other calculations.
+    >>> # Note: specification of dtype gives you a massive speed-up!
+    >>> a = array(proc.monitor.a, dtype=float64)
+    >>> # NumPy: average, std. deviation, variance
+    >>> print 'a stats:', a.mean(), a.std(), a.var()
+    a stats: 2.04867732762 0.947900129333 0.898514655189
+    >>> 
+    >>> # This one creates a multi-dimensional array
+    >>> np_mon = array(proc.monitor, dtype=float64)
+    >>> # Get the average of all monitored proc.b
+    >>> print 'b stats:', np_mon[2].mean()
+    b stats: 5.57142857143
+    >>> # Get the std. deviation of all monitored proc.c
+    >>> print 'c stats:', np_mon[3].std()
+    c stats: 3.09047252183
+    >>> 
+    >>> # Matplotlib plots your data:
+    >>> # Either directly from a monitor ...
+    >>> p = plt.plot(proc.monitor.time, proc.monitor.a, 'b')
+    >>> # ... or the NumPy array
+    >>> p = plt.plot(np_mon[0], np_mon[2], 'r')
+    >>> plt.show()
+
+
+One collector for multiple processes
+------------------------------------
+
+This example shows a very simple process whose PEM will be executed each time
+step. This enables us to use one collector instance to monitor the attribute
+``a`` of all processes and the simulation time.
+
+We also use SimPy’s brand-new :meth:`~SimPy.Simulation.Simulation.peek` and
+:meth:`~SimPy.Simulation.Simulation.step` methods here which will be introduced
+with version 2.1.
+
+    >>> from SimPy.Simulation import Simulation, Process, hold
+    >>> from collectors import Collector, get_objects
+    >>> 
+    >>> class MyProc(Process):
+    ...     """docstring for MyProc2"""
+    ...     def __init__(self, sim, pid):
+    ...         Process.__init__(self, sim=sim)
+    ...         self._pid = 'p%d' % pid
+    ...         self.a = 0
+    ...         
+    ...     def run(self):
+    ...         while True:
+    ...             self.a += 1
+    ... 
+    >>> sim = Simulation()
+    >>> procs = [MyProc(sim, i) for i in range(10)]
+    >>> for proc in procs:
+    ...     sim.activate(proc, proc.run())
+    ...     
+    >>> # This coll. will have the attributes "t", "p0_a", "p1_a", ..., "p9_a"
+    >>> # and monitor the simulation time as well as the values of "a" for each
+    >>> # process.
+    >>> monitor = Collector(('t', sim.now), get_objects(procs, 'pid', 'a'))
+    >>>     
+    >>> # Run the simulation by using the band-new "peek()" and "step()".
+    >>> while sim.peek() < 10:
+    ...     sim.step()
+    ...     monitor()
