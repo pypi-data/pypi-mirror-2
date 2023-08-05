@@ -1,0 +1,1 @@
+%~dp0..\python mapachemon_start.py C:\web\MicroApache2.2\mhttpd.exe
