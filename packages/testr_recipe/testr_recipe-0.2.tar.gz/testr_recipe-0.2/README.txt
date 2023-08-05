@@ -1,0 +1,67 @@
+testr recipe
+============
+
+This allows you to easily add a testrepository script to your buildout
+project. This really only means that the user doesn't have to have
+testr on their path, and they can just use ./bin/test or simlar.
+
+This works very similarly to zc.recipe.testrunner, and in fact borrows
+most of its code from there.
+
+A sample buildout configuration would be::
+
+[buildout]
+develop = .
+parts = test
+
+[test]
+recipe = testr_recipe
+script = test
+
+which will have ./bin/test run using the .testr.conf in your root
+dir.
+
+These are the options you can use:
+
+  * script: define the name of the script to create, if not passed
+    then the name of the section will be used.
+  * working-directory: if somewhere other than the root of the project
+    should be used.
+  * environment: the name of a section containing pairs of values to
+    put in the environment for the test run, e.g.
+
+    ::
+
+    [test]
+    recipe = testr_recipe
+    enironment = testenv
+
+    [testenv]
+    foo = bar
+    zap = zang
+
+  * initialization: a string containing python code to put in the test
+    script before testr is run.
+  * executable: the python executable to put in the #! of the script.
+  * defaults: a list of options to prepend sys.argv for testr.
+    These are specified as Python source for an expression yielding a list,
+    typically a list literal. One thing you can do with this is::
+
+    [buildout]
+    parts = test testr
+
+    [testr]
+    recipe = testr_recipe
+
+    [test]
+    recipe = testr_recipe
+    defaults = ["run"]
+
+    which will make ./bin/test run the tests, and allow you to use
+    ./bin/testr to access all the features of testr.
+
+Future enhancments:
+
+  * Maybe automatically doing "testr init" when setting up the project, so that
+    ./bin/test works straight away.
+  * Automatically generate a .testr.conf using standard mechanisms.
