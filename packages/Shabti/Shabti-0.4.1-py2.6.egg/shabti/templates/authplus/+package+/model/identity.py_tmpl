@@ -1,0 +1,269 @@
+import os
+import hashlib
+from datetime import datetime
+
+import pylons
+
+from elixir import *
+from elixir import events
+from sqlalchemy.ext.orderinglist import ordering_list
+from sqlalchemy.types import *
+from {{package}}.model import Session, metadata
+from {{package}}.model import meta
+
+options_defaults['inheritance'] = 'multi'
+
+def encrypt_value(value):
+    return hashlib.sha1(value).hexdigest()
+
+class NotAuthenticated(Exception):pass
+
+class User(Entity):
+    """User"""
+    using_options(shortnames=True, order_by='displayname')
+    using_table_options(useexisting=True)
+    username = Field(Unicode, 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    displayname = Field(Unicode, 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    email = Field(String, 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    gender = Field(String, 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    timezone = Field(String, 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    password = Field(String)
+    created = Field(DateTime, default=datetime.utcnow, 
+                    # info = {'formatter':'date', 'sorttype':'date',
+                    #         'formatoptions':dict(newformat='Y-m-d')}
+                            )
+    last_login = Field(DateTime, default=datetime.utcnow, 
+                    # info = {'formatter':'date', 
+                    #         'sorttype':'date', 
+                    #         'formatoptions':dict(newformat='Y-m-d')}
+                            )
+    session_id = Field(String)
+    email_token = Field(String)
+    password_token = Field(String)
+    email_token_issue = Field(DateTime)
+    password_token_issue = Field(DateTime)
+    active = Field(Boolean, default=False, 
+                    # info = {'choices': {0: 'False', 1: 'True'}
+                    # }
+                            )
+    groups = ManyToMany('Group')
+    openids = OneToMany('OpenID')
+    
+    def __str__(self):
+        return self.displayname
+    
+    def __unicode__(self):
+        return self.displayname
+    
+    @staticmethod
+    def hash_password(plaintext):
+        """Returns a crypted/salted password field
+        
+        The salt is stored in front of the password, for per user 
+        salts.
+        
+        """
+        if isinstance(plaintext, unicode):
+            plaintext = plaintext.encode('utf-8')
+        password_salt = hashlib.sha1(os.urandom(60)).hexdigest()
+        crypt = hashlib.sha1(plaintext + password_salt).hexdigest()
+        return password_salt + crypt
+    
+    def verify_password(self, plaintext):
+        """Verify a plain text string is the users password"""  
+        if isinstance(plaintext, unicode):
+            plaintext = plaintext.encode('utf-8')
+        
+        # Some users don't have passwords, like OpenID users, so they
+        # can't use a password to login
+        if not self.password:
+            return False
+        
+        password_salt = self.password[:40]
+        crypt_pass = hashlib.sha1(plaintext + password_salt).hexdigest()
+        if crypt_pass == self.password[40:]:
+            return True
+        else:
+            return False
+    
+    def email_hash(self):
+        return hashlib.md5(self.email).hexdigest()
+    
+    def generate_token(self):
+        """Generate's a token for use either for forgot password or
+        email verification"""
+        return hashlib.sha1(os.urandom(60)).hexdigest()
+    
+    def valid_password_token(self):
+        diff = datetime.now() - self.password_token_issue
+        token_lifespan = pylons.config['sso.password_token_lifespan']
+        if diff.days < 1 and diff.seconds < token_lifespan:
+            return True
+        else:
+            return False
+    
+    def in_group(self, group):
+        if group in list(self.groups):
+            return True
+        else:
+            return False
+    
+    def process_login(self):
+        session = pylons.session._current_obj()
+        session['logged_in'] = True
+        session['displayname'] = self.displayname
+        session['user_id'] = self.id
+        session.save()
+        self.session_id = session.id
+        Session.commit()
+    
+    
+    # Imported from User ....
+    @classmethod
+    def authenticate(cls, username, password):
+        try:
+            user=cls.query.filter_by(username=username, active=True).one()
+            if user and encrypt_value(password) == user.password:
+                return user
+        except Exception:
+            raise NotAuthenticated
+        raise NotAuthenticated
+    
+    def validate_password(user, plaintext):
+        return encrypt_value(plaintext) == user.password
+    
+    @events.before_insert
+    @events.before_update
+    def encrypt_password(self):
+        pass
+        # if self.password and self.password != self.password_check:
+        #     self.password = encrypt_value(self.password)
+        #     self.password_check = self.password
+    
+    @property
+    def permissions(self):
+        permissions = set()
+        for g in self.groups:
+            permissions = permissions | set(g.permissions)
+        return permissions        
+    
+    @property
+    def permission_names(self):
+        return [p.name for p in self.permissions]
+    
+    def has_permission(self, perm):
+        return (perm in self.permission_names)
+    
+
+
+class OpenID(Entity):
+    """OpenID"""
+    using_options(shortnames=True, order_by="text")
+    using_table_options(useexisting=True)
+    user = ManyToOne('User')
+    # position = Field(Integer, 
+    #                info = {'align':'right',
+    #                        'formatter':'int', 
+    #                        'sorttype':'int'}
+    #                        )
+    text = Field(Unicode(255), 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    
+    def __str__(self):
+        return str(self.text)
+    
+    def __unicode__(self):
+        return u'%s' % self.text
+    
+
+
+class Group(Entity):
+    """Group"""
+    using_options(shortnames=True, order_by="name")
+    using_table_options(useexisting=True)
+    name = Field(Unicode(30), 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    description = Field(Unicode(255), 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    created = Field(DateTime, 
+                    # info = {'formatter':'date', 
+                    #         'sorttype':'date', 
+                    #         'formatoptions':dict(newformat='Y-m-d')}
+                            )
+    active = Field(Boolean, 
+                    # info = {'choices': {0: 'False', 1: 'True'}
+                    # }
+                            )
+    users = ManyToMany('User', 
+                    # info = {'key':'displayname', 'label':'User'}
+                            )
+    permissions = ManyToMany('Permission', 
+                    # info = {'key':'displayname', 'label':'Permission'}
+                            )
+    
+    def __str__(self):
+        return str(self.name)
+    
+    def __unicode__(self):
+        return '%s' % self.name
+    
+
+
+class Permission(Entity):
+    """Permission"""
+    using_options(shortnames=True, order_by="name")
+    using_table_options(useexisting=True) 
+    name = Field(Unicode(30), 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    description = Field(Unicode(255), 
+                    # info = {'edittype':'textarea',
+                    #         'editoptions':{'rows':1, "cols":20}
+                    # }
+                            )
+    groups = ManyToMany('Group', onupdate = 'CASCADE', 
+                        ondelete = 'CASCADE', uselist = True,
+                    # info = {'key':'name', 'label':'Group'}
+                            )
+    
+    def __str__(self):
+        return str(self.name)
+    
+    def __unicode__(self):
+        return u'%s' % self.name
+    
+
+
+__all__=['User', 'Permission', 'Group', 'NotAuthenticated', 'OpenID']
+

@@ -1,0 +1,43 @@
+"""Custom validators"""
+import formencode
+from {{package}}.model import User
+from {{package}}.model import meta
+
+class ValidLogin(formencode.FancyValidator):
+    field_names = None
+    validate_partial_form = False
+    email = None
+    answer = None
+    password = None
+    
+    messages = {
+        'badlogin': "Invalid email and/or password",
+    }
+    
+    def validate_python(self, field_dict, state):
+        errors = {}
+        email = field_dict[self.email]
+        password = field_dict[self.password]
+        
+        users = meta.Session.query(User).filter_by(email=email).all()
+        if users:
+            user = users[0]
+        else:
+            user = None
+        
+        if not user:
+            errors[self.email] = self.message('badlogin', state)
+        if not errors:
+            valid_password = user.verify_password(password)
+            if valid_password:
+                field_dict['user'] = user
+            else:
+                errors[self.email] = self.message('badlogin', state)
+        if errors:
+            error_list = errors.items()
+            error_list.sort()
+            error_message = '<br>\n'.join(
+                ['%s: %s' % (name, value) for name, value in error_list])
+            raise formencode.Invalid(error_message,
+                                     field_dict, state,
+                                     error_dict=errors)
