@@ -1,0 +1,116 @@
+logtools
+A log files analysis / filtering framework.
+
+Author: Adam Ever-Hadani <adamhadani@gmail.com>
+
+logtools encompasses of a few easy-to-use, easy to configure command-line
+tools, typically used in conjunction with Apache logs.
+
+The idea is to standardize log parsing and filtering using a coherent
+configuration methodology and UNIX command-line interface (STDIN input streaming, command-line piping etc.)
+so as to create a consistent environment for creating reports, charts and other such
+log mining artifacts that are typically employed in a Website context.
+
+This software is distributed under the Apache 2.0 license.
+
+
+Installation
+------------
+To install this package and associated console scripts, unpack the distributable tar file,
+or check out the project directory, and then run:
+	python setup.py install
+
+
+Console Scripts
+---------------
+* filterbots - used to filter bots based on an ip blacklist and a useragent blacklist file(s).
+               The actual regular expression mask used for matching is also user-specified,
+               so this can be used with any arbitrary log format (See examples below).
+
+* geoip      - Simple helper utility for using the GeoIP tool to tag log lines by the IP's country.
+               The regular expression mask used for matching the IP in the log line is user-specified.
+
+* logmerge   - Merge multiple input logstreams and stream them out in (combined) sorted order			   
+
+* logsample  - Produce a (uniform or weighted) random sample from log stream. This uses Reservoir Sampling to
+			   efficiently produce a random sampling over an arbitrary large input stream.
+			  
+* aggregate  - Convenient shortcut for aggregating values and sorting by frequency of appearance (see example below) 
+
+* logplot    - Render a plot of parsed aggregate counts log. Can use one of several backends (e.g Google Chart API)
+
+* logplotserve - Start a compact webserver (WSGI-based) serving logplots. Under Construction.
+
+
+Configuration
+-------------
+All tools' command-line parameters can assume a default value using parameter interpolation
+from /etc/logtools.cfg and ~/.logtoolsrc, if these exist.
+This allows for convenient operation in the usual case where these rarely change.
+The configuration file format is of the form:
+
+[script_name]
+optname: optval
+
+For example:
+
+[geoip]
+ip_re: ^(.*?) -
+
+[filterbots]
+bots_ua: /home/www/conf/bots_useragents.txt
+bots_ips: /home/www/conf/bots_hosts.txt
+ip_ua_re: ^(?P<ip>.*?) -(?:.*?"){5}(?P<ua>.*?)"
+
+
+Usage Examples
+--------------
+1. The following example demonstrates specifying a custom regular expression for matching
+the ip/user agent. Notice the use of named match groups in the regular expression - (?P<name>...).
+The ips/useragents files are not specified in commandline and therefore are assumed to be defined
+in ~/.logtoolsrc or /etc/logtools.cfg. The option --print is used to actually print matching lines.
+
+	cat error_log.1 | filterbots -r ".*\[client (?P<ip>.*?)\].*USER_AGENT:(?P<ua>.*?)\'" --print
+
+Notice that its easy to reverse the filtermask simply by adding the --reverse flag:
+
+	cat error_log.1 | filterbots -r ".*\[client (?P<ip>.*?)\].*USER_AGENT:(?P<ua>.*?)\'" --print --reverse
+
+2. The following example demonstrates using the geoip wrapper (Uses Maxmind GeoIP package). Pretty self-explanatory:
+
+	cat access_log.1 | geoip -r '.*client (.*?)\]'
+
+3. Merge (individually sorted) log files from multiple webapps and output combined and (lexically) sorted stream:
+	
+	logmerge -d' ' -f1 app_log.1 app_log.2
+	
+4. Merge and sort numerically on some numeric field:
+
+	logmerge -d' ' -f3 --numeric app_log.*
+	
+5. Use a custom parser for sort/merge. In this example, parse CommonLogFormat and sort by date:
+
+	logmerge --parser CommonLogFormat -f4 access_log.*
+	
+6. Generate a pie chart of Country distributions in Apache access_log using Maxmind GeoIP and GoogleChart API. requires pygooglechart package:
+
+	cat access_log.1 | geoip -r '^(.*?) -' | cut -d$'\t' -f2 | sort | uniq -c | logplot -d' ' -f1 --backend gchart -W600 -H300 --limit 10 --output plot.png
+
+7. Filter bots and aggregate IP address values to show IPs of visitors with counts and sorted from most frequent to least:
+
+	cat access_log.1 | filterbots --print | aggregate -d' ' -f1
+	
+8. Naturally, piping between utilities is useful:
+	
+	cat access_log.1 | filterbots -r "^(?P<ip>.*?) -.*(?P<ua>.*?)" --print | geoip -r '.*client (.*?)\]'
+
+9. All tools admit a --help command-line option that will print out detailed information about the different
+   options available.
+
+Unit-testing
+------------
+A test suite is included in the package. Simplest way to run would be using nose. From package root directory, issue:
+
+	nosetests
+
+~~
