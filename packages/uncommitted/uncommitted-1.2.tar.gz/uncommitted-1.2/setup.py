@@ -1,0 +1,21 @@
+# This setup.py was generated automatically by Pyron.
+# For details, see http://pypi.python.org/pypi/pyron/
+
+from setuptools import setup, find_packages
+
+setup(
+    name = 'uncommitted',
+    version = '1.2',
+    description = u'Scan Version Control For Uncommitted Changes',
+    long_description = u'\nWhen working on one version-controlled project on my hard drive, I often\nflip over quickly to another project to make a quick change.  By the end\nof the day I have forgotten about that other change and often find it\nmonths later when I enter that repository again.  I needed a way to be\nalerted at the end of each day about any uncommitted changes sitting\naround on my system.\n\nThus was born this "uncommitted" script: using either your system\n*locate(1)* command or by walking a filesystem tree on its own, it will\nfind version controlled directories and print a report on the standard\noutput about any uncommitted changes still sitting on your drive.  By\nrunning it from a *cron(8)* job you can make this notification routine.\n\nRunning "uncommitted"\n---------------------\n\nBy default "uncommitted" uses the *locate(1)* command to scan for\nrepositories, which means that it can operate quickly even over very\nlarge filesystems like my home directory::\n\n    $ uncommitted ~\n\nBut you should **be warned:** because the *locate(1)* database is only\nupdated once a day on most systems, this will miss repositories which\nyou have created since its last run.  To be absolutely sure to see all\ncurrent repositories, you should instead ask "uncommitted" to search the\nfilesystem tree itself.  To do this on your "devel" directory, for\nexample, you would type this::\n\n    $ uncommitted -w ~/devel\n\nNot only will the output of "-w" always be up-to-date, but it is usually\nfaster for small directory trees.  The default behavior of using\n*locate(1)* (which can also be explicitly requested, with "-l") is\nfaster when the directory tree you are searching is very large.\n\nShould you ever want a list of all repositories, and not just those with\nuncommitted changes, you can use the "-v" verbose option::\n\n    $ uncommitted -v ~\n\nYou can always get help by running "uncommitted" without arguments or\nwith the "-h" or "--help" options.\n\nSupported VCs\n-------------\n\nAt the moment, "uncommitted" supports:\n\n* `Mercurial`_ (.hg directories)\n* `Git`_ (.git directories)\n* `Subversion`_ (.svn directories)\n\nI am not opposed to someone contributing code to support Bazaar, or\nother more obscure version control systems.  But we should probably keep\n"uncommitted" from ever supporting CVS, because that might imply that it\nis still an acceptible system to be using.\n\nIt occurs to me that there might already be some version control\nabstraction layer that I should be using for this, rather than figuring\nout how to run each version control system myself; a quick search of\nPyPI suggests that I take a closer look at the `pyvcs`_ project.  Maybe\nthat can be a useful direction for the next phase of development!\n\nChangelog\n---------\n\n**1.2** (2010 May 9)\n\n- `Eapen`_ contributed code to support Git.\n\n**1.1** (2010 April 24)\n\n- *Bugfix:* changed *locate(1)* command line to use shell wildcards, since\n  it does not support regular expressions under MacOS X.\n\n- *Bugfix:* all repositories were being called "Subversion" repositories.\n\n.. _Mercurial: http://mercurial.selenic.com/\n.. _Subversion: http://subversion.tigris.org/\n.. _Git: http://git-scm.com/\n.. _pyvcs: http://github.com/alex/pyvcs/blob/master/README.txt\n.. _Eapen: http://eapen.in\n',
+    author = 'Brandon Craig Rhodes',
+    author_email = 'brandon@rhodesmill.org',
+    url = 'http://bitbucket.org/brandon/uncommitted/',
+    classifiers = ['Development Status :: 5 - Production/Stable', 'Environment :: Console', 'Intended Audience :: Developers', 'License :: OSI Approved :: MIT License', 'Topic :: Software Development :: Version Control', 'Topic :: Utilities'],
+
+    package_dir = {'': 'src'},
+    packages = find_packages('src'),
+    include_package_data = True,
+    install_requires = [],
+    entry_points = '[console_scripts]\nuncommitted = uncommitted.command:main\n',
+    )
