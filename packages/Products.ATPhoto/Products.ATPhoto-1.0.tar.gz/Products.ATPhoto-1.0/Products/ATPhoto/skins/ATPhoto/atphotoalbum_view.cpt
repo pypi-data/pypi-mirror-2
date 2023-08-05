@@ -1,0 +1,75 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="ATPhoto">
+      <head>
+      </head>
+<body>
+<div metal:fill-slot="main"
+         tal:define="standalone python:1;
+                     contentFilter python: {'meta_type':['ATPhoto','ATPhotoAlbum'], 
+                                            'sort_on':'Date', 'sort_order':'reverse'};
+                     b_size b_size|request/b_size|python:12;
+                     view_title view_title|request/view_title|string:;
+                     contentsMethod nocall:here/getFolderContents;
+                     batch batch|python:contentsMethod(contentFilter,batch=True, b_size=b_size);
+                     full_view full_view|request/full_view|python:True;">
+    
+    <div metal:use-macro="here/document_actions/macros/document_actions">
+        Document actions (print, sendto etc)
+    </div>
+
+    <h1 tal:content="object_title" class="documentFirstHeading">
+      Title or id
+    </h1>
+
+    <tal:full_view condition="full_view" i18n:domain="plone">
+
+        <a href=""
+           class="link-parent"
+           tal:define="parent_url python:here.navigationParent(here, fallThroughDefaultPage = False, checkPermissions = ['List folder contents'])"
+           tal:condition="parent_url"
+           tal:attributes="href string:${parent_url}/folder_contents"
+           i18n:translate="go_to_parent_url">
+            Up one level
+        </a>
+
+        <p tal:content="here/Description">
+            Description
+        </p>
+    </tal:full_view>
+
+    <div tal:condition="batch">
+
+        <tal:loop tal:repeat="item batch">
+            <div tal:define="title item/pretty_title_or_id;
+                             isAlbum python: test(item.meta_type == 'ATPhotoAlbum', 1, 0)"
+                 tal:attributes="class python:'photoWrapper ' + test(isAlbum,'even','odd')">
+                 <a href=""
+                    tal:condition="isAlbum"
+                    tal:define="photo python: item.getObject().getSymbolic_photo()"
+                    tal:attributes="href string:${item/getURL}/view;
+                                    title title;"
+                    tal:content="structure python:photo and photo.tag(scale='thumb')" />
+                <a href=""
+                   tal:condition="not: isAlbum"
+                   tal:define="photo item/getObject"
+                   tal:attributes="href string:${item/getURL}/view;
+                                   title title;"
+                   tal:content="structure python:photo.tag(scale='thumb')" />
+                <a href=""
+                   tal:attributes="href string:${item/getURL}/view;
+                                   title title;"
+                   tal:content="title" />
+            </div>
+        </tal:loop>
+
+        <div class="visualClear">&nbsp;</div>
+            
+        <div metal:use-macro="here/batch_macros/macros/navigation" />
+    </div>
+</div>
+</body>
+</html>
+
+

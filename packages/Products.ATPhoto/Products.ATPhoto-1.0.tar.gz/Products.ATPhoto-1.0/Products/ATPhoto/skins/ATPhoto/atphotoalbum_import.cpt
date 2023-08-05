@@ -1,0 +1,96 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US"
+      lang="en-US"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="ATPhoto">
+
+<body>
+
+
+<div metal:fill-slot="main"
+ tal:define="auth python:here.getFlickrIdAndUrl(request)">
+<form tal:attributes="action string:${request/URL1}/importPhotos" enctype="multipart/form-data" method="post">
+
+<fieldset>
+<legend><span i18n:translate="">Import photos from ZIP file</span></legend>
+
+  <label i18n:translate="">Zip file</label>
+  <div class="formHelp">This file must be a zip, tar, gz or bz2 file</div>
+  <input type="file" name="zipFile" size="50" />
+
+<div class="formControls">
+   <input i18n:attributes="value" class="context" type="submit" value="Import" />
+</div>
+</fieldset>
+
+</form>
+
+<fieldset tal:condition="here/hasPloneJUpload">
+<legend><span i18n:translate="">Batch Import</span></legend>
+
+        <div class="jupload">
+                      <applet code="wjhk.jupload.JUploadApplet" archive="PloneJUpload.jar" width="640" height="300" mayscript="true">
+                                        <param name="postURL" value="" tal:attributes="value string:${here/absolute_url}/PloneJUpload_script" />
+                                                               Java 1.4 or higher plugin required.
+                      </applet>
+                </div>
+</fieldset>
+
+
+
+<fieldset 
+   tal:define="authenticated python:here.isFlickrAuth(auth[0],REQUEST=request)">
+  <legend>Flickr Import</legend>
+  <fieldset tal:condition="python:not authenticated or request.get('forceNewAuth',0)">
+   <legend>Not Authenticated!</legend>
+    <div>
+      To authenticate go first to <a href="" tal:attributes="href python:auth[1]"><span tal:replace="python:auth[1]"/></a>
+    </div>
+    <div class="formControls">
+     <form action="" tal:attributes="action request/URL0">
+     <input class="context" type="submit" value="Check Authentication"  onClick="checkAuth()">
+     </form>
+     <form action="" tal:attributes="action request/URL0">
+        <input type="hidden" name="forceNewAuth" value="1"/>
+     <input class="context" type="submit" value="New Authentication">
+     </form>
+  </div>
+
+  </fieldset>
+  <tal:block tal:condition="python:authenticated and not request.get('forceNewAuth',0)">
+  <fieldset>
+   <legend>Authenticated!</legend>
+
+  <form method="post" action="" action="" tal:attributes="action string:${request/URL1}/importFlickrSet">
+    <div class="field">
+      <label i18n:translate="">Set</label>
+      <div class="formHelp" i18n:translate="">Select the Flickr Set of photos you want to import</div>
+        <select name="photoSetId">
+          <tal:block tal:repeat="set python:here.getFlickrSets(auth[0],None,None,request)">
+           <option value="" tal:define="setTitle python:set['title'];
+                                        setId    python:set['id'];
+                                        setDescription python:set['description']" tal:attributes="value setId" tal:content="string:${setTitle} (${setDescription})"/>
+          </tal:block>
+        </select>
+    </div>
+
+<div class="formControls">
+   <input type="hidden" name="frob" value="" tal:attributes="value python:auth[0]"/>
+   <input i18n:attributes="value" class="context" type="submit" value="Import">
+</div>
+</form>
+<div class="formControls">
+     <form action="" tal:attributes="action request/URL0">
+        <input type="hidden" name="forceNewAuth" value="1"/>
+     <input class="context" type="submit" value="New Authentication">
+     </form>
+
+</div>
+
+  </fieldset>
+  </tal:block>
+</fieldset>
+
+</div>
+
+</body>
+</html>

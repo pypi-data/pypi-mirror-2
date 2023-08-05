@@ -1,0 +1,2 @@
+class DependancyError(StandardError):
+	pass
