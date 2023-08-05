@@ -1,0 +1,78 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+
+
+env = Environment( )
+env.Tool( 'slab_cc' )
+
+LoadConfigFile( env )
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+gdome_var = PackageVariable('EXPAT', 'expat install path', env.get('EXPAT',True) )
+
+vars.Add( gdome_var )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'expat' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+tc = ToolCreator( 'expat' )
+
+#import pdb; pdb.set_trace(); 
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log" )
+    
+    
+    EXPAT = env['EXPAT']
+    if EXPAT:
+        if isinstance( EXPAT, str ):
+            tc.Append(CPPPATH=join(EXPAT,'include') )
+            tc.Append(LIBPATH=join(EXPAT,'lib') )
+            conf.env.Append(CPPPATH=join(EXPAT,'include') )
+            conf.env.Append(LIBPATH=join(EXPAT,'lib') )
+        else:
+            pass
+        
+        tc.Append(LIBS=['expat'])
+        if conf.CheckLibWithHeader( ['expat'],['expat.h'], 'c', autoadd=False ):
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+    else:
+        tc.Exists(False)
+    
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+

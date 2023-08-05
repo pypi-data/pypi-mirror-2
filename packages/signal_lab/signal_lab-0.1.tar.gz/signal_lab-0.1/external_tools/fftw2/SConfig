@@ -1,0 +1,83 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+from os.path import join
+from glob import glob
+
+env = Environment( )
+env.Tool( 'slab_cc' )
+
+LoadConfigFile( env )
+#CommandLineToolPath( env )
+
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+fftw2var = PackageVariable('FFTW2', 'path to your FFTW2.x installation directory', env.get('FFTW2',True) ) 
+
+vars.Add( fftw2var )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'fftw2' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+toolname = 'onlyfftw2'
+tc = ToolCreator( toolname )
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log")
+    
+    if env.get('FFTW2'):
+        FFTW2        = env.get('FFTW2')
+        fftw2path    = None
+        fftw2libpath = None
+        if isinstance( FFTW2 , str):
+            # Header path
+            fftw2path = join( FFTW2, 'include' )
+            conf.env['CPPPATH'] = fftw2path
+            # Library path
+            fftw2libpath = join( FFTW2, 'lib' )
+            conf.env['LIBPATH'] = fftw2libpath
+    
+        if conf.CheckLibWithHeader( ['fftw'],'fftw.h', 'c', autoadd=False):
+            tc.Prepend( LIBS=['fftw'] )
+            if fftw2path:
+                tc.Prepend( CPPPATH=fftw2path )
+            if fftw2libpath:
+                tc.Prepend( LIBPATH=fftw2libpath )
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+        
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+

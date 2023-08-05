@@ -1,0 +1,181 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+import sys
+import os
+import signal_lab as slab
+from xml.dom import minidom
+from os.path import isfile
+
+def cleanup( env ):
+    """Usage: %prog [options] list=n only_print=n
+    
+    DESCRIPTION
+            Clean up all floating binary files that have no headers  
+    PARAMETERS:
+      bool list=n        list all header-binary files found 
+      bool only_print=n  don't remove any files
+      
+    """
+    
+    if env.args:
+        datapath_logs = env.args
+    else:  
+        datapath_logs = [env.options['datapath_log']]
+        if not datapath_logs[0]:
+            print "Warning no DATAPATH log file found exiting cleanup"
+            return 
+        
+    for datapath_log in datapath_logs:
+    
+        print "log file: ",datapath_log
+        
+        flog = open( datapath_log, 'r' )
+        doc = minidom.parse( flog )
+        flog.close()
+        root = doc.firstChild
+        
+        header_keys = { }
+        binary_keys = { }
+        
+        for element in root.childNodes:
+            if element.nodeType == element.TEXT_NODE:
+                root.removeChild( element )
+                
+        
+        num_pairs = 0
+        for element in root.getElementsByTagName('binary_header_pair'):
+            header = element.getAttribute('header')
+            binary = element.getAttribute('binary')
+            
+            num_pairs+=1
+            header_keys.setdefault(header,[]).append( binary )
+            binary_keys.setdefault(binary,[]).append( header )
+            
+        if env.get_eval( 'list',False, etype=env._bool ):
+            
+            
+            hmaxlen = max( [ len(a) for a in header_keys.keys()] )
+            bmaxlen = max( [ len(a) for a in binary_keys.keys()] )
+            
+            hstr = "%%-%is  " %hmaxlen
+            bstr = "%%-%is" %bmaxlen
+            
+            print "*"*(hmaxlen+bmaxlen+3)
+            print hstr %('headers'), bstr %('binaries')
+            print "*"*(hmaxlen+bmaxlen+1)
+            
+            hstr = "%%-%is  " %hmaxlen
+            bstr = "%%-%is" %bmaxlen
+            
+            for header,binaries in header_keys.items():
+                for binary in binaries:
+                    print hstr %(header),bstr %(binary)
+            print "*"*(hmaxlen+bmaxlen+1)
+            
+        existing_bins = [ b for b in binary_keys.keys() if isfile(b) ]
+        size_existing = sum([ os.stat(b).st_size for b in existing_bins ])
+        i = 0
+        units = ['bytes','Kb','Mb','Gb','Tb','Pb']
+        while size_existing >> 10:
+            size_existing = size_existing >> 10
+            i+=1
+        unit = units[i]
+        
+        
+        h_num_exist = len( [isfile(h) for h in header_keys.keys()] )
+        b_num_exist = len( existing_bins )
+        
+         
+        print  "Cleanup: detected %5i registered header/binary pairs" %num_pairs
+        if  h_num_exist < len(header):
+            print  "         Only     %5i existing headers" %(h_num_exist)
+        if  b_num_exist < len(binary):
+            print  "         Only     %5i existing binaries %i%s" %(b_num_exist, size_existing, unit)
+        print
+        
+        exists = lambda slfile: isfile(slfile) and "(e)" or "(n)"
+        for key,value in binary_keys.items():
+            if len(value) > 1:
+                print "Warning: Multiple headers point to the same binary file"
+                break
+        
+        for key,value in binary_keys.items():
+            if len(value) > 1:
+                print
+                print " + binary:", key, exists(key) 
+                for head in value:
+                    print "     - header:", head, exists(head)
+        print 
+        
+        for key,value in header_keys.items( ):
+            if len(value) > 1:
+                print "Warning: Multiple binary files from the same header"
+                break
+        
+        binaries_to_remove = [ ]
+        
+        def to_remove( pair ):
+            binaries_to_remove.append( pair )
+            for element in root.getElementsByTagName('binary_header_pair'):
+                header = element.getAttribute('header')
+                binary = element.getAttribute('binary')
+                if header == pair[0] and binary == pair[1]:
+                     root.removeChild( element )
+            
+            
+        for key,value in header_keys.items( ):
+            if len(value) > 1:
+                print 
+                print " + header:", key, exists(key)
+                
+                if isfile(key):
+                    hfile = slab.File(key,env=env)
+                    bfile = hfile.binary_abspath
+                
+                for bin in value:
+                    if bfile == bin: 
+                        sym = '+'
+                        if not isfile(key) and isfile(bin):
+                            to_remove( (key,bin) )
+                    else: 
+                        sym = '-'
+                        if isfile(bin):
+                            to_remove( (key,bin) )
+                    print "     %s binary:" %sym, bin, exists(head)
+            else:
+                bin = value[0]
+                
+                if not isfile(key) and isfile(bin):
+                    to_remove( (key,bin) )
+    
+        print
+        
+        if binaries_to_remove:
+            print "Removing floating binary files:"
+        
+        only_print = env.get_eval( 'only_print', False, etype=env._bool )
+        for header,binary in binaries_to_remove:
+            print "  rm:", binary
+            if not only_print:
+                try:    
+                    os.remove(binary)
+                except Exception,e:
+                    print '  - trouble removing file reason:', e
+        
+        if not only_print:
+            
+            flog = open( datapath_log,'w+' )
+            doc.writexml( flog, indent='  ' , addindent='', newl='\n' )
+            flog.close( )
+    
+    return 
+
+
+if __name__ == '__main__':
+    
+    env = slab.Environment( sys.argv, help=cleanup.__doc__ )
+    
+    cleanup(env)
+
+

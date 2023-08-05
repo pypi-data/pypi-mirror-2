@@ -1,0 +1,117 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+
+## GLIB
+
+
+from slabcore import *
+from os.path import join
+from glob import glob
+from sys import stdout
+import os
+
+env = Environment( )
+
+LoadConfigFile( env )
+
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+glib_var = PackageVariable('GLIB', 'glib install path', env.get('GLIB',True) )
+glib_version_var = ('GLIB_VERSION', 'glib install path', env.get('GLIB_VERSION','2.0') )
+
+vars.Add( glib_var )
+vars.Add( glib_version_var )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'gdome' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+tc = ToolCreator( 'glib' )
+
+#import pdb; pdb.set_trace(); 
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log" )
+    
+    
+    GLIB = env['GLIB']
+    GLIB_VERSION = env['GLIB_VERSION']
+    if GLIB:
+        GVER = 'glib-%s' %GLIB_VERSION
+        if isinstance( GLIB, str ):
+            tc.Append(CPPPATH=[join(GLIB,'include',GVER), 
+                               join(GLIB,'lib',GVER,'include' )] )
+            tc.Append(LIBPATH=join(GLIB,'lib') )
+            
+            conf.env.Append(CPPPATH=[join(GLIB,'include',GVER), 
+                               join(GLIB,'lib',GVER,'include' )] )
+            conf.env.Append(LIBPATH=join(GLIB,'lib') )
+        else:
+            pass
+        
+        tc.Append(LIBS=[GVER])
+        if conf.CheckLibWithHeader( ['glib-%s' %GLIB_VERSION ],['glib.h'], 'c', autoadd=False ):
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+    else:
+        tc.Exists(False)
+    
+        
+            
+    
+#    if env.get('MATH'):
+#        MATH        = env.get('MATH')
+#        mathpath    = None
+#        mathlibpath = None
+#        if isinstance( MATH , str):
+#            # Header path
+#            mathpath = join( MATH, 'include' )
+#            conf.env['CPPPATH'] = mathpath
+#            # Library path
+#            mathlibpath = join( MATH, 'lib' )
+#            conf.env['LIBPATH'] = mathlibpath
+#    
+#        if conf.CheckLibWithHeader( ['m'],['math.h','complex.h'], 'c', autoadd=False):
+#            tc.Prepend( LIBS=['m'] )
+#            if mathpath:
+#                tc.Prepend( CPPPATH=mathpath )
+#            if mathlibpath:
+#                tc.Prepend( LIBPATH=mathlibpath )
+#            tc.Exists(True)
+#        else:
+#            tc.Exists(False)
+        
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+

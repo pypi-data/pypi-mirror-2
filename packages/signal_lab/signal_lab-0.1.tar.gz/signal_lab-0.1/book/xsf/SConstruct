@@ -1,0 +1,101 @@
+#  Copyright (C) 2008 Gilles Hennenfent and Sean Ross-Ross
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+"""/*!
+@page book_xsf book/xsf
+This isthe doc for xsf book
+*/"""
+import SCons.Script
+#
+#CT = SCons.Script.CleanTask
+#fs_delete_old = CT.fs_delete
+#remove_old = CT.remove
+#def my_fs_delete( self, path, pathstr, remove=1 ):
+#    print pathstr
+#    fs_delete_old( self, path, pathstr, remove=1 )
+#
+#
+#_custom_remove = [ ]
+#
+#def target_has_custom( targets ):
+#    _cr = Flatten(_custom_remove)
+#    for t in targets:
+#        for rr in _cr:
+#            if t.abspath == rr.abspath:
+#                return True
+#    return False
+#    
+#def remove( self ):
+#    
+#    if target_has_custom(targets):
+#        print "xsfrm "
+#    remove_old(self)
+#    
+#CT.fs_delete = my_fs_delete
+#CT.remove = remove
+
+
+#class CT( SCons.Script.CleanTask ):
+#    def fs_delete(self, path, pathstr, remove=1):
+#        pass
+#    def remove(self):
+#        print "CT.remove", [str(s) for s in self.targets]
+#        SCons.Script.CleanTask.remove( self )
+#    def show(self):
+#        print "CT.show" 
+#        SCons.Script.CleanTask.show( self )
+
+SCons.Script.CleanTask = CT
+SCons.Script.Main.CleanTask = CT 
+
+from repro import *
+
+env =Environment( )
+
+# Set up mpi run for parallel commands
+env['MPICOMMAND'] = "mpirun -np 2"
+
+# Create synthetic
+sig = env.Rush( 'sig.rsf', None, ['sfsigmoid n1=100 n2=100']  , 
+                stdin=0 )
+
+tm = env.Rush( 'tm', sig, ['sfboolcmp right=sig.rsf sign=ge' ]  )
+
+#===============================================================================
+# Scatter data to xsf meta data format
+#===============================================================================
+scatter = env.Rush( 'scatter.xsf', sig, '$MPICOMMAND xsfwinscumpi inv=n p1=2 p2=1 datapath=.' )
+
+#===============================================================================
+# Do 'embarasingly parallel' operaions  
+# Note: in this block no rsf command has changed 
+#===============================================================================
+
+math = env.Rush( 'math', scatter, '~math output="1+input"' )
+
+_custom_remove.extend(scatter)
+_custom_remove.extend(math)
+
+#===============================================================================
+# Gather to collect data back to rsf file
+#===============================================================================
+gather = env.Rush( 'gather.rsf', math, '$MPICOMMAND xsfwinscumpi inv=y datapath=.' )
+
+#c1 = env.Rush('clean.2', scatter, "xsfrm $SOURCE" , sdtin=0, stdout=0)
+#c2 = env.Rush('clean.1', math, "xsfrm $SOURCE" ,sdtin=0, stdout=0)
+#env.Alias('clean', [c1,c2])
+
+

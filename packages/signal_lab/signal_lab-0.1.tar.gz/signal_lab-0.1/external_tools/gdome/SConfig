@@ -1,0 +1,107 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+from os.path import join
+from glob import glob
+from sys import stdout
+import os
+
+env = Environment( )
+env.Tool('glib')
+
+LoadConfigFile( env )
+
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+gdome_var = PackageVariable('GDOME', 'gdome install path', env.get('GDOME',True) )
+
+vars.Add( gdome_var )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'gdome' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+tc = ToolCreator( 'onlygdome' )
+
+#import pdb; pdb.set_trace(); 
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log" )
+    
+    
+    GDOME = env['GDOME']
+    if GDOME:
+        if isinstance( GDOME, str ):
+            tc.Append(CPPPATH=join(GDOME,'include','libgdome') )
+            tc.Append(LIBPATH=join(GDOME,'lib') )
+            conf.env.Append(CPPPATH=join(GDOME,'include','libgdome' ) )
+            conf.env.Append(LIBPATH=join(GDOME,'lib') )
+        else:
+            pass
+        
+        tc.Append(LIBS=['gdome'])
+        if conf.CheckLibWithHeader( ['gdome'],['gdome.h'], 'c', autoadd=False ):
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+    else:
+        tc.Exists(False)
+    
+        
+            
+    
+#    if env.get('MATH'):
+#        MATH        = env.get('MATH')
+#        mathpath    = None
+#        mathlibpath = None
+#        if isinstance( MATH , str):
+#            # Header path
+#            mathpath = join( MATH, 'include' )
+#            conf.env['CPPPATH'] = mathpath
+#            # Library path
+#            mathlibpath = join( MATH, 'lib' )
+#            conf.env['LIBPATH'] = mathlibpath
+#    
+#        if conf.CheckLibWithHeader( ['m'],['math.h','complex.h'], 'c', autoadd=False):
+#            tc.Prepend( LIBS=['m'] )
+#            if mathpath:
+#                tc.Prepend( CPPPATH=mathpath )
+#            if mathlibpath:
+#                tc.Prepend( LIBPATH=mathlibpath )
+#            tc.Exists(True)
+#        else:
+#            tc.Exists(False)
+        
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+

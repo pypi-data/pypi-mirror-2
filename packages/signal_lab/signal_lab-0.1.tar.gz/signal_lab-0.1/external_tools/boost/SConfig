@@ -1,0 +1,129 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+from os.path import join 
+from sys import stdout
+
+toolname1 = 'boost'
+toolname2 = 'boost_python'
+tc_b = ToolCreator( toolname1 )
+tc_bp = ToolCreator( toolname2 )
+
+env = Environment( )
+env.Tool('sfcore')
+env.Tool('slab_cc')
+#===============================================================================
+# Variables
+#===============================================================================
+variables_file = CreateOptionsFileName( env, 'boostvars.py' )
+
+vars = Variables( variables_file )
+
+boost_var = PackageVariable('BOOST', 'path to your boost installation directory', True )
+boost_version_var = ("BOOST_VERSION" ,'version of boost on include path, e.g., 1_33_1' , False )
+boost_python_var = ("BOOST_PYTHON" ,'check for boost_python as well' , False )
+vars.Add( boost_var )
+vars.Add( boost_version_var )
+vars.Add( boost_python_var )
+
+LoadConfigFile( env )
+
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'boost' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configure
+#===============================================================================
+boost_python_text = """
+#include<boost/python.hpp>
+BOOST_PYTHON_MODULE(conftest_)
+{
+}
+"""
+
+
+def CheckBoostPython( context ):
+    
+    context.env.Tool('python')
+    
+    context.Message("checking Boost Python ..."); stdout.flush( )
+    ret = context.TryBuild( conf.env.LoadableModule, boost_python_text, '.cpp' )
+    if ret:
+        context.env['BOOST_PYTHON'] = True
+        
+    context.Result( ret )
+    return ret 
+
+
+if DoConfig( env ):
+    if env.get('BOOST'):
+        BOOST = env['BOOST']
+        BOOST_VERSION = env['BOOST_VERSION']
+        conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log",
+                          custom_tests = { 'CheckBoostPython' : CheckBoostPython })
+        
+        libpath = []
+        lib = 'boost_python'
+        conf.env.Append(LIBS = lib)
+        tc_bp.Append(LIBS = lib)
+        if isinstance(BOOST, str):
+            include =  join( BOOST, 'include' )
+            libpath =  join( BOOST, 'lib' )
+            if BOOST_VERSION:
+                boost_python = "-".join([lib,BOOST_VERSION])
+                include =  join( include, "-".join( [ 'boost', BOOST_VERSION ] ) )
+            
+            conf.env.Append(CPPPATH = include) 
+            tc_b.Append(CPPPATH = include) 
+            tc_bp.Append(CPPPATH = include) 
+        
+        if not conf.CheckCXXHeader( 'boost/version.hpp' ):
+            
+#            conf.env['BOOST'] = False
+            tc_b.Exists(False)
+            tc_bp.Exists(False)
+            
+        else:
+            tc_b.Exists(True)
+            
+            conf.env.Append(LIBPATH = libpath) 
+            tc_b.Append(LIBPATH = libpath) 
+            tc_bp.Append(LIBPATH = libpath) 
+    
+            if conf.CheckBoostPython( ):
+                tc_bp.Exists(True)
+        
+        env = conf.Finish()
+        
+        
+    
+    tc_b.CreateTool( env)
+    tc_bp.CreateTool( env )
+    vars.Save( variables_file, env )
+
+#===============================================================================
+# Clean
+#===============================================================================
+Clean( '.', Glob('tools/*.pyc') )
+

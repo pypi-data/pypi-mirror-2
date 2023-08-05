@@ -1,0 +1,175 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+"""
+Main SConstruct
+"""
+from os import listdir
+from os import environ, getcwd
+from os.path import abspath, join, isfile
+from glob import glob
+
+EnsureSConsVersion(0, 98)
+
+from slabcore import *
+
+env = Environment( )
+
+try:
+    env.Tool('slabroot')
+except Exception:
+    if env.GetOption('help'):
+        print "for initial help please do:"
+        print "    scons -f SConfig -h"
+    else:
+        print "******************************************************************"
+        print "* SLAB: Error                                                    *"
+        print "* SLAB has detected that SCons has been run without configuring. *"
+        print "* Printing Install instructions to stdout                        *"
+        print "******************************************************************"
+        print open('INSTALL.txt').read()
+        print "******************************************************************"
+        print "* SLAB Error, See Above for instructions                         *"
+        print "******************************************************************"
+        raise
+#===============================================================================
+# Main Configure
+#===============================================================================
+
+help_text = """
+Remember to call 'scons -f SConfig' before building SLAB.
+without configuring the SLAB build may be unstable (but it may work)
+I dare you to try it. 
+
+Users may call any of the following aliases to do the following:
+
+    scons   buildinc -> build include files
+    scons  buildlibs -> build libraries [default]
+    
+    scons        inc -> install include files
+    scons       libs -> install libraries
+    
+    scons       core -> build and install slab core 
+     
+    scons buildmains -> build main programs
+    scons      mains -> install main programs
+    
+"""
+Help(help_text)
+
+
+#===============================================================================
+# Install The slabcore 
+#===============================================================================
+
+#core_python1 = env.Install( join(env["python_prefix"], "slabcore"),
+#                            glob("slabcore/*.py"))
+
+slabcore_packages = ["slabcore",
+                     "slabcore/custom_scons_builders",
+                     "slabcore/slab_tools",
+                     "slabcore/slabconfig",
+                      ]
+
+core_python1 = env.InstallPythonPackage( slabcore_packages )
+core_python2 = env.InstallPythonPackage( "#/config-etc/lib", 
+                                         package_name="slabcore/slabconfig" )
+
+
+Alias('lib',[core_python1,core_python2] )
+
+repro_python1 = env.InstallPythonPackage( "reproducibility/slabproj", 
+                                         package_name="slabproj" )
+
+repro_python2 = env.InstallPythonPackage("reproducibility/slabproj/custom_scons_builders",
+                                          package_name="slabproj/custom_scons_builders" )
+
+repro_python3 = env.InstallPythonPackage("reproducibility/slabproj/slab_scanners",
+                                          package_name="slabproj/slab_scanners" )
+
+repro_python4 = env.InstallPythonPackage("reproducibility/slabproj/slab_tools",
+                                          package_name="slabproj/slab_tools" )
+                            
+Alias(["repro","lib"], [repro_python1,
+               repro_python2,
+               repro_python3,
+               repro_python4])
+
+
+Export("env")
+
+
+#===============================================================================
+# # Build all Other stuff
+#===============================================================================
+
+Install_Tools( env ) 
+SLABBuild_components( env )
+#components = env.SConscript("components/SConstruct")
+
+#===============================================================================
+# Users
+#===============================================================================
+SLABBuild_user( env )
+#user_src = env.SConscript("user/SConscript")
+
+#===============================================================================
+# Set the default to the core
+#===============================================================================
+Depends('buildbin', env['INSTALL_PREFIX'])
+#Depends('main','buildbin')
+Alias("all", ["install","main"])
+
+Default(["buildlib"])
+Clean('buildlib', 'build')
+
+#===============================================================================
+# bad Idea, I deleted my whole curdir 
+# #if abspathenv["RSFROOT"]
+# #Clean('core', env["RSFROOT"] )
+#===============================================================================
+
+
+#===============================================================================
+# Documentation
+#===============================================================================
+
+curdir = abspath('.')
+
+docs = env.Command([Dir('doc/html')], [ 'doc/Doxyfile' ],
+                    "cd doc; ${DOXYGEN} ${SOURCE.name} > /dev/null" %vars())
+Alias('doc', docs)
+#Clean(['docs', 'core'], 'doc/html')
+Clean(['doc'], 'doc/html')
+#Clean(['core'], join(env['SLABROOT'], 'doc'))
+
+mans = env.Command([Dir('doc/man')], [ 'doc/Doxyfile.ManPages' ],
+                    "cd doc; ${DOXYGEN} ${SOURCE.name} > /dev/null" %vars())
+
+#AlwaysBuild(mans)
+#AlwaysBuild(docs)
+
+Alias( 'doc', mans )
+#Clean( ['core'], join( env['SLABROOT'],'doc','slab') )
+Clean(['doc', 'core'], 'doc/man' )
+
+if abspath(env['INSTALL_PREFIX']) != abspath('.'):
+    docinstall = env.Install( join( env['INSTALL_PREFIX'], 'share/slab') , ['doc/html'] )
+    maninstall = env.Install( join( env['INSTALL_PREFIX'], 'man') , ['doc/man/man3'] )
+    
+#    if env.get('DOXYGEN'):
+#        Alias('core', docinstall)
+#        Alias('core', maninstall)

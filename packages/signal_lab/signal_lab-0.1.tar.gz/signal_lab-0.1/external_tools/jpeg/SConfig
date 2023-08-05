@@ -1,0 +1,88 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+from os.path import join
+from glob import glob
+
+env = Environment( )
+
+LoadConfigFile( env )
+
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+jpegvar = PackageVariable('JPEG', 'path to your JPEG installation directory', env.get('JPEG',True) )
+
+vars.Add( jpegvar )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'jpeg' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+toolname = 'jpeg'
+tc = ToolCreator( toolname )
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log")
+    
+    if env.get('JPEG'):
+        JPEG        = env.get('JPEG')
+        jpegpath    = None
+        jpeglibpath = None
+        if isinstance( JPEG , str):
+            # Header path
+            jpegpath = join( JPEG, 'include' )
+            conf.env['CPPPATH'] = jpegpath
+            # Library path
+            jpeglibpath = join( JPEG, 'lib' )
+            conf.env['LIBPATH'] = jpeglibpath
+    
+        if conf.CheckLibWithHeader( 'jpeg',['stdio.h','jpeglib.h'], 'c', autoadd=False):
+            tc.Prepend( LIBS=['jpeg'] )
+            if jpegpath:
+                tc.Prepend( CPPPATH=jpegpath )
+            if jpeglibpath:
+                tc.Prepend( LIBPATH=jpeglibpath )
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+        
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+
+#===============================================================================
+# Clean
+#===============================================================================
+Clean('.', '#/config-etc' )
+Clean( '.', glob('*.pyc') )
+Clean( '.', join( Dir('#').abspath,toolname+'.py') )
+Clean( '.', '#/.sconsign.dblite' )

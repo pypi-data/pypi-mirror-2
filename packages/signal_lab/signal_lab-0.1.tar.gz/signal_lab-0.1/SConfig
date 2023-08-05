@@ -1,0 +1,127 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from glob import glob
+from os import environ, getcwd
+from os import listdir
+from os.path import abspath,join,isfile, isdir
+from slabcore import *
+import sys
+
+EnsureSConsVersion( 0, 98 )
+
+
+SConsignFile( join("config-etc/sconfig-signatures" ) )
+
+env = Environment(  )
+
+#===============================================================================
+# Main Configure
+#===============================================================================
+options_file = CreateOptionsFileName( env,'config.py' )
+LoadConfigFile( env )
+#===============================================================================
+# Variables for the command line
+#===============================================================================
+#import pdb
+#pdb.set_trace()
+
+doxypackage   = PackageVariable(  'DOXYGEN',  'doxygen executable' , env.get('DOXYGEN',False) )
+show_warnings = BoolVariable(     'WARNINGS', 'warn if program is not going to be built' , env.get('WARNINGS',False) )
+
+disable_users = ( 'disable_users', 'Do not include specific user folders in compilation' )
+disable_tools = ( 'disable_tools', 'Do not include specific external tools in compilation' )
+disable_components = ('disable_components', 'Do not include specific components in compilation' )
+
+
+Cxxvar = ( 'CXX', 'the c++ compiler', env['CXX']  )
+#CCvar  = ( 'CC' , 'the c compiler', env['CC'] )
+
+LDflagsvar = ( 'LDFLAGS', 'linker flags', env.get('LDFLAGS',[])  )
+Cxxflagsvar = ( 'CXXFLAGS', 'the c++ compiler', env.get('CXXFLAGS',[])   )
+#CCflagsvar  = ( 'CCFLAGS' , 'the c compiler', env['CCFLAGS'] )
+
+#def validate_cppath(key, val, env):
+#    for _cpath in val.split():
+#        if not isdir( _cpath ):
+#            raise Exception("Invalid path passed to %s: '%s'" %(key, _cpath) )
+#
+#def cpppath_converter( val ):
+#    return val.split(':')
+
+#CPPPATHvar  = ( 'CPPPATH' , 'c and c++ include paths' , env.get('CPPPATH',[]) , validate_cppath, cpppath_converter )
+#LIBPATHvar  = ( 'LIBPATH' , 'c and c++ library paths' , env.get('LIBPATH',[]), validate_cppath, cpppath_converter )
+
+#===============================================================================
+# Add Variables to the environment
+#===============================================================================
+opts = Variables( options_file )
+
+opts.Add( doxypackage )
+opts.Add( show_warnings )
+opts.Add( disable_users )
+opts.Add( disable_tools )
+opts.Add( disable_components )
+opts.Add( Cxxvar )
+#opts.Add( CCvar )
+#opts.Add( CPPPATHvar )
+#opts.Add( LIBPATHvar )
+#
+#opts.Add( CCflagsvar )
+opts.Add( Cxxflagsvar )
+opts.Add( LDflagsvar )
+
+opts.Update(env)
+
+AddSLABOptions( env )
+#===============================================================================
+# HELP
+#===============================================================================
+
+Help( "Command Line Variables for Signal Lab SConfig file:" )
+Help( opts.GenerateHelpText(env) )
+
+#opts.Add(  rootvariable ) 
+#env["SLABROOT"] = abspath( env['INSTALL_PREFIX'] )
+
+if DoConfig(env):
+    print 'writing file:', options_file 
+    opts.Save( options_file, env )
+
+#===============================================================================
+# # Build all Other stuff
+#===============================================================================
+#components = env.SConscript( "components/SConfig" )
+
+StdInstall( env, 'slabroot', 'slabcore/slab_tools' )
+
+
+env.Install('slabcore/slab_tools', env.Glob('external_tools/*/*.py') )
+env.Install('slabcore/slab_tools', env.Glob('components/*/tools/*.py') )
+env.Install('slabcore/slabconfig', env.Glob('config-etc/variables/*.py') )
+
+standard_tools_config(env)
+standard_component_config(env) 
+
+Clean( '.', [options_file] )
+Clean('.', '#/config-etc' )
+Clean( '.', glob("slabcore/*.pyc") )
+Clean( '.', glob("slabcore/slab_tools/*.pyc") )
+Clean( '.', glob("slabcore/slabconfig/*.pyc") )
+Clean( '.', glob("slabcore/custom_scons_builders/*.pyc") )
+Clean( '.', Glob('components/*/tools/*.pyc') )
+
+Default('.')

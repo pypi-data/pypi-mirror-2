@@ -1,0 +1,534 @@
+% Copyright (C) 2008 The University of British Columbia
+% 
+% This program is free software; you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation; either version 2 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program; if not, write to the Free Software
+% Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+\documentclass{book}
+
+\usepackage{amsmath,amssymb,amsfonts} % Typical maths resource packages
+\usepackage{graphicx}                 % Packages to allow inclusion of graphics
+\usepackage{color}                    % For creating coloured text and background
+	\definecolor{theshade}{gray}{0.94}
+	\definecolor{theframe}{gray}{0.75}
+	\definecolor{theblue} {rgb}{0.02,0.04,0.48}
+	\definecolor{thered}  {rgb}{0.65,0.04,0.00}
+	\definecolor{thegreen}{rgb}{0.06,0.44,0.00}
+	\definecolor{thegrey} {gray}{0.5}
+
+\usepackage{hyperref}                 % For creating hyperlinks in cross references
+\usepackage{listings}				  % Package to allow inclusion of code snippets
+
+\lstset{language=python,keepspaces,
+        firstnumber=auto,
+        showstringspaces=false,
+        frame=single,
+        gobble=0,
+        backgroundcolor=\color{theshade},
+        rulecolor=\color{theframe},
+        basewidth={1ex},
+        basicstyle=\ttfamily,
+        keywordstyle=\color{theblue},
+        keywordstyle=[0]\color{thered},
+        morekeywords={None},
+        sensitive=true,
+        commentstyle=\color{thegreen},
+        keywords=[0]{FTP,WGET,Rush,Matlab,Command,PNG,PDF,Preamble,View,GetPar}
+        }
+\lstnewenvironment{codeblock}[1][]{\lstset{#1}}{}
+\lstnewenvironment{shell}[1][]{\lstset{language=csh,#1}}{}
+
+\newcommand{\SLab}{\textsf{SLab}}
+\newcommand{\email}[1]{\href{mailto:#1}{#1}}
+
+\makeindex
+
+\title{The \SLab\ User's Guide}
+\author{G. Hennenfent \& Sean Ross-Ross}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\chapter{Introduction}
+
+\SLab\ is an open-source software package for making signal/data processing
+projects reproducible, re-usable, and easily extendable. Although it has its
+origins in emulating RSF/Madagascar, it does not require it. \SLab\ is conceptually
+divided into four layers:
+%
+\begin{description}
+	\item[\SLab\ config] prepares \SLab\ installation;
+  	\item[\SLab\ core] provides you with several API's (C, C++, Python)
+  	that you can use to write your command line programs;
+  	\item[\SLab\ contrib] gathers command line programs contributed by the \SLab\
+  	community;
+  	\item[\SLab\ repro] proposes a framework to organize your reproducible 
+	processing projects.
+\end{description}
+
+\SLab\ is designed with the philosophy that you should be able to create a simple
+program or sequence of processing steps for your data---e.g., satellite
+or medical images, geophysical data, speech recordings---within minutes or even
+seconds. However, it also lets you create templated programs and advanced
+projects, e.g., running parallel on a large cluster.\\
+
+\SLab\ is intended for a broad audience coming from a wide spectrum of interest
+areas. Some people may just want to use \SLab\ programs to process their data.
+Others may only be interested in \SLab\ repro to organize their work but most
+users probably use the full suite to develop their programs, write processing
+flows and document their work.\\
+
+Enjoy!\\
+
+---G.H. \& S.R.-R.
+
+\chapter{Getting started}
+\SLab\ is known to work on Mac OS X platforms. This chapter will begin with basic
+installation and setup instructions to help new users get going quickly. The
+suggested setup for \SLab\ (config, core, contrib) requires
+\begin{itemize}
+  \item Subversion
+  \item Python 2.5 or later,
+  \item C/C++ compiler,
+  \item SCons 0.98.5 or later
+\end{itemize}
+%
+\SLab\ repro only requires Subversion, Python, and SCons. However, to get the
+most out of \SLab, you should also install
+%
+\begin{itemize} 
+  \item RSF/Madagascar,
+  \item Matlab,
+  \item SciPy, Matplotlib, and other Python modules,
+  \item FFTW
+  \item Boost
+  \item CurveLab
+  \item etc.
+\end{itemize}
+
+\section{Download}
+\label{sec:download}
+
+\SLab's development version is available\footnote{Some restrictions apply as of
+\today. Please contact G. Hennenfent (\email{hegilles@gmail.com}) or S.
+Ross-Ross (\email{srossross@gmail.com}) for more information.} at
+\url{https://wave.eos.ubc.ca/SLIM/SLIM.Software.MiniRSF/}. The following command
+
+\begin{shell}
+svn co https://wave.eos.ubc.ca/SLIM/SLIM.Software.MiniRSF/ SLab-src
+\end{shell}
+%
+will create a ``SLab-src'' folder in the current working directory and put
+\SLab\ source code in it.\\
+
+Alternatively, if you are only interested by \SLab\ repro, you can issue the
+following command
+
+\begin{shell}
+svn co https://wave.eos.ubc.ca/SLIM/SLIM.Software.MiniRSF/reproducibility/ SLab-repro-src
+\end{shell}
+
+\section{Basic installations}
+
+Unless otherwise stated, \SLab\ layers are installed from the \SLab\ source code
+directory---referred to as ``SLab-src'' in the previous section. For more
+details about the installation of the individual layers, their advanced
+setup, and features, please refer to chapter~\ref{sec:slab_layers}.
+
+\subsection{\SLab\ core}
+\label{sec:basic_core}
+
+In \SLab\ source code directory, issue the commands
+
+\begin{shell}
+scons -f SConfig --prefix=/Path/To/SLab-install
+scons install
+\end{shell}
+%
+to install \SLab\ core into the ``/Path/To/SLab-install'' directory. For
+example,
+
+\begin{shell}
+scons -f SConfig --prefix=$HOME/SLab-install
+scons install
+\end{shell}
+%
+installs \SLab\ core into your home directory under the ``SLab-install''
+directory.\\
+
+Once you have completed the installation, you can run our test suite with the
+command
+
+\begin{shell}
+scons test
+\end{shell}
+%
+Please let us know if the tests do not pass\footnote{Please contact either G.
+Hennenfent (\email{hegilles@gmail.com}) or S. Ross-Ross
+(\email{srossross@gmail.com}).}.\\
+
+The last step before you can start to write and compile your own \SLab\ programs
+is to setup your environment. \SLab\ core requires you to add to your
+\textsf{PYTHONPATH} the path to the \textsf{slabcore} module that you just
+installed, i.e., ``/Path/To/SLab-install/lib/pythonX.X/site-packages'' where
+X.X is the Python version number. For example, if you use Python 2.5 and have
+installed \SLab\ core under \textsf{\$HOME}/install, you should add
+
+\begin{shell}
+$HOME/SLab-install/lib/python2.5/site-packages
+\end{shell}
+%
+to your \textsf{PYTHONPATH}. In bash, issue the following command
+
+\begin{shell}
+export PYTHONPATH=$HOME/SLab-install/lib/python2.5/site-packages:$PYTHONPATH
+\end{shell}
+
+\subsection{\SLab\ contrib}
+
+Install \SLab\ core and issue the following command
+
+\begin{shell}
+scons main
+\end{shell}
+%
+The command line programs provided by the \SLab's users community are installed
+under ``/Path/To/SLab-install/bin''. Add this location to your PATH to use
+these programs. In bash, issue the following command
+
+\begin{shell}
+export PATH=/Path/To/SLab-install/bin:$PATH
+\end{shell}
+
+\subsection{\SLab\ repro}
+\subsubsection{One layer among the others}
+
+If you have already installed \SLab\ core, you are all set! Otherwise, you can
+install \SLab\ repro using the commands
+
+\begin{shell}
+scons -f SConfig --prefix=/Path/To/SLab-install
+scons repro
+\end{shell}
+%
+You also need to update your \textsf{PYTHONPATH} with
+``/Path/To/SLab-install/\-lib/pythonX.X/site-packages'' where X.X is the Python
+version number (see section~\ref{sec:basic_core} for an example).
+
+\subsubsection{Only layer}
+
+If you only downloaded \SLab\ repro, from the source code directory--referred
+to as ``SLab-repro-src'' in section~\ref{sec:download}, issue the command
+
+\begin{shell}
+python setup.py install --prefix=/Path/To/SLab-repro-install
+\end{shell}
+%
+and add ``/Path/To/SLab-repro-install/lib/pythonX.X/site-packages'', where X.X
+is the version number of the Python you use, to your \textsf{PYTHONPATH}. In
+bash, 
+
+\begin{shell}
+export PYTHONPATH=/Path/To/SLab-repro-install/lib/pythonX.X/site-packages:$PYTHONPATH
+\end{shell}
+
+\chapter{\SLab\ layers}
+\label{sec:slab_layers}
+
+\section{\SLab\ config}
+
+\subsection{Configuration file(s) and related command line option(s)}
+
+\begin{description}
+  \item[-\thinspace-config-file=FileName] specifies configuration file
+\end{description}
+
+\subsection{Installation location(s)}
+
+\begin{description}
+  \item[-\thinspace-prefix=Path] specifies installation prefix
+  \item[-\thinspace-lib-prefix=Path] specifies installation prefix
+  \item[-\thinspace-bin-prefix=Path] specifies installation prefix
+  \item[-\thinspace-python-prefix=Path] specifies installation prefix
+  \item[-\thinspace-include-prefix=Path] specifies installation prefix
+  \item[-\thinspace-no-std-python-install=Boolean] performs non-standard Python
+  installation
+\end{description}
+
+\subsection{Disable user(s)/component(s)/tool(s)}
+
+\begin{description}
+  \item[-\thinspace-disable-users=UserNames] does not compile specified user
+  folder(s)
+  \item[-\thinspace-disable-components=ComponentNames] does not configure
+  and compile specified component(s)
+  \item[-\thinspace-disable-tools=ToolNames] does not configure
+  and compile specified tool(s)
+\end{description}
+
+\subsection{Installation debugging}
+
+\begin{description}
+  \item[-\thinspace-fatal-error] does not ignore errors
+\end{description}
+
+\section{\SLab\ core}
+
+Please read \SLab\ reference guide for more details about the API's.
+
+\subsection{Simple example using C API}
+\subsubsection{Source code}
+\subsubsection{SConstruct}
+
+\subsection{Simple example using C++ API}
+\subsubsection{Source code}
+\lstinputlisting[firstline=19,frame=single,language=c]{core/democlip.cpp}
+
+\subsubsection{SConstruct}
+\lstinputlisting[firstline=17,frame=single]{core/SConstruct}
+
+\subsection{Simple example using Python API}
+\subsubsection{Source code}
+\subsubsection{SConstruct}
+
+\subsection{Simple example using Matlab API}
+\subsubsection{Source code}
+\subsubsection{SConstruct}
+
+\section{\SLab\ contrib}
+
+\section{\SLab\ repro}
+
+\subsection{Fetch file(s) from a remote location}
+
+\begin{itemize}
+  \item WGET,
+  \item FTP,
+\end{itemize}
+
+\subsection{Process data}
+
+\begin{itemize}
+  \item Command (from SCons, general use)
+  \item Rush (run RSF programs)
+  \item Matlab (run Matlab scritps)
+  \item GetPar (\textit{description})
+\end{itemize}
+
+\subsection{Display data}
+
+\begin{itemize}
+  \item View (popup display for .vpl, .pdf, jpeg, and .eps figures)
+  \item PDF (from SCons, extended to generate .pdf from .vpl, and .eps)
+\end{itemize}
+
+\subsection{Document data processing}
+
+\begin{itemize}
+  \item Preamble (gather \LaTeX\ pieces into full \LaTeX\ document)
+  \item PDF (from SCons, generate .pdf from full \LaTeX\ document)
+  \item HTML (generate website from full \LaTeX\ document)
+\end{itemize}
+
+\chapter{Tutorials}
+
+\section{Fetch file(s) from a remote location}
+
+\SLab\ provides you with two options to fetch data from a remote
+location: \textsf{WGET} and \textsf{FTP}. Both options are imported from the
+Python module \textsf{slabproj.py}, i.e., 
+
+\lstinputlisting[firstline=17,lastline=17,frame=single]{repro/FetchData/WGET/SConstruct}
+
+Here we assume that you have properly setup \SLab\ so that
+\textsf{slabproj.py} is in your \textsf{PYTHONPATH} environment variable. If it
+is not the case, refer to the installation section.
+
+\subsection{WGET}
+
+\textsf{WGET}, based on the Linux/Unix command
+\textsf{wget}\footnote{\textsf{wget} is standard on most flavours of Linux. On
+Macs, you can install \textsf{wget} e.g. thru Fink.}, is the method of choice
+for download of files. It supports HTTP, HTTPS, and FTP protocols, as well as
+retrieval through HTTP proxies. Refer to the man pages of \textsf{wget} for
+more information.\\
+
+\lstinputlisting[firstline=19,lastline=22,frame=single]{repro/FetchData/WGET/SConstruct}
+
+\marginpar{NOTE: following bock requires interactive mode because of password
+prompt.}
+\lstinputlisting[firstline=24,lastline=28,frame=single]{repro/FetchData/WGET/SConstruct}
+
+\lstinputlisting[firstline=30,lastline=36,frame=single]{repro/FetchData/WGET/SConstruct}
+
+\marginpar{NOTE: all WGET targets are gathered under ``fetch''
+alias, i.e., ``scons fetch'' runs all WGET commands at once.}
+\marginpar{NOTE: file(s) fetched are Precious so that ``scons -c'' does NOT
+remove fetched file(s), only ``scons -c fetch''.}
+
+\lstinputlisting[firstline=38,lastline=42,frame=single]{repro/FetchData/WGET/SConstruct}
+
+\subsection{FTP}
+
+Although less flexible, \textsf{FTP} offers a similar functionality as
+\textsf{WGET}. \textsf{FTP} relies on the Linux/Unix command \textsf{ftp}. In
+the following example, we retrieve the RSF file \textsf{shotdeep.p.rsf} from the unsecure FTP
+server \textsf{slim.eos.ubc.ca}. The file is located under
+the path \textsf{data/synth/delphi}.
+
+\lstinputlisting[firstline=19,lastline=22,frame=single]{repro/FetchData/FTP/SConstruct}
+
+On the command line, the above translates into
+
+\begin{codeblock}
+ftp -a slim.eos.ubc.ca:data/synth/delphi/shotdeep.p.rsf shotdeep.p.rsf
+\end{codeblock}
+
+\textsf{FTP} can also be used to retrieve files from a password-protected FTP
+server. In this case, you will be prompted for your password at run time. For
+example, running a SConstruct with
+
+\lstinputlisting[firstline=24,lastline=27,frame=single]{repro/FetchData/FTP/SConstruct}
+%
+generates the following output on the command line
+
+\begin{codeblock}
+scons: Reading SConscript files ...
+scons: done reading SConscript files.
+scons: Building targets ...
+ftp -a private@slim.eos.ubc.ca:data/synth/CVX/Tuiko2/README README
+Connected to slim.eos.ubc.ca.
+220 ProFTPD 1.3.0a Server (SLIM FTP server) [137.82.49.113]
+331 Password required for private.
+Password:
+\end{codeblock}
+
+\textit{Detailed description\ldots}
+
+\lstinputlisting[firstline=29,lastline=34,frame=single]{repro/FetchData/FTP/SConstruct}
+
+\newpage
+\section{Process data using RSF programs}
+
+\marginpar{NOTE: explain automatic parallelization thanks to \~\ in
+front of name of RSF programs.}
+
+\lstinputlisting[firstline=17,frame=single]{repro/ProcData/SConstruct}
+
+\newpage
+\section{Process data using Matlab}
+
+\lstinputlisting[firstline=17,lastline=17,frame=single]{repro/Matlab/SConstruct}
+
+\lstinputlisting[firstline=19,lastline=20,frame=single]{repro/Matlab/SConstruct}
+
+\lstinputlisting[firstline=22,lastline=28,frame=single]{repro/Matlab/SConstruct}
+
+\lstinputlisting[firstline=30,lastline=31,frame=single]{repro/Matlab/SConstruct}
+
+\newpage
+\section{Display data}
+
+\lstinputlisting[firstline=17,frame=single]{repro/PlotData/SConstruct}
+
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[height=.4\textheight]{repro/PlotData/plot}
+  \end{center}
+  \caption{RSF plot demo}
+\end{figure}
+
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[height=.4\textheight]{repro/PlotData/fig1}
+  \end{center}
+  \caption{Matplotlib demo 1}
+\end{figure}
+
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[height=.4\textheight]{repro/PlotData/fig2}
+  \end{center}
+  \caption{Matplotlib demo 2}
+\end{figure}
+
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[height=.4\textheight]{repro/PlotData/fig3}
+  \end{center}
+  \caption{Matplotlib demo 3}
+\end{figure}
+
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[height=.4\textheight]{repro/PlotData/epsfig}
+  \end{center}
+  \caption{Matlab demo}
+\end{figure}
+
+\newpage
+\section{Document data processing}
+
+\lstinputlisting[firstline=17,lastline=17,frame=single]{repro/WriteDoc/SConstruct}
+
+\subsection{Simple paper example}
+
+Two input \LaTeX\ files (\textsf{isrc.tex} and \textsf{isrc1.tex}):
+\lstinputlisting[firstline=17,frame=single,caption=isrc.tex,language=TeX]{repro/WriteDoc/isrc.tex}
+\lstinputlisting[firstline=17,frame=single,caption=isrc1.tex,language=TeX]{repro/WriteDoc/isrc1.tex}
+
+combine into one output \LaTeX\ file (\textsf{isrc.ltx}):
+\lstinputlisting[frame=single,caption=isrc.ltx,language=TeX]{repro/WriteDoc/isrc.ltx}
+
+using \textsf{Preamble}:
+\lstinputlisting[firstline=19,lastline=19,frame=single]{repro/WriteDoc/SConstruct}
+
+Output \LaTeX\ file (\textsf{isrc.ltx}) turned into PDF using \textsf{Paper}:
+\lstinputlisting[firstline=20,lastline=20,frame=single]{repro/WriteDoc/SConstruct}
+
+\subsection{Other paper examples}
+\lstinputlisting[firstline=22,lastline=32,frame=single]{repro/WriteDoc/SConstruct}
+
+\marginpar{NOTE: this block is unnecessarily complicated for now because of
+faulty \LaTeX\ scanner. PDF images will be implicit depencies of paper once
+\LaTeX\ scanner is properly working.}
+\lstinputlisting[firstline=34,lastline=40,frame=single]{repro/WriteDoc/SConstruct}
+
+\subsection{Book example}
+Input \LaTeX\ file (\textsf{book.ltx})
+\lstinputlisting[firstline=17,frame=single,caption=book.ltx,language=TeX]{repro/WriteDoc/book.ltx}
+
+turned into PDF using \textsf{Paper}
+\lstinputlisting[firstline=42,lastline=42,frame=single]{repro/WriteDoc/SConstruct}
+
+Note that \textsf{book.ltx} has \textsf{isrc1.tex} and \textsf{isrc3.tex}
+as implicit dependencies thanks to SCons \LaTeX\ Scanner.
+
+\chapter{Migrating from RSF/Madagascar}
+
+\chapter{\SLab\ multi-user setup}
+
+\section{Lonely user}
+
+Possible to develop programs anywhere(!) and build using construction
+environment from main \SLab\ installation.
+
+\section{Lonely developer}
+
+Possible to develop components, tools, and programs anywhere(!) and
+configure + build using construction environment from main \SLab\ installation.
+
+\end{document}

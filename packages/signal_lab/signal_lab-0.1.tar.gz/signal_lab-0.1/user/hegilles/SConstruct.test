@@ -1,0 +1,69 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabproj import *
+
+# model parameters
+n1        = 400        # no. of time samples
+n2        = 400        # no. of traces
+n3        = 2          # no. of slices
+
+plotcube  = ['sfbyte','sfgrey3 frame1=%d title="" '%(n1/2)]
+plotimag  = 'sfgrey title="" '
+makefloat = 'sfdd type=float'
+
+# model
+model     = Rush('model3d.rsf',None,
+                 'sfqdome n1=%(n1)d n2=%(n2)d n3=%(n3)d'%vars(),
+                 stdin=False)
+modelfig  = Rush('model3d.vpl',model,plotcube)
+
+View( modelfig )
+
+# mask parameter
+perc = .4       # percentage of missing traces
+
+# masks
+mask2dspa = Rush('mask2dspa',model,'sfshotholes perc=%f'%perc)
+mask3d    = Rush('mask3d',mask2dspa,
+                 [makefloat,'sfspray n=%d'%n1,'sftransp'])
+mask2d    = Rush('mask2d',mask3d,
+                 ['sfwindow n3=1'])
+
+# data
+data3d    = Rush('data3d',[model,mask2dspa],
+                 'sfheadercut mask=${SOURCES[1]}')
+data3dfig = Rush('data3d.vpl',data3d,plotcube)
+
+data2d    = Rush('data2d',data3d,'sfwindow n3=1')
+data2dfig = Rush('data2d.vpl',data2d,plotimag)
+
+View( [data2dfig,data3dfig] )
+
+# interpolation parameters
+iloop     = 5
+oloop     = 20
+
+interpolate = 'sfcrsi nin=%(iloop)d nout=%(oloop)d mask=${SOURCES[1]}'%vars()
+
+# results
+res2d     = Rush('res2d',[data2d,mask2d],interpolate)
+res2dfig  = Rush('res2d.vpl',res2d,plotimag)
+
+res3d     = Rush('res3d',[data3d,mask3d],interpolate)
+res3dfig  = Rush('res3d.vpl',res3d,plotcube)
+
+View( [res2dfig,res3dfig] )

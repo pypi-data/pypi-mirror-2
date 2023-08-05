@@ -1,0 +1,159 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+
+from os.path import isdir
+
+def validate_cppath(key, val, env):
+    for _cpath in val.split():
+        if not isdir( _cpath ):
+            raise Exception("Invalid path passed to %s: '%s'" %(key, _cpath) )
+
+def cpppath_converter( val ):
+    return val.split(':')
+
+env = Environment( )
+
+LoadConfigFile( env )
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+
+SLABCCOPTSvar = ( 'SLABCCOPTS', 'the c++ compiler', env.get('SLABCCOPTS',None ) )
+
+CCvar  = ( 'CC' , 'the c compiler', env['CC'] )
+CCflagsvar  = ( 'CCFLAGS' , 'the c compiler', env['CCFLAGS'] )
+CPPPATHvar  = ( 'CPPPATH' , 'c include paths' , env.get('CPPPATH',[]) , validate_cppath, cpppath_converter )
+LIBPATHvar  = ( 'LIBPATH' , 'c library paths' , env.get('LIBPATH',[]), validate_cppath, cpppath_converter )
+
+
+vars.Add( CCvar )
+vars.Add( CCflagsvar )
+vars.Add( CPPPATHvar )
+vars.Add( LIBPATHvar )
+vars.Add( SLABCCOPTSvar )
+
+vars.Update( env )
+
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'CC' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+tc = ToolCreator( 'slab_cc_debug' )
+tc2 = ToolCreator( 'slab_cc_opt' )
+
+tc3 = ToolCreator( 'slab_cc_option' )
+tc3.Replace( SLABCCOPTS=env.get('SLABCCOPTS',None) )
+tc3.Append( CCFLAGS=env.get('CCFLAGS',[]) )
+tc3.Append( CPPPATH=env.get('CPPPATH',[]) )
+tc3.Append( LIBPATH=env.get('LIBPATH',[]) )
+#tc3.Replace( SLABCCOPTS=env.get('SLABCCOPTS',None) )
+tc3.Exists(1)
+tc3.CreateTool(env)
+
+
+c_text = """
+void func( void)
+{
+    
+}
+"""
+clink_text = """
+int main( int argc, char** argv )
+{
+    return 0;
+}
+"""
+
+ 
+def CheckCCFlags( context, flags ):
+    
+    context.Message( "checking if '%s' accepts %s flag ... " %(context.env['CC'],flags) )
+    CCFLAGS = context.env['CCFLAGS']
+    context.env.Replace( CCFLAGS=flags )
+    ret = context.TryCompile( c_text, ".c" )
+    context.env.Replace( CCFLAGS=CCFLAGS )
+    context.Result( ret )
+    return ret
+
+def CheckLinkFlags( context, flags ):
+    
+    context.Message( "checking if '%s' accepts %s flag ... " %(context.env['LINK'],flags) )
+    LINKFLAGS = context.env['LINKFLAGS']
+    context.env.Replace( LINKFLAGS=flags )
+    ret = context.TryLink( clink_text, ".c" )
+    context.env.Replace( LINKFLAGS=LINKFLAGS )
+    context.Result( ret )
+    return ret
+
+
+if DoConfig( env ):
+    conf  = Configure( env, conf_dir="#/config-etc/tests", log_file="#/config-etc/config.log",
+                       custom_tests = { 'CheckCCFlags' : CheckCCFlags,
+                                       'CheckLinkFlags':CheckLinkFlags } )
+    
+    # Debug headers
+    tc.Append( CCFLAGS="-DDEBUG" )
+    
+    if conf.CheckCCFlags( "-g3" ):
+        tc.Append( CCFLAGS="-g3" )
+    elif conf.CheckCCFlags( "-g" ):
+        tc.Append( CCFLAGS="-g" )
+    
+    if conf.CheckCCFlags( "-Wall" ):
+        tc.Append( CCFLAGS="-Wall" )
+
+#    if conf.CheckLinkFlags( "-Wl,-rpath=." ):
+#        tc.Append( CCFLAGS="${_RPATH}" )
+#        tc2.Append( CCFLAGS="${_RPATH}" )
+
+#    if conf.CheckCCFlags( "-pedantic" ):
+#        tc.Append( CCFLAGS="-pedantic" )
+
+    #optimized headers
+    tc2.Append( CCFLAGS="-DNDEBUG" )
+    
+    if conf.CheckCCFlags( "-O3" ):
+        tc2.Append( CCFLAGS="-O3" )
+    
+    if conf.CheckCCFlags( "-w" ):
+        tc2.Append( CCFLAGS="-w" )
+
+    if conf.CheckCCFlags( "-fpermissive" ):
+        tc2.Append( CCFLAGS="-fpermissive" )
+    
+    tc.Exists( 1 )
+    tc2.Exists( 1 )
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+tc2.CreateTool(env)
+

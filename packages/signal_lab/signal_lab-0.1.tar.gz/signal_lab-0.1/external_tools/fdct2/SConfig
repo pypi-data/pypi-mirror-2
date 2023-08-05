@@ -1,0 +1,91 @@
+#  Copyright (C) 2008 The University of British Columbia
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+from slabcore import *
+from os.path import join
+from glob import glob
+
+env = Environment( )
+env.Tool( 'slab_cc' )
+
+LoadConfigFile( env )
+
+#===============================================================================
+# Variables
+#===============================================================================
+vars = Variables( )
+
+fdctvar = PackageVariable('FDCT', 'path to your CurveLab installation directory', env.get('FDCT',True) )
+
+vars.Add( fdctvar )
+vars.Update( env )
+
+#===============================================================================
+# HELP
+#===============================================================================
+Help( "\n" )
+Help( "\n" )
+Help( "Options for 'fdct2' external tool:" )
+Help( vars.GenerateHelpText(env) )
+
+#===============================================================================
+# Configuration
+#===============================================================================
+toolname = 'onlyfdct2'
+tc = ToolCreator( toolname )
+
+if DoConfig( env ):
+    conf  = Configure(env,conf_dir="#/config-etc/tests",log_file="#/config-etc/config.log")
+
+    FDCT = env.get('FDCT')
+    fftw2tool = Tool('fftw2')
+
+    if FDCT and fftw2tool.exists( env ):
+        conf.env.Tool('fftw2')
+        
+        if isinstance( FDCT , str):
+            # Header path
+            fdct2path = join( FDCT, 'fdct_wrapping_cpp', 'src' )
+            conf.env.Prepend(CPPPATH=fdct2path)
+            # Library path
+            conf.env.Prepend(LIBPATH=fdct2path)
+    
+        if conf.CheckLibWithHeader( 'fdct_wrapping','fdct_wrapping.hpp', 'c++', autoadd=False):
+            tc.Prepend( LIBS=['fdct_wrapping'] )
+            tc.Prepend( CPPPATH=fdct2path )
+            tc.Prepend( LIBPATH=fdct2path )
+            tc.Exists(True)
+        else:
+            tc.Exists(False)
+                
+    else:
+        print "Checking for C++ library fdct_wrapping... no (missing fftw2 and/or math tool(s) )"
+        tc.Exists(False)        
+        
+    env = conf.Finish( )
+    
+#===============================================================================
+# Write file
+#===============================================================================
+tc.CreateTool(env)
+
+#===============================================================================
+# Clean
+#===============================================================================
+Clean('.', '#/config-etc' )
+Clean( '.', glob('*.pyc') )
+Clean( '.', join( Dir('#').abspath,toolname+'.py') )
+Clean( '.', '#/.sconsign.dblite' )
