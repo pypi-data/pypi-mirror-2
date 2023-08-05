@@ -1,0 +1,155 @@
+Tokyo Cabinet (http://1978th.net/tokyocabinet/) is a modern
+implementation of DBM database. Mikio Hirabayashi (the author of Tokyo
+Cabinet) describe the project as:
+
+  Tokyo Cabinet is a library of routines for managing a database. The
+  database is a simple data file containing records, each is a pair of
+  a key and a value. Every key and value is serial bytes with variable
+  length. Both binary data and character string can be used as a key
+  and a value. There is neither concept of data tables nor data
+  types. Records are organized in hash table, B+ tree, or fixed-length
+  array.
+
+The py-tcdb project is an interface to the library using the ctypes
+Python module and provides a two-level access to TC functions: a low
+level and a high level.
+
+Low Level API
+-------------
+
+We can interface with TC library using directly the tc module. This
+module declare all functions and data types. For example, if we want
+to create a HDB (hash database object) we can write:
+
+  from tcdb import tc
+  from tcdb import hdb
+
+  if not tc.hdb_open(db, 'example.tch', hdb.OWRITER|hdb.OCREAT):
+      print tc.hdb_errmsg(tc.hdb_ecode(db))
+
+  if not tc.hdb_put2(db, 'key', 'value'):
+      print tc.hdb_errmsg(tc.hdb_ecode(db))
+
+  v = tc.hdb_get2(db, 'key')
+
+  print 'VALUE:', v.value
+
+The low level API works with ctypes types (like c_char_p or c_int).
+
+High Level API
+--------------
+
+For each kind of database type allowed in TC, we have a Python class
+that encapsulate all the functionality. For every class we try to
+emulate the bsddb Python module interface. This interface is quite
+similar to a dict data type with persistence.
+
+We also try to improve this API. For example, we can work with
+transactions using the with Python keyword.
+
+Hash Database
+~~~~~~~~~~~~~
+
+We can use the HDB class to create and manage TC hash databases. This
+class behaves like a dictionary object, but we can use put and get
+methods in order to have more control over the stored data. In a hash
+database we can store serialized Python objects as a key or as a
+value, or raw data (that can be retrieved from the database using C,
+Lua, Perl or Java).
+
+  from tcdb import hdb
+
+  # The open method can change other params like cache or
+  # auto defragmentation steep.
+  db = hdb.HDB()
+  db.open('example.tch')
+
+  # Store pickled object in the database
+  db['key'] = 10
+  assert type(db['key']) == int
+
+  db['key'] = 1+1j
+  assert type(db['key']) == complex
+
+  db[1+1j] = 'text'
+  assert type(db[1+1j]) == str
+
+  # If we use put/get, we can store raw data
+  # Equiv. to use db.put_int('key', 10, as_raw=True)
+  db.put('key', 10, raw_key=True, raw_value=True)
+  # Equiv. to use db.get_int('key', as_raw=True)
+  assert db.get('key', raw_key=True, value_type=int) == 10
+
+  # We can remove records using 'del' keyword
+  # or out methods
+  db.out('key', as_raw=True)
+
+  # We can iterate over the records.
+  for key, value in db.iteritems():
+      print key, ':', value
+
+  # The 'with' keywork works as expected
+  with db:
+      db[10] = 'ten'
+      assert db[10] == 'ten'
+      raise Exception
+
+  # Because we abort the transaction, we don't
+  # have the new record
+  try:
+      db[10]
+  except KeyError:
+      pass
+
+
+B+ Tree Database
+~~~~~~~~~~~~~~~~
+
+We can use the class BDB to create and manage B+ tree TC
+databases. The API is quite similar to the HDB one. One thing that we
+can do with BDB class is that we can access using a Cursor. With range
+we can access to a set of ordered keys in a efficient way, and with
+Cursor object we can navigate over the database.
+
+Fixed-length Database
+~~~~~~~~~~~~~~~~~~~~~
+
+FDB class can create and manage a fixed-length array database. In this
+kind of database we can only use int keys, like in a dynamic array.
+
+Table Database
+~~~~~~~~~~~~~~
+
+Tokyo Cabinet can use a variation of a hash database to store
+table-like object. In Python we can use a dict object to represent a
+single table. With THD we can store these tables and make queries
+using Query object.
+
+  from tcdb import tdb
+
+  # The open method can change other params like cache or
+  # auto defragmentation steep.
+  db = tdb.TDB()
+  db.open('example.tct')
+
+  # Store directly a new table
+  alice = {'user': 'alice', 'name': 'Alice', 'age': 23}
+  db['pk'] = alice
+  assert db['pk'] == alice
+  assert type(db['pk']['age']) == int
+
+  # If we use put/get, we can store raw data
+  db.put('pk', alice, raw_key=True, raw_cols=True)
+  # Equiv. to use db.get_col_int('pk', 'age', raw_key=True)
+  schema = {'user': str, 'name': str, 'age': int}
+  assert db.get('pk', raw_key=True, schema=schema)['age'] == 23
+
+  # We can remove records using 'del' keyword
+  # or out methods
+  del db['pk']
+
+Abstract Database
+~~~~~~~~~~~~~~~~~
+
+For completeness, we include the ADB abstract interface for accessing
+hash, B+ tree, fixed-length and table database objects.
