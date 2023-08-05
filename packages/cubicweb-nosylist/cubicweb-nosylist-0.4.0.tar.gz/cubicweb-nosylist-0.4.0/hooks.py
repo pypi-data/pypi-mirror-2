@@ -1,0 +1,75 @@
+from cubicweb import ValidationError
+from cubicweb.server import hook
+from cubicweb.selectors import implements
+
+from cubes.nosylist.interfaces import INosyList
+
+class INotificationBaseAddedHook(hook.Hook):
+    """automatically register the user creating a ticket as interested by it
+    """
+    __regid__ = 'notification_base_added_hook'
+    __select__ = hook.Hook.__select__ & implements(INosyList)
+    events = ('after_add_entity',)
+
+    def __call__(self):
+        session = self._cw
+        if not session.is_internal_session:
+            session.execute('SET U interested_in X WHERE X eid %(x)s, U eid %(u)s',
+                            {'x': self.entity.eid, 'u': session.user.eid})
+
+
+class InterestedInAddHook(hook.Hook):
+    """adds relation nosy_list corresponding to relation interested_in
+    """
+    __regid__ = 'add_interested_in_hook'
+    __select__ = hook.Hook.__select__ & hook.match_rtype('interested_in')
+    events = ('after_add_relation',)
+
+    def __call__(self):
+        self._cw.execute('SET X nosy_list U WHERE X eid %(x)s, U eid %(u)s, '
+                         'NOT X nosy_list U',
+                         {'x': self.eidto, 'u': self.eidfrom})
+
+
+class InterestedInDelHook(hook.Hook):
+    """deletes relation nosy_list corresponding to relation interested_in
+    """
+    __regid__ = 'deleted_interested_in_hook'
+    __select__ = hook.Hook.__select__ & hook.match_rtype('interested_in')
+    events = ('after_delete_relation',)
+
+    def __call__(self):
+        self._cw.execute('DELETE X nosy_list U WHERE X eid %(x)s, U eid %(u)s',
+                         {'x': self.eidto, 'u': self.eidfrom})
+
+
+# relations where the "main" entity is the subject
+S_RELS = set()
+# relations where the "main" entity is the object
+O_RELS = set()
+
+class NosyListPropagationHook(hook.PropagateSubjectRelationHook):
+    """propagate permissions when new entity are added"""
+    __regid__ = 'nosy_list_propagation_hook'
+    __select__ = hook.Hook.__select__ & hook.match_rtype_sets(S_RELS, O_RELS)
+
+    main_rtype = 'nosy_list'
+    subject_relations = S_RELS
+    object_relations = O_RELS
+
+
+class NosyListAddPropagationHook(hook.PropagateSubjectRelationAddHook):
+    """propagate permissions when new entity are added"""
+    __regid__ = 'nosy_list_add_propagation_hook'
+    __select__ = hook.Hook.__select__ & hook.match_rtype('nosy_list')
+
+    subject_relations = S_RELS
+    object_relations = O_RELS
+
+
+class NosyListDelPropagationHook(hook.PropagateSubjectRelationDelHook):
+    __regid__ = 'nosy_list_del_propagation_hook'
+    __select__ = hook.Hook.__select__ & hook.match_rtype('nosy_list')
+
+    subject_relations = S_RELS
+    object_relations = O_RELS
