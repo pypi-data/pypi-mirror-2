@@ -1,0 +1,469 @@
+#!/usr/bin/env python
+
+"""
+usage: rosinstall [OPTIONS] INSTALL_PATH [URI]
+
+Options:
+-s SETUP_FILE or --setup=SETUP_FILE (use another setup.sh file to create env)
+-n or --nobuild (don't perform a 'make core_cools' on the ros stack)
+
+Common invocations:
+
+initial checkout:   rosinstall ~/ros http://ros.org/rosconfigs/all.rosconfig
+subsequent update:  rosinstall ~/ros
+
+"""
+
+from __future__ import with_statement
+
+import os
+import subprocess
+import sys
+import xml.dom.minidom #import parse
+from optparse import OptionParser
+import yaml
+
+import rosinstall.helpers
+from rosinstall.vcs import svn, bzr, git
+
+def usage():
+  print __doc__ % vars()
+  exit(1)
+
+class ROSInstallException(Exception): pass
+
+class ConfigElement:
+  def __init__(self, name, path):
+    self.name = name
+    self.path = path
+  def get_path(self):
+    return self.path
+  def get_name(self):
+    return self.name
+  def install(self):
+    raise NotImplementedError, "ConfigElement install unimplemented"
+  def get_ros_path(self):
+    raise NotImplementedError, "ConfigElement get_ros_path unimplemented"
+  def get_versioned_yaml(self):
+    raise NotImplementedError, "ConfigElement get_versioned_yaml unimplemented"
+
+class OverlayConfigElement(ConfigElement):
+  def install(self):
+    return True
+
+  def get_ros_path(self):
+    if rosinstall.helpers.is_path_ros(self.path):
+      return self.path
+    else:
+      return None
+
+  def get_versioned_yaml(self):
+    raise ROSInstallException("Cannot generate versioned outputs with overlays")
+    return [{"overlay": {"local-name": self.name, "uri": self.path} }]
+
+class VCSConfigElement(ConfigElement):
+  def __init__(self, name, path, uri, version):
+    self.name = name
+    self.path = path
+    self.uri = uri
+    self.version = version
+    
+  def install(self):
+    if not self.vcsc.path_exists():
+      self.vcsc.checkout(self.uri, self.version)
+    else:
+      if not self.vcsc.detect_presence():
+        raise ROSInstallException("Directory '%s' already exists but is not of type %s"%(self.vcsc.get_path(), self.vcsc.get_vcs_type_name()))
+      self.vcsc.update(self.version)
+    return True
+  
+  def get_ros_path(self):
+    if rosinstall.helpers.is_path_ros(self.path):
+      return self.path
+    else:
+      return None
+
+  def get_versioned_yaml(self):
+    return [{self.vcsc.get_vcs_type_name(): {"local-name": self.name, "uri": self.uri, "version":self.vcsc.get_version()} }]
+  
+
+class SVNConfigElement(VCSConfigElement):
+  def __init__(self, name, path, uri, version = None):
+    self.name = name
+    self.path = path
+    self.uri = uri
+    self.version = version
+    self.vcsc = svn.SVNClient(self.path)
+
+class BZRConfigElement(VCSConfigElement):
+  def __init__(self, name, path, uri, version = None):
+    self.name = name
+    self.path = path
+    self.uri = uri
+    self.version = version
+    self.vcsc = bzr.BZRClient(self.path)
+
+class GITConfigElement(VCSConfigElement):
+  def __init__(self, name, path, uri, version = None):
+    self.name = name
+    self.path = path
+    self.uri = uri
+    self.version = version
+    self.vcsc = git.GITClient(self.path)
+
+class DistroStackConfigElement(VCSConfigElement):
+  def __init__(self, name, path, uri, release_name, rule = "release_svn"):
+    self.name = name
+    self.path = path
+    self.distro_uri = uri
+
+    self.version = ''
+    self.release_name = release_name
+    self.rule = rule
+    self.distro = rosinstall.distro.Distro(uri)
+    if self.release_name != self.distro.release_name:
+      raise ROSInstallException("incompatable release names: requested %s but %s is in %s"%(self.release_name, self.distro.release_name,uri))
+    if self.name in self.distro.stack_names:
+      self.stack = self.distro.stacks[name]
+      self.vcsc = svn.SVNClient(self.path)
+      self.uri = getattr(self.stack, rule)
+    else:
+      raise ROSInstallException("stack %s missing in rosdistro %s"%(name, uri))
+
+class DistroVariantConfigElement(ConfigElement):
+  def __init__(self, name, path, uri, release_name, rule = "release_svn"):
+    self.name = name
+    self.path = path
+
+    self.distro_uri = uri
+    self.release_name = release_name
+    self.rule = rule
+
+    self.distro = rosinstall.distro.Distro(uri)
+    if not name in self.distro.variants:
+      ROSInstallException("distro doesn't have variant %s"%name)
+    variant = self.distro.variants[name]
+    self.stack_list = variant.stack_names
+
+
+  def install(self):
+    for stack_name in self.stack_list:
+      uri = getattr(self.distro.stacks[stack_name], self.rule)
+      stack_path = os.path.join(self.path, stack_name)
+      vcsc = svn.SVNClient(stack_path)
+      if not vcsc.path_exists():
+        if not vcsc.checkout(uri, ''):
+          return False
+      else:
+        if not vcsc.detect_presence():
+          raise ROSInstallException("Directory '%s' already exists but is not of type %s"%(vcsc.get_path(), vcsc.get_vcs_type_name()))
+        if not vcsc.update(''):
+          return False
+    return True
+
+  def get_ros_path(self):
+    for s in self.stack_list:
+      if rosinstall.helpers.is_path_ros(os.path.join(self.path, s)):
+        return os.path.join(self.path, s)
+    return None
+  
+  def get_versioned_yaml(self):
+    output = []
+    for stack_name in self.stack_list:
+      uri = getattr(self.distro.stacks[stack_name], self.rule)
+      stack_path = os.path.join(self.path, stack_name)
+      vcsc = svn.SVNClient(stack_path)
+      
+      output.append({vcsc.get_vcs_type_name(): {"local-name": stack_path, "uri": uri, "version":vcsc.get_version()} })
+
+class Config:
+  def __init__(self, yaml_source, install_path):
+    self.source_uri = "hack" #TODO Hack so I don't have to fix theusages of this remove!!!
+    self.source = yaml_source
+    self.trees = [ ]
+    self.base_path = install_path
+
+    if self.source:
+      self.load_yaml(self.source)
+      self.valid = True
+    else:
+      self.valid = False
+    
+  def is_valid(self):
+    return self.valid
+
+  def load_yaml(self, y):
+    for t in y:
+      for k, v in t.iteritems():
+
+
+        if not 'local-name' in v:
+          raise ROSInstallException("local-name is required on all code trees")
+        else:
+          local_name = v['local-name']
+
+        source_uri = v.get('uri', None)
+        version = v.get('version', '')
+        local_path = os.path.join(self.base_path, local_name)
+
+        #if local_path in self.vcs:
+        #  raise Exception("cannot install two things into the same directory!! %s"%local_path)
+        
+        if k == 'svn':
+          if not source_uri:
+            raise ROSInstallException("woah! no uri for svn tree %s" % local_name)
+          elem = SVNConfigElement(local_name, local_path, source_uri, version)
+        elif k == 'git':
+          if not source_uri:
+            raise ROSInstallException("woah! no uri for git tree %s" % local_name)
+          elem = GITConfigElement(local_name, local_path, source_uri, version)
+        elif k == 'bzr':
+          if not source_uri:
+            raise ROSInstallException("woah! no uri for bzr tree %s" % local_name)
+          elem = BZRConfigElement(local_name, local_path, source_uri, version)
+        elif k == 'overlay':
+          if not source_uri:
+            print v
+            raise ROSInstallException("woah! no uri for overlay %s" % local_name)
+          rosinstall_uri = os.path.join(source_uri, "this.rosinstall")
+          if os.path.exists(rosinstall_uri):
+            child_config = Config(rosinstall.helpers.get_yaml_from_uri(rosinstall_uri), source_uri)
+            for child_t in child_config.trees:
+              elem = OverlayConfigElement(child_t.get_name(), child_t.get_path())
+              self.trees.append(elem)
+            continue # so we don't append some individual one at the end
+          else:
+            raise ROSInstallException("woah! invalid uri for overlay tree %s: %s"% (local_name, rosinstall_uri))
+          pass
+        elif k == 'stack':
+          if not source_uri:
+            raise ROSInstallException("woah! no uri for stack %s" % local_name)
+          elem = DistroStackConfigElement(local_name, local_path, source_uri, version, rule = "distro_svn")
+        elif k == 'variant':
+          if not source_uri:
+            raise ROSInstallException("woah! no uri for variant %s" % local_name)
+          elem = DistroVariantConfigElement(local_name, local_path, source_uri, version, rule = "distro_svn")
+        else:
+          raise ROSInstallException("woah, unknown installation method %s" % k)
+
+
+        self.trees.append(elem)
+
+  def ros_path(self):
+    rp = None
+    for t in self.trees:
+      ros_path = t.get_ros_path()
+      if ros_path:
+        rp = ros_path
+    return rp
+  
+  def write_version_locked_source(self, filename):
+    source_aggregate = []
+    for t in self.trees:
+      source_aggregate.extend(t.get_versioned_yaml())
+
+    with open(filename, 'w') as fh:
+      fh.write(yaml.safe_dump(source_aggregate))
+      
+  def write_source(self):
+    """
+    Write this.rosinstall into the root of the checkout
+    """
+    if not os.path.exists(self.base_path):
+      os.makedirs(self.base_path)
+    f = open(os.path.join(self.base_path, "this.rosinstall"), "w+b")
+    f.write(yaml.safe_dump(self.source))
+    f.close()
+    
+  def execute_install(self):
+    if not os.path.exists(self.base_path):
+      os.mkdir(self.base_path)
+    for t in self.trees:
+      if not t.install():
+        raise ROSInstallException("Failed to install tree '%s'\n vcs not setup correctly"%t.get_name())
+        
+  # TODO go back and make sure that everything in options.path is described
+  # in the yaml, and offer to delete otherwise? not sure, but it could go here
+
+
+
+  def get_ros_package_path(self):
+    """ Return the simplifed ROS_PACKAGE_PATH """
+    code_trees = []
+    for t in self.trees:
+      if t.get_name() != 'ros':
+        code_trees.append(t.get_path())
+    code_trees.reverse()
+    rpp = ':'.join(set(code_trees))
+    return rpp
+    
+  
+  def generate_full_setup_text(self, ros_root, ros_package_path):
+    # overlay or standard
+    text = ""
+    text += "export ROS_ROOT=%s\n" % ros_root
+    text += "export PATH=$ROS_ROOT/bin:$PATH\n" # might include it twice
+    text += "export PYTHONPATH=$ROS_ROOT/core/roslib/src:$PYTHONPATH\n"
+    text += "if [ ! \"$ROS_MASTER_URI\" ] ; then export ROS_MASTER_URI=http://localhost:11311 ; fi\n"
+    text += "export ROS_PACKAGE_PATH=%s\n" % ros_package_path
+    text += "source $ROS_ROOT/tools/rosbash/rosbash\n"
+    return text
+    
+
+  def generate_setup(self):
+    # simplest case first
+    ros_root = self.ros_path()
+    if not ros_root:
+      raise ROSInstallException("No ROS_ROOT defined")
+    rpp = self.get_ros_package_path()
+
+    text = self.generate_full_setup_text(ros_root, rpp)
+
+    setup_path = os.path.join(self.base_path, 'setup.sh')
+    with open(setup_path, 'w') as f:
+      f.write(text)
+
+
+## legacy for breadcrumb which will be removed shortly.
+def installed_uri(path):
+  try:
+    f = open(os.path.join(path, '.rosinstall_source_uri'),'r')
+    print "Falling back onto deprecated .rosinstall_source_uri"
+  except IOError, e:
+    pass
+    return None
+  return rosinstall.helpers.conditional_abspath(f.readline())  # abspath here for backwards compatability with change to abspath in breadcrumb
+
+def insert_source_yaml(source_yaml, source, observed_paths, aggregate_source_yaml):
+    if source_yaml:
+      for element in source_yaml:
+        #print "element", element
+        for k in element:
+          #print "k", k
+          #print "element[k]", element[k]
+          if 'local-name' in element[k]:
+            path = element[k]['local-name']
+            if path in observed_paths:
+              return "local-name '%s' multiply defined, first definition in %s, second definition in %s"%(path, observed_paths[path], source)
+            else:
+              observed_paths[path] = source
+          else:  
+            return "local-name must be defined for all targets, failed in %s"%source
+      aggregate_source_yaml.extend(source_yaml)
+      #print "aggregated to", aggregate_source_yaml
+      return ''
+
+
+def rosinstall_main(argv):
+  if len(argv) < 2:
+    usage()
+  args = argv[1:]
+  parser = OptionParser(usage="usage: %prog PATH [URI] [options]")
+  parser.add_option("-u", "--update", dest="update", default=False,
+                    help="(deprecated unused)",
+                    action="store_true")
+  parser.add_option("-p", "--prepend", dest="prepend",
+                    metavar="prepend overlay", action="append", 
+                    help="prepend the install in this directory as an overlay")
+  parser.add_option("-s", "--setup_file", dest="setup_file",
+                    metavar="SETUP_FILE",
+                    help="create environment using an existing setup file(deprecated)")
+  parser.add_option("-o", "--overlay", dest="overlay", default=False,
+                    help="(deprecated unused)",
+                    action="store_true")
+  parser.add_option("-n", "--nobuild", dest="nobuild", default=False,
+                    help="skip the build step for the ROS stack",
+                    action="store_true")
+  parser.add_option("--rosdep-yes", dest="rosdep_yes", default=False,
+                    help="Pass through --rosdep-yes to rosmake", 
+                    action="store_true")
+  parser.add_option("--generate-versioned-rosinstall", dest="generate_versioned", default=None,
+                    help="generate a versioned rosintall file", action="store")
+  (options, args) = parser.parse_args(args)
+    
+
+  # Get the path to the rosinstall 
+  options.path = os.path.abspath(args[0])
+
+  # Find out what the URI is (args, this.rosinstall, or breadcrumb(for backwards compatability)
+
+
+  config_uris = []
+
+  if os.path.exists(os.path.join(options.path, "this.rosinstall")):
+    config_uris.append(os.path.join(options.path, "this.rosinstall"))
+  else: ## backwards compatability to be removed in the future
+    # try to read the source uri from the breadcrumb mmmm delicious
+    config_uri = installed_uri(options.path)
+    if config_uri:
+      config_uris.append(config_uri)
+
+  config_uris.extend(args[1:])
+
+  overlay_source = """- overlay: 
+    local-name: %s
+    uri: %s"""
+
+  observed_paths = {}
+  aggregate_source_yaml = []
+  print "rosinstall operating on", options.path, "from specifications in rosinstall files ", ", ".join(config_uris)
+
+  if options.prepend:
+    for p in options.prepend:
+      pa = os.path.abspath(p)
+      print "adding overlay of %s"%pa
+      #print overlay_source%(pa, pa)
+      source_yaml = yaml.load(overlay_source%(pa, pa))
+      result = insert_source_yaml(source_yaml, pa, observed_paths, aggregate_source_yaml)
+      if result != '':
+        parser.error(result)
+
+  for a in config_uris:
+    #print "argument", a
+    config_uri = rosinstall.helpers.conditional_abspath(a)
+    source_yaml = rosinstall.helpers.get_yaml_from_uri(config_uri)
+    #print "source yaml", source_yaml
+    result = insert_source_yaml(source_yaml, a, observed_paths, aggregate_source_yaml)
+    if result != '':
+      parser.error(result)
+
+  ## Could not get uri therefore error out
+  if len(config_uris) == 0:
+    parser.error( "no source rosinstall file found! looked at arguments, %s , and %s(deprecated)"%(
+        os.path.join(options.path, "this.rosinstall"), os.path.join(options.path, ".rosinstall_source_uri")))
+
+  #print "source...........................", aggregate_source_yaml
+
+  ## Generate the config class with the uri and path
+  config = Config(aggregate_source_yaml, options.path)
+  if not config.is_valid():
+    return -1
+
+  if options.generate_versioned:
+    filename = os.path.abspath(options.generate_versioned)
+    config.write_version_locked_source(filename)
+    print "Saved versioned rosinstall of current directory %s to %s"%(options.path, filename)
+    return 0
+
+  ## Save this.rosinstall 
+  config.write_source()
+  ## install or update each element
+  config.execute_install()
+  ## Generate setup.sh and save
+  config.generate_setup()
+  ## bootstrap the build if installing ros
+  if config.ros_path() and not (options.setup_file or options.nobuild):
+    print "Bootstraping ROS build"
+    if options.rosdep_yes:
+      subprocess.check_call("source %s && rosmake rostest --rosdep-install --rosdep-yes" % (os.path.join(options.path, 'setup.sh')), shell=True, executable='/bin/bash')
+    else:
+      subprocess.check_call("source %s && rosmake rostest --rosdep-install" % (os.path.join(options.path, 'setup.sh')), shell=True, executable='/bin/bash')
+  print "\ndone. Now, type 'source %s/setup.sh' to set up your environment.\nAdd that to the bottom of your ~/.bashrc to set it up every time.\n\n" % options.path
+
+if __name__ == "__main__":
+  try:
+    sys.exit(rosinstall_main(sys.argv) or 0)
+  except ROSInstallException, e:
+    print >> sys.stderr, "ERROR: %s"%str(e)
+    sys.exit(1)
+
