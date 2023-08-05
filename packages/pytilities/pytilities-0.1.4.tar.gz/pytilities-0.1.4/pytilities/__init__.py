@@ -1,0 +1,55 @@
+# Copyright (C) 2010 Tim Diels <limyreth@users.sourceforge.net>
+# 
+# This file is part of pytilities.
+# 
+# pytilities is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# pytilities is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with pytilities.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+'''
+Root of pytilities, various utilities
+
+Web site: http://pytilities.sourceforge.net/
+Sourceforge site: http://sourceforge.net/projects/pytilities/
+
+Features:
+
+    - delegation: decorate classes with attributes that are delegated to a
+    target object without having to write those attributes on the decorating
+    class
+
+    - event dispatching: Observer/Subject like event dispatching with wrappers
+    for hiding events on dispatchers and combining dispatchers
+
+    - function overloading
+
+    - various: Vector, Rectangle classes, custom types, ...
+
+Classes:
+
+    - `AttributeCollection`: Abstract, represents a collection of attributes.
+    - `AttributeCollectionBase`: Mixin, allows easy extension of class attributes
+    - `Stringifiable`: Mixin, provides a reasonable default __str__
+
+Functions:
+
+    - `mangle`: Get the mangled name of an attribute
+'''
+
+__docformat__ = 'reStructuredText'
+
+from .attributecollection import AttributeCollection
+from .attributecollectionbase import AttributeCollectionBase
+from .stringifiable import Stringifiable
+from .mangling import mangle
+
