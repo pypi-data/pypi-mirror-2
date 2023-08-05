@@ -1,0 +1,438 @@
+# Copyright (c) 2010 Adam Tauno Williams <awilliam@whitemice.org>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+import sys, logging, pickle, traceback
+from lxml       import etree
+from datetime   import datetime
+from coils.core import *
+from exception import NoActionException, UnknownActionException, NoSuchMessageException
+from coils.logic.workflow  import ActionMapper
+
+#
+# TODO: Clean-up!  Works great, but is getting a bit spider-webby.
+#
+
+def filename_for_process_code(process):
+    return '{0}/wf/p/{1}.{2}.cpm'.format(Backend.store_root(),
+                                          process.object_id,
+                                          process.version)
+
+class Process(Service):
+    __auto_dispatch__ = True
+    __is_worker__     = True
+
+    def __init__(self, p, c):
+        self._process_id = p
+        self._context_id = c
+        Service.__init__(self)
+
+    def setup(self):
+        self.__service__ = 'coils.workflow.process.{0}'.format(self._process_id)
+        self._route_name = None
+        self._process    = None
+        self._ctx        = None
+        self.iteration   = 0
+        Service.setup(self)
+
+    def prepare(self):
+        Service.prepare(self)
+        # Create context
+        self._ctx = AssumedContext(self._context_id)
+        self.log.debug('Workflow process assumed login {0}'.format(self._ctx.get_login()))
+        # Load process
+        self._process = self._ctx.run_command('process::get', id=self._process_id,
+                                                              access_check=False)
+        if (self._process is None):
+            self.send(Packet('{0}/__null'.format(self.__service__),
+                 'coils.workflow.executor/failure',
+                 { 'processId': self._process_id }))
+            self.shutdown()
+        self.load_state()
+        self._process.started = self._ctx.get_locatime()
+        self._process.state = 'R'
+        self._process.parked  = None
+        self.save_state()
+        self.log_message('started', 'Process {0} started'.format(self._process.object_id))
+        self._ctx.commit()
+        self.send(Packet('{0}/__null'.format(self.__service__),
+                         'coils.workflow.executor/running',
+                         { 'processId': self._process_id }))
+
+# State
+
+    def load_state(self):
+        filename = filename_for_process_code(self._process)
+        source = open(filename, 'rb')
+        self._cpm = pickle.load(source)
+        source.close()
+        self._park = False
+        self._complete = False
+
+    def save_state(self):
+        self._process.version = self._process.version + 1
+        filename = filename_for_process_code(self._process)
+        handle = open(filename, 'wb')
+        self.log.debug('Opened file {0} for writing.'.format(filename))
+        pickle.dump(self._cpm, handle)
+        handle.close()
+        self.log.debug('Closed file {0}.'.format(filename))
+        self._ctx.commit()
+        return True
+
+# Message acquisition and action execution
+
+    def get_message(self, label):
+        message = self._ctx.run_command('message::get', process=self._process,
+                                                        scope=self.stack,
+                                                        label=label)
+        if (message is None):
+            self.log.error('No such message as {0} in proccess {1} with scope {2}'.\
+                format(label, self._process.object_id, ','.join(self.stack)))
+            raise NoSuchMessageException('No such message as {0} in process.'.format(label))
+        return message
+
+    def run_stanza(self, uuid):
+        stanza = self._cpm[uuid]
+        self.send(Packet('{0}/__null'.format(self.__service__),
+                         'coils.workflow.executor/running',
+                         { 'processId': self._process_id }))
+        if (stanza.get('control') is None):
+            # This is a normal non-control action
+            # 1.) Lookup Action
+            _action_name = stanza.get('params', { }).get('activityName', None)
+            if (_action_name is None):
+                raise NoActionException()
+            _action = ActionMapper.get_action(_action_name)
+            if (_action is None):
+                self.log.warn('No support for process action {0}', _action_name)
+                raise UnknownActionException('No support for process action {0}', _action_name)
+            # 2.) Get Input Message
+            _input = stanza.get('input')
+            # TODO: Test that _input has a format and label key
+            _message = self.get_message(_input.get('label'))
+            # 3.) Run Command
+            # TODO: Test that _output has a format and label key
+            (self._continue, self._proceed) = self._ctx.run_command(_action, input=_message,
+                                                   process=self._process,
+                                                   uuid=uuid,
+                                                   scope=self.stack,
+                                                   state=self._cpm['__state__'],
+                                                   label=stanza.get('output').get('label'),
+                                                   parameters=stanza.get('params'))
+            if (self._continue):
+                if (self._proceed):
+                    self._cpm['__next__'] = stanza.get('next')
+            else:
+                self._park = True
+        else:
+            self._continue = True
+            self._proceed = True
+            self._park = False
+            # Control action!
+            if (stanza.get('control') == 'start'):
+                self.log.debug('start action')
+                self._cpm['__next__'] = stanza.get('next')
+                self.log.debug('first action will be {0}'.format(self._cpm['__next__']))
+            elif (stanza.get('control') == 'foreach'):
+                self._flow_foreach(uuid)
+            elif (stanza.get('control') == 'switch'):
+                self._flow_switch(uuid)
+            elif (stanza.get('control') == 'while'):
+                self._flow_while(uuid, stanza)
+            elif (stanza.get('control') == 'until'):
+                self._flow_until(uuid)
+            else:
+                self._ctx.log.error('Unsupported control action: {0}'.format(stanza.get('control')))
+                raise CoilsException('Unsupported control action: {0}'.format(stanza.get('control')))
+
+# Flow Control
+
+    # Foreach
+    def _flow_foreach(self, uuid):
+        stanza = self._cpm[uuid]
+        node_list = stanza.get('nodes', None)
+        if (node_list is None):
+            message = self.get_message(stanza.get('input').get('label'))
+            rfile = self._ctx.run_command('message::get-handle', object=message)
+            doc = etree.parse(rfile)
+            rfile.close()
+            result = doc.xpath(stanza.get('params').get('xpath'))
+            if (isinstance(result, list)):
+                self._cpm['__next__'] = uuid
+                stanza['nodes'] = [ ]
+                stanza['count'] = 0
+                for x in result:
+                    stanza['nodes'].append(etree.tostring(x))
+                self.log.debug('foreach initialized; scope {0} w/{1} nodes'.\
+                    format(self.stack_tip, len(stanza.get('nodes'))))
+            else:
+                self.log.debug('foreach shorting out, nothing to iterate.')
+        else:
+            node_list = stanza['nodes']
+            if (len(node_list) > 0):
+                self.stack.append(uuid)
+                stanza['count'] = stanza['count'] + 1
+                self.log.debug('foreach iteration; scope:{0} count:{1}'.format(self.stack_tip, stanza['count']))
+                node = node_list.pop(0)
+                if ('current' in stanza):
+                    message = self._ctx.run_command('message::get', uuid=stanza['current'])
+                    self._ctx.run_command('message::set', object=message, data=node)
+                else:
+                    message = self._ctx.run_command('message::new', process=self._process,
+                                                                    data=node,
+                                                                    scope=self.stack_tip,
+                                                                    mimetype='StandardXML',
+                                                                    label='current')
+                    stanza['current'] = message.uuid
+                self._cpm['__next__'] = stanza.get('branch')
+                # Continue execution, but do not proceed
+            else:
+                # Node list exhausted, proceed
+                self.log.debug('foreach node list exhausted; scope:{0}'.format(self.stack_tip))
+                self._cpm['__next__'] = stanza.get('next')
+        return True, True
+
+    # Switch
+    def _flow_switch(self, uuid):
+        stanza = self._cpm[uuid]
+        self._ctx.log.error('Unsupported control action: switch'.format(stanza.get('control')))
+        raise NotImplementedException('Flow control structure "switch" not implemented.')
+
+    # While: Look until false
+    def _flow_while(self, uuid):
+        stanza = self._cpm[uuid]
+        self._ctx.log.error('Unsupported control action: while')
+        raise NotImplementedException('Flow control structure "while" not implemented.')
+
+    # Until: Loop until true
+    def _flow_until(self, uuid):
+        stanza = self._cpm[uuid]
+        self._ctx.log.error('Unsupported control action: while')
+        raise NotImplementedException('Flow control structure "while" not implemented.')
+
+# Logging & Error Handling (Exception Route)
+
+    def log_message(self, action, message):
+        log_entry = AuditEntry()
+        log_entry.context_id = self._process.object_id
+        log_entry.action = action
+        log_entry.actor_id = self._ctx.account_id
+        log_entry.message = message
+        self._ctx.db_session().add(log_entry)
+
+    def run_exception_context(self, message):
+        # TODO: Implement
+        self.log_message('exception', message)
+        output = self._ctx.run_command('message::new', process=self._process,
+                                                       label='Exception',
+                                                       data=message)
+        action_uuid = self._cpm.get('__error__', None)
+        self.send(Packet('{0}/__null'.format(self.__service__),
+                         'coils.workflow.executor/failure',
+                         {'processId': self._process_id}))
+        self._process.output_message = output.uuid
+        output = None
+        self._process.completed = self._ctx.get_utctime()
+        self.log.debug('Failure time is {0}'.format(self._process.completed))
+        self._process.state = 'F'
+        self._ctx.commit()
+        action_uuid = self._cpm.get('__error__', None)
+        if (action_uuid is None):
+            self._continue = False
+        else:
+            self._continue = True
+        while (self._continue):
+            try:
+                self.log.debug('Running stanza {0}'.format(action_uuid))
+                self.run_stanza(action_uuid)
+                self.log.debug('Stanza {0} complete'.format(action_uuid))
+                if (self._proceed):
+                    action_uuid = self._cpm.get('__next__', None)
+                    if (action_uuid is None):
+                        self._continue = False
+            except Exception, e:
+                exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
+                self.log.error('An exception occurred in exception stanza {0} of process {1}'.format(action_uuid, self._process_id))
+                self.log.exception(e)
+                message = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
+                self.log_message('exception', ''.join(message))
+                self._continue = False
+            else:
+                self._ctx.commit()
+                self.save_state()
+        self.log_message('failed', 'Process {0} failed'.format(self._process.object_id))
+        self._ctx.commit()
+        self.shutdown()
+
+# Run
+
+    def prepare_state(self):
+        # _cpm (Coils Process Markup [a pickle file] is loaded by load_state()
+        # which is invoked in prepare()
+        self._continue = True
+        if ('__namespace__' in self._cpm):
+            # Route is starting, otherwise __namespace__ would not be present
+            self._route_name = self._cpm.get('__namespace__')
+            self._cpm = self._cpm.get(self._route_name)
+            self._cpm['__state__'] = { }
+            self._cpm['__stack__'] = [ ]
+            self._cpm['__next__']  = self._cpm.get('__start__', None)
+            self._proceed  = True
+            self._continue = True
+            self.save_state()
+
+    def work(self):
+        if (self.iteration == 0):
+            self.prepare_state()
+        action_uuid = self.next_stanza_uuid
+        # If there is no action to perform we assume the route is complete
+        if (action_uuid):
+            self.iteration = self.iteration + 1
+            try:
+                self.log.debug('Running stanza {0}'.format(action_uuid))
+                self.run_stanza(action_uuid)
+                self.log.debug('Stanza {0} complete'.format(action_uuid))
+                self.log_message('complete', 'Action {0} completed'.format(action_uuid))
+            except Exception, e:
+                self.log.debug('Exception in stanza {0}'.format(action_uuid))
+                self.log.exception(e)
+                exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
+                self._ctx.rollback()
+                self.log.error('An exception occurred in stanza {0} of process {1}'.format(action_uuid, self._process_id))
+                message = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
+                self.run_exception_context(''.join(message))
+            else:
+                self.save_state()
+        if (self._park):
+            self._do_park()
+        elif (self._complete):
+            # Route complete
+            self._do_complete()
+
+
+    def _do_park(self):
+        # Process parked
+        self.log.debug('Parking process')
+        self.send(Packet('{0}/__null'.format(self.__service__),
+                         'coils.workflow.executor/parked',
+                         { 'processId': self._process_id,
+                           'status':    201,
+                           'message':   'OK' }))
+        self._process.parked = self._ctx.get_utctime()
+        self._process.state = 'P'
+        self.log_message('parked', 'Process {0} parked'.format(self._process.object_id))
+        self.save_state()
+        self.shutdown()
+
+    def _do_complete(self):
+        # Process complete
+        self.log.info('Performing process completion')
+        # 1.) Mark output message
+        start_uuid = self._cpm.get('__start__')
+        output_label = self._cpm.get(start_uuid).get('output', {}).get('label', 'OutputMessage')
+        self.log.debug('Output message is {0} from stanza {1}'.format(output_label, start_uuid))
+        message = self._ctx.run_command('message::get', process=self._process,
+                                                        label=output_label)
+        if (message is None):
+            self.log.warn('Specified OutputMessage not found in global scope, using input message.')
+            message = self._ctx.run_command('process::get-input-message', process=self._process)
+        self._process.output_message = message.uuid
+        self.log.debug('Output message is {0}'.format(self._process.output_message))
+        # 2.) Bump process info
+        self._process.completed = self._ctx.get_utctime()
+        self.log.debug('Completed time is {0}'.format(self._process.completed))
+        self._process.state = 'C'
+        # 3.) Log completion
+        self.log_message('complete', 'Process {0} completed'.format(self._process.object_id))
+        # 4.) Commit!
+        self.save_state()
+        self.log.info('Process completion committed')
+        # 5.) Send someone a complete message
+        self.send(Packet('{0}/__null'.format(self.__service__),
+                         'coils.workflow.executor/complete',
+                         { 'processId': self._process_id,
+                           'status':    201,
+                           'message':   'OK' }))
+        self.shutdown()
+
+# State
+
+    @property
+    def state(self):
+        return self._cpm['state']
+
+    @property
+    def stack(self):
+        return self._cpm['__stack__']
+
+    @property
+    def stack_tip(self):
+        if (len(self.stack) == 0):
+            return None
+        return self.stack[-1]
+
+    def pop_stack(self):
+        self.log.debug('stack reduced')
+        return self.stack.pop()
+
+    @property
+    def next_stanza_uuid(self):
+        # Returns the next UUID to be processed
+        # NOTE: This may be the same UUID as previously executed in the case of
+        #       an iteration such as foreach, until, and while.
+        action_uuid = self._cpm.get('__next__', None)
+        # If __next__ is None that means we have reached the end of a scope, which
+        # may or may not be the outermost scope.  So pop the stack in order to
+        # resume the next-outer scope.
+        if ((action_uuid is None) and (len(self.stack) > 0)):
+            action_uuid = self.pop_stack()
+        if (action_uuid is None):
+            self._complete = True
+        return action_uuid
+
+    @property
+    def _proceed(self):
+        return self._cpm['__proceed__']
+
+    @_proceed.setter
+    def _proceed(self, value):
+        if (value):
+            self._cpm['__proceed__'] = True
+        else:
+            self._cpm['__proceed__'] = False
+
+    @property
+    def _continue(self):
+        return self._cpm['__continue__']
+
+    @_continue.setter
+    def _continue(self, value):
+        if (value):
+            self._cpm['__continue__'] = True
+        else:
+            self._cpm['__continue__'] = False
+
+    @property
+    def _next(self):
+        return self._cpm.get('__next__', None)
+
+    @_next.setter
+    def _next(self, value):
+        self._cpm['__next__'] = value

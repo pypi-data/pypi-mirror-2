@@ -1,0 +1,104 @@
+#
+# Copyright (c) 2010 Adam Tauno Williams <awilliam@whitemice.org>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#
+from time             import time
+from coils.foundation import *
+from coils.core       import *
+from process          import Process as WFProcess
+import multiprocessing
+
+def start_workflow_process(p, c):
+    w = WFProcess(p, c)
+    w.run()
+
+
+class ExecutorService(Service):
+    __service__ = 'coils.workflow.executor'
+    __auto_dispatch__ = True
+    __is_worker__     = False
+
+    def __init__(self):
+        Service.__init__(self)
+
+    def prepare(self):
+        Service.prepare(self)
+        self._workers = { }
+
+    def _start_process(self, process_id, context_id):
+        self.log.debug('Attempting to start/restart processId#{0}'.format(process_id))
+        if (process_id in self._workers):
+            # TODO: Signal the route, maybe it wants to check for new messages?
+            self.log.info('Received start signal for already running process.')
+            return
+        s, r = multiprocessing.Pipe()
+        p = multiprocessing.Process(target=start_workflow_process,
+                                    args=(process_id, context_id))
+        self._workers[process_id] = { 'process':   p,
+                                      'status':    'started',
+                                      'timestamp': time(),
+                                      'contextId': context_id }
+        p.start()
+        self.log.debug('Worker for processId#{0} started.'.format(process_id))
+        p.join()
+
+
+    def do_start(self, parameter, packet):
+        process_id = packet.data.get('processId')
+        context_id = packet.data.get('contextId')
+        self.log.info('Received message to start/restart processId#{0}'.format(process_id))
+        self._start_process(process_id, context_id)
+        self.send(Packet.Reply(packet, {'status': 201, 'text': 'OK'}))
+
+    def do_signal(self, parameter, packet):
+        # TODO: Authorize signal!
+        process_id = packet.data.get('processId')
+
+    def do_running(self, parameter, packet):
+        ''' Packet indicates the process is actively working, update the timestamp '''
+        process_id = packet.data.get('processId')
+        if (process_id in self._workers):
+            worker = self._workers.get(process_id)
+            if (worker.get('timestamp') < packet.time):
+                self._workers[process_id]['status'] = 'running'
+                self._workers[process_id]['timestamp'] = time()
+
+    def do_parked(self, parameter, packet):
+        ''' Parking a workflow is effectively the same as shutting down.'''
+        process_id = packet.data.get('processId')
+        if (process_id in self._workers):
+            del self._workers[process_id]
+            self.log.debug('discarding parked process {0}'.format(process_id))
+        return
+
+    def do_failure(self, parameter, packet):
+        ''' When a process fails shut down the worker '''
+        process_id = packet.data.get('processId')
+        if (process_id in self._workers):
+            del self._workers[process_id]
+            self.log.debug('discarding completed process {0}'.format(process_id))
+        return
+
+    def do_complete(self, parameter, packet):
+        ''' When a process is complete, shut down the worker '''
+        process_id = packet.data.get('processId')
+        if (process_id in self._workers):
+            del self._workers[process_id]
+            self.log.debug('discarding completed process {0}'.format(process_id))
+        return
