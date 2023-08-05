@@ -1,0 +1,161 @@
+.. _topics-permissions:
+
+========================
+Working with permissions
+========================
+
+.. highlightlang:: html+django
+
+
+Overview
+========
+
+Permission in merengue are strongly based on wonderful `django-permissions`_ application.
+
+Main change (but important) is not using ``GenericForeignKey`` for granting
+permissions to objects. We prefer use a ``ForeignKey`` to ``BaseContent`` for
+performance reasons. Besides, in merengue all managed content are ``BaseContent``
+instances.
+
+.. _django-permissions: http://pypi.python.org/pypi/django-permissions
+
+What is an permission?
+----------------------
+
+(( to be completed ))
+
+How it works?
+-------------
+
+(( to be completed ))
+
+Builtin permissions on merengue
+-------------------------------
+
+A builtin permission will appears in the manage permission view of every content.
+
+The builtin permissions in merengue are:
+
+    View (``view``)
+        A non published content will be visible for anonymous if this permission
+        is activated for this content.
+
+    Edit (``edit``)
+        If a user is member of a role with this permission or for a content
+        which has activated that permission for a user role, user will can edit
+        the content.
+
+    Delete (``delete``)
+        If user has this permission in a content, user will be able to delete it.
+
+(( to be completed ))
+
+
+Using the python API
+====================
+
+Creating a custom permission
+----------------------------
+
+.. code-block:: python
+
+    >>> from merengue.perms.utils import register_permission
+    >>> register_permission('Vote', 'vote')
+    <Permission: Vote (vote)>
+    >>> from merengue.perms.utils import register_permission
+    >>> register_permission('Vote', 'vote')
+
+You can create a custom permission available only for some models (inherited
+from ``BaseContent``):
+
+.. code-block:: python
+
+    >>> from merengue.section.models import Document
+    >>> from plugins.news.models import NewsItem
+    >>> register_permission('My permission', 'myperm', 
+                            for_models=[Document, NewsItem])
+    <Permission: My permission (myperm)>
+
+Creating a role and assigning user to role
+------------------------------------------
+
+.. code-block:: python
+
+    >>> staff_user = User.objects.create(username='roque')
+    >>> plain_user = User.objects.create(username='other')
+    >>> from merengue.perms.utils import register_role
+    >>> editor = register_role('Editor')
+    >>> editor.add_principal(staff_user) # add user to role 'Editor'
+
+Granting a permission to a content
+----------------------------------
+
+.. code-block:: python
+
+    >>> from merengue.base.models import BaseContent
+    >>> content = BaseContent.objects.create(slug='mycontent', name_en='My content')
+    >>> from merengue.perms.utils import grant_permission
+    >>> grant_permission(editor, 'vote', content)
+
+Granting a permission to all contents
+----------------------------------
+
+.. code-block:: python
+
+    >>> grant_permission(editor, 'vote')
+
+Checking permissions
+--------------------
+
+.. code-block:: python
+
+    >>> from merengue.perms.utils import has_permission
+    >>> has_permission(content, staff_user, 'vote')
+    True
+
+Removing a permission to a content
+----------------------------------
+
+.. code-block:: python
+
+    >>> from merengue.perms.utils import remove_permission
+    >>> remove_permission(editor, 'vote', content)
+
+Removing a permission to all contents
+----------------------------------
+
+.. code-block:: python
+
+    >>> remove_permission(editor, 'vote')
+
+
+Local roles
+-----------
+
+You can assign a role to an user globally (for all contents) or locally (to one content).
+
+.. code-block:: python
+
+    >>> othercontent = BaseContent.objects.create(slug='othercontent', name_en='Other content')
+    >>> grant_permission(editor, 'vote', othercontent) # like "content"
+    >>> from merengue.perms.utils import add_local_role
+    >>> add_local_role(othercontent, plain_user, editor)
+    # plain_user will be editor only in othercontent
+    >>> has_permission(content, plain_user, 'vote')
+    False
+    >>> has_permission(othercontent, plain_user, 'vote')
+    True # because is local editor for that content
+    >>> has_permission(othercontent, staff_user, 'vote')
+    True # because is a global editor (for all contents)
+
+
+Admin interface
+===============
+
+(( to be completed ))
+
+
+Permissions in plugins
+======================
+
+(( to be completed ))
