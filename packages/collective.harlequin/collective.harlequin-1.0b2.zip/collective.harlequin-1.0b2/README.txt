@@ -1,0 +1,67 @@
+Introduction
+============
+
+Harlequin provide infrastructure to make configurable browser view without
+to have to deals with how the configuration data are stored. Most of the time
+developers faced to this issue store data in the model. This is bad because
+all instances have those data and do not necessary need it.
+
+Your configuration view data are stored and your view can access to this
+configuration easily.
+
+This module doesn't provide any 'user' feature to Plone.
+
+How to use it
+=============
+
+You want to develop a browser view that need configuration ? Make your browser
+view inherits from collective.harlequin.browser.Harlequin (or implements IHarlequinView)
+
+Next you can define your configuration with a zope.schema interface which inherits from
+collective.harlequin.forms.Schema
+
+Next you have to make your z3cform with the configuration schema and inherits from
+collective.harlequin.forms.Form.
+
+You have to attach the form to your browser view by override the method 'harlequin_form'.
+Make it return the Page form wrapper class.
+
+Next make your view available in the display drop down menu, and try by selecting it ! You get
+The form displayed, fill it and validate it, the job is made for you.
+
+How it works
+============
+
+It override the setViewTemplate script, verify if the asked view is harlequin one.
+If it is the case it mark the view to display the configuration form.
+
+z3cform is used to display the configuration form.
+
+Configuration are stored with an adapter over the context. Two adapters are available:
+
+* use property manager.
+* use annotation.
+
+For ATContTypes annotation will be used. 
+
+WARNING: the property manager is not working that much and is never used on a 
+default Plone.
+
+
+Credits
+=======
+
+|makinacom|_
+
+  * `Planet Makina Corpus <http://www.makina-corpus.org>`_
+  * `Contact us <mailto:python@makina-corpus.org>`_
+
+Authors
+
+  - JeanMichel FRANCOIS aka toutpt <toutpt@gmail.com>
+
+Contributors
+
+
+.. |makinacom| image:: http://depot.makina-corpus.org/public/logo.gif
+.. _makinacom:  http://www.makina-corpus.com
