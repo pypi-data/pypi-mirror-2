@@ -1,0 +1,101 @@
+# -*- coding: utf-8 -*-
+<%inherit file="content_layout.html"/>
+<%page args="toc, extension, paged"/>
+<%namespace  name="formatting" file="formatting.html"/>
+<%namespace  name="nav" file="nav.html"/>
+<%def name="title()">Mako Documentation - Caching</%def>
+<%!
+    filename = 'caching'
+%>
+## This file is generated.  Edit the .txt files instead of this one.
+
+
+<%call expr="formatting.section(path='caching',paged=paged,extension=extension,toc=toc)">
+
+<p>Any template or component can be cached using the <code><%text filter='h'>cache</%text></code> argument to the <code><%text filter='h'><%page></%text></code> or <code><%text filter='h'><%def></%text></code> directives:
+</p>
+<%call expr="formatting.code()"><%text><%page cached="True"/>
+
+template text
+</%text></%call><p>The above template, after being executed the first time, will store its content within a cache that by default is scoped within memory.  Subsequent calls to the template's <code><%text filter='h'>render()</%text></code> method will return content directly from the cache.  When the <code><%text filter='h'>Template</%text></code> object itself falls out of scope, its corresponding cache is garbage collected along with the template.
+</p>
+<p>Caching requires that the <code><%text filter='h'>beaker</%text></code> package be installed on the system.
+</p>
+<p>The caching flag and all its options can be used with the <code><%text filter='h'><%def></%text></code> tag.  <br></br>
+</p>
+<%call expr="formatting.code()"><%text><%def name="mycomp" cached="True" cache_timeout="30" cache_type="memory">
+    other text
+</%def>
+</%text></%call>
+<%call expr="formatting.section(path='caching_arguments',paged=paged,extension=extension,toc=toc)">
+
+<p>The various cache arguments are cascaded from their default values, to the arguments specified programmatically to the <code><%text filter='h'>Template</%text></code> or its originating <code><%text filter='h'>TemplateLookup</%text></code>, then to those defined in the <code><%text filter='h'><%page></%text></code> tag of an individual template, and finally to an individual <code><%text filter='h'><%def></%text></code> tag within the template.  This means you can define, for example, a cache type of <code><%text filter='h'>dbm</%text></code> on your <code><%text filter='h'>TemplateLookup</%text></code>, a cache timeout of 60 seconds in a particular template's <code><%text filter='h'><%page></%text></code> tag, and within one of that template's <code><%text filter='h'><%def></%text></code> tags <code><%text filter='h'>cache=True</%text></code>, and that one particular def will then cache its data using a <code><%text filter='h'>dbm</%text></code> cache and a data timeout of 60 seconds.
+</p>
+<p>The options available are:
+</p>
+<ul>
+ <li><p>cached="False|True" - turn caching on
+</p>
+
+ </li>
+
+ <li><p>cache_timeout - number of seconds in which to invalidate the cached data.  after this timeout, the content is re-generated on the next call.
+</p>
+
+ </li>
+
+ <li><p>cache_type - type of caching.  <code><%text filter='h'>memory</%text></code>, <code><%text filter='h'>file</%text></code>, <code><%text filter='h'>dbm</%text></code>, or <code><%text filter='h'>memcached</%text></code>.
+</p>
+
+ </li>
+
+ <li><p>cache_url - (only used for <code><%text filter='h'>memcached</%text></code> but required) a single IP address or a semi-colon separated list of IP address of memcache servers to use.
+</p>
+
+ </li>
+
+ <li><p>cache_dir  - In the case of the <code><%text filter='h'>file</%text></code> and <code><%text filter='h'>dbm</%text></code> cache types, this is the filesystem directory with which to store data files.  If this option is not present, the value of <code><%text filter='h'>module_directory</%text></code> is used (i.e. the directory where compiled template modules are stored).  If neither option is available an exception is thrown.
+   In the case of the <code><%text filter='h'>memcached</%text></code> type, this attribute is required and it's used to store the lock files.
+</p>
+
+ </li>
+
+ <li><p>cache_key - the "key" used to uniquely identify this content in the cache.  the total namespace of keys within the cache is local to the current template, and the default value of "key" is the name of the def which is storing its data.  It is an evaluable tag, so you can put a Python expression to calculate the value of the key on the fly.  For example, heres a page that caches any page which inherits from it, based on the filename of the calling template:
+</p>
+<%call expr="formatting.code()"><%text><%page cached="True" cache_key="${self.filename}"/>
+
+${next.body()}
+
+## rest of template
+</%text></%call>
+ </li>
+</ul>
+
+</%call>
+<%call expr="formatting.section(path='caching_accessing',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'>Template</%text></code>, as well as any template-derived namespace, has an accessor called <code><%text filter='h'>cache</%text></code> which returns the <code><%text filter='h'>Cache</%text></code> object for that template.   This object is a facade on top of the Beaker internal cache object, and provides some very rudimental capabilities, such as the ability to get and put arbitrary values:
+</p>
+<%call expr="formatting.code()"><%text><%
+    local.cache.put("somekey", type="memory", "somevalue")
+%>
+</%text></%call><p>Above, the cache associated with the <code><%text filter='h'>local</%text></code> namespace is accessed and a key is placed within a memory cache.
+</p>
+<p>More commonly the <code><%text filter='h'>cache</%text></code> object is used to invalidate cached sections programmatically:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+template = lookup.get_template('/sometemplate.html')
+
+# invalidate the "body" of the template
+template.cache.invalidate_body()
+
+# invalidate an individual def
+template.cache.invalidate_def('somedef')
+
+# invalidate an arbitrary key
+template.cache.invalidate('somekey')
+</%text></%call>
+
+</%call>
+</%call>
+</html>

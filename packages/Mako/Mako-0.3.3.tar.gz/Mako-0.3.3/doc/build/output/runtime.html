@@ -1,0 +1,158 @@
+# -*- coding: utf-8 -*-
+<%inherit file="content_layout.html"/>
+<%page args="toc, extension, paged"/>
+<%namespace  name="formatting" file="formatting.html"/>
+<%namespace  name="nav" file="nav.html"/>
+<%def name="title()">Mako Documentation - The Mako Runtime Environment</%def>
+<%!
+    filename = 'runtime'
+%>
+## This file is generated.  Edit the .txt files instead of this one.
+
+
+<%call expr="formatting.section(path='runtime',paged=paged,extension=extension,toc=toc)">
+
+<p>This section describes a little bit about the objects and built-in functions that are available in templates.
+</p>
+
+<%call expr="formatting.section(path='runtime_context',paged=paged,extension=extension,toc=toc)">
+
+<p>The <code><%text filter='h'>Context</%text></code> is the central object that is created when a template is first executed, and is responsible for handling all communication with the outside world.  This includes two major components, one of which is the output buffer, which is a file-like object such as Python's <code><%text filter='h'>StringIO</%text></code> or similar, and the other a dictionary of variables that can be freely referenced within a template; this dictionary is a combination of the arguments sent to the <code><%text filter='h'>template.render()</%text></code> function and some built-in variables provided by Mako's runtime environment.
+</p>
+
+<%call expr="formatting.section(path='runtime_context_buffer',paged=paged,extension=extension,toc=toc)">
+
+<p>The buffer is stored within the <code><%text filter='h'>Context</%text></code>, and writing to it is achieved by calling <code><%text filter='h'>context.write()</%text></code>.  You usually don't need to care about this as all text within a template, as well as all expressions provided by <code><%text filter='h'>${}</%text></code>, automatically send everything to this method.  The cases you might want to be aware of its existence are if you are dealing with various filtering/buffering scenarios, which are described in <%call expr="nav.toclink(path='filtering',paged=paged,extension=extension,toc=toc)"></%call>, or if you want to programmatically send content to the output stream, such as within a <code><%text filter='h'><% %></%text></code> block.
+</p>
+<%call expr="formatting.code()"><%text><%
+    context.write("some programmatic text")
+%>
+</%text></%call><p>The actual buffer may or may not be the original buffer sent to the <code><%text filter='h'>Context</%text></code> object, as various filtering/caching scenarios may "push" a new buffer onto the context's underlying buffer stack.  For this reason, just stick with <code><%text filter='h'>context.write()</%text></code> and content will always go to the topmost buffer.
+</p>
+
+</%call>
+<%call expr="formatting.section(path='runtime_context_variables',paged=paged,extension=extension,toc=toc)">
+
+<p>When your template is compiled into a Python module, the body content is enclosed within a Python function called <code><%text filter='h'>render_body</%text></code>.  Other top-level defs defined in the template are defined within their own function bodies which are named after the def's name with the prefix <code><%text filter='h'>render_</%text></code> (i.e. <code><%text filter='h'>render_mydef</%text></code>).  One of the first things that happens within these functions is that all variable names that are referenced within the function which are not defined in some other way (i.e. such as via assignment, module level imports, etc.) are pulled from the <code><%text filter='h'>Context</%text></code> object's dictionary of variables.  This is how you're able to freely reference variable names in a template which automatically correspond to what was passed into the current <code><%text filter='h'>Context</%text></code>.
+</p>
+<ul>
+ <li><p><strong>What happens if I reference a variable name that is not in the current context?</strong> - the value you get back is a special value called <code><%text filter='h'>UNDEFINED</%text></code>.  This is just a simple global variable with the class <code><%text filter='h'>mako.runtime.Undefined</%text></code>.  The <code><%text filter='h'>UNDEFINED</%text></code> object throws an error when you call <code><%text filter='h'>str()</%text></code> on it, which is what happens if you try to use it in an expression.
+</p>
+
+ </li>
+
+ <li><p><strong>Why not just return None?</strong>  Using <code><%text filter='h'>UNDEFINED</%text></code> is more explicit and allows differentiation between a value of <code><%text filter='h'>None</%text></code> that was explicitly passed to the <code><%text filter='h'>Context</%text></code> and a value that wasn't present at all.
+</p>
+
+ </li>
+
+ <li><p><strong>Why raise an exception when you call str() on it ?  Why not just return a blank string?</strong> - Mako tries to stick to the Python philosophy of "explicit is better than implicit".  In this case, its decided that the template author should be made to specifically handle a missing value rather than experiencing what may be a silent failure.  Since <code><%text filter='h'>UNDEFINED</%text></code> is a singleton object just like Python's <code><%text filter='h'>True</%text></code> or <code><%text filter='h'>False</%text></code>, you can use the <code><%text filter='h'>is</%text></code> operator to check for it:
+</p>
+<%call expr="formatting.code()"><%text>% if someval is UNDEFINED:
+    someval is: no value
+% else:
+    someval is: ${someval}
+% endif
+</%text></%call>
+ </li>
+</ul>
+<p>Another facet of the <code><%text filter='h'>Context</%text></code> is that its dictionary of variables is <strong>immutable</strong>.  Whatever is set when <code><%text filter='h'>template.render()</%text></code> is called is what stays.  Of course, since its Python, you can hack around this and change values in the context's internal dictionary, but this will probably will not work as well as you'd think.  The reason for this is that Mako in many cases creates copies of the <code><%text filter='h'>Context</%text></code> object, which get sent to various elements of the template and inheriting templates used in an execution.  So changing the value in your local <code><%text filter='h'>Context</%text></code> will not necessarily make that value available in other parts of the template's execution.  Examples of where Mako creates copies of the <code><%text filter='h'>Context</%text></code> include within top-level def calls from the main body of the template (the context is used to propagate locally assigned variables into the scope of defs; since in the template's body they appear as inlined functions, Mako tries to make them act that way), and within an inheritance chain (each template in an inheritance chain has a different notion of <code><%text filter='h'>parent</%text></code> and <code><%text filter='h'>next</%text></code>, which are all stored in unique <code><%text filter='h'>Context</%text></code> instances).
+</p>
+<ul>
+ <li>
+     <strong>So what if I want to set values that are global to everyone within a template request?</strong> - All you have to do is provide a dictionary to your <code><%text filter='h'>Context</%text></code> when the template first runs, and everyone can just get/set variables from that.  Lets say its called <code><%text filter='h'>attributes</%text></code>.
+ </li>
+</ul>
+<p>Running the template looks like:
+</p>
+<%call expr="formatting.code(syntaxtype='python')"><%text>
+output = template.render(attributes={})
+</%text></%call><p>Within a template, just reference the dictionary:
+</p>
+<%call expr="formatting.code()"><%text><%
+    attributes['foo'] = 'bar'
+%>
+'foo' attribute is: ${attributes['foo']}
+</%text></%call><ul>
+ <li>
+     <strong>Why can't "attributes" be a built-in feature of the Context?</strong> - This is an area where Mako is trying to make as few decisions about your application as it possibly can.  Perhaps you don't want your templates to use this technique of assigning and sharing data, or perhaps you have a different notion of the names and kinds of data structures that should be passed around.  Once again Mako would rather ask the user to be explicit.
+ </li>
+</ul>
+
+</%call>
+<%call expr="formatting.section(path='runtime_context_accessors',paged=paged,extension=extension,toc=toc)">
+
+<p>Significant members off of <code><%text filter='h'>Context</%text></code> include:
+</p>
+<ul>
+ <li><p><code><%text filter='h'>context[key]</%text></code> / <code><%text filter='h'>context.get(key, default=None)</%text></code> - dictionary-like accessors for the context.  Normally, any variable you use in your template is automatically pulled from the context if it isnt defined somewhere already.  Use the dictionary accessor and/or <code><%text filter='h'>get</%text></code> method when you want a variable that <em>is</em> already defined somewhere else, such as in the local arguments sent to a %def call.  If a key is not present, like a dictionary it raises <code><%text filter='h'>KeyError</%text></code>.
+</p>
+
+ </li>
+
+ <li><p><code><%text filter='h'>keys()</%text></code> - all the names defined within this context.
+</p>
+
+ </li>
+
+ <li><p><code><%text filter='h'>kwargs</%text></code> - this returns a <strong>copy</strong> of the context's dictionary of variables.  This is useful when you want to propagate the variables in the current context to a function as keyword arguments, i.e.:
+</p>
+<%call expr="formatting.code()"><%text>${next.body(**context.kwargs)}
+</%text></%call>
+ </li>
+
+ <li><p><code><%text filter='h'>write(text)</%text></code> - write some text to the current output stream.
+</p>
+
+ </li>
+
+ <li><p><code><%text filter='h'>lookup</%text></code> - returns the <code><%text filter='h'>TemplateLookup</%text></code> instance that is used for all file-lookups within the current execution (even though individual <code><%text filter='h'>Template</%text></code> instances can conceivably have different instances of a <code><%text filter='h'>TemplateLookup</%text></code>, only the <code><%text filter='h'>TemplateLookup</%text></code> of the originally-called <code><%text filter='h'>Template</%text></code> gets used in a particular execution).
+</p>
+
+ </li>
+</ul>
+
+</%call>
+</%call>
+<%call expr="formatting.section(path='runtime_builtins',paged=paged,extension=extension,toc=toc)">
+
+<p>A one-stop shop for all the names Mako defines.  Most of these names are instances of <code><%text filter='h'>Namespace</%text></code>, which are described in the next section,   <%call expr="nav.toclink(path='namespaces',paged=paged,extension=extension,toc=toc)"></%call>.  Also, most of these names other than <code><%text filter='h'>context</%text></code> and <code><%text filter='h'>UNDEFINED</%text></code> are also present <em>within</em> the <code><%text filter='h'>Context</%text></code> itself.
+</p>
+<ul>
+ <li>
+     <code><%text filter='h'>local</%text></code> - the namespace of the current template, described in <%call expr="nav.toclink(path='namespaces_builtin',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>self</%text></code> - the namespace of the topmost template in an inheritance chain (if any, otherwise the same as <code><%text filter='h'>local</%text></code>), mostly described in <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>parent</%text></code> - the namespace of the parent template in an inheritance chain (otherwise undefined); see <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>next</%text></code> - the namespace of the next template in an inheritance chain (otherwise undefined); see <%call expr="nav.toclink(path='inheritance',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>caller</%text></code> - a "mini" namespace created when using the <code><%text filter='h'><%call></%text></code> tag to define a "def call with content"; described in <%call expr="nav.toclink(path='defs_defswithcontent',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>capture</%text></code> - a function that calls a given def and captures its resulting content into a string, which is returned.  Usage is described in <%call expr="nav.toclink(path='filtering_buffering',paged=paged,extension=extension,toc=toc)"></%call>
+ </li>
+
+ <li>
+     <code><%text filter='h'>UNDEFINED</%text></code> - a global singleton that is applied to all otherwise uninitialized template variables that were not located within the <code><%text filter='h'>Context</%text></code> when rendering began.  Is an instance of <code><%text filter='h'>mako.runtime.Undefined</%text></code>, and raises an exception when its <code><%text filter='h'>__str__()</%text></code> method is called.
+ </li>
+
+ <li>
+     <code><%text filter='h'>pageargs</%text></code> - this is a dictionary which is present in a template which does not define any <em></em>kwargs section in its <code><%text filter='h'><%page></%text></code> tag.  All keyword arguments sent to the <code><%text filter='h'>body()</%text></code> function of a template (when used via namespaces) go here by default unless otherwise defined as a page argument.  If this makes no sense, it shouldn't; read the section <%call expr="nav.toclink(path='namespaces_body',paged=paged,extension=extension,toc=toc)"></%call>.
+ </li>
+</ul>
+
+
+</%call>
+</%call>
+</html>
