@@ -1,0 +1,101 @@
+"""Pylons application test package
+
+This package assumes the Pylons environment is already loaded, such as
+when this script is imported from the `nosetests --with-pylons=test.ini`
+command.
+
+This module initializes the application via ``websetup`` (`paster
+setup-app`) and provides the base testing objects.
+"""
+from unittest import TestCase
+
+from paste.deploy import loadapp
+from paste.script.appinstall import SetupCommand
+from pylons import url
+from routes.util import URLGenerator
+from webtest import TestApp
+import datetime
+import hashlib
+import pylons.test
+from elixir import *
+from {{package}}.model import *
+from {{package}}.model import meta
+from {{package}} import model as model
+from sqlalchemy import engine_from_config
+import datetime
+
+__all__ = ['environ', 'url', 'TestController', 'TestModel']
+
+
+# Invoke websetup with the current config file
+# SetupCommand('setup-app').run([pylons.test.pylonsapp.config['__file__']])
+
+# additional imports ...
+import os
+from paste.deploy import appconfig
+from {{package}}.config.environment import load_environment
+
+here_dir = os.path.dirname(__file__)
+conf_dir = os.path.dirname(os.path.dirname(here_dir))
+
+test_file = os.path.join(conf_dir, 'test.ini')
+conf = appconfig('config:' + test_file)
+config = load_environment(conf.global_conf, conf.local_conf)
+environ = {}
+
+engine = engine_from_config(config, 'sqlalchemy.')
+model.init_model(engine)
+metadata = elixir.metadata
+Session = elixir.session = meta.Session
+
+class TestModel(TestCase):
+    def setUp(self):
+        elixir.session.configure(bind=engine)
+        metadata.create_all(engine)
+        perm = Permission(id=1,
+                          name = u"Editors",
+                          description = u"Can edit content.")
+        Session.add(perm)
+        gadmin = Group(id=1,
+                       name = u"Administrators",
+                       description = u"Administration group",
+                       created = datetime.datetime.utcnow(),
+                       active = True)
+        Session.add(gadmin)
+        g = Session.query(Group).filter_by(
+                    name=u"Administrators").all()
+        assert len(g) == 1
+        assert g[0] == gadmin
+        admin = User(id=1,
+                     username = u"admin",
+                     firstname = u"System",
+                     lastname = u"Administrator",
+                     password=hashlib.sha1("admin").hexdigest(),
+                     password_check=hashlib.sha1("admin").hexdigest(), 
+                     email="admin@example.com",
+                     created = datetime.datetime.utcnow(),
+                     active = True)
+        gadmin.users.append(admin)
+        gadmin.permissions.append(perm)
+        Session.add(admin)
+        u = Session.query(User).filter_by(username=u"admin").all()
+        assert len(u) == 1
+        assert u[0] == admin
+        Session.commit()
+    
+    def tearDown(self):
+        metadata.drop_all(engine)
+        Session.commit()
+        Session.close()
+    
+
+
+class TestController(TestModel):
+    
+    def __init__(self, *args, **kwargs):
+        wsgiapp = pylons.test.pylonsapp
+        config = wsgiapp.config
+        self.app = TestApp(wsgiapp)
+        url._push_object(URLGenerator(config['routes.map'], environ))
+        TestCase.__init__(self, *args, **kwargs)
+    
