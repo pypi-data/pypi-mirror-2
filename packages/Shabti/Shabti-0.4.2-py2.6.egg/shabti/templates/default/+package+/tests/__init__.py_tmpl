@@ -1,0 +1,95 @@
+# default/tests/__init__.py
+"""Pylons application test package
+
+This package assumes the Pylons environment is already loaded, such as
+when this script is imported from the `nosetests --with-pylons=test.ini`
+command.
+
+This module initializes the application via ``websetup`` (`paster
+setup-app`) and provides the base testing objects.
+"""
+
+from unittest import TestCase
+import os
+import sys
+
+import pylons
+from pylons.i18n.translation import _get_translator
+from paste.deploy import loadapp
+from pylons import url
+from paste.script.appinstall import SetupCommand
+from routes.util import URLGenerator
+from webtest import TestApp
+
+import pylons.test
+
+from {{package}}.config.environment import load_environment
+
+# 1. Necessary imports (see foot of page)
+from elixir import *
+from {{package}} import model
+
+__all__ = ['environ', 'url', 'TestController', 'TestModel']
+
+# 2. Invoke websetup with the current config file (see foot of page)
+# SetupCommand('setup-app').run(
+#             [pylons.test.pylonsapp.config['__file__']])
+
+environ = {}
+here_dir = os.path.dirname(os.path.abspath(__file__))
+conf_dir = os.path.dirname(os.path.dirname(here_dir))
+
+sys.path.insert(0, conf_dir)
+
+# 2. Define standard setUp and tearDown methods (see foot of page)
+class TestModel(TestCase):
+    def setUp(self):
+        setup_all(True)
+    
+    def tearDown(self):
+        drop_all(metadata.bind)
+    
+
+# 3. Create a specialised test controller (see foot of page)
+class TestController(TestModel):
+    def __init__(self, *args, **kwargs):
+        wsgiapp = loadapp('config:test.ini', relative_to=conf_dir)
+        config = wsgiapp.config
+        pylons.app_globals._push_object(config['pylons.app_globals'])
+        pylons.config._push_object(config)
+        
+        # Initialize a translator for tests that utilize i18n
+        translator = _get_translator(pylons.config.get('lang'))
+        pylons.translator._push_object(translator)
+        
+        url._push_object(URLGenerator(config['routes.map'], environ))
+        self.app = TestApp(wsgiapp)
+        TestCase.__init__(self, *args, **kwargs)
+    
+
+
+"""
+Shabt default template narrative:
+
+"Unit tests tell a developer that the code is doing things right; 
+functional tests tell a developer that the code is doing the right 
+things."
+    -- http://www.ibm.com/developerworks/library/j-test.html#h1
+
+1.  import * from elixir because that's how it's designed to be used, 
+    import the model module for maximum clarity of use (model.Session,
+    model.User, model.this and model.that, etc.)
+
+2.  running websetup also binds the database engine and creates tables
+    via `model.metadata.create_all()` - execution causes the environment
+    to be suitably populated with session objects, globals, etc.
+
+3.  create a "TestModel" class (subclassing TestCase) to define the two 
+    standard-by-convention methods for setting up data model+mapping and 
+    tearing it down after testing: setUp() and tearDown() - these methods 
+    call the relevant elixir convenience functions
+
+4.  Finally, adjust the TestController as defined in the default Pylons 
+    template so that it subclasses the specialised TestModel class
+
+"""
