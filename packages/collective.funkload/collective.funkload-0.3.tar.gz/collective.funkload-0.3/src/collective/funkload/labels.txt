@@ -1,0 +1,472 @@
+.. -*-doctest-*-
+
+fl-build-label-reports
+======================
+
+The fl-build-label-reports script builds HTML (fl-build-report --html)
+and differential (fl-build-report --diff) reports for multiple bench
+results at once based on the bench result labels.  Labels are selected
+for the X and Y axes to be compared against each other using the
+"--x-label" and "--y-label" options.  These options accept the same
+regular expression filters as the zope.testing.testrunner --module and
+--test options and like those options maybe given multiple times.
+
+The direction or polarity of the differential reports, which report is
+the reference and which report is the challenger, is determined by
+sorting the labels involved.  This avoids confusion that could occur
+if differential reports of both directions are included the same
+matrix, one showing green and the other read.  As such, labels should
+be specified such that their sort order will reflect the desired
+differential polarity.  The "--reverse" option can also be used to
+reverse the sort order for polarity only without affecting the sort
+order used on the axes.  IOW, when the polarity of the differentials
+should be the reverse of the order of the axes, use "--reverse".
+
+The title and sub-title rendered on the matrix index may be specified
+using the "--title" and "--sub-title" options.  If not specified a
+default title will be used and a sub-title will be generated based on
+the labels on the X and Y axes.  Arbitrary text or HTML may also be
+included on stdin or using the "--input" option.  If provided, it will
+be rendered beneath the sub-title and above the matrix.
+
+In the examples below, load tests have been run to measure read,
+write, and add performance under Python 2.4, 2.5, and 2.6.  There are
+three different tests to measure read, write and add performance.
+Labels are used to designate which Python version the load tests have
+been run under.  Thus fl-build-label-reports can be used to quickly
+generate reports which can be used to evaluate any performance trade
+offs the various python versions might have for the application being
+tested.
+
+Start with some bench result XML files.
+
+    >>> import os
+    >>> from collective.funkload import testing
+    >>> testing.setUpReports(reports_dir)
+    >>> sorted(os.listdir(reports_dir), reverse=True)
+    ['write-bench-20081211T071242.xml',
+     'write-bench-20081211T071242.log',
+     'read-bench-20081211T071242.xml',
+     'read-bench-20081211T071242.log',
+     'read-bench-20081211T071241.xml',
+     'read-bench-20081211T071241.log',
+     'read-bench-20081210T071243.xml',
+     'read-bench-20081210T071243.log',
+     'read-bench-20081210T071241.xml',
+     'read-bench-20081210T071241.log',
+     'add-bench-20081211T071243.xml',
+     'add-bench-20081211T071243.log',
+     'add-bench-20081211T071242.xml',
+     'add-bench-20081211T071242.log']
+
+These bench results cover multiple tests and have multiple labels.
+Some labels are applied to bench results for multiple tests.
+
+    >>> import pprint
+    >>> pprint.pprint(testing.listReports(reports_dir))
+    [(u'python-2.4',
+      [(u'test_add',
+        [(u'2008-12-11T07:12:43.000000',
+          Bench(path='add-bench-20081211T071243.xml', diffs={}))]),
+       (u'test_read',
+        [(u'2008-12-11T07:12:42.000000',
+          Bench(path='read-bench-20081211T071242.xml', diffs={})),
+         (u'2008-12-10T07:12:43.000000',
+          Bench(path='read-bench-20081210T071243.xml', diffs={}))])]),
+     (u'python-2.5',
+      [(u'test_read',
+        [(u'2008-12-10T07:12:41.000000',
+          Bench(path='read-bench-20081210T071241.xml', diffs={}))])]),
+     (u'python-2.6',
+      [(u'test_add',
+        [(u'2008-12-11T07:12:42.000000',
+          Bench(path='add-bench-20081211T071242.xml', diffs={}))]),
+       (u'test_read',
+        [(u'2008-12-11T07:12:41.000000',
+          Bench(path='read-bench-20081211T071241.xml', diffs={}))])])]
+
+When labels are specified for the X or Y axes, HTML reports are
+generated for the latest bench result XML file for each combination of
+the specified label and each test for which there are bench results
+available.  Then differential reports are generated between the X and
+Y axes forming a grid of reports.  Finally, an index.html file is
+generated providing clear and easy access to the generated reports.
+Generate reports and comparisons for python-2.4 vs python-2.6.  Also
+specify the "--reverse" option so that the differential polarity will
+be the reverse of the axes label order.
+
+    >>> from collective.funkload import label
+    >>> input_ = os.path.join(reports_dir, 'input.html')
+    >>> open(input_, 'w').write('<a href="http://foo.com">foo</a>')
+    >>> args = (
+    ...     '-o %s --x-label python-2.4 --y-label !.*-2.5 --reverse'
+    ...     % reports_dir).split() + [
+    ...         '--title', 'Python 2.6 vs Python 2.4',
+    ...         '--sub-title', 'Comparing Python versions',
+    ...         '--input', input_]
+    >>> options, _ = label.parser.parse_args(args=args)
+    >>> label.run(options)
+    Creating html report ...done: 
+    .../reports/test_add-20081211T071242-python-2.6/index.html
+    Creating html report ...done: 
+    .../reports/test_read-20081211T071241-python-2.6/index.html
+    Creating html report ...done: 
+    .../reports/test_add-20081211T071243-python-2.4/index.html
+    Creating diff report ...done: 
+    .../reports/diff_add-20081211T_071242-python-2.6_vs_071243-python-2.4/index.html
+    Creating html report ...done: 
+    .../reports/test_read-20081211T071242-python-2.4/index.html
+    Creating diff report ...done: 
+    .../reports/diff_read-20081211T_071241-python-2.6_vs_071242-python-2.4/index.html
+    Creating report index ...done:
+    .../reports/index.html
+    '.../reports/index.html'
+
+The report index renders a table with links to the HTML reports on the
+X and Y axes and links to the differential reports in the table cells.
+In this case there's only one HTML report on the X axis and four
+reports on the Y axis.  Note that report links aren't included in the
+column headers for the X axis to conserve space and avoid duplication.
+When using only one label for the X axis, it may be useful to include
+it in the Y axis even though the differential report cells will be
+empty in order to include the links to the non-differential test
+reports for each test.
+
+    >>> print open(os.path.join(reports_dir, 'index.html')).read()
+    <...
+    <title>Python 2.6 vs Python 2.4</title>...
+         <h1 class="title">Python 2.6 vs Python 2.4</h1>
+         <h2 class="subtitle">Comparing Python versions</h2>
+         <a href="http://foo.com">foo</a>
+          <table class="docutils">
+            <thead>
+              <tr class="field">
+                <th class="field-name" colspan="2">&nbsp;</th>
+                <th class="field-name" colspan="1">
+                  Label
+                </th>
+              </tr>
+              <tr class="field">
+                <th class="field-name">Label</th>
+                <th class="field-name">Test</th>
+                <th class="field-name">python-2.4</th>
+              </tr>
+            </thead>
+            <tbody>
+                  <tr>
+                    <th class="field-name" rowspan="2">python-2.4</th>
+                    <th class="field-name">
+                      <a href="test_add-20081211T071243-python-2.4/index.html">
+                        <img alt="foo.sampletests.FooTestCase.test_add"
+                             src="test_add-20081211T071243-python-2.4/tests.png"
+                             height="120" width="120"/>
+                        <div>test_add</div>
+                      </a>
+                    </th>
+                    <td class="field-body">
+                    </td>
+                </tr>
+                <tr>
+                    <th class="field-name">
+                    <a href="test_read-20081211T071242-python-2.4/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_read"
+                           src="test_read-20081211T071242-python-2.4/tests.png"
+                           height="120" width="120"/>
+                      <div>test_read</div>
+                    </a>
+                    </th>
+                    <td class="field-body">
+                    </td>
+                </tr>
+                <tr>
+                    <th class="field-name" rowspan="2">python-2.6</th>
+                    <th class="field-name">
+                    <a href="test_add-20081211T071242-python-2.6/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_add"
+                           src="test_add-20081211T071242-python-2.6/tests.png"
+                           height="120" width="120"/>
+                      <div>test_add</div>
+                    </a>
+                    </th>
+                    <td class="field-body">
+                    <a href="diff_add-20081211T_071242-python-2.6_vs_071243-python-2.4/index.html">
+                      <img alt="diff of python-2.6 vs python-2.4 for test_add"
+                           src="diff_add-20081211T_071242-python-2.6_vs_071243-python-2.4/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.6 vs python-2.4</div>
+                    </a>
+                    </td>
+                </tr>
+                <tr>
+                    <th class="field-name">
+                    <a href="test_read-20081211T071241-python-2.6/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_read"
+                           src="test_read-20081211T071241-python-2.6/tests.png"
+                           height="120" width="120"/>
+                      <div>test_read</div>
+                    </a>
+                    </th>
+                    <td class="field-body">
+                    <a href="diff_read-20081211T_071241-python-2.6_vs_071242-python-2.4/index.html">
+                      <img alt="diff of python-2.6 vs python-2.4 for test_read"
+                           src="diff_read-20081211T_071241-python-2.6_vs_071242-python-2.4/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.6 vs python-2.4</div>
+                    </a>
+                    </td>
+                </tr>
+            </tbody>
+            <tfooter>
+              <tr class="field">
+                <th class="field-name">Label</th>
+                <th class="field-name">Test</th>
+                <th class="field-name">python-2.4</th>
+              </tr>
+              <tr class="field">
+                <th class="field-name" colspan="2">&nbsp;</th>
+                <th class="field-name" colspan="1">
+                  Label
+                </th>
+              </tr>
+            </tfooter>
+          </table>...
+
+If no labels are specified for the X or Y axes then all labels are
+selected for both the X and Y axes for a full NxN comparison.  Both
+HTML and differential reports are only generated if they haven't been
+already.  IOW, existing reports will be re-used.  Reports or results
+without labels will be ignored.  Since the HTML report contains the
+bench run XML results file, the original is removed and any
+corresponding log file is moved into the HTML report directory.
+
+    >>> open(input_, 'w').write('')
+    >>> args = ('-o %s' % reports_dir).split()+['--input', input_]
+    >>> options, _ = label.parser.parse_args(args=args)
+    >>> label.run(options)
+    Creating html report ...done: 
+    .../reports/test_read-20081210T071241-python-2.5/index.html
+    Creating diff report ...done: 
+    .../reports/diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5/index.html
+    Creating diff report ...done: 
+    .../reports/diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6/index.html
+    Creating report index ...done:
+    .../reports/index.html
+    '.../reports/index.html'
+
+    >>> pprint.pprint(sorted(os.listdir(reports_dir), reverse=True))
+    ['write-bench-20081211T071242.xml',
+     'write-bench-20081211T071242.log',
+     'test_read-20081211T071242-python-2.4',
+     'test_read-20081211T071241-python-2.6',
+     'test_read-20081210T071241-python-2.5',
+     'test_add-20081211T071243-python-2.4',
+     'test_add-20081211T071242-python-2.6',
+     'read-bench-20081210T071243.xml',
+     'read-bench-20081210T071243.log',
+     'input.html',
+     'index.html',
+     'diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5',
+     'diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6',
+     'diff_read-20081211T_071242-python-2.4_vs_071241-python-2.6',
+     'diff_read-20081211T_071241-python-2.6_vs_071242-python-2.4',
+     'diff_add-20081211T_071243-python-2.4_vs_071242-python-2.6',
+     'diff_add-20081211T_071242-python-2.6_vs_071243-python-2.4']
+    >>> os.path.isfile(os.path.join(
+    ...     reports_dir, 'test_read-20081211T071242-python-2.4',
+    ...     'funkload.log'))
+    True
+    >>> os.path.isfile(os.path.join(
+    ...     reports_dir, 'test_read-20081211T071242-python-2.4',
+    ...     'funkload.xml'))
+    True
+    
+The HTML report index will be updated to reflect the newly included
+results and reports.
+
+    >>> print open(os.path.join(reports_dir, 'index.html')).read()
+    <...
+        <title>
+          collective.funkload label matrix report
+        </title>...
+          <h1 class="title">
+            <a href="http://pypi.python.org/pypi/collective.funkload">
+              collective.funkload label matrix report
+            </a>
+          </h1>
+          <h2 class="subtitle">python-2.4, python-2.5, python-2.6 vs python-2.4, python-2.5, python-2.6</h2>
+          <table class="docutils">
+            <thead>
+              <tr class="field">
+                <th class="field-name" colspan="2">&nbsp;</th>
+                <th class="field-name" colspan="3">
+                  Label
+                </th>
+              </tr>
+              <tr class="field">
+                  <th class="field-name">Label</th>
+                  <th class="field-name">Test</th>
+                  <th class="field-name">python-2.4</th>
+                  <th class="field-name">python-2.5</th>
+                  <th class="field-name">python-2.6</th>
+              </tr>
+              </thead>
+              <tbody>
+                  <tr>
+                      <th class="field-name" rowspan="2">python-2.4</th>
+                      <th class="field-name">
+                    <a href="test_add-20081211T071243-python-2.4/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_add"
+                           src="test_add-20081211T071243-python-2.4/tests.png"
+                           height="120" width="120"/>
+                      <div>test_add</div>
+                    </a>
+                      </th>
+                      <td class="field-body">
+                    </td>
+                      <td class="field-body">
+                    </td>
+                      <td class="field-body">
+                    <a href="diff_add-20081211T_071243-python-2.4_vs_071242-python-2.6/index.html">
+                      <img alt="diff of python-2.4 vs python-2.6 for test_add"
+                           src="diff_add-20081211T_071243-python-2.4_vs_071242-python-2.6/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.6</div>
+                    </a>
+                      </td>
+                  </tr>
+                  <tr>
+                      <th class="field-name">
+                    <a href="test_read-20081211T071242-python-2.4/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_read"
+                           src="test_read-20081211T071242-python-2.4/tests.png"
+                           height="120" width="120"/>
+                      <div>test_read</div>
+                    </a>
+                      </th>
+                      <td class="field-body">
+                    </td>
+                      <td class="field-body">
+                    <a href="diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5/index.html">
+                      <img alt="diff of python-2.4 vs python-2.5 for test_read"
+                           src="diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.5</div>
+                    </a>
+                      </td>
+                      <td class="field-body">
+                    <a href="diff_read-20081211T_071242-python-2.4_vs_071241-python-2.6/index.html">
+                      <img alt="diff of python-2.4 vs python-2.6 for test_read"
+                           src="diff_read-20081211T_071242-python-2.4_vs_071241-python-2.6/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.6</div>
+                    </a>
+                      </td>
+                  </tr>
+                  <tr>
+                      <th class="field-name" rowspan="1">python-2.5</th>
+                      <th class="field-name">
+                    <a href="test_read-20081210T071241-python-2.5/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_read"
+                           src="test_read-20081210T071241-python-2.5/tests.png"
+                           height="120" width="120"/>
+                      <div>test_read</div>
+                    </a>
+                      </th>
+                      <td class="field-body">
+                    <a href="diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5/index.html">
+                      <img alt="diff of python-2.4 vs python-2.5 for test_read"
+                           src="diff_read_20081211T071242-python-2.4_vs_20081210T071241-python-2.5/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.5</div>
+                    </a>
+                      </td>
+                      <td class="field-body">
+                    </td>
+                      <td class="field-body">
+                    <a href="diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6/index.html">
+                      <img alt="diff of python-2.5 vs python-2.6 for test_read"
+                           src="diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.5 vs python-2.6</div>
+                    </a>
+                      </td>
+                  </tr>
+                  <tr>
+                      <th class="field-name" rowspan="2">python-2.6</th>
+                      <th class="field-name">
+                    <a href="test_add-20081211T071242-python-2.6/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_add"
+                           src="test_add-20081211T071242-python-2.6/tests.png"
+                           height="120" width="120"/>
+                      <div>test_add</div>
+                    </a>
+                      </th>
+                      <td class="field-body">
+                    <a href="diff_add-20081211T_071243-python-2.4_vs_071242-python-2.6/index.html">
+                      <img alt="diff of python-2.4 vs python-2.6 for test_add"
+                           src="diff_add-20081211T_071243-python-2.4_vs_071242-python-2.6/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.6</div>
+                    </a>
+                      </td>
+                      <td class="field-body">
+                    </td>
+                      <td class="field-body">
+                    </td>
+                  </tr>
+                  <tr>
+                      <th class="field-name">
+                    <a href="test_read-20081211T071241-python-2.6/index.html">
+                      <img alt="foo.sampletests.FooTestCase.test_read"
+                           src="test_read-20081211T071241-python-2.6/tests.png"
+                           height="120" width="120"/>
+                      <div>test_read</div>
+                    </a>
+                      </th>
+                      <td class="field-body">
+                    <a href="diff_read-20081211T_071242-python-2.4_vs_071241-python-2.6/index.html">
+                      <img alt="diff of python-2.4 vs python-2.6 for test_read"
+                           src="diff_read-20081211T_071242-python-2.4_vs_071241-python-2.6/spps_diff.png"
+                           height="95" width="160"/>
+                      <div>python-2.4 vs python-2.6</div>
+                    </a>
+                      </td>
+                      <td class="field-body">
+                      <a href="diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6/index.html">
+                        <img alt="diff of python-2.5 vs python-2.6 for test_read"
+                             src="diff_read_20081210T071241-python-2.5_vs_20081211T071241-python-2.6/spps_diff.png"
+                             height="95" width="160"/>
+                        <div>python-2.5 vs python-2.6</div>
+                      </a>
+                    </td>
+                    <td class="field-body">
+                    </td>
+                  </tr>
+            </tbody>
+            <tfooter>
+              <tr class="field">
+                <th class="field-name">Label</th>
+                <th class="field-name">Test</th>
+                <th class="field-name">python-2.4</th>
+                <th class="field-name">python-2.5</th>
+                <th class="field-name">python-2.6</th>
+              </tr>
+              <tr class="field">
+                <th class="field-name" colspan="2">&nbsp;</th>
+                <th class="field-name" colspan="3">
+                  Label
+                </th>
+              </tr>
+            </tfooter>
+          </table>...
+
+The "fl-list" script prints out the labeled XML bench result files,
+HTML report directories, and differential report directories that meet
+the criteria of the given options.  The "--old" option lists
+everything for which there is an equivalent with a newer time stamp.
+
+    >>> from collective.funkload import report
+    >>> options, _ = report.list_parser.parse_args(
+    ...     args=('-o %s --old' % reports_dir).split())
+    >>> list(report.run(**options.__dict__))
+    ['read-bench-20081210T071243.xml']
