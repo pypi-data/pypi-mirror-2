@@ -1,0 +1,236 @@
+.. _topics-blocks:
+
+======
+Blocks
+======
+
+This section is about blocks in Merengue. Merengue blocks are components
+which can be located in several places and render a fragment with information
+(usually HTML). Blocks are defined inside plugins and registered when plugin
+is activated.
+
+The place of every block can be defined in admin site and you can even
+using the Merengue `block reordering interface`_ to change blocks location.
+
+.. _`block reordering interface`: http://www.merengueproject.org/features/visual-blocks-management/
+
+Block kinds
+-----------
+
+* **Basic blocks**: plain blocks which are thought to be render in every Merengue page. Some examples:
+
+  * The calendar block.
+
+  * The portal menu block.
+
+* **Content blocks**: blocks which will be rendered in every content view. Examples are:
+
+  * The feedback block, for content comments.
+
+  * The Open Document export block.
+
+* **Section blocks**: blocks to be render inside a section, like the section menu block.
+
+Plugin tree with blocks
+-----------------------
+
+We know the conventional plugin tree (see :ref:`plugin development reference
+<topics-plugins-development>`). Here we emphasize the files on which we are
+going to work in this example:
+
+.. code-block:: html
+
+     /plugins/
+         |-- news/
+         |   |-- ...
+         |   |-- config.py
+         |   |-- blocks.py
+         |   `-- templates/
+         |       `-- news/
+         |           |-- block_latest.html
+         |
+         ...
+
+
+Example plugin block
+--------------------
+
+This is a ``blocks.py`` file code fragment:
+
+.. code-block:: python
+
+    from merengue.block.blocks import Block
+    from plugins.news.views import get_news
+
+    class LatestNewsBlock(Block):
+        name = 'latestnews'
+        default_place = 'leftsidebar'
+
+        @classmethod
+        def render(cls, request, place, context):
+            news_list = get_news(request, 5)
+            return cls.render_block(request, template_name='news/block_latest.html',
+                                    block_title='Latest news',
+                                    context={'news_list': news_list})
+
+* ``name`` is the block name.
+* ``default_place`` indicates the place where the block will be showed by default.
+* ``render`` is a similar function to the ``render_to_response`` Django function. This function is the responsible for displaying the block.
+* ``news_list`` stores the number of news gotten by ``get_news``.
+* ``template_name`` is the full name of the block template.
+* ``block_title`` is the block title.
+* ``context`` is a dictionary of values to render the template with.
+
+About block rendering
+---------------------
+
+In a Merengue block, ``render`` method is a callback function which will be
+called when Merengue is rendering blocks in location defined for that block.
+
+For rendering block you can use several templatetags like ``render_blocks``,
+``render_content_blocks``, ``render_section_blocks`` and ``render_all_blocks``.
+
+The block rendering is done in some base templates. For example, in
+`base/inc.leftsidebar.html`_ template, the blocks placed at ``leftsidebar`` are
+rendered, using this ``render_all_blocks`` templatetags as follows:
+
+.. code-block:: html+django
+
+  {% load block_tags %}
+
+  {% block leftsidebarblocks %}
+    {% render_all_blocks "leftsidebar" %}
+    {# more stuff #}
+  {% endblock %}
+
+This ``render_all_blocks`` templatetags will cause calling to ``render`` method
+with ``leftsidebar`` passed in ``place`` parameter. The ``render_all_blocks``
+method is in fact a shortcut of this HTML fragment:
+
+.. code-block:: html+django
+
+    {% render_blocks "leftsidebar" %}
+    {% if content %}
+        {% render_content_blocks "leftsidebar" for content %}
+    {% endif %}
+    {% if section %}
+        {% render_section_blocks "leftsidebar" for section %}
+    {% endif %}
+
+So, the first ``render_blocks`` call will render the plain blocks,
+``render_content_blocks`` call will render all content block and the
+``render_section_blocks`` will render all section blocks.
+
+Every ``render_*_blocks`` templatetag will call to the ``render`` method of
+every registered block. Also, request and context will be passed by param, to
+be used in ``render`` method, if you want. Next example is self-explanatory:
+
+.. code-block:: python
+
+    from merengue.block.blocks import Block
+
+    class WhereIAmBlock(Block):
+        name = 'whereiam'
+        default_place = 'leftsidebar'
+
+        @classmethod
+        def render(cls, request, place, context):
+            if place in ['leftsidebar', 'rightsidebar']:
+                return 'I am in a side column'
+            else:
+                return 'I am in %s place' % place
+
+.. _`base/inc.leftsidebar.html`: http://dev.merengueproject.org/browser/trunk/merengueproj/merengue/base/templates/base/inc.leftsidebar.html
+
+Implementing the block template
+-------------------------------
+
+Let's back to ``LatestNewsBlock`` block. To finish block rendering we must
+create a template inside ``block_latest.html``:
+
+.. code-block:: html+django
+
+    {% extends "block.html" %}
+
+    {% block blockbody %}
+    <ul>
+    {% for n in news_list %}
+        <li><a href="{{ n.get_absolute_url }}" title="{{ n }}">{{ n }}</a></li>
+    {% endfor %}
+    </ul>
+    {% endblock %}
+
+This template shows the title of the last published news. The number of news that is considered
+*last news* is specified in render function inside the ``blocks.py`` (five in this case).
+
+Showing and hiding blocks
+--------------------------
+
+From Merengue v0.6, block rendering can be controlled using two additional parameters in the block configuration:
+
+* ``Shown in urls``
+* ``Hidden in urls``
+
+These parameters are used to decide wether to render or not the block. If both
+are empty, the block will always be rendered in its place. Otherwise, the block 
+will be shown or hidden if the current url is found within the specified values.
+
+``hiden in urls`` does only take effect if ``shown in urls`` is *not set*.
+
+Both parameters accept a list of regular expressions, written one per line with
+the standard `python regular expression syntax <http://docs.python.org/library/re.html#regular-expression-syntax/>`_
+and no quotes.
+
+For example:
+
+``shown in urls``
+
+.. code-block:: python
+
+  news/
+
+would show the block only in urls with *news/* in it. This means the block won't
+be displayed in any other place (such as the homepage).
+
+The regular expressions are matched towards the site relative url, so leave out
+the http and domain part. Nonetheless, make sure you provide complete 
+expressions in order to avoid undesired matches.
+
+For example:
+
+``hiden in urls``
+
+.. code-block:: python
+
+  /$
+
+will hide the block in all urls ending with a / character. If you want to hide 
+the block in your home page, you should write:
+
+``hiden in urls``
+
+.. code-block:: python
+
+  ^/$
+
+
+How to register the block
+-------------------------
+
+Our ``LatestNewsBlock`` class must be referenced in the plugin configuration inside ``config.py`` file:
+
+.. code-block:: python
+
+    from merengue.pluggable import Plugin
+    from plugins.news.blocks import LatestNewsBlock
+    #some stuff
+
+    class PluginConfig(Plugin):
+        #some stuff
+
+        @classmethod
+        def get_blocks(cls):
+            return [LatestNewsBlock]
+
+* ``get_blocks`` is a classmethod that returns the specified blocks that we want to register.
+
