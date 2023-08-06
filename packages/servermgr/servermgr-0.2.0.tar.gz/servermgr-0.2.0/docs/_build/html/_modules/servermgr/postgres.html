@@ -1,0 +1,345 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>servermgr.postgres &mdash; ServerMgr v0.2 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="ServerMgr v0.2 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ServerMgr v0.2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for servermgr.postgres</h1><div class="highlight"><pre>
+<span class="c"># -*- mode: python; tab-width:8; py-indent-offset:4; indent-tabs-mode:nil -*-</span>
+<span class="c">#pylint: disable=C0301</span>
+<span class="c">#line length;</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Postgres process management.</span>
+
+<span class="sd">Use this module to initialize a postgres data directory and to </span>
+<span class="sd">manage a postgres server.</span>
+
+<span class="sd">Environment Variables</span>
+<span class="sd">---------------------</span>
+
+<span class="sd">POSTGRES_VERSION - if specified, this will be the default version of postgres. The </span>
+<span class="sd">documentation for the **Manager** class describes how the version of postgres is chosen.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="kn">import</span> <span class="nn">base</span>
+
+<div class="viewcode-block" id="DatabaseException"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres.DatabaseException">[docs]</a><span class="k">class</span> <span class="nc">DatabaseException</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Database exceptions.&quot;&quot;&quot;</span>
+</div>
+<div class="viewcode-block" id="_check_lockdir_permissions"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres._check_lockdir_permissions">[docs]</a><span class="k">def</span> <span class="nf">_check_lockdir_permissions</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Make sure we have permission to create a postgres postfile.</span>
+<span class="sd">    </span>
+<span class="sd">    :raises: **DatabaseException** if we do not have write permission on the lockfile directory.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="s">&quot;/var/run/postgresql&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">W_OK</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">DatabaseException</span><span class="p">(</span><span class="s">&quot;We require write access to the postgres lockfile directory, /var/run/postgresql.&quot;</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="_get_default_postgres_version"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres._get_default_postgres_version">[docs]</a><span class="k">def</span> <span class="nf">_get_default_postgres_version</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Select the default version of postgres to use. </span>
+
+<span class="sd">    If the environment variable POSTGRES_VERSION is set, use that.</span>
+<span class="sd">    Otherwise, use the largest numbered directory in /usr/lib/postgresql.</span>
+
+<span class="sd">    :returns: the default version of postgres, or **None** if we can&#39;t determine the default postgres version.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">environ_version</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&quot;POSTGRES_VERSION&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">environ_version</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">environ_version</span>
+
+    <span class="c"># Pick the version with the largest number in the directory /usr/lib/postgresql;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">([(</span><span class="nb">float</span><span class="p">(</span><span class="n">d</span><span class="p">),</span> <span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="s">&quot;/usr/lib/postgresql&quot;</span><span class="p">)])[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="c"># bad directory;</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span> 
+        <span class="k">pass</span>
+    <span class="c"># can&#39;t convert name to a float;</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span> 
+        <span class="k">pass</span>
+    
+    <span class="k">return</span> <span class="bp">None</span>
+
+</div>
+<div class="viewcode-block" id="_env_with_postgres_path"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres._env_with_postgres_path">[docs]</a><span class="k">def</span> <span class="nf">_env_with_postgres_path</span><span class="p">(</span><span class="n">pg_version</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return a new environment with Postgres bin directories append to the end.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">env</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span>
+    <span class="n">new_path_element</span> <span class="o">=</span> <span class="s">&quot;/usr/lib/postgresql/</span><span class="si">%s</span><span class="s">/bin&quot;</span> <span class="o">%</span> <span class="n">pg_version</span>
+    <span class="n">env</span><span class="p">[</span><span class="s">&quot;PATH&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="s">&quot;:&quot;</span> <span class="o">+</span> <span class="n">new_path_element</span>
+    <span class="k">return</span> <span class="n">env</span><span class="p">,</span> <span class="n">new_path_element</span>
+</div>
+<div class="viewcode-block" id="_initialize_directory"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres._initialize_directory">[docs]</a><span class="k">def</span> <span class="nf">_initialize_directory</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">pg_version</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Initialize a postgres data directory.</span>
+
+<span class="sd">    :param directory: Name of the postgres data directory.</span>
+<span class="sd">    :param pg_version: The version of postgres to use.</span>
+<span class="sd">    :raises: **OSError** if subprocess execution fails.</span>
+<span class="sd">    :raises: **DatabaseException** on initdb error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">env</span><span class="p">,</span> <span class="n">new_path_elem</span> <span class="o">=</span> <span class="n">_env_with_postgres_path</span><span class="p">(</span><span class="n">pg_version</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s">&quot;initdb&quot;</span><span class="p">,</span> <span class="s">&quot;-D&quot;</span><span class="p">,</span> <span class="n">directory</span><span class="p">],</span> 
+                                   <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> 
+                                   <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                                   <span class="n">close_fds</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">,</span> <span class="n">ex</span><span class="p">:</span>
+        <span class="n">ex</span><span class="o">.</span><span class="n">strerror</span> <span class="o">+=</span> <span class="s">&quot;: initdb; new path element:&quot;</span> <span class="o">+</span> <span class="n">new_path_elem</span>
+        <span class="k">raise</span> <span class="n">ex</span>
+
+    <span class="n">process</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+
+    <span class="n">messages</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">errors</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s">&quot;WARNING&quot;</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">messages</span> <span class="o">+=</span> <span class="n">errors</span>
+        <span class="n">errors</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">errors</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">DatabaseException</span><span class="p">(</span><span class="n">errors</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">messages</span>
+</div>
+<div class="viewcode-block" id="Manager"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres.Manager">[docs]</a><span class="k">class</span> <span class="nc">Manager</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">ManagerBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Postgres manager object.</span>
+
+<span class="sd">    Selecting the postgres version: </span>
+
+<span class="sd">    * Use the version specified by the pg_version parameter.</span>
+<span class="sd">    * If pg_version is not specified, use the environment variable POSTGRES_VERSION.</span>
+<span class="sd">    * If the environment variable is not set, use the highest numbered version in the</span>
+<span class="sd">      directory /usr/lib/postgresql.</span>
+
+<span class="sd">    :param host: the interface to listen on.</span>
+<span class="sd">    :type host: string</span>
+<span class="sd">    :param port: the post to listen on.</span>
+<span class="sd">    :type port: int</span>
+<span class="sd">    :param db_dir: the database data directory.</span>
+<span class="sd">    :type db_dir: string</span>
+<span class="sd">    :param initialize: If this flag is true, the database data directory will be initialized iff </span>
+<span class="sd">      the data directory does not already exist.</span>
+<span class="sd">    :type initialize: bool</span>
+<span class="sd">    :param pg_version: Version of postgres to use. </span>
+<span class="sd">    :type pg_version: string</span>
+
+<span class="sd">    :raises: **DatabaseException** if data directory initialization fails.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">__implements__</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">ManagerInterface</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">db_dir</span><span class="p">,</span> <span class="n">initialize</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">pg_version</span><span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="n">Manager</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="s">&quot;Postgres&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">_check_lockdir_permissions</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pg_version</span><span class="p">:</span>
+            <span class="n">pg_version</span> <span class="o">=</span> <span class="n">_get_default_postgres_version</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pg_version</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">DatabaseException</span><span class="p">(</span><span class="s">&quot;could not select a version of postgres to use.&quot;</span><span class="p">)</span>
+            
+        <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">host</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">port</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">db_dir</span> <span class="o">=</span> <span class="n">db_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pg_version</span> <span class="o">=</span> <span class="n">pg_version</span>
+
+        <span class="k">if</span> <span class="n">initialize</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">db_dir</span><span class="p">):</span>
+            <span class="n">_initialize_directory</span><span class="p">(</span><span class="n">db_dir</span><span class="p">,</span> <span class="n">pg_version</span><span class="p">)</span>
+        
+<div class="viewcode-block" id="Manager.health"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres.Manager.health">[docs]</a>    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check manager health.</span>
+
+<span class="sd">        :raises: **WorkerError** if we cannot connect to the database</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">database</span><span class="o">=</span><span class="s">&quot;postgres&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">OperationalError</span><span class="p">,</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">base</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Manager.start"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres.Manager.start">[docs]</a>    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">10.0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Launch the postgres process.</span>
+<span class="sd">        </span>
+<span class="sd">        :param wait: If true, call self.ready_wait() after starting the subprocess.</span>
+<span class="sd">        :param timeout: When calling ready_wait(), use this timeout value.</span>
+<span class="sd">        :raises: **OSError** if postgres fails to launch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">base</span><span class="o">.</span><span class="n">address_free_check</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">)</span>
+        <span class="n">env</span><span class="p">,</span> <span class="n">new_path_elem</span> <span class="o">=</span> <span class="n">_env_with_postgres_path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pg_version</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s">&quot;postgres&quot;</span><span class="p">,</span> 
+                                             <span class="s">&quot;-D&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_dir</span><span class="p">,</span>
+                                             <span class="s">&quot;-h&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                                             <span class="s">&quot;-p&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">)],</span>
+                                            <span class="n">stdout</span><span class="o">=</span><span class="nb">file</span><span class="p">(</span><span class="s">&quot;/dev/null&quot;</span><span class="p">),</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                                            <span class="n">close_fds</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">,</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">ex</span><span class="o">.</span><span class="n">strerror</span> <span class="o">+=</span> <span class="s">&quot;: postgres; new path element:&quot;</span> <span class="o">+</span> <span class="n">new_path_elem</span>
+            <span class="k">raise</span> <span class="n">ex</span>
+
+        <span class="k">if</span> <span class="n">wait</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ready_wait</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+
+</div></div>
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../postgres.html#servermgr.postgres.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    You can use this script to start a copy of postgres.</span>
+
+<span class="sd">    Usage: postgres.py [options]</span>
+
+<span class="sd">    Options:</span>
+<span class="sd">      -h, --help            show this help message and exit</span>
+<span class="sd">      -H HOST, --host=HOST  listener hostname</span>
+<span class="sd">      -p PORT, --port=PORT  listener port</span>
+<span class="sd">      -d DATADIR, --datadir=DATADIR</span>
+<span class="sd">                            data directory</span>
+<span class="sd">      -i INITIALIZE, --init=INITIALIZE</span>
+<span class="sd">                            initialize data directory</span>
+<span class="sd">      -v VERSION, --version=VERSION</span>
+<span class="sd">                            postgres version</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="kn">import</span> <span class="nn">optparse</span>
+    <span class="kn">import</span> <span class="nn">signal</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    
+    <span class="k">def</span> <span class="nf">to_bool</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Convert boolean string to an actual bool&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">True</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="bp">False</span><span class="o">=</span><span class="bp">False</span><span class="p">)[</span><span class="n">val</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">interrupt</span><span class="p">(</span><span class="n">_unused_signum</span><span class="p">,</span> <span class="n">_unused_frame</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle user stopping with control-C.&quot;&quot;&quot;</span>
+        <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Keyboard interrupt, exiting.&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+
+    <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">interrupt</span><span class="p">)</span>
+
+    <span class="n">default_host</span> <span class="o">=</span> <span class="s">&quot;localhost&quot;</span>
+    <span class="n">default_port</span> <span class="o">=</span> <span class="mi">15432</span>
+    <span class="n">default_datadir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&quot;POSTGRES_DATA&quot;</span><span class="p">,</span> <span class="s">&quot;/var/tmp/pg_data&quot;</span><span class="p">)</span>
+    <span class="n">default_initialize</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="n">default_version</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="s">&quot;usage: %prog [options]&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-H&quot;</span><span class="p">,</span> <span class="s">&quot;--host&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;host&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;listener hostname&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-p&quot;</span><span class="p">,</span> <span class="s">&quot;--port&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;port&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;listener port&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-d&quot;</span><span class="p">,</span> <span class="s">&quot;--datadir&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;datadir&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;data directory&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-i&quot;</span><span class="p">,</span> <span class="s">&quot;--init&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;initialize&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;initialize data directory&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-v&quot;</span><span class="p">,</span> <span class="s">&quot;--version&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;version&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;postgres version&quot;</span><span class="p">)</span>
+
+    <span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">_unused_args</span><span class="p">)</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">host</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">host</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">host</span> <span class="k">else</span> <span class="n">default_host</span>
+    <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">port</span><span class="p">)</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">port</span> <span class="k">else</span> <span class="n">default_port</span>
+    <span class="n">datadir</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">datadir</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">datadir</span> <span class="k">else</span> <span class="n">default_datadir</span>
+    <span class="n">initialize</span> <span class="o">=</span> <span class="n">to_bool</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">initialize</span><span class="p">)</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">initialize</span> <span class="k">else</span> <span class="n">default_initialize</span>
+    <span class="n">pg_version</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">version</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">version</span> <span class="k">else</span> <span class="n">default_version</span>
+
+    <span class="n">db_manager</span> <span class="o">=</span> <span class="n">Manager</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">datadir</span><span class="p">,</span> <span class="n">initialize</span><span class="o">=</span><span class="n">initialize</span><span class="p">,</span> <span class="n">pg_version</span><span class="o">=</span><span class="n">pg_version</span><span class="p">)</span>
+    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;starting database...&quot;</span>
+    <span class="n">db_manager</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;database ready on </span><span class="si">%s</span><span class="s">:</span><span class="si">%d</span><span class="s"> using data directory </span><span class="si">%s</span><span class="s">.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">datadir</span><span class="p">)</span>
+    <span class="n">db_manager</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ServerMgr v0.2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Don Bennett.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>
