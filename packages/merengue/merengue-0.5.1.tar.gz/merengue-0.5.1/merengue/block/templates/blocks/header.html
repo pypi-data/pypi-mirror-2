@@ -1,0 +1,119 @@
+{% load i18n permissions_tags %}
+{% ifhasperm manage_portal %}
+<link rel="stylesheet" type="text/css" href="{{ MEDIA_URL }}merengue/css/render_blocks.css"/>
+<script language="javascript">
+;(function($) {
+  if (!$.browser.msie || $.browser.version != '6.0') {
+    $(document).ready(function() {
+        var containers = $(".blockContainer:visible");
+
+        function getBlocksOrder() {
+            var order = [];
+            containers.each(function() {
+                var orderList = [];
+                var place = $(this).children(".blockPlace").val();
+                $(this).children(".block").children(".blockOrder").each(function() {
+                    var val = $(this).val();
+                    if (val) {
+                        order.push(val +"#"+ place);
+                    }
+                });
+            });
+            return order.join(",");
+        }
+
+        function initDragging() {
+            $(".block").each(function() {
+                var aTools, divTools, position;
+                position = $(this).position();
+                aTools = $("<a>");
+                divTools = $("<div>");
+                aTools.attr("href", "javascript:void(0)");
+                aTools.attr("title", "{% trans "Enable/disable blocks dragging" %}");
+                aTools.click(enableDragging);
+                divTools.append(aTools);
+                divTools.addClass("blockTools");
+                divTools.css({"left": position.left - 20});
+                divTools.css({"top": position.top});
+                $(this).append(divTools);
+                $(this).mouseenter(function() {
+                    $(this).children(".blockTools").stop(true, true).show();
+                }).mouseleave(function() {
+                    $(this).children(".blockTools").delay(1000).fadeOut();
+                });
+            });
+        }
+
+        function enableDragging() {
+            containers.each(function() {
+                if ($(this).children().length < 2) {
+                    var child;
+                    child = $("<div>");
+                    child.html("Drag here");
+                    child.addClass("blockDrag");
+                    $(this).append(child);
+                }
+            });
+            if (!containers.hasClass("blockContainerBorder")) {
+                containers.addClass("blockContainerBorder");
+                containers.sortable({
+                    connectWith: '.blockContainer',
+                    parent: 'document',
+                    opacity: 0.6,
+                    revert: true,
+                    items: '.block',
+                    helper: 'clone',
+                    tolerance: 'pointer',
+                    start: function(event, ui) {
+                        $(".block .blockTools").hide();
+                    },
+                    stop: function(event, ui) {
+                        $(".block .blockTools").hide();
+                        disableDragging();
+                        recalculatePosition(ui.item);
+                        postNewOrder();
+                    }
+                });
+                containers.disableSelection();
+            } else {
+                disableDragging();
+            }
+            return false;
+        }
+
+        function disableDragging() {
+            containers.sortable("destroy");
+            containers.removeClass("blockContainerBorder");
+            containers.find(".blockDrag").remove();
+        }
+
+        function recalculatePosition(ui) {
+            var position;
+            position = $(ui).position();
+            divTools = $(ui).children(".blockTools");
+            divTools.css({"left": position.left - 20});
+            divTools.css({"top": position.top});
+        }
+
+        function postNewOrder() {
+            var newOrder = getBlocksOrder();
+            $.ajax({
+                url: "{% url blocks_reorder %}",
+                type: "POST",
+                data: ({new_order : newOrder}),
+                dataType: "json",
+                success: function(msg) {
+                    // It's not necesary to alert the user
+                },
+                error: function() {
+                    window.location = window.location;
+                }
+            });
+        }
+
+        initDragging();
+    });
+  }
+})(jQuery);
+</script>
+{% endifhasperm %}
