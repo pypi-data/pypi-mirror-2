@@ -1,0 +1,254 @@
+Version 1.2 - May 6, 2011
+=========================
+- Removed Config from webapp2 core. It is now part of the new "webapp2_extras"
+  package.
+- Added the package webapp2_extras. These are all optional modules that
+  complement webapp2 with common functionalities. Currently they include:
+  - webapp2_extras.config: Configuration object.
+  - webapp2_extras.jinja2: Support for Jinja2 templating.
+  - webapp2_extras.json: JSON utilities.
+  - webapp2_extras.routes: Extended route classes.
+  - webapp2_extras.securecookie: Signed cookie serializer.
+  - webapp2_extras.sessions: Sessions support.
+
+
+Version 1.1 - May 5, 2011
+=========================
+- Simplified routing with an unified dispatch method for classes and functions.
+
+
+Version 1.0 - May 1st, 2011
+===========================
+This is a major refactoring with some incompatible changes, mostly internal
+stuff that won't be noticed in common usage.
+
+- Changed signature of RequestHandler's constructor: it now receives only
+  (request, response) instead of (app, request, response).
+
+- Added RequestContext class, which should help testing.
+
+- Added .app attribute to Request, a reference to the active app.
+
+- Refactored routing scheme:
+  - Now also supports function views besides classes.
+  - Now also supports normal functions as exception handlers, and exception
+    handlers don't need to be a subclass RequestHandler (but still can).
+  - Now also supports custom handler methods besides using the request method.
+
+- Removed Request.context: was redundant with Request.registry.
+
+- Renamed WSGIApplication.wsgi_app to WSGIApplication.dispatch.
+
+- Moved ALLOWED_METHODS to WSGIApplication.allowed_methods.
+
+- Moved get_valid_methods() to RequestHandler.get_valid_methods().
+
+
+Version 0.7 - September 26, 2010
+================================
+- Added WSGIApplication.app and WSGIApplication.request, class attributes set
+  on each request to reference currently active app and request.
+  WSGIApplication.app is an alias to WSGIApplication.active_instance.
+
+- Fixed double escaping of + in urlunsplit(). Thanks, alkis.
+
+- IMPROVED: configuration now behaves exactly like a dictionary, still
+  auto-loading configuration values when needed and honoring required configs.
+  For example, we always used this::
+
+      bar = self.app.get_config('foo', 'bar')
+
+  Now it is also possible to use direct access and dict methods::
+
+      bar = self.app.config['foo']['bar']
+      # or...
+      bar = self.app.config['foo'].get('bar')
+      # or...
+      bar = self.app.config.get('foo').get('bar')
+
+  The previous get_config() method works as always.
+
+
+Version 0.6 - August 31, 2010
+=============================
+- Fix: Anchors in generated URLs are quoted using urlib.quote, instead of
+  urlib.quote_plus.
+
+- In Router.dispatch(), if an exception occurs while handling an exception,
+  raise it instead of trying to handle it again.
+
+- Fixed bug when writing a unicode string to Response and charset is not set.
+  Thanks to martinc for the patch.
+
+- Changed: the app won't fallback anymore to the exception handler set for
+  status 500 if handlers for other status are not set.
+
+- Changed: exceptions are only logged when unhandled. It is up to exception
+  handlers to log them when appropriate.
+
+
+Version 0.5.1 - August 17, 2010
+===============================
+- When a URL matches, some attributes are set in the request object:
+  - request.route: the matched route
+  - request.route_args: the matched positional arguments, a tuple
+  - request.route_kwargs: the matched keyword arguments, a dict
+
+- WSGIApplication.handle_exception() doesn't automatically raises the exception
+  when in debug mode: it is up to the error handler to raise it if in dev; it
+  will be raised if no error handler is defined to handle it anyway.
+
+- Added attributes, WSGIApplication.registry, Request.registry and
+  Request.context, dictionaries for objects in use during the app or request
+  lifetimes.
+
+- Before passing the request method to the RequestHandler, '-' is replaced
+  by '_', so that a method like WebDav's 'VERSION-CONTROL' can be supported.
+
+- Config.get() now only returns the passed default value when key is defined.
+  This is the intended, more predictable behavior: default is a default for
+  the key, not the module. For example::
+
+      # If config['foo']['bar'] is not set, return 'baz'.
+      config.get('foo', 'bar', default='baz')
+
+      # If config['foo'] is not set, return None. Default is ignored here.
+      config.get('foo', default='baz')
+
+- Router initialization now receives the app as parameter, so that extended
+  routes can access app's config.
+
+
+Version 0.5 - August 13, 2010
+=============================
+- Better compatibility with webapp:
+  - webapp2.WSGIapplication can be used with webapp.RequestHandler.
+  - webapp.WSGIapplication can be used with webapp2.RequestHandler.
+
+  Although the functionality becomes limited in both cases, this should help
+  migration.
+
+- Review of Response based on observations from
+  http://pythonpaste.org/webob/differences.html#webapp-response:
+
+  - Response.out is now a reference to self, to use webob.Response's neat
+    .write() method which can handle both string and unicode.
+  - Response.clear() now sets .body = '' instead of .app_iter = [].
+
+- Added Response.write(), for compatibility with StringIO behavior in webapp
+  when calling write() passing non-basestring values (issue 2).
+
+- Removed url_escape() and url_unescape(). Unused or almost unused.
+
+- ErrorHandlers can now be defined as strings to be lazily loaded, as they
+  now use the same dispatch mechanism of other handlers.
+
+Backwards compatibility warning
+-------------------------------
+- The method handle_exception() is called from app-wide error handlers.
+  Previously, get() was called.
+
+
+Version 0.4.1 - August 08, 2010
+===============================
+- Removed router parameter from get_routes(), get_match_routes(),
+  get_build_routes(). This simplifies multi-routes quite a bit.
+
+
+Version 0.4 - August 07, 2010
+=============================
+- redirect() and redirect_to() now accept a keyword argument 'abort' to raise
+  an exception to do the redirect.
+
+- '_netloc' can be passed to url_for() build URLs for a given domain or
+  subdomain.
+
+- Added BaseRoute, an interface for custom routes. Several improvements make
+  the routing system more extensible, while the default Route class sticks to
+  the basics.
+
+- Nested routes are now possible. As an example, `extras/routes.py` has several
+  classes that accept nested routes or extend routing in other ways:
+
+  - PathPrefixRoute: the idea of this route is to set a base path for other
+    routes::
+
+        app = WSGIApplication([
+            PathPrefixRoute('/users/<user:\w+>', [
+                Route('/', UserOverviewHandler, 'user-overview'),
+                Route('/profile', UserProfileHandler, 'user-profile'),
+                Route('/projects', UserProjectsHandler, 'user-projects'),
+            ]),
+        ])
+
+    The example above is the same as setting the following routes, just more
+    convenient as you can reuse the path prefix::
+
+        app = WSGIApplication([
+            Route('/users/<user:\w+>/', UserOverviewHandler, 'user-overview'),
+            Route('/users/<user:\w+>/profile', UserProfileHandler, 'user-profile'),
+            Route('/users/<user:\w+>/projects', UserProjectsHandler, 'user-projects'),
+        ])
+
+  - NamePrefixRoute: Same as PathPrefixRoute, but prefixes the names of routes.
+
+  - HandlerPrefixRoute: Same as PathPrefixRoute, but prefixes the handlers of
+    routes.
+
+  - DomainRoute: a route used to restrict route matches to a given domain or
+    subdomain.
+
+    For example, to restrict routes to a subdomain of the appspot domain::
+
+        SUBDOMAIN_RE = '^([^.]+)\.app-id\.appspot\.com$'
+
+        app = WSGIApplication([
+            DomainRoute(SUBDOMAIN_RE, [
+                Route('/foo', 'FooHandler', 'subdomain-thing'),
+            ]),
+            Route('/bar', 'BarHandler', 'normal-thing'),
+        ])
+
+  - ImprovedRoute: a route with redirect_to and strict_slash.
+
+    - `redirect_to`: if set, the route is used to redirect to a URL. The value
+       can be a URL string or a callable that returns a URL. These two are
+       equivalent::
+
+          route = Route('/foo', RedirectHandler, defaults={'url': '/bar'})
+          route = Route('/foo', redirect_to='/bar')
+
+    - `strict_slash`: if True, redirects access to the same URL with different
+      trailing slash to the strict path defined in the rule. For example, take
+      these rules::
+
+          route = Route('/foo', FooHandler, strict_slash=True)
+          route = Route('/bar/', BarHandler, strict_slash=True)
+
+      Because **strict_slash** is True, this is what will happen:
+
+      - Access to ``/foo`` will execute ``FooHandler`` normally.
+      - Access to ``/bar/`` will execute ``BarHandler`` normally.
+      - Access to ``/foo/`` will redirect to ``/foo``.
+      - Access to ``/bar`` will redirect to ``/bar/``.
+
+
+Version 0.3 - August 05, 2010
+=============================
+- Routes store the handler, as we had in 0.1. This allows custom routes to
+  have nested routes.
+- Much improved URL building, now delegated to routes.
+- added urlunsplit() helper.
+
+
+Version 0.2 - August 04, 2010
+=============================
+- Fixed a bug in Route.match() that would make it return positional arguments
+  with wrong order. Dictionary is correctly sorted now.
+- Added build_only option for routes: routes that are only used for url_for()
+  and never match.
+
+
+Version 0.1 - August 03, 2010
+=============================
+- Initial release.
