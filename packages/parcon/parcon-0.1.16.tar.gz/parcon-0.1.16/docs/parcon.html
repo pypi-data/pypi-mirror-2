@@ -1,0 +1,2727 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: package parcon</title>
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+// START JCP ADD
+  if(window.location.href.indexOf("http://www.opengroove.org/") == 0) {
+// END JCP ADD
+  _gaq.push(['_setAccount', 'UA-6079740-6']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+// START JCP ADD
+}
+// END JCP ADD
+
+</script>
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>parcon</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/boydam/workspace/Parcon-python/parcon/parcon/__init__.py">/home/boydam/workspace/Parcon-python/parcon/parcon/__init__.py</a></font></td></tr></table>
+    <p><tt>parcon.py<br>
+&nbsp;<br>
+Parcon&nbsp;is&nbsp;a&nbsp;parser&nbsp;combinator&nbsp;library&nbsp;written&nbsp;by&nbsp;Alexander&nbsp;Boyd.<br>
+&nbsp;<br>
+Technically,&nbsp;it's&nbsp;a&nbsp;monadic&nbsp;parser&nbsp;combinator&nbsp;library,&nbsp;but&nbsp;you&nbsp;don't&nbsp;need&nbsp;to<br>
+know&nbsp;that&nbsp;unless&nbsp;you're&nbsp;doing&nbsp;really&nbsp;fancy&nbsp;things.&nbsp;(The&nbsp;bind&nbsp;and&nbsp;return<br>
+operations&nbsp;are&nbsp;provided&nbsp;by&nbsp;the&nbsp;<a href="#Bind">Bind</a>&nbsp;and&nbsp;<a href="#Return">Return</a>&nbsp;parsers,&nbsp;respectively.)<br>
+&nbsp;<br>
+To&nbsp;get&nbsp;started,&nbsp;look&nbsp;at&nbsp;all&nbsp;of&nbsp;the&nbsp;subclasses&nbsp;of&nbsp;the&nbsp;<a href="#Parser">Parser</a>&nbsp;class,&nbsp;and<br>
+specifically,&nbsp;look&nbsp;at&nbsp;<a href="#Parser">Parser</a>'s&nbsp;parse_string&nbsp;method.&nbsp;And&nbsp;perhaps&nbsp;try<br>
+running&nbsp;this:<br>
+&nbsp;<br>
+parser&nbsp;=&nbsp;"("&nbsp;+&nbsp;<a href="#ZeroOrMore">ZeroOrMore</a>(<a href="#SignificantLiteral">SignificantLiteral</a>("a")&nbsp;+&nbsp;<a href="#SignificantLiteral">SignificantLiteral</a>("b"))&nbsp;+&nbsp;")"<br>
+print&nbsp;parser.parse_string("(abbaabaab)")<br>
+print&nbsp;parser.parse_string("(a)")<br>
+print&nbsp;parser.parse_string("")&nbsp;#&nbsp;should&nbsp;raise&nbsp;an&nbsp;exception<br>
+print&nbsp;parser.parse_string("(a")&nbsp;#&nbsp;should&nbsp;raise&nbsp;an&nbsp;exception<br>
+print&nbsp;parser.parse_string("(ababacababa)")&nbsp;#&nbsp;should&nbsp;raise&nbsp;an&nbsp;exception<br>
+&nbsp;<br>
+The&nbsp;<a href="#Parser">Parser</a>&nbsp;class,&nbsp;and&nbsp;hence&nbsp;all&nbsp;of&nbsp;its&nbsp;subclasses,&nbsp;overload&nbsp;a&nbsp;few&nbsp;operators<br>
+that&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;make&nbsp;writing&nbsp;parsers&nbsp;easier.&nbsp;Here's&nbsp;what&nbsp;each&nbsp;operator<br>
+ends&nbsp;up&nbsp;translating&nbsp;to:<br>
+&nbsp;<br>
+x&nbsp;+&nbsp;y&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Then">Then</a>(x,&nbsp;y).<br>
+x&nbsp;|&nbsp;y&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#First">First</a>(x,&nbsp;y).<br>
+-x&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Optional">Optional</a>(x).<br>
++x&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#OneOrMore">OneOrMore</a>(x).<br>
+x&nbsp;-&nbsp;y&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Except">Except</a>(x,&nbsp;y).<br>
+x[min:max]&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Repeat">Repeat</a>(x,&nbsp;min,&nbsp;max).<br>
+x[some_int]&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Repeat">Repeat</a>(x,&nbsp;some_int,&nbsp;some_int).<br>
+x[...]&nbsp;(three&nbsp;literal&nbsp;dots)&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#ZeroOrMore">ZeroOrMore</a>(x).<br>
+x[function]&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Translate">Translate</a>(x,&nbsp;function).<br>
+"x"&nbsp;op&nbsp;some_parser&nbsp;or&nbsp;some_parser&nbsp;op&nbsp;"x"&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Literal">Literal</a>("x")&nbsp;op&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;some_parser&nbsp;or&nbsp;some_parser&nbsp;op&nbsp;<a href="#Literal">Literal</a>("x"),&nbsp;respectively.<br>
+&nbsp;<br>
+A&nbsp;simple&nbsp;expression&nbsp;evaluator&nbsp;written&nbsp;using&nbsp;Parcon:<br>
+&nbsp;<br>
+from&nbsp;parcon&nbsp;import&nbsp;*<br>
+from&nbsp;decimal&nbsp;import&nbsp;Decimal<br>
+import&nbsp;operator<br>
+expr&nbsp;=&nbsp;<a href="#Forward">Forward</a>()<br>
+number&nbsp;=&nbsp;(+<a href="#Digit">Digit</a>()&nbsp;+&nbsp;-(<a href="#SignificantLiteral">SignificantLiteral</a>(".")&nbsp;+&nbsp;+<a href="#Digit">Digit</a>()))[flatten]["".join][Decimal]<br>
+term&nbsp;=&nbsp;number&nbsp;|&nbsp;"("&nbsp;+&nbsp;expr&nbsp;+&nbsp;")"<br>
+term&nbsp;=&nbsp;<a href="#InfixExpr">InfixExpr</a>(term,&nbsp;[("*",&nbsp;operator.mul),&nbsp;("/",&nbsp;operator.truediv)])<br>
+term&nbsp;=&nbsp;<a href="#InfixExpr">InfixExpr</a>(term,&nbsp;[("+",&nbsp;operator.add),&nbsp;("-",&nbsp;operator.sub)])<br>
+expr&nbsp;&lt;&lt;&nbsp;term<br>
+&nbsp;<br>
+Some&nbsp;example&nbsp;expressions&nbsp;that&nbsp;can&nbsp;now&nbsp;be&nbsp;evaluated&nbsp;using&nbsp;the&nbsp;above<br>
+simple&nbsp;expression&nbsp;evaluator:<br>
+&nbsp;<br>
+print&nbsp;expr.parse_string("1+2")&nbsp;#&nbsp;prints&nbsp;3<br>
+print&nbsp;expr.parse_string("1+2+3")&nbsp;#&nbsp;prints&nbsp;6<br>
+print&nbsp;expr.parse_string("1+2+3+4")&nbsp;#&nbsp;prints&nbsp;10<br>
+print&nbsp;expr.parse_string("3*4")&nbsp;#&nbsp;prints&nbsp;12<br>
+print&nbsp;expr.parse_string("5+3*4")&nbsp;#&nbsp;prints&nbsp;17<br>
+print&nbsp;expr.parse_string("(5+3)*4")&nbsp;#&nbsp;prints&nbsp;32<br>
+print&nbsp;expr.parse_string("10/4")&nbsp;#&nbsp;prints&nbsp;2.5<br>
+&nbsp;<br>
+Another&nbsp;example&nbsp;use&nbsp;of&nbsp;Parcon,&nbsp;this&nbsp;one&nbsp;being&nbsp;a&nbsp;JSON&nbsp;parser&nbsp;(essentially<br>
+a&nbsp;reimplementation&nbsp;of&nbsp;Python's&nbsp;json.dumps,&nbsp;without&nbsp;all&nbsp;of&nbsp;the&nbsp;fancy<br>
+arguments&nbsp;that&nbsp;it&nbsp;supports,&nbsp;and&nbsp;currently&nbsp;without&nbsp;support&nbsp;for&nbsp;backslash<br>
+escapes&nbsp;in&nbsp;JSON&nbsp;string&nbsp;literals):<br>
+&nbsp;<br>
+from&nbsp;parcon&nbsp;import&nbsp;*<br>
+import&nbsp;operator<br>
+cat_dicts&nbsp;=&nbsp;lambda&nbsp;x,&nbsp;y:&nbsp;dict(x.items()&nbsp;+&nbsp;y.items())<br>
+json&nbsp;=&nbsp;<a href="#Forward">Forward</a>()<br>
+number&nbsp;=&nbsp;(+<a href="#Digit">Digit</a>()&nbsp;+&nbsp;-(<a href="#SignificantLiteral">SignificantLiteral</a>(".")&nbsp;+&nbsp;+<a href="#Digit">Digit</a>()))[flatten]["".join][float]<br>
+boolean&nbsp;=&nbsp;<a href="#Literal">Literal</a>("true")[lambda&nbsp;x:&nbsp;True]&nbsp;|&nbsp;<a href="#Literal">Literal</a>("false")[lambda&nbsp;x:&nbsp;False]<br>
+string&nbsp;=&nbsp;('"'&nbsp;+&nbsp;<a href="#Exact">Exact</a>(<a href="#ZeroOrMore">ZeroOrMore</a>(<a href="#AnyChar">AnyChar</a>()&nbsp;-&nbsp;<a href="#CharIn">CharIn</a>('\"')))&nbsp;+&nbsp;&nbsp;'"')["".join]<br>
+null&nbsp;=&nbsp;<a href="#Literal">Literal</a>("null")[lambda&nbsp;x:&nbsp;None]<br>
+pair&nbsp;=&nbsp;(string&nbsp;+&nbsp;":"&nbsp;+&nbsp;json[lambda&nbsp;x:&nbsp;(x,)])[lambda&nbsp;x:&nbsp;{x[0]:&nbsp;x[1]}]<br>
+json_object&nbsp;=&nbsp;("{"&nbsp;+&nbsp;<a href="#Optional">Optional</a>(<a href="#InfixExpr">InfixExpr</a>(pair,&nbsp;[(",",&nbsp;cat_dicts)]),&nbsp;{})&nbsp;+&nbsp;"}")<br>
+json_list&nbsp;=&nbsp;("["&nbsp;+&nbsp;<a href="#Optional">Optional</a>(<a href="#InfixExpr">InfixExpr</a>(json[lambda&nbsp;x:&nbsp;[x]],&nbsp;[(",",&nbsp;operator.add)]),&nbsp;[])&nbsp;+&nbsp;"]")<br>
+json&nbsp;&lt;&lt;&nbsp;(json_object&nbsp;|&nbsp;json_list&nbsp;|&nbsp;string&nbsp;|&nbsp;boolean&nbsp;|&nbsp;null&nbsp;|&nbsp;number)<br>
+&nbsp;<br>
+Thereafter,&nbsp;json.parse_string(text)&nbsp;can&nbsp;be&nbsp;used&nbsp;as&nbsp;a&nbsp;replacement&nbsp;for<br>
+Python's&nbsp;json.loads.<br>
+&nbsp;<br>
+An&nbsp;interesting&nbsp;fact:&nbsp;the&nbsp;set&nbsp;of&nbsp;all&nbsp;Parcon&nbsp;parsers&nbsp;form&nbsp;a&nbsp;monoid&nbsp;with&nbsp;the<br>
+binary&nbsp;operation&nbsp;being&nbsp;the&nbsp;<a href="#Then">Then</a>&nbsp;parser&nbsp;(or&nbsp;the&nbsp;+&nbsp;operator,&nbsp;since&nbsp;it&nbsp;produces&nbsp;a<br>
+<a href="#Then">Then</a>&nbsp;parser)&nbsp;and&nbsp;the&nbsp;identity&nbsp;element&nbsp;being&nbsp;<a href="#Return">Return</a>(None).</tt></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Package Contents</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="parcon.pargen.html"><strong>pargen</strong>&nbsp;(package)</a><br>
+</td><td width="25%" valign=top><a href="parcon.static.html">static</a><br>
+</td><td width="25%" valign=top></td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="__builtin__.html#object">__builtin__.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="parcon.html#Expectation">Expectation</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="parcon.html#EAnyChar">EAnyChar</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#EAnyCharIn">EAnyCharIn</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#EStringLiteral">EStringLiteral</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#EUnsatisfiable">EUnsatisfiable</a>
+</font></dt></dl>
+</dd>
+<dt><font face="helvetica, arial"><a href="parcon.html#Parser">Parser</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="parcon.html#AnyCase">AnyCase</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#AnyChar">AnyChar</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Bind">Bind</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#CharIn">CharIn</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="parcon.html#Alpha">Alpha</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Alphanum">Alphanum</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Digit">Digit</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Lower">Lower</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Upper">Upper</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Whitespace">Whitespace</a>
+</font></dt></dl>
+</dd>
+<dt><font face="helvetica, arial"><a href="parcon.html#Chars">Chars</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Discard">Discard</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Exact">Exact</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Except">Except</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#First">First</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Forward">Forward</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#InfixExpr">InfixExpr</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Invalid">Invalid</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Keyword">Keyword</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Literal">Literal</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="parcon.html#SignificantLiteral">SignificantLiteral</a>
+</font></dt></dl>
+</dd>
+<dt><font face="helvetica, arial"><a href="parcon.html#Longest">Longest</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#OneOrMore">OneOrMore</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Optional">Optional</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Present">Present</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Repeat">Repeat</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Return">Return</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Then">Then</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Translate">Translate</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#Word">Word</a>
+</font></dt><dt><font face="helvetica, arial"><a href="parcon.html#ZeroOrMore">ZeroOrMore</a>
+</font></dt></dl>
+</dd>
+<dt><font face="helvetica, arial"><a href="parcon.html#Result">Result</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Alpha">class <strong>Alpha</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(upper_chars&nbsp;+&nbsp;lower_chars).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Alpha">Alpha</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Alpha-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Alpha-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alpha-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Alpha-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Alpha-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alpha-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alpha-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alpha-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alpha-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Alphanum">class <strong>Alphanum</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(upper_chars&nbsp;+&nbsp;lower_chars&nbsp;+&nbsp;digit_chars).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Alphanum">Alphanum</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Alphanum-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Alphanum-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alphanum-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Alphanum-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Alphanum-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alphanum-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alphanum-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Alphanum-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Alphanum-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="AnyCase">class <strong>AnyCase</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;case-insensitive&nbsp;version&nbsp;of&nbsp;<a href="#Literal">Literal</a>.&nbsp;Behaves&nbsp;exactly&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#Literal">Literal</a><br>
+does,&nbsp;but&nbsp;without&nbsp;regard&nbsp;to&nbsp;the&nbsp;case&nbsp;of&nbsp;the&nbsp;input.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#AnyCase">AnyCase</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="AnyCase-__init__"><strong>__init__</strong></a>(self, text)</dt></dl>
+
+<dl><dt><a name="AnyCase-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyCase-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="AnyCase-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="AnyCase-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyCase-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyCase-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyCase-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyCase-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="AnyChar">class <strong>AnyChar</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;any&nbsp;single&nbsp;character.&nbsp;It&nbsp;returns&nbsp;the&nbsp;character&nbsp;that<br>
+it&nbsp;matched.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#AnyChar">AnyChar</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="AnyChar-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyChar-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="AnyChar-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="AnyChar-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyChar-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyChar-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="AnyChar-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="AnyChar-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Bind">class <strong>Bind</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;functions&nbsp;similar&nbsp;to&nbsp;<a href="#Then">Then</a>,&nbsp;but&nbsp;that&nbsp;allows&nbsp;the&nbsp;second&nbsp;parser<br>
+to&nbsp;be&nbsp;determined&nbsp;from&nbsp;the&nbsp;value&nbsp;that&nbsp;the&nbsp;first&nbsp;parser&nbsp;produced.&nbsp;It's<br>
+constructed&nbsp;as&nbsp;<a href="#Bind">Bind</a>(parser,&nbsp;function).&nbsp;parser&nbsp;is&nbsp;the&nbsp;first&nbsp;parser&nbsp;to&nbsp;run.<br>
+function&nbsp;is&nbsp;a&nbsp;function&nbsp;that&nbsp;accepts&nbsp;one&nbsp;argument,&nbsp;the&nbsp;value&nbsp;that&nbsp;the&nbsp;first<br>
+parser&nbsp;produced.&nbsp;It&nbsp;will&nbsp;be&nbsp;called&nbsp;whenever&nbsp;the&nbsp;first&nbsp;parser&nbsp;succeeds;&nbsp;the<br>
+value&nbsp;that&nbsp;the&nbsp;first&nbsp;parser&nbsp;produced&nbsp;will&nbsp;be&nbsp;passed&nbsp;in,&nbsp;and&nbsp;the&nbsp;function<br>
+should&nbsp;return&nbsp;a&nbsp;second&nbsp;parser.&nbsp;This&nbsp;parser&nbsp;will&nbsp;then&nbsp;be&nbsp;applied&nbsp;immediately<br>
+after&nbsp;where&nbsp;the&nbsp;first&nbsp;parser&nbsp;finished&nbsp;parsing&nbsp;from&nbsp;(similar&nbsp;to&nbsp;how&nbsp;<a href="#Then">Then</a><br>
+starts&nbsp;its&nbsp;second&nbsp;parser&nbsp;parsing&nbsp;after&nbsp;where&nbsp;its&nbsp;first&nbsp;parser&nbsp;finished).<br>
+<a href="#Bind">Bind</a>&nbsp;then&nbsp;returns&nbsp;the&nbsp;value&nbsp;that&nbsp;the&nbsp;second&nbsp;parser&nbsp;produced.<br>
+&nbsp;<br>
+Those&nbsp;of&nbsp;you&nbsp;familiar&nbsp;with&nbsp;functional&nbsp;programming&nbsp;will&nbsp;notice&nbsp;that&nbsp;this<br>
+parser&nbsp;implements&nbsp;a&nbsp;monadic&nbsp;bind,&nbsp;hence&nbsp;its&nbsp;name.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Bind">Bind</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Bind-__init__"><strong>__init__</strong></a>(self, parser, function)</dt></dl>
+
+<dl><dt><a name="Bind-parse"><strong>parse</strong></a>(self, text, position, whitespace)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Bind-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Bind-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Bind-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Bind-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Bind-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Bind-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="CharIn">class <strong>CharIn</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;a&nbsp;single&nbsp;character&nbsp;as&nbsp;long&nbsp;as&nbsp;it&nbsp;is&nbsp;in&nbsp;the&nbsp;specified<br>
+sequence&nbsp;(which&nbsp;can&nbsp;be&nbsp;a&nbsp;string&nbsp;or&nbsp;a&nbsp;list&nbsp;of&nbsp;one-character&nbsp;strings).&nbsp;It<br>
+returns&nbsp;the&nbsp;character&nbsp;matched.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="CharIn-__init__"><strong>__init__</strong></a>(self, chars)</dt></dl>
+
+<dl><dt><a name="CharIn-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="CharIn-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="CharIn-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="CharIn-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="CharIn-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="CharIn-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="CharIn-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="CharIn-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Chars">class <strong>Chars</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;parses&nbsp;a&nbsp;specific&nbsp;number&nbsp;of&nbsp;characters&nbsp;and&nbsp;returns&nbsp;them&nbsp;as<br>
+a&nbsp;string.&nbsp;<a href="#Chars">Chars</a>(5),&nbsp;for&nbsp;example,&nbsp;would&nbsp;parse&nbsp;exactly&nbsp;five&nbsp;characters&nbsp;in&nbsp;a<br>
+row,&nbsp;and&nbsp;return&nbsp;a&nbsp;string&nbsp;of&nbsp;length&nbsp;5.&nbsp;This&nbsp;would&nbsp;be&nbsp;essentially&nbsp;identical<br>
+to&nbsp;<a href="#AnyChar">AnyChar</a>()[5:5]["".join],&nbsp;except&nbsp;for&nbsp;two&nbsp;things:&nbsp;1,&nbsp;the&nbsp;whitespace&nbsp;parser<br>
+is&nbsp;not&nbsp;applied&nbsp;in&nbsp;between&nbsp;each&nbsp;character&nbsp;parsed&nbsp;by&nbsp;<a href="#Chars">Chars</a>&nbsp;(although&nbsp;it&nbsp;is<br>
+applied&nbsp;just&nbsp;before&nbsp;the&nbsp;first&nbsp;character),&nbsp;and&nbsp;2,&nbsp;<a href="#Chars">Chars</a>&nbsp;is&nbsp;much&nbsp;more<br>
+efficient&nbsp;than&nbsp;the&nbsp;aforementioned&nbsp;expression&nbsp;using&nbsp;<a href="#AnyChar">AnyChar</a>.<br>
+&nbsp;<br>
+This&nbsp;can&nbsp;be&nbsp;used&nbsp;in&nbsp;combination&nbsp;with&nbsp;<a href="#Bind">Bind</a>&nbsp;to&nbsp;create&nbsp;a&nbsp;parser&nbsp;that&nbsp;parses<br>
+a&nbsp;binary&nbsp;protocol&nbsp;where&nbsp;a&nbsp;fixed&nbsp;number&nbsp;of&nbsp;bytes&nbsp;are&nbsp;present&nbsp;that&nbsp;specify<br>
+the&nbsp;length&nbsp;of&nbsp;the&nbsp;rest&nbsp;of&nbsp;a&nbsp;particular&nbsp;packet,&nbsp;followed&nbsp;by&nbsp;the&nbsp;rest&nbsp;of&nbsp;the<br>
+packet&nbsp;itself.&nbsp;For&nbsp;example,&nbsp;imagine&nbsp;a&nbsp;protocol&nbsp;where&nbsp;packets&nbsp;look&nbsp;like&nbsp;this:<br>
+&nbsp;<br>
+length&nbsp;b1&nbsp;b2&nbsp;b3&nbsp;...&nbsp;blength<br>
+&nbsp;<br>
+a.k.a.&nbsp;a&nbsp;byte&nbsp;indicating&nbsp;the&nbsp;length&nbsp;of&nbsp;the&nbsp;data&nbsp;carried&nbsp;in&nbsp;that&nbsp;packet,<br>
+followed&nbsp;by&nbsp;the&nbsp;actual&nbsp;data&nbsp;of&nbsp;the&nbsp;packet.&nbsp;Such&nbsp;a&nbsp;packet&nbsp;could&nbsp;be&nbsp;parsed<br>
+into&nbsp;a&nbsp;string&nbsp;containing&nbsp;the&nbsp;data&nbsp;of&nbsp;a&nbsp;single&nbsp;packet&nbsp;with&nbsp;this:<br>
+&nbsp;<br>
+<a href="#Bind">Bind</a>(<a href="#AnyChar">AnyChar</a>(),&nbsp;lambda&nbsp;x:&nbsp;<a href="#Chars">Chars</a>(ord(x)))<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Chars">Chars</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Chars-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Chars-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Chars-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Chars-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Chars-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Chars-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<dl><dt><a name="Chars-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Digit">class <strong>Digit</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(digit_chars).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Digit">Digit</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Digit-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Digit-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Digit-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Digit-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Digit-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Digit-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Digit-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Digit-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Digit-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Discard">class <strong>Discard</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;if&nbsp;the&nbsp;parser&nbsp;it's&nbsp;constructed&nbsp;with&nbsp;matches.&nbsp;It<br>
+consumes&nbsp;the&nbsp;same&nbsp;amount&nbsp;of&nbsp;input&nbsp;that&nbsp;the&nbsp;specified&nbsp;parser&nbsp;does,&nbsp;but&nbsp;this<br>
+parser&nbsp;always&nbsp;returns&nbsp;None&nbsp;as&nbsp;the&nbsp;result.&nbsp;Since&nbsp;instances&nbsp;of&nbsp;<a href="#Then">Then</a>&nbsp;treat<br>
+None&nbsp;values&nbsp;specially,&nbsp;you'll&nbsp;likely&nbsp;use&nbsp;this&nbsp;parser&nbsp;in&nbsp;conjunction&nbsp;with<br>
+<a href="#Then">Then</a>&nbsp;in&nbsp;some&nbsp;grammars.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Discard">Discard</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Discard-__init__"><strong>__init__</strong></a>(self, parser)</dt></dl>
+
+<dl><dt><a name="Discard-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Discard-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Discard-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Discard-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Discard-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Discard-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Discard-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Discard-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="EAnyChar">class <strong>EAnyChar</strong></a>(<a href="parcon.html#Expectation">Expectation</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#EAnyChar">EAnyChar</a></dd>
+<dd><a href="parcon.html#Expectation">Expectation</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="EAnyChar-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="EAnyChar-format"><strong>format</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><a name="EAnyChar-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="EAnyCharIn">class <strong>EAnyCharIn</strong></a>(<a href="parcon.html#Expectation">Expectation</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#EAnyCharIn">EAnyCharIn</a></dd>
+<dd><a href="parcon.html#Expectation">Expectation</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="EAnyCharIn-__init__"><strong>__init__</strong></a>(self, chars)</dt></dl>
+
+<dl><dt><a name="EAnyCharIn-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="EAnyCharIn-format"><strong>format</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><a name="EAnyCharIn-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="EStringLiteral">class <strong>EStringLiteral</strong></a>(<a href="parcon.html#Expectation">Expectation</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#EStringLiteral">EStringLiteral</a></dd>
+<dd><a href="parcon.html#Expectation">Expectation</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="EStringLiteral-__init__"><strong>__init__</strong></a>(self, text)</dt></dl>
+
+<dl><dt><a name="EStringLiteral-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="EStringLiteral-format"><strong>format</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><a name="EStringLiteral-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="EUnsatisfiable">class <strong>EUnsatisfiable</strong></a>(<a href="parcon.html#Expectation">Expectation</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#EUnsatisfiable">EUnsatisfiable</a></dd>
+<dd><a href="parcon.html#Expectation">Expectation</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="EUnsatisfiable-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="EUnsatisfiable-format"><strong>format</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><a name="EUnsatisfiable-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Expectation">Expectation</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Exact">class <strong>Exact</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;returns&nbsp;whatever&nbsp;the&nbsp;specified&nbsp;parser&nbsp;returns,&nbsp;but&nbsp;<a href="#Invalid">Invalid</a>()<br>
+will&nbsp;be&nbsp;passed&nbsp;as&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;the&nbsp;specified&nbsp;parser&nbsp;when&nbsp;its<br>
+parse&nbsp;method&nbsp;is&nbsp;called.&nbsp;This&nbsp;allows&nbsp;for&nbsp;sections&nbsp;of&nbsp;the&nbsp;grammar&nbsp;to&nbsp;take<br>
+whitespace&nbsp;significantly,&nbsp;which&nbsp;is&nbsp;useful&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.<br>
+For&nbsp;example,&nbsp;the&nbsp;following&nbsp;parser,&nbsp;intended&nbsp;to&nbsp;parse&nbsp;string&nbsp;literals,<br>
+demonstrates&nbsp;the&nbsp;problem:<br>
+&nbsp;<br>
+stringLiteral&nbsp;=&nbsp;'"'&nbsp;+&nbsp;<a href="#ZeroOrMore">ZeroOrMore</a>(<a href="#AnyChar">AnyChar</a>()&nbsp;-&nbsp;'"')&nbsp;+&nbsp;'"'<br>
+result&nbsp;=&nbsp;stringLiteral.<a href="#Exact-parse_string">parse_string</a>('"Hello,&nbsp;great&nbsp;big&nbsp;round&nbsp;world"')<br>
+&nbsp;<br>
+After&nbsp;running&nbsp;that,&nbsp;result&nbsp;would&nbsp;have&nbsp;the&nbsp;value&nbsp;"Hello,greatbigroundworld".<br>
+This&nbsp;is&nbsp;because&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;(which&nbsp;defaults&nbsp;to&nbsp;<a href="#Whitespace">Whitespace</a>())<br>
+consumed&nbsp;all&nbsp;of&nbsp;the&nbsp;space&nbsp;in&nbsp;the&nbsp;string&nbsp;literal.&nbsp;This&nbsp;can,&nbsp;however,&nbsp;be<br>
+rewritten&nbsp;using&nbsp;<a href="#Exact">Exact</a>&nbsp;to&nbsp;mitigate&nbsp;this&nbsp;problem:<br>
+&nbsp;<br>
+stringLiteral&nbsp;=&nbsp;'"'&nbsp;+&nbsp;<a href="#Exact">Exact</a>(<a href="#ZeroOrMore">ZeroOrMore</a>(<a href="#AnyChar">AnyChar</a>()&nbsp;-&nbsp;'"'))&nbsp;+&nbsp;'"'<br>
+result&nbsp;=&nbsp;stringLiteral.<a href="#Exact-parse_string">parse_string</a>('"Hello,&nbsp;great&nbsp;big&nbsp;round&nbsp;world"')<br>
+&nbsp;<br>
+This&nbsp;parser&nbsp;produces&nbsp;the&nbsp;correct&nbsp;result,&nbsp;'Hello,&nbsp;great&nbsp;big&nbsp;round&nbsp;world'.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Exact">Exact</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Exact-__init__"><strong>__init__</strong></a>(self, parser, space_parser<font color="#909090">=Invalid()</font>)</dt></dl>
+
+<dl><dt><a name="Exact-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Exact-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Exact-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Exact-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Exact-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Exact-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Exact-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Exact-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Except">class <strong>Except</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;and&nbsp;returns&nbsp;whatever&nbsp;the&nbsp;specified&nbsp;parser&nbsp;matches<br>
+and&nbsp;returns,&nbsp;as&nbsp;long&nbsp;as&nbsp;the&nbsp;specified&nbsp;avoidParser&nbsp;does&nbsp;not&nbsp;also&nbsp;match&nbsp;at<br>
+the&nbsp;same&nbsp;location.&nbsp;For&nbsp;example,&nbsp;<a href="#Except">Except</a>(<a href="#AnyChar">AnyChar</a>(),&nbsp;<a href="#Literal">Literal</a>("*/"))&nbsp;would<br>
+match&nbsp;any&nbsp;character&nbsp;as&nbsp;long&nbsp;as&nbsp;that&nbsp;character&nbsp;was&nbsp;not&nbsp;a&nbsp;*&nbsp;followed<br>
+immediately&nbsp;by&nbsp;a&nbsp;/&nbsp;character.&nbsp;This&nbsp;would&nbsp;most&nbsp;likely&nbsp;be&nbsp;useful&nbsp;in,&nbsp;for<br>
+example,&nbsp;a&nbsp;parser&nbsp;designed&nbsp;to&nbsp;parse&nbsp;C-style&nbsp;comments.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Except">Except</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Except-__init__"><strong>__init__</strong></a>(self, parser, avoidParser)</dt></dl>
+
+<dl><dt><a name="Except-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Except-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Except-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Except-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Except-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Except-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Except-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Except-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Expectation">class <strong>Expectation</strong></a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr><td bgcolor="#ffc8d8"><tt>&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Expectation-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Expectation-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Expectation-format"><strong>format</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="First">class <strong>First</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;tries&nbsp;all&nbsp;of&nbsp;its&nbsp;specified&nbsp;parsers&nbsp;in&nbsp;order.&nbsp;As&nbsp;soon&nbsp;as&nbsp;one<br>
+matches,&nbsp;its&nbsp;result&nbsp;is&nbsp;returned.&nbsp;If&nbsp;none&nbsp;of&nbsp;them&nbsp;match,&nbsp;this&nbsp;parser&nbsp;fails.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#First">First</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="First-__init__"><strong>__init__</strong></a>(self, *parsers)</dt></dl>
+
+<dl><dt><a name="First-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="First-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="First-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="First-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="First-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="First-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="First-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="First-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Forward">class <strong>Forward</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;allows&nbsp;forward-definition.&nbsp;In&nbsp;other&nbsp;words,&nbsp;you&nbsp;can&nbsp;create&nbsp;a<br>
+<a href="#Forward">Forward</a>&nbsp;and&nbsp;use&nbsp;it&nbsp;in&nbsp;a&nbsp;parser&nbsp;grammar,&nbsp;and&nbsp;then&nbsp;set&nbsp;the&nbsp;parser&nbsp;that&nbsp;it<br>
+actually&nbsp;represents&nbsp;later&nbsp;on.&nbsp;This&nbsp;is&nbsp;useful&nbsp;for&nbsp;defining&nbsp;grammars&nbsp;that<br>
+need&nbsp;to&nbsp;include&nbsp;themselves&nbsp;(for&nbsp;example,&nbsp;parentheses&nbsp;in&nbsp;a&nbsp;numerical<br>
+expression&nbsp;contain&nbsp;yet&nbsp;another&nbsp;numberical&nbsp;expression,&nbsp;which&nbsp;is&nbsp;an&nbsp;example<br>
+of&nbsp;where&nbsp;this&nbsp;would&nbsp;be&nbsp;used).<br>
+&nbsp;<br>
+You&nbsp;create&nbsp;a&nbsp;forward&nbsp;with&nbsp;something&nbsp;like&nbsp;this:<br>
+&nbsp;<br>
+forward&nbsp;=&nbsp;<a href="#Forward">Forward</a>()<br>
+&nbsp;<br>
+You&nbsp;can&nbsp;then&nbsp;use&nbsp;it&nbsp;in&nbsp;your&nbsp;grammar&nbsp;as&nbsp;you&nbsp;would&nbsp;a&nbsp;normal&nbsp;parser.&nbsp;When<br>
+you're&nbsp;ready&nbsp;to&nbsp;set&nbsp;the&nbsp;parser&nbsp;that&nbsp;the&nbsp;<a href="#Forward">Forward</a>&nbsp;should&nbsp;actually&nbsp;represent,<br>
+you&nbsp;can&nbsp;do&nbsp;it&nbsp;either&nbsp;with:<br>
+&nbsp;<br>
+forward&nbsp;&lt;&lt;&nbsp;parser<br>
+&nbsp;<br>
+or&nbsp;with:<br>
+&nbsp;<br>
+forward.<a href="#Forward-set">set</a>(parser)<br>
+&nbsp;<br>
+Both&nbsp;of&nbsp;them&nbsp;cause&nbsp;the&nbsp;forward&nbsp;to&nbsp;act&nbsp;as&nbsp;if&nbsp;it&nbsp;was&nbsp;really&nbsp;just&nbsp;the<br>
+specified&nbsp;parser.<br>
+&nbsp;<br>
+The&nbsp;parser&nbsp;must&nbsp;be&nbsp;set&nbsp;before&nbsp;parse&nbsp;is&nbsp;called&nbsp;on&nbsp;anything&nbsp;using&nbsp;the<br>
+<a href="#Forward">Forward</a>&nbsp;instance&nbsp;for&nbsp;the&nbsp;first&nbsp;time.&nbsp;This&nbsp;normally&nbsp;shouldn't&nbsp;be&nbsp;a&nbsp;problem.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Forward">Forward</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Forward-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Forward-__lshift__"><strong>__lshift__</strong></a> = <a href="#Forward-set">set</a>(self, parser)</dt></dl>
+
+<dl><dt><a name="Forward-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Forward-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<dl><dt><a name="Forward-set"><strong>set</strong></a>(self, parser)</dt><dd><tt>Sets&nbsp;the&nbsp;parser&nbsp;that&nbsp;this&nbsp;<a href="#Forward">Forward</a>&nbsp;should&nbsp;use.&nbsp;After&nbsp;you&nbsp;call&nbsp;this<br>
+method,&nbsp;this&nbsp;<a href="#Forward">Forward</a>&nbsp;acts&nbsp;just&nbsp;like&nbsp;it&nbsp;were&nbsp;really&nbsp;the&nbsp;specified&nbsp;parser.</tt></dd></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Forward-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Forward-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Forward-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Forward-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Forward-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Forward-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="InfixExpr">class <strong>InfixExpr</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that's&nbsp;created&nbsp;with&nbsp;a&nbsp;component&nbsp;parser&nbsp;and&nbsp;a&nbsp;series&nbsp;of&nbsp;operator<br>
+parsers,&nbsp;which&nbsp;can&nbsp;be&nbsp;literal&nbsp;strings&nbsp;(and&nbsp;will&nbsp;be&nbsp;translated&nbsp;to&nbsp;<a href="#Literal">Literal</a><br>
+instances),&nbsp;and&nbsp;two-argument&nbsp;functions&nbsp;for&nbsp;each&nbsp;of&nbsp;these&nbsp;operator&nbsp;parsers.<br>
+It&nbsp;parses&nbsp;expressions&nbsp;of&nbsp;the&nbsp;form&nbsp;"component"&nbsp;or&nbsp;"component&nbsp;op&nbsp;component"<br>
+or&nbsp;"component&nbsp;op&nbsp;component&nbsp;op&nbsp;component"&nbsp;etc.&nbsp;For&nbsp;each&nbsp;op&nbsp;it&nbsp;encounters&nbsp;in<br>
+the&nbsp;result&nbsp;it&nbsp;parses,&nbsp;it&nbsp;calls&nbsp;the&nbsp;two-arg&nbsp;function&nbsp;supplied&nbsp;with&nbsp;that<br>
+operator,&nbsp;passing&nbsp;in&nbsp;the&nbsp;value&nbsp;of&nbsp;the&nbsp;parser&nbsp;on&nbsp;its&nbsp;left&nbsp;and&nbsp;the&nbsp;value&nbsp;of<br>
+the&nbsp;parser&nbsp;on&nbsp;its&nbsp;right.&nbsp;It&nbsp;then&nbsp;stores&nbsp;the&nbsp;result,&nbsp;and&nbsp;moves&nbsp;onto&nbsp;the&nbsp;next<br>
+operator,&nbsp;this&nbsp;time&nbsp;using&nbsp;the&nbsp;aforementioned&nbsp;result&nbsp;as&nbsp;the&nbsp;left-hand&nbsp;value<br>
+for&nbsp;the&nbsp;next&nbsp;operator.<br>
+&nbsp;<br>
+This&nbsp;reduction&nbsp;of&nbsp;values&nbsp;proceeds&nbsp;from&nbsp;left&nbsp;to&nbsp;right,&nbsp;which&nbsp;makes&nbsp;<a href="#InfixExpr">InfixExpr</a><br>
+implement&nbsp;a&nbsp;left-associative&nbsp;infix&nbsp;grammar.&nbsp;In&nbsp;the&nbsp;future,&nbsp;there&nbsp;will&nbsp;be&nbsp;a<br>
+way&nbsp;to&nbsp;specify&nbsp;that&nbsp;certain&nbsp;operators&nbsp;should&nbsp;be&nbsp;right-associative&nbsp;instead.<br>
+&nbsp;<br>
+If&nbsp;only&nbsp;a&nbsp;single&nbsp;component&nbsp;is&nbsp;present,&nbsp;<a href="#InfixExpr">InfixExpr</a>&nbsp;will&nbsp;match&nbsp;that&nbsp;and&nbsp;return<br>
+whatever&nbsp;the&nbsp;component&nbsp;resulted&nbsp;in.&nbsp;If&nbsp;not&nbsp;even&nbsp;a&nbsp;single&nbsp;component&nbsp;is<br>
+present,&nbsp;<a href="#InfixExpr">InfixExpr</a>&nbsp;will&nbsp;fail&nbsp;to&nbsp;match.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#InfixExpr">InfixExpr</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="InfixExpr-__init__"><strong>__init__</strong></a>(self, component_parser, operators)</dt><dd><tt>Creates&nbsp;an&nbsp;<a href="#InfixExpr">InfixExpr</a>.&nbsp;component_parser&nbsp;is&nbsp;the&nbsp;parser&nbsp;that&nbsp;will&nbsp;parse<br>
+the&nbsp;individual&nbsp;components&nbsp;of&nbsp;the&nbsp;expression.&nbsp;operators&nbsp;is&nbsp;a&nbsp;list&nbsp;of<br>
+2-tuples;&nbsp;each&nbsp;tuple&nbsp;represents&nbsp;an&nbsp;operator,&nbsp;with&nbsp;the&nbsp;first&nbsp;item&nbsp;in&nbsp;the<br>
+tuple&nbsp;being&nbsp;a&nbsp;parser&nbsp;that&nbsp;parses&nbsp;the&nbsp;operator&nbsp;itself&nbsp;(or&nbsp;a&nbsp;literal<br>
+string,&nbsp;such&nbsp;as&nbsp;"+",&nbsp;"-",&nbsp;etc,&nbsp;which&nbsp;will&nbsp;be&nbsp;wrapped&nbsp;with&nbsp;a&nbsp;<a href="#Literal">Literal</a><br>
+instance)&nbsp;and&nbsp;the&nbsp;second&nbsp;item&nbsp;being&nbsp;a&nbsp;two-arg&nbsp;function&nbsp;that&nbsp;will&nbsp;be<br>
+used&nbsp;to&nbsp;reduce&nbsp;components&nbsp;on&nbsp;either&nbsp;side&nbsp;of&nbsp;the&nbsp;operator&nbsp;to&nbsp;get&nbsp;a<br>
+result.</tt></dd></dl>
+
+<dl><dt><a name="InfixExpr-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="InfixExpr-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="InfixExpr-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="InfixExpr-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="InfixExpr-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Invalid">class <strong>Invalid</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;never&nbsp;matches&nbsp;any&nbsp;input&nbsp;and&nbsp;always&nbsp;fails.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Invalid">Invalid</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Invalid-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Invalid-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Invalid-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Invalid-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Invalid-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Invalid-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Invalid-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Invalid-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Keyword">class <strong>Keyword</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;the&nbsp;specified&nbsp;parser&nbsp;as&nbsp;long&nbsp;as&nbsp;it&nbsp;is&nbsp;followed<br>
+immediately&nbsp;by&nbsp;the&nbsp;specified&nbsp;terminator&nbsp;parser,&nbsp;or&nbsp;by&nbsp;whitespace<br>
+(according&nbsp;to&nbsp;the&nbsp;current&nbsp;whitespace&nbsp;parser)&nbsp;if&nbsp;a&nbsp;terminator&nbsp;parser&nbsp;is&nbsp;not<br>
+specified.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Keyword">Keyword</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Keyword-__init__"><strong>__init__</strong></a>(self, parser, terminator<font color="#909090">=None</font>)</dt></dl>
+
+<dl><dt><a name="Keyword-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Keyword-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Keyword-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Keyword-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Keyword-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Keyword-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Keyword-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Keyword-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Literal">class <strong>Literal</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;the&nbsp;specified&nbsp;literal&nbsp;piece&nbsp;of&nbsp;text.&nbsp;It&nbsp;succeeds<br>
+only&nbsp;if&nbsp;that&nbsp;piece&nbsp;of&nbsp;text&nbsp;is&nbsp;found,&nbsp;and&nbsp;it&nbsp;returns&nbsp;None&nbsp;when&nbsp;it&nbsp;succeeds.<br>
+If&nbsp;you&nbsp;need&nbsp;the&nbsp;return&nbsp;value&nbsp;to&nbsp;be&nbsp;the&nbsp;literal&nbsp;piece&nbsp;of&nbsp;text,&nbsp;you&nbsp;should<br>
+probably&nbsp;use&nbsp;<a href="#SignificantLiteral">SignificantLiteral</a>&nbsp;instead.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Literal">Literal</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Literal-__init__"><strong>__init__</strong></a>(self, text)</dt></dl>
+
+<dl><dt><a name="Literal-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Literal-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Literal-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Literal-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Literal-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Literal-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Literal-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Literal-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Longest">class <strong>Longest</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;tries&nbsp;all&nbsp;of&nbsp;its&nbsp;specified&nbsp;parsers.&nbsp;The&nbsp;longest&nbsp;one&nbsp;that<br>
+succeeds&nbsp;is&nbsp;chosen,&nbsp;and&nbsp;its&nbsp;result&nbsp;is&nbsp;returned.&nbsp;If&nbsp;none&nbsp;of&nbsp;the&nbsp;parsers<br>
+succeed,&nbsp;<a href="#Longest">Longest</a>&nbsp;fails.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Longest">Longest</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Longest-__init__"><strong>__init__</strong></a>(self, *parsers)</dt></dl>
+
+<dl><dt><a name="Longest-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Longest-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Longest-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Longest-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Longest-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Longest-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Longest-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Longest-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Lower">class <strong>Lower</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(lower_chars).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Lower">Lower</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Lower-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Lower-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Lower-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Lower-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Lower-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Lower-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Lower-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Lower-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Lower-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="OneOrMore">class <strong>OneOrMore</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#ZeroOrMore">ZeroOrMore</a>,&nbsp;but&nbsp;requires&nbsp;that&nbsp;the&nbsp;specified&nbsp;parser&nbsp;match&nbsp;at&nbsp;least<br>
+once.&nbsp;If&nbsp;it&nbsp;does&nbsp;not,&nbsp;this&nbsp;parser&nbsp;will&nbsp;fail.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#OneOrMore">OneOrMore</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="OneOrMore-__init__"><strong>__init__</strong></a>(self, parser)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="OneOrMore-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="OneOrMore-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="OneOrMore-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="OneOrMore-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Optional">class <strong>Optional</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;returns&nbsp;whatever&nbsp;its&nbsp;underlying&nbsp;parser&nbsp;returns,&nbsp;except&nbsp;that<br>
+if&nbsp;the&nbsp;specified&nbsp;parser&nbsp;fails,&nbsp;this&nbsp;parser&nbsp;succeeds&nbsp;and&nbsp;returns&nbsp;the&nbsp;default<br>
+result&nbsp;specified&nbsp;to&nbsp;it&nbsp;(which,&nbsp;itself,&nbsp;defaults&nbsp;to&nbsp;None).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Optional">Optional</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Optional-__init__"><strong>__init__</strong></a>(self, parser, default<font color="#909090">=None</font>)</dt></dl>
+
+<dl><dt><a name="Optional-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Optional-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Optional-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Optional-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Optional-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Optional-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Optional-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Optional-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Parser">class <strong>Parser</strong></a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser.&nbsp;This&nbsp;class&nbsp;cannot&nbsp;itself&nbsp;be&nbsp;instantiated;&nbsp;you&nbsp;can&nbsp;only&nbsp;use&nbsp;one&nbsp;of<br>
+its&nbsp;subclasses.&nbsp;Most&nbsp;classes&nbsp;in&nbsp;this&nbsp;module&nbsp;are&nbsp;<a href="#Parser">Parser</a>&nbsp;subclasses.<br>
+&nbsp;<br>
+The&nbsp;method&nbsp;you'll&nbsp;typically&nbsp;use&nbsp;on&nbsp;<a href="#Parser">Parser</a>&nbsp;objects&nbsp;is&nbsp;parse_string.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Parser-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Parser-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Parser-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Parser-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Parser-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Parser-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<dl><dt><a name="Parser-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Present">class <strong>Present</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;lookahead&nbsp;parser;&nbsp;it&nbsp;matches&nbsp;as&nbsp;long&nbsp;as&nbsp;the&nbsp;parser&nbsp;it's&nbsp;constructed&nbsp;with<br>
+matches&nbsp;at&nbsp;the&nbsp;specified&nbsp;position,&nbsp;but&nbsp;it&nbsp;doesn't&nbsp;actually&nbsp;consume&nbsp;any<br>
+input,&nbsp;and&nbsp;its&nbsp;result&nbsp;is&nbsp;None.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Present">Present</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Present-__init__"><strong>__init__</strong></a>(self, parser)</dt></dl>
+
+<dl><dt><a name="Present-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Present-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Present-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Present-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Present-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Present-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Present-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Repeat">class <strong>Repeat</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;its&nbsp;underlying&nbsp;parser&nbsp;a&nbsp;certain&nbsp;number&nbsp;of&nbsp;times.&nbsp;If<br>
+the&nbsp;underlying&nbsp;parser&nbsp;did&nbsp;not&nbsp;match&nbsp;at&nbsp;least&nbsp;min&nbsp;times,&nbsp;this&nbsp;parser&nbsp;fails.<br>
+This&nbsp;parser&nbsp;stops&nbsp;parsing&nbsp;after&nbsp;max&nbsp;times,&nbsp;even&nbsp;if&nbsp;the&nbsp;underlying&nbsp;parser<br>
+would&nbsp;still&nbsp;match.&nbsp;The&nbsp;results&nbsp;of&nbsp;all&nbsp;of&nbsp;the&nbsp;parses&nbsp;are&nbsp;returned&nbsp;as&nbsp;a&nbsp;list.<br>
+&nbsp;<br>
+If&nbsp;max&nbsp;is&nbsp;None,&nbsp;no&nbsp;maximum&nbsp;limit&nbsp;will&nbsp;be&nbsp;enforced.&nbsp;The&nbsp;same&nbsp;goes&nbsp;for&nbsp;min.<br>
+&nbsp;<br>
+<a href="#Repeat">Repeat</a>(parser,&nbsp;0,&nbsp;None)&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#ZeroOrMore">ZeroOrMore</a>(parser),&nbsp;and<br>
+<a href="#Repeat">Repeat</a>(parser,&nbsp;1,&nbsp;None)&nbsp;is&nbsp;the&nbsp;same&nbsp;as&nbsp;<a href="#OneOrMore">OneOrMore</a>(parser).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Repeat">Repeat</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Repeat-__init__"><strong>__init__</strong></a>(self, parser, min, max)</dt></dl>
+
+<dl><dt><a name="Repeat-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Repeat-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Repeat-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Repeat-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Repeat-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Repeat-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Repeat-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Repeat-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Result">class <strong>Result</strong></a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;result&nbsp;from&nbsp;a&nbsp;parser.&nbsp;Parcon&nbsp;users&nbsp;usually&nbsp;won't&nbsp;have&nbsp;any&nbsp;use&nbsp;for<br>
+instances&nbsp;of&nbsp;this&nbsp;class&nbsp;since&nbsp;it's&nbsp;primarily&nbsp;used&nbsp;internally&nbsp;by&nbsp;Parcon,&nbsp;but<br>
+if&nbsp;you're&nbsp;implementing&nbsp;your&nbsp;own&nbsp;<a href="#Parser">Parser</a>&nbsp;subclass,&nbsp;then&nbsp;you'll&nbsp;likely&nbsp;find<br>
+this&nbsp;class&nbsp;useful&nbsp;since&nbsp;you'll&nbsp;be&nbsp;returning&nbsp;instances&nbsp;of&nbsp;it.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Result-__init__"><strong>__init__</strong></a>(self, end, value, expected)</dt></dl>
+
+<dl><dt><a name="Result-__nonzero__"><strong>__nonzero__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Result-__repr__"><strong>__repr__</strong></a> = <a href="#Result-__str__">__str__</a>(self)</dt></dl>
+
+<dl><dt><a name="Result-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Return">class <strong>Return</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;always&nbsp;succeeds,&nbsp;consumes&nbsp;no&nbsp;input,&nbsp;and&nbsp;always&nbsp;returns&nbsp;a<br>
+value&nbsp;specified&nbsp;when&nbsp;the&nbsp;<a href="#Return">Return</a>&nbsp;instance&nbsp;is&nbsp;constructed.<br>
+&nbsp;<br>
+Those&nbsp;of&nbsp;you&nbsp;familiar&nbsp;with&nbsp;functional&nbsp;programming&nbsp;will&nbsp;notice&nbsp;that&nbsp;this<br>
+parser&nbsp;implements&nbsp;a&nbsp;monadic&nbsp;return,&nbsp;hence&nbsp;its&nbsp;name.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Return">Return</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Return-__init__"><strong>__init__</strong></a>(self, value)</dt></dl>
+
+<dl><dt><a name="Return-parse"><strong>parse</strong></a>(self, text, position, whitespace)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Return-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Return-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Return-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Return-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Return-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Return-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="SignificantLiteral">class <strong>SignificantLiteral</strong></a>(<a href="parcon.html#Literal">Literal</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;the&nbsp;specified&nbsp;literal&nbsp;piece&nbsp;of&nbsp;text.&nbsp;Is&nbsp;succeeds<br>
+only&nbsp;if&nbsp;that&nbsp;piece&nbsp;of&nbsp;text&nbsp;is&nbsp;found.&nbsp;Unlike&nbsp;<a href="#Literal">Literal</a>,&nbsp;however,<br>
+<a href="#SignificantLiteral">SignificantLiteral</a>&nbsp;returns&nbsp;the&nbsp;literal&nbsp;string&nbsp;passed&nbsp;into&nbsp;it&nbsp;instead&nbsp;of<br>
+None.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#SignificantLiteral">SignificantLiteral</a></dd>
+<dd><a href="parcon.html#Literal">Literal</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="SignificantLiteral-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Literal">Literal</a>:<br>
+<dl><dt><a name="SignificantLiteral-__init__"><strong>__init__</strong></a>(self, text)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="SignificantLiteral-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="SignificantLiteral-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Then">class <strong>Then</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;the&nbsp;first&nbsp;specified&nbsp;parser&nbsp;followed&nbsp;by&nbsp;the&nbsp;second.<br>
+If&nbsp;neither&nbsp;of&nbsp;them&nbsp;matches,&nbsp;or&nbsp;if&nbsp;only&nbsp;one&nbsp;of&nbsp;them&nbsp;matches,&nbsp;this&nbsp;parser<br>
+fails.&nbsp;If&nbsp;both&nbsp;of&nbsp;them&nbsp;match,&nbsp;the&nbsp;result&nbsp;is&nbsp;as&nbsp;follows,&nbsp;assuming&nbsp;A&nbsp;and&nbsp;B<br>
+are&nbsp;the&nbsp;results&nbsp;of&nbsp;the&nbsp;first&nbsp;and&nbsp;the&nbsp;second&nbsp;parser,&nbsp;respectively:<br>
+&nbsp;<br>
+If&nbsp;A&nbsp;is&nbsp;None,&nbsp;the&nbsp;result&nbsp;is&nbsp;B.<br>
+If&nbsp;B&nbsp;is&nbsp;None,&nbsp;the&nbsp;result&nbsp;is&nbsp;A.<br>
+If&nbsp;A&nbsp;and&nbsp;B&nbsp;are&nbsp;tuples,&nbsp;the&nbsp;result&nbsp;is&nbsp;A&nbsp;+&nbsp;B.<br>
+If&nbsp;A&nbsp;is&nbsp;a&nbsp;tuple&nbsp;but&nbsp;B&nbsp;is&nbsp;not,&nbsp;the&nbsp;result&nbsp;is&nbsp;A&nbsp;+&nbsp;(B,).<br>
+If&nbsp;B&nbsp;is&nbsp;a&nbsp;tuple&nbsp;but&nbsp;A&nbsp;is&nbsp;not,&nbsp;the&nbsp;result&nbsp;is&nbsp;(A,)&nbsp;+&nbsp;B.<br>
+Otherwise,&nbsp;the&nbsp;result&nbsp;is&nbsp;(A,&nbsp;B).<br>
+&nbsp;<br>
+Named&nbsp;tuples&nbsp;(instances&nbsp;of&nbsp;classes&nbsp;created&nbsp;with&nbsp;collections.namedtuple)&nbsp;are<br>
+not&nbsp;treated&nbsp;as&nbsp;tuples&nbsp;in&nbsp;the&nbsp;above&nbsp;decision&nbsp;process.&nbsp;In&nbsp;fact,&nbsp;any&nbsp;subclass<br>
+of&nbsp;tuple&nbsp;is&nbsp;treated&nbsp;as&nbsp;if&nbsp;it&nbsp;were&nbsp;a&nbsp;completely&nbsp;separate&nbsp;<a href="__builtin__.html#object">object</a>&nbsp;and&nbsp;not&nbsp;a<br>
+tuple&nbsp;at&nbsp;all.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Then">Then</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Then-__init__"><strong>__init__</strong></a>(self, first, second)</dt></dl>
+
+<dl><dt><a name="Then-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Then-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Then-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Then-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Then-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Then-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Then-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Then-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Translate">class <strong>Translate</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;passes&nbsp;the&nbsp;result&nbsp;of&nbsp;the&nbsp;parser&nbsp;it's&nbsp;created&nbsp;with,&nbsp;if&nbsp;said<br>
+parser&nbsp;matches&nbsp;successfully,&nbsp;through&nbsp;a&nbsp;function,&nbsp;and&nbsp;the&nbsp;function's&nbsp;return<br>
+value&nbsp;is&nbsp;then&nbsp;used&nbsp;as&nbsp;the&nbsp;result.&nbsp;The&nbsp;function&nbsp;is&nbsp;not&nbsp;called&nbsp;if&nbsp;the<br>
+specified&nbsp;parser&nbsp;fails.<br>
+&nbsp;<br>
+For&nbsp;example,&nbsp;the&nbsp;following&nbsp;parser&nbsp;would&nbsp;use&nbsp;the&nbsp;flatten&nbsp;function&nbsp;provided<br>
+by&nbsp;parcon&nbsp;to&nbsp;flatten&nbsp;any&nbsp;lists&nbsp;and&nbsp;tuples&nbsp;produced&nbsp;by&nbsp;the&nbsp;parser<br>
+example_parser:<br>
+&nbsp;<br>
+<a href="#Translate">Translate</a>(example_parser,&nbsp;flatten)<br>
+&nbsp;<br>
+The&nbsp;following&nbsp;parser&nbsp;would&nbsp;likewise&nbsp;expect&nbsp;another_parser&nbsp;to&nbsp;produce&nbsp;a&nbsp;list<br>
+of&nbsp;strings&nbsp;and&nbsp;concatenate&nbsp;them&nbsp;together&nbsp;into&nbsp;a&nbsp;single&nbsp;result&nbsp;string:<br>
+&nbsp;<br>
+<a href="#Translate">Translate</a>(another_parser,&nbsp;"".join)<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Translate">Translate</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Translate-__init__"><strong>__init__</strong></a>(self, parser, function)</dt></dl>
+
+<dl><dt><a name="Translate-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Translate-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Translate-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Translate-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Translate-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Translate-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Translate-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Translate-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Upper">class <strong>Upper</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(upper_chars).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Upper">Upper</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Upper-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Upper-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Upper-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Upper-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Upper-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Upper-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Upper-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Upper-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Upper-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Whitespace">class <strong>Whitespace</strong></a>(<a href="parcon.html#CharIn">CharIn</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Same&nbsp;as&nbsp;<a href="#CharIn">CharIn</a>(whitespace).<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Whitespace">Whitespace</a></dd>
+<dd><a href="parcon.html#CharIn">CharIn</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Whitespace-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Whitespace-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#CharIn">CharIn</a>:<br>
+<dl><dt><a name="Whitespace-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Whitespace-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Whitespace-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Whitespace-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Whitespace-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Whitespace-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Whitespace-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Word">class <strong>Word</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;parses&nbsp;a&nbsp;word&nbsp;consisting&nbsp;of&nbsp;a&nbsp;certain&nbsp;set&nbsp;of&nbsp;allowed<br>
+characters.&nbsp;A&nbsp;minimum&nbsp;and&nbsp;maximum&nbsp;word&nbsp;length&nbsp;can&nbsp;also&nbsp;be&nbsp;specified,&nbsp;as&nbsp;can<br>
+a&nbsp;set&nbsp;of&nbsp;characters&nbsp;of&nbsp;which&nbsp;the&nbsp;first&nbsp;character&nbsp;in&nbsp;the&nbsp;word&nbsp;must&nbsp;be&nbsp;a<br>
+member.<br>
+&nbsp;<br>
+If&nbsp;min&nbsp;is&nbsp;unspecified,&nbsp;it&nbsp;defaults&nbsp;to&nbsp;1.&nbsp;Max&nbsp;defaults&nbsp;to&nbsp;None,&nbsp;which&nbsp;places<br>
+no&nbsp;upper&nbsp;limit&nbsp;on&nbsp;the&nbsp;number&nbsp;of&nbsp;characters&nbsp;that&nbsp;can&nbsp;be&nbsp;in&nbsp;this&nbsp;word.<br>
+&nbsp;<br>
+<a href="#Word">Word</a>&nbsp;parses&nbsp;as&nbsp;many&nbsp;characters&nbsp;as&nbsp;it&nbsp;can&nbsp;that&nbsp;are&nbsp;in&nbsp;the&nbsp;specified<br>
+character&nbsp;set&nbsp;until&nbsp;it's&nbsp;parsed&nbsp;the&nbsp;specified&nbsp;maximum&nbsp;number&nbsp;of&nbsp;characters,<br>
+or&nbsp;it&nbsp;hits&nbsp;a&nbsp;character&nbsp;not&nbsp;in&nbsp;the&nbsp;specified&nbsp;character&nbsp;set.&nbsp;If,&nbsp;at&nbsp;that<br>
+point,&nbsp;the&nbsp;number&nbsp;of&nbsp;characters&nbsp;parsed&nbsp;is&nbsp;less&nbsp;than&nbsp;min,&nbsp;this&nbsp;parser&nbsp;fails.<br>
+Otherwise,&nbsp;it&nbsp;succeeds&nbsp;and&nbsp;produces&nbsp;a&nbsp;string&nbsp;containing&nbsp;all&nbsp;the&nbsp;characters.<br>
+&nbsp;<br>
+min&nbsp;can&nbsp;be&nbsp;zero,&nbsp;which&nbsp;will&nbsp;allow&nbsp;this&nbsp;parser&nbsp;to&nbsp;succeed&nbsp;even&nbsp;if&nbsp;there&nbsp;are<br>
+no&nbsp;characters&nbsp;available&nbsp;or&nbsp;if&nbsp;the&nbsp;first&nbsp;character&nbsp;is&nbsp;not&nbsp;in&nbsp;init_chars.<br>
+The&nbsp;empty&nbsp;string&nbsp;will&nbsp;be&nbsp;returned&nbsp;in&nbsp;such&nbsp;a&nbsp;case.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#Word">Word</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Word-__init__"><strong>__init__</strong></a>(self, chars, init_chars<font color="#909090">=None</font>, min<font color="#909090">=1</font>, max<font color="#909090">=None</font>)</dt></dl>
+
+<dl><dt><a name="Word-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="Word-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="Word-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Word-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Word-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Word-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="Word-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="ZeroOrMore">class <strong>ZeroOrMore</strong></a>(<a href="parcon.html#Parser">Parser</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>A&nbsp;parser&nbsp;that&nbsp;matches&nbsp;the&nbsp;specified&nbsp;parser&nbsp;as&nbsp;many&nbsp;times&nbsp;as&nbsp;it&nbsp;can.&nbsp;The<br>
+results&nbsp;are&nbsp;collected&nbsp;into&nbsp;a&nbsp;list,&nbsp;which&nbsp;is&nbsp;then&nbsp;returned.&nbsp;Since<br>
+<a href="#ZeroOrMore">ZeroOrMore</a>&nbsp;succeeds&nbsp;even&nbsp;if&nbsp;zero&nbsp;matches&nbsp;were&nbsp;made&nbsp;(the&nbsp;empty&nbsp;list&nbsp;will<br>
+be&nbsp;returned&nbsp;in&nbsp;such&nbsp;a&nbsp;case),&nbsp;this&nbsp;parser&nbsp;always&nbsp;succeeds.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%"><dl><dt>Method resolution order:</dt>
+<dd><a href="parcon.html#ZeroOrMore">ZeroOrMore</a></dd>
+<dd><a href="parcon.html#Parser">Parser</a></dd>
+<dd><a href="__builtin__.html#object">__builtin__.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="ZeroOrMore-__init__"><strong>__init__</strong></a>(self, parser)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__repr__"><strong>__repr__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-parse"><strong>parse</strong></a>(self, text, position, space)</dt></dl>
+
+<hr>
+Methods inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><a name="ZeroOrMore-__add__"><strong>__add__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__getitem__"><strong>__getitem__</strong></a>(self, function)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__neg__"><strong>__neg__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__or__"><strong>__or__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__pos__"><strong>__pos__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__radd__"><strong>__radd__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__ror__"><strong>__ror__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__rsub__"><strong>__rsub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__str__"><strong>__str__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-__sub__"><strong>__sub__</strong></a>(self, other)</dt></dl>
+
+<dl><dt><a name="ZeroOrMore-parse_string"><strong>parse_string</strong></a>(self, string, all<font color="#909090">=True</font>, whitespace<font color="#909090">=None</font>)</dt><dd><tt>Parses&nbsp;a&nbsp;string&nbsp;using&nbsp;this&nbsp;parser&nbsp;and&nbsp;returns&nbsp;the&nbsp;result,&nbsp;or&nbsp;throws&nbsp;an<br>
+exception&nbsp;if&nbsp;the&nbsp;parser&nbsp;does&nbsp;not&nbsp;match.&nbsp;If&nbsp;all&nbsp;is&nbsp;True&nbsp;(the&nbsp;default),<br>
+an&nbsp;exception&nbsp;will&nbsp;be&nbsp;thrown&nbsp;if&nbsp;this&nbsp;parser&nbsp;does&nbsp;not&nbsp;match&nbsp;all&nbsp;of&nbsp;the<br>
+input.&nbsp;Otherwise,&nbsp;if&nbsp;the&nbsp;parser&nbsp;only&nbsp;matches&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;input<br>
+starting&nbsp;at&nbsp;the&nbsp;beginning,&nbsp;just&nbsp;that&nbsp;portion&nbsp;will&nbsp;be&nbsp;returned.<br>
+&nbsp;<br>
+whitespace&nbsp;is&nbsp;the&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;use;&nbsp;this&nbsp;parser&nbsp;will&nbsp;be&nbsp;applied<br>
+(and&nbsp;its&nbsp;results&nbsp;discarded)&nbsp;between&nbsp;matching&nbsp;every&nbsp;other&nbsp;parser&nbsp;while<br>
+attempting&nbsp;to&nbsp;parse&nbsp;the&nbsp;specified&nbsp;string.&nbsp;A&nbsp;typical&nbsp;grammar&nbsp;might&nbsp;have<br>
+this&nbsp;parser&nbsp;represent&nbsp;whitespace&nbsp;and&nbsp;comments.&nbsp;An&nbsp;instance&nbsp;of&nbsp;<a href="#Exact">Exact</a>&nbsp;can<br>
+be&nbsp;used&nbsp;to&nbsp;suppress&nbsp;whitespace&nbsp;parsing&nbsp;for&nbsp;a&nbsp;portion&nbsp;of&nbsp;the&nbsp;grammar,<br>
+which&nbsp;you&nbsp;would&nbsp;most&nbsp;likely&nbsp;use&nbsp;in,&nbsp;for&nbsp;example,&nbsp;string&nbsp;literals.&nbsp;The<br>
+default&nbsp;value&nbsp;for&nbsp;this&nbsp;parameter&nbsp;is&nbsp;<a href="#Whitespace">Whitespace</a>().</tt></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="parcon.html#Parser">Parser</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-failure"><strong>failure</strong></a>(expected)</dt><dd><tt>Returns&nbsp;a&nbsp;<a href="#Result">Result</a>&nbsp;representing&nbsp;a&nbsp;failure&nbsp;of&nbsp;a&nbsp;parser&nbsp;to&nbsp;match.&nbsp;expected&nbsp;is<br>
+a&nbsp;list&nbsp;of&nbsp;expectations&nbsp;that&nbsp;would&nbsp;have&nbsp;had&nbsp;to&nbsp;be&nbsp;satisfied&nbsp;in&nbsp;the&nbsp;text<br>
+passed&nbsp;to&nbsp;the&nbsp;parser&nbsp;calling&nbsp;this&nbsp;method&nbsp;in&nbsp;order&nbsp;for&nbsp;it&nbsp;to&nbsp;potentially<br>
+succeed.&nbsp;Expectations&nbsp;are&nbsp;2-tuples&nbsp;of&nbsp;the&nbsp;position&nbsp;at&nbsp;which&nbsp;some&nbsp;particular<br>
+piece&nbsp;of&nbsp;text&nbsp;was&nbsp;expected&nbsp;and&nbsp;an&nbsp;instance&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;subclasses&nbsp;of<br>
+<a href="#Expectation">Expectation</a>&nbsp;describing&nbsp;what&nbsp;was&nbsp;expected.</tt></dd></dl>
+ <dl><dt><a name="-flatten"><strong>flatten</strong></a>(value)</dt><dd><tt>A&nbsp;function&nbsp;that&nbsp;recursively&nbsp;flattens&nbsp;the&nbsp;specified&nbsp;value.&nbsp;Tuples&nbsp;and&nbsp;lists<br>
+are&nbsp;flattened&nbsp;into&nbsp;the&nbsp;items&nbsp;that&nbsp;they&nbsp;contain.&nbsp;The&nbsp;result&nbsp;is&nbsp;a&nbsp;list.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;single&nbsp;non-list,&nbsp;non-tuple&nbsp;value&nbsp;is&nbsp;passed&nbsp;in,&nbsp;the&nbsp;result&nbsp;is&nbsp;a&nbsp;list<br>
+containing&nbsp;just&nbsp;that&nbsp;item.&nbsp;If,&nbsp;however,&nbsp;that&nbsp;value&nbsp;is&nbsp;None,&nbsp;the&nbsp;result&nbsp;is<br>
+the&nbsp;empty&nbsp;list.<br>
+&nbsp;<br>
+This&nbsp;function&nbsp;is&nbsp;intended&nbsp;to&nbsp;be&nbsp;used&nbsp;as&nbsp;the&nbsp;function&nbsp;passed&nbsp;to&nbsp;<a href="#Translate">Translate</a><br>
+where&nbsp;the&nbsp;parser&nbsp;passed&nbsp;to&nbsp;<a href="#Translate">Translate</a>&nbsp;could&nbsp;produce&nbsp;multiple&nbsp;nested&nbsp;lists&nbsp;of<br>
+tuples&nbsp;and&nbsp;lists,&nbsp;and&nbsp;a&nbsp;single,&nbsp;flat,&nbsp;list&nbsp;is&nbsp;desired.</tt></dd></dl>
+ <dl><dt><a name="-format_failure"><strong>format_failure</strong></a>(expected)</dt><dd><tt>Formats&nbsp;a&nbsp;list&nbsp;of&nbsp;expectations&nbsp;into&nbsp;a&nbsp;failure&nbsp;message&nbsp;that&nbsp;typically&nbsp;looks<br>
+something&nbsp;like&nbsp;this:<br>
+&nbsp;<br>
+At&nbsp;position&nbsp;n:&nbsp;expected&nbsp;one&nbsp;of&nbsp;x,&nbsp;y,&nbsp;or&nbsp;z</tt></dd></dl>
+ <dl><dt><a name="-match"><strong>match</strong></a>(end, value, expected)</dt><dd><tt>Returns&nbsp;a&nbsp;<a href="#Result">Result</a>&nbsp;representing&nbsp;a&nbsp;parser&nbsp;successfully&nbsp;matching.&nbsp;end&nbsp;is&nbsp;the<br>
+position&nbsp;in&nbsp;the&nbsp;string&nbsp;just&nbsp;after&nbsp;where&nbsp;the&nbsp;parser&nbsp;finished,&nbsp;or&nbsp;rather,<br>
+where&nbsp;the&nbsp;next&nbsp;parser&nbsp;after&nbsp;this&nbsp;one&nbsp;would&nbsp;be&nbsp;expected&nbsp;to&nbsp;start&nbsp;parsing.<br>
+value&nbsp;is&nbsp;the&nbsp;value&nbsp;that&nbsp;this&nbsp;parser&nbsp;resulted&nbsp;in,&nbsp;which&nbsp;is&nbsp;typically<br>
+specific&nbsp;to&nbsp;the&nbsp;parser&nbsp;calling&nbsp;this&nbsp;function.&nbsp;expected&nbsp;is&nbsp;a&nbsp;list&nbsp;of<br>
+expectations&nbsp;that&nbsp;would&nbsp;have&nbsp;allowed&nbsp;this&nbsp;parser&nbsp;to&nbsp;match&nbsp;more&nbsp;input&nbsp;than<br>
+it&nbsp;did;&nbsp;this&nbsp;parameter&nbsp;takes&nbsp;the&nbsp;same&nbsp;format&nbsp;as&nbsp;its&nbsp;corresponding&nbsp;parameter<br>
+to&nbsp;the&nbsp;failure&nbsp;function.</tt></dd></dl>
+ <dl><dt><a name="-op_add"><strong>op_add</strong></a>(first, second)</dt></dl>
+ <dl><dt><a name="-op_getitem"><strong>op_getitem</strong></a>(parser, function)</dt></dl>
+ <dl><dt><a name="-op_neg"><strong>op_neg</strong></a>(parser)</dt></dl>
+ <dl><dt><a name="-op_or"><strong>op_or</strong></a>(first, second)</dt></dl>
+ <dl><dt><a name="-op_pos"><strong>op_pos</strong></a>(parser)</dt></dl>
+ <dl><dt><a name="-op_sub"><strong>op_sub</strong></a>(first, second)</dt></dl>
+ <dl><dt><a name="-parse_space"><strong>parse_space</strong></a>(text, position, space)</dt><dd><tt>Repeatedly&nbsp;applies&nbsp;the&nbsp;specified&nbsp;whitespace&nbsp;parser&nbsp;to&nbsp;the&nbsp;specified&nbsp;text<br>
+starting&nbsp;at&nbsp;the&nbsp;specified&nbsp;position&nbsp;until&nbsp;it&nbsp;no&nbsp;longer&nbsp;matches.&nbsp;The&nbsp;result<br>
+of&nbsp;all&nbsp;of&nbsp;these&nbsp;parses&nbsp;will&nbsp;be&nbsp;discarded,&nbsp;and&nbsp;the&nbsp;location&nbsp;at&nbsp;which&nbsp;the<br>
+whitespace&nbsp;parser&nbsp;failed&nbsp;will&nbsp;be&nbsp;returned.</tt></dd></dl>
+ <dl><dt><a name="-promote"><strong>promote</strong></a>(value)</dt><dd><tt>Converts&nbsp;a&nbsp;value&nbsp;of&nbsp;some&nbsp;type&nbsp;to&nbsp;an&nbsp;appropriate&nbsp;parser.&nbsp;Right&nbsp;now,&nbsp;this<br>
+returns&nbsp;the&nbsp;value&nbsp;as&nbsp;is&nbsp;if&nbsp;it's&nbsp;an&nbsp;instance&nbsp;of&nbsp;<a href="#Parser">Parser</a>,&nbsp;or&nbsp;<a href="#Literal">Literal</a>(value)&nbsp;if<br>
+the&nbsp;value&nbsp;is&nbsp;a&nbsp;string.</tt></dd></dl>
+</td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>alpha_chars</strong> = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'<br>
+<strong>alpha_word</strong> = &lt;parcon.Word object&gt;<br>
+<strong>alphanum_chars</strong> = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'<br>
+<strong>alphanum_word</strong> = &lt;parcon.Word object&gt;<br>
+<strong>digit_chars</strong> = '0123456789'<br>
+<strong>lower_chars</strong> = 'abcdefghijklmnopqrstuvwxyz'<br>
+<strong>upper_chars</strong> = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'<br>
+<strong>whitespace</strong> = ' <font color="#c040c0">\t\r\n</font>'</td></tr></table>
+</body></html>
