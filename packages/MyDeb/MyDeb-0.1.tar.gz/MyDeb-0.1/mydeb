@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+# -----------------------------------------------------------------------------
+#    Myconf - Personal configuration and installed software backup
+#    Copyright (C) 2011 Some Hackers In Town
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# -----------------------------------------------------------------------------
+import os
+import sys
+from optparse import OptionParser
+
+from Mydeb.console import Console
+from Mydeb.backup import Target
+from Mydeb.utils import parse_config_file
+
+
+parser = OptionParser()
+
+parser.add_option('-v', '--verions',
+                  dest='version',
+                  action="store_true",
+                  help="Show version information.")
+parser.add_option('-l', '--list',
+                  dest='list',
+                  action="store_true",
+                  help="Show current backup list.")
+parser.add_option('--debug', dest='debug', action="store_true",
+                  help="Activate debug mode.")
+parser.add_option('-a', '--add',
+                  dest='url',
+                  help="Add given path to backup list.\n")
+parser.add_option('-r', '--restore',
+                  dest='restore', help="Restore backuped files." )
+options, args = parser.parse_args()
+
+
+homedir = os.environ["HOME"]
+backupdir = os.path.join(homedir, ".backup")
+listfile = os.path.join(backupdir, "configlist")
+if not os.path.exists(backupdir):
+    os.mkdir(backupdir)
+    # TODO:create file if it not exist
+stdout = Console(debuging=options.debug)
+
+if options.version:
+    print "MyDeb version 0.1 \n"\
+    "Wrote by Behnam Ahmad Khan Beigi [ b3hnam@gnu.org ]\n"\
+    "https://gitorious.org/mydeb/"
+
+if options.url:
+    fd = open(listfile, "a+")
+    dependencies = raw_input("Enter dependencies[comma sperated]: ")
+    # TODO: checking for malform input
+    fd.write("%s:%s\n" % (options.url, dependencies))
+    fd.close()
+    stdout.sprintf("'%s' url registered for future backups." % options.url,
+                   "info")
+    sys.exit(0)
+
+if options.restore:
+    targets, packages = parse_config_file(listfile)
+
+    # TODO: install the packages.
+
+    for target in targets:
+        targetobj = Target(target)
+        targetobj.create_backup()
