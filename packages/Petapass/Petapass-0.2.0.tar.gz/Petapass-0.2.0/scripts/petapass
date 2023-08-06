@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import signal
+
+pidfile = os.path.join(os.path.expanduser("~"), ".petapass.pid")
+
+def write_pidfile():
+    if os.path.exists(pidfile):
+        raise RuntimeError("pidfile exists for process %d"%read_pidfile())
+
+    with open(pidfile, 'w') as f:
+        f.write("%d"%os.getpid())
+
+def read_pidfile():
+    with open(pidfile, 'r') as f:
+        return int(f.readline().strip())
+
+def one(args):
+    import petapass.terminal
+    petapass.terminal.main()
+
+def daemon(args):
+    try:
+        write_pidfile()
+        import petapass.gtkgui, petapass.daemon
+        d = petapass.daemon.Daemon(args.timeout)
+        gui = petapass.gtkgui.GtkGui(d)
+        gui.main()
+    finally:
+        if os.path.exists(pidfile):
+            os.unlink(pidfile)
+
+def show(args):
+    pid = read_pidfile()
+    os.kill(pid, signal.SIGUSR1)
+
+def forget(args):
+    pid = read_pidfile()
+    os.kill(pid, signal.SIGUSR2)
+
+def kill(args):
+    pid = read_pidfile()
+    os.kill(pid, signal.SIGTERM)
+
+parser = argparse.ArgumentParser(description='Generate passwords using hashes')
+
+subparsers = parser.add_subparsers()
+
+sub = subparsers.add_parser('one')
+sub.set_defaults(func=one)
+
+sub = subparsers.add_parser('daemon')
+sub.add_argument('--timeout', type=lambda x: int(x)*60, default=900, help="how long to remember the master password, in minutes. Default: 15")
+sub.set_defaults(func=daemon)
+
+sub = subparsers.add_parser('show')
+sub.set_defaults(func=show)
+
+sub = subparsers.add_parser('forget')
+sub.set_defaults(func=forget)
+
+sub = subparsers.add_parser('kill')
+sub.set_defaults(func=kill)
+
+args = parser.parse_args()
+args.func(args)
