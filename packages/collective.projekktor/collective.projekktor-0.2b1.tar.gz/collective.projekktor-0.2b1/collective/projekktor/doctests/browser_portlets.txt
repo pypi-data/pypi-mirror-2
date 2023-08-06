@@ -1,0 +1,88 @@
+=================
+Browser: Portlets
+=================
+
+The browser section adds browserviews used by Projekktor.
+
+Let's start by logging in as a manager.
+
+  >>> self.setRoles(['Manager'])
+
+And getting some handy tools
+
+  >>> from zope.component import getUtility, getMultiAdapter
+  >>> from Products.GenericSetup.utils import _getDottedName
+  >>> from plone.portlets.interfaces import IPortletManager, IPortletAssignmentMapping, IPortletRenderer, IPortletType, IPortletAssignment, IPortletDataProvider
+
+And setup the browser and request objects
+
+  >>> from Products.Five.testbrowser import Browser
+  >>> browser = Browser()
+  >>> from zope.publisher.browser import TestRequest
+  >>> request = TestRequest()
+
+We need a logged in user
+
+  >>> self.app.acl_users.userFolderAddUser('root', 'secret', ['Manager'], [])
+  >>> browser.addHeader('Authorization', 'Basic root:secret')
+
+projekktor_portlet
+------------------
+
+Lets check our portlet is registered
+
+  >>> portlet = getUtility(IPortletType, name='portlets.Projekktor')
+  >>> portlet.addview
+  'portlets.Projekktor'
+
+And that it is registered with correct manager interfaces
+
+  >>> registered_interfaces = [_getDottedName(i) for i in portlet.for_]
+  >>> registered_interfaces.sort()
+  >>> registered_interfaces
+  ['plone.app.portlets.interfaces.IColumn', 'plone.app.portlets.interfaces.IDashboard']
+    
+Now lets test the assignment
+
+  >>> from collective.projekktor.browser.portlets import projekktor_portlet
+  >>> assignment = projekktor_portlet.Assignment()
+  >>> IPortletAssignment.providedBy(assignment)
+  True
+  >>> IPortletDataProvider.providedBy(assignment.data)
+  True
+
+Let's try adding a new portlet
+
+  >>> mapping = self.portal.restrictedTraverse('++contextportlets++plone.leftcolumn')
+  >>> for m in mapping.keys(): del mapping[m]
+  >>> addview = mapping.restrictedTraverse('+/' + portlet.addview)
+  >>> addview.createAndAdd(data={'filepath':'/samples/projekktor.ogg'})
+  >>> len(mapping) == 1
+  True
+  >>> assigned = mapping.values()[0]
+  >>> assigned
+  <collective.projekktor.browser.portlets.projekktor_portlet.Assignment ...>
+
+And editing the portlet
+
+  >>> editview = getMultiAdapter((assigned, request), name='edit')
+  >>> isinstance(editview,projekktor_portlet.EditForm)
+  True
+
+Finally, let's render our portlet
+
+  >>> context = self.folder       
+  >>> request = self.folder.REQUEST
+  >>> view = self.folder.restrictedTraverse('@@plone')
+  >>> manager = getUtility(IPortletManager, name='plone.leftcolumn', context=self.portal)
+  >>> renderer = getMultiAdapter((context, request, view, manager, assigned), IPortletRenderer)
+
+  >>> renderer
+  <collective.projekktor.browser.portlets.projekktor_portlet.Renderer ...>
+
+Lets take a look at the portlet being rendered onto the samples folder 
+
+  >>> browser.open('http://nohost/plone/samples')
+  >>> browser.contents.strip()
+  '<!DOCTYPE html PUBLIC...<div id="portal-column-one"...<div class="projekktor-audio-widget"...<a class="projekktor-audio-link" href="http://nohost/plone/samples/projekktor.ogg" title="An example ogg"...</html>'
+

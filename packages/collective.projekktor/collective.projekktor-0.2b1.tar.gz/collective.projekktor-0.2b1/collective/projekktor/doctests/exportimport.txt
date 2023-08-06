@@ -1,0 +1,59 @@
+=============
+Export/Import
+=============
+
+Import
+------
+
+This module takes care of exporting and importing settings for Projekktor. Let's
+create a dummy import context. And a dummy file.
+
+    >>> from Products.GenericSetup.tests.common import DummyImportContext
+    >>> xml = """\
+    ... <object>
+    ...   <audio>
+    ...     <audio_mimetypes purge="True">
+    ...       <element value="audio/x-test"/>
+    ...     </audio_mimetypes>
+    ...   </audio>
+    ... </object>
+    ... """
+    >>> context = DummyImportContext(portal, purge=True)
+    >>> context._files = {'projekktor.xml': xml}
+
+Now import the file.
+
+    >>> from collective.projekktor.exportimport import importProjekktorSettings
+    >>> importProjekktorSettings(context)
+
+Our specified plugin should now be stored in the utility.
+
+    >>> from collective.projekktor.interfaces import IProjekktorUtility
+    >>> from zope.component import getUtility
+    >>> projekktor_utility = getUtility(IProjekktorUtility)
+    >>> 'audio/x-test' in projekktor_utility.audio_mimetypes
+    True
+
+Export
+------
+
+Let's create a dummy export context.
+
+    >>> from Products.GenericSetup.tests.common import DummyExportContext
+    >>> context = DummyExportContext(portal)
+
+And export the current settings.
+
+    >>> from collective.projekktor.exportimport import exportProjekktorSettings
+    >>> exportProjekktorSettings(context)
+
+Check if projekktor.xml is exported.
+
+    >>> context._wrote[0][0]
+    'projekktor.xml'
+
+Check the contents of the export.
+
+    >>> context._wrote[0][1]
+    '...audio/x-test...'
+

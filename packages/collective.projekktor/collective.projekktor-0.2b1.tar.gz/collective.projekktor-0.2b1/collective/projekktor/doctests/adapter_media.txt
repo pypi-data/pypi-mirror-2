@@ -1,0 +1,110 @@
+=========================
+Adapter: Projekktor Media
+=========================
+
+This Projekktor Media Adapter adapts ATFiles to ensure they provide projekktor with any information it requires.
+
+If you want to provide customised projekktor functionality for your own content types, or subtypes you should provide an adapter for IProjekktorMedia
+
+Let's start by logging in as a manager.
+
+  >>> self.setRoles(['Manager'])
+
+And getting the current folder
+
+  >>> TEST_DIR = self.thisDir(__file__,__name__)
+
+ProjekktorMedia
+---------------
+
+Create an ogg audio test file and populate it with some data.
+
+  >>> ogg_id = 'example.ogg'
+  >>> ogg_id = portal.invokeFactory('File', id=ogg_id)
+  >>> ogg_example = portal[ogg_id]
+  >>> ogg_example.setFile(open('%s/projekktor.ogg'%TEST_DIR,'r'))
+  >>> ogg_example.setTitle("Ogg audio")
+  >>> ogg_example.setDescription("An example ogg audio file")
+
+Get the IProjekktorMedia interface for our file object.
+  
+  >>> from collective.projekktor.interfaces import IProjekktorMedia
+  >>> ogg_audio = IProjekktorMedia(ogg_example)
+  >>> ogg_audio
+  <collective.projekktor.projekktor.ProjekktorMedia object at ...>
+
+Get the basic information about this file.
+
+  >>> ogg_audio.getTitle()
+  'Ogg audio'
+  >>> ogg_audio.getDescription()
+  'An example ogg audio file'
+
+Get its display width and height - the site defaults
+    
+  >>> ogg_audio.getWidth()
+  u'480px'
+  >>> ogg_audio.getHeight()
+  u'270px'  
+
+Check we get the correct url for this ogg_audio
+
+  >>> ogg_audio.getFilepath()
+  'http://nohost/plone/example.ogg'
+
+Get the mimetype of the file
+
+  >>> ogg_audio.getMimetype()
+  'application/ogg'
+
+Check that this is audio
+  
+  >>> ogg_audio.isAudio()
+  True
+  >>> ogg_audio.isVideo()
+  False
+     
+This file doesn't have any alternatives yet
+
+  >>> ogg_audio.getAlternativeFilepaths()
+  {}
+  
+Let's add an mp3 alternative
+      
+  >>> mp3_id = 'example.mp3'
+  >>> mp3_id = portal.invokeFactory('File', id=mp3_id)
+  >>> mp3_example = portal[mp3_id]
+  >>> mp3_example.setFile(open('%s/projekktor.mp3'%TEST_DIR,'r'))
+  >>> mp3_example.setTitle("Mp3 audio")
+  >>> mp3_example.setDescription("An example mp3 audio file")
+  >>> mp3_audio = IProjekktorMedia(mp3_example)
+
+As these files have the same names they should be provided as alternatives for each other
+
+  >>> ogg_audio.getAlternativeFilepaths()
+  {'example.mp3': 'http://nohost/plone/example.mp3'}
+  >>> mp3_audio.getAlternativeFilepaths()
+  {'example.ogg': 'http://nohost/plone/example.ogg'}	
+
+This file doesn't currently have a poster image, so it uses the site default
+
+  >>> ogg_audio.getPoster()
+  u'/media-audio.png'
+  
+If we add an image file with the same root name it will be used as the poster
+
+  >>> png_id = 'example.png'
+  >>> png_id = portal.invokeFactory('Image', id=png_id)
+  >>> portal[png_id].setImage(open('%s/projekktor.png'%TEST_DIR,'r'))
+
+We should now get the image we added as the poster
+
+  >>> ogg_audio.getPoster()
+  'http://nohost/plone/example.png'	
+  >>> mp3_audio.getPoster()
+  'http://nohost/plone/example.png'		
+
+
+   
+
+

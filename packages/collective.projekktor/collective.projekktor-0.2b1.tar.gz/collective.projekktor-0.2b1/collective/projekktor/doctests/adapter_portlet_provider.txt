@@ -1,0 +1,114 @@
+====================================
+Adapter: Projekktor Portlet Provider
+====================================
+
+The Projekktor Portlet Provider Adapter adapts portlets (IPortletRenderer) and the current context to provide information about a target file to the projekktor player viewlet.
+
+This adapter provides the IProjekktorProvider interface 
+
+  >>> from collective.projekktor.interfaces import IProjekktorProvider
+
+If you want to provide customised projekktor functionality for your portlets or views you should provide an adapter for IProjekktorProvider
+
+Let's start by logging in as a manager.
+
+  >>> self.setRoles(['Manager'])
+
+And get some tools
+
+  >>> from zope.component import getMultiAdapter, getUtility
+  >>> from zope.browser.interfaces import IBrowserView
+  >>> from zope.publisher.browser import TestRequest
+
+And set some stuff up!
+
+  >>> TEST_DIR = self.thisDir(__file__,__name__)
+  >>> request = TestRequest()
+
+
+ProjekktorPortletProvider
+-------------------------
+
+This class provides information about the context specified in the portlet settings. 
+
+It gets width and height and alternative files and poster from the portlet if these are specified, and from the site defaults or target context where they are not.
+
+Let's add a folder to add the portlet to
+
+  >>> folder_id = 'example'
+  >>> folder_id = self.portal.invokeFactory('Folder','example')
+  >>> folder = self.portal[folder_id]
+
+Let's create a portlet data assignment pointing to our sample/projekktor.ogg
+      
+  >>> from collective.projekktor.browser.portlets.projekktor_portlet import Assignment
+
+  >>> projekktor_assignment = Assignment(filepath='/samples/projekktor.ogg')
+
+Now we can get the portlet renderer view
+
+  >>> portlet_renderer = self.portletRenderer(folder,projekktor_assignment)
+  
+And use it to get our portlet adapted IProjekktorProvider
+
+  >>> portlet_provider = getMultiAdapter((folder,portlet_renderer),IProjekktorProvider)
+  >>> portlet_provider 
+  <collective.projekktor.browser.portlets.projekktor_portlet.ProjekktorPortletProvider ...>
+
+Now let's get the basic information about our target ogg file
+
+  >>> portlet_provider.getFilepath()
+  'http://nohost/plone/samples/projekktor.ogg'
+  >>> portlet_provider.getTitle()
+  'An example ogg'
+  >>> portlet_provider.getDescription()
+  'An ogg file to use for testing purposes'
+  >>> portlet_provider.getMimetype()
+  'application/ogg'
+  >>> portlet_provider.isAudio()
+  True
+  >>> portlet_provider.isVideo()
+  False
+
+As we have not overridden any variables in our portlet, the provider retrieves the following information from the target context
+
+  >>> portlet_provider.getWidth()
+  u'480px'
+  >>> portlet_provider.getHeight()
+  u'270px'  
+  >>> portlet_provider.getPoster()
+  'http://nohost/plone/samples/projekktor.png'	
+  >>> portlet_provider.getAlternativeFilepaths()
+  {'projekktor.mp3': 'http://nohost/plone/samples/projekktor.mp3'}
+
+Now let's create a new portlet renderer with different settings for the poster, width, height and alternatives
+
+  >>> projekktor_assignment = Assignment(filepath='/samples/projekktor.ogg'
+  ...					,mediaWidth='1000px' # ultra-widescreen!
+  ...					,mediaHeight='1px'
+  ...					,mediaPoster='/sitelogo.png'
+  ...					,alternativeFilepaths=['/some-other.mp3','/and-another.wav'])
+
+  >>> portlet_renderer = self.portletRenderer(folder,projekktor_assignment)
+  >>> portlet_provider = getMultiAdapter((folder,portlet_renderer),IProjekktorProvider)
+
+  >>> portlet_provider.getWidth()
+  '1000px'  
+  >>> portlet_provider.getHeight()
+  '1px'
+  >>> portlet_provider.getPoster()
+  '/sitelogo.png'
+  >>> paths = portlet_provider.getAlternativeFilepaths()
+  >>> pathids = paths.keys()
+  >>> pathids.sort()
+  >>> pathids
+  ['and-another.wav', 'some-other.mp3']
+  
+This URL should be translated here!
+   
+  >>> paths['and-another.wav']
+  '/and-another.wav'
+
+ 
+
+  

@@ -1,0 +1,115 @@
+=================================
+Adapter: Projekktor View Provider
+=================================
+
+The Projekktor View Provider Adapter adapts projekktor_view and the file context to provide information to the projekktor player viewlet.
+
+This adapter provides the IProjekktorProvider interface 
+
+  >>> from collective.projekktor.interfaces import IProjekktorProvider
+
+If you want to provide customised projekktor functionality for your portlets or views you should provide an adapter for IProjekktorProvider
+
+Let's start by logging in as a manager.
+
+  >>> self.setRoles(['Manager'])
+
+And get some tools
+
+  >>> from zope.component import getMultiAdapter
+  >>> from zope.browser.interfaces import IBrowserView 
+  >>> from zope.publisher.browser import TestRequest
+
+And set some stuff up!
+
+  >>> TEST_DIR = self.thisDir(__file__,__name__)
+  >>> request = TestRequest()
+
+
+ProjekktorViewProvider
+----------------------
+
+This class provides information about the currently viewed context. It get's width and height information from the site defaults, and gets the rest of its information from the IProjekktorMedia interface of the current context
+
+Let's use the samples that are already created. 
+
+There are 2 video files - samples/projekktor.ogv and samples/projekktor.mp4.
+
+There are also 2 audio files - samples/projekktor.ogg and samples/projekktor.mp3.
+
+There is also a samples/projekktor.png image - which should get set as the poster.
+
+First, get a 'projekktor_view' for an ogg audio file
+
+  >>> ogg_context = self.samples['ogg']
+  >>> view = getMultiAdapter((ogg_context,request),name='projekktor_view')
+
+And adapt it with the context to IProjekktorProvider
+
+  >>> audio_provider = getMultiAdapter((ogg_context,view),IProjekktorProvider)
+  >>> audio_provider
+  <collective.projekktor.browser.views.projekktor_view.ProjekktorViewProvider ...>
+
+The target of this provider is always the context object being viewed
+
+  >>> audio_provider.target == ogg_context
+  True
+
+This should get most of the IProjekktorMedia information from the context
+
+  >>> audio_provider.getTitle()
+  'An example ogg'
+  >>> audio_provider.getDescription()
+  'An ogg file to use for testing purposes'
+  >>> audio_provider.getMimetype()
+  'application/ogg'
+  >>> audio_provider.isAudio()
+  True
+  >>> audio_provider.isVideo()
+  False
+  >>> audio_provider.getPoster()
+  'http://nohost/plone/samples/projekktor.png'	
+  >>> audio_provider.getFilepath()
+  'http://nohost/plone/samples/projekktor.ogg'
+  >>> audio_provider.getAlternativeFilepaths()
+  {'projekktor.mp3': 'http://nohost/plone/samples/projekktor.mp3'}
+
+And some of the IProjekktorMedia information from the site defaults
+
+  >>> audio_provider.getWidth()
+  u'480px'
+  >>> audio_provider.getHeight()
+  u'270px'  
+
+Now let's do the same for a video file
+
+  >>> ogv_context = self.samples['ogv']
+  >>> view = getMultiAdapter((ogv_context,request),name='projekktor_view')
+  >>> video_provider = getMultiAdapter((ogv_context,view),IProjekktorProvider)
+
+  >>> video_provider.getTitle()
+  'An example ogv'
+  >>> video_provider.getDescription()
+  'An ogv file to use for testing purposes'
+  >>> video_provider.getMimetype()
+  'video/ogg'
+  >>> video_provider.isAudio()
+  False
+  >>> video_provider.isVideo()
+  True
+  >>> video_provider.getPoster()
+  'http://nohost/plone/samples/projekktor.png'	
+  >>> video_provider.getFilepath()
+  'http://nohost/plone/samples/projekktor.ogv'
+  >>> video_provider.getAlternativeFilepaths()
+  {'projekktor.mp4': 'http://nohost/plone/samples/projekktor.mp4'}
+
+And again some of the IProjekktorMedia information comes from the site defaults
+
+  >>> video_provider.getWidth()
+  u'480px'
+  >>> video_provider.getHeight()
+  u'270px'  
+
+
+
