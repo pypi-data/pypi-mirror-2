@@ -1,0 +1,81 @@
+﻿*******************
+Introduction
+*******************
+
+NeuroLab - a library of basic nueral networks algorithms with flexible network configurations and learning algorithms.
+To simplify migration, the syntax of the library is as close to a package of Neural Network Toolbox (NNT) of MATLAB (c). 
+The library is based on the package numpy (http://numpy.scipy.org), some learning algorithms are used scipy.optymyze (http://scipy.org).
+
+:Create network:
+	>>> import neurolab as nl
+	>>> # create feed forward multilayer perceptron
+	>>> net = nl.net.newff([[0, 0.5], [0, 0.5]], [3,1])
+
+Created two-layer network(3-1) with 2-inputs and one output.
+Input layer contains 3 neurons, the output 1 neuron.
+Input range: 0.0, 0.5
+
+:Train:
+	>>> # Create learning samples
+	>>> input = [[0.1, 0.1], 
+	...          [0.1, 0.2], 
+	...          [0.1, 0.3], 
+	...          [0.1, 0.4], 
+	...          [0.2, 0.2], 
+	...          [0.2, 0.3], 
+	...          [0.2, 0.4], 
+	...          [0.3, 0.3], 
+	...          [0.3, 0.4], 
+	...          [0.4, 0.4]]
+	>>> 
+	>>> target = [[i[0] + i[1]] for i in input]
+	>>> # Train
+	>>> error = net.train(input, target, epochs=500, goal=0.1)
+
+:Train error:
+	>>> print "Finish error:", error[-1]
+	Finish error: 0.125232586274
+
+:Simulate:
+	>>> net.sim([[0.1, 0.5], [0.3, 0. 1]])
+	array([[ 0.59650825],
+           [ 0.41686071]])
+
+:Network Info:
+	>>> # Number of network inputs:
+	>>> net.ci
+	2
+	>>> # Number of network outputs:
+	>>> net.co
+	1
+	>>> # Number of network layers:
+	>>> len(net.layers)
+	2
+	>>> # Weight of first neuron of input layer (net.layers[0])
+	>>> net.layers[0].np['w'][1]
+	array([-0.67211163, -0.87277918])
+	>>> 
+	>>> # Bias output layer:
+	>>> net.layers[-1].np['b']
+	array([-0.69717423])
+	>>> # Train params
+	>>> net.train.defaults
+	{'goal': 0.01, 
+	 'show': 100, 
+	 'epochs': 1000, 
+	 'lr': 0.01, 
+	 'adapt': False, 
+	 'errorf': <neurolab.error.SSE instance at 0x03757EB8>}
+	
+
+:Save/Load:
+	>>> net.save('sum.net')
+	>>> newnet = nl.load('sum.net')
+
+:Change train function:
+	>>> net.trainf = nl.train.TrainCG()
+	>>> # Change error function:
+	>>> net.trainf.defaunts['trainf'] = nl.error.SAE()
+
+:Change transfer function on output layer:
+	>>> net.layers[-1].transf = nl.trans.HardLim()
