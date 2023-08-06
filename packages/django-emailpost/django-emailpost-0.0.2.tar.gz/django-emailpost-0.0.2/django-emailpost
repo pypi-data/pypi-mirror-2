@@ -1,0 +1,203 @@
+#!/usr/bin/env python
+
+#   Copyright 2011 Josh Kearney
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+"""django-emailpost - Post to Django blogs via email."""
+
+from __future__ import with_statement
+
+import Image
+import optparse
+import os
+import re
+import sys
+import uuid
+
+from datetime import datetime
+from django.conf import settings
+from django.template import defaultfilters
+from email import message_from_file
+from email.parser import Parser
+
+
+def capture_headers(msg):
+    """Capture and return the email's headers."""
+    subject = msg["SUBJECT"]
+
+    # Pull the category out of the subject.
+    regex = re.compile("\{(.*)\}")
+    match = regex.search(subject)
+
+    if match:
+        category = match.group(1).capitalize()
+        # Purge '{category}' from the subject line.
+        subject = subject[:-(len(category) + 2)].strip()
+
+        return dict(
+                original_recipient=os.getenv("ORIGINAL_RECIPIENT"),
+                sender=os.getenv("SENDER"),
+                subject=subject,
+                category=category)
+    else:
+        sys.exit("Must provide a category.")
+
+
+def walk_email(msg, attachment_dir):
+    """Walk through the email and return its body with attachments."""
+    body = ""
+    attachments = []
+
+    for part in msg.walk():
+        part_type = part.get_content_type()
+
+        if part_type.startswith("image"):
+            # TODO(jk0): Support more than just JPEG.
+            image_name = str(uuid.uuid4().hex) + ".jpg"
+            image_path = os.path.join(attachment_dir, image_name)
+            thumbnail_name = image_name[:-4] + "-300x224.jpg"
+            thumbnail_path = attachment_dir + thumbnail_name
+
+            with open(image_path, "w") as f:
+                f.write(part.get_payload(decode=True))
+            f.closed
+
+            # Generate a thumbnail version of the image.
+            image = Image.open(image_path)
+            image.thumbnail((300, 224), Image.ANTIALIAS)
+            image.save(thumbnail_path)
+
+            # Let the images be viewable on the web server.
+            os.chmod(image_path, 0644)
+            os.chmod(thumbnail_path, 0644)
+
+            attachments.append((image_name, thumbnail_name))
+        elif part_type == "text/plain":
+            body = part.get_payload().strip()
+
+    return (body, attachments)
+
+
+def build_options():
+    """Generate command line options."""
+    parser = optparse.OptionParser()
+
+    parser.add_option("-a", "--app", dest="app",
+            help="name of the Django app")
+    parser.add_option("-p", "--project-path", dest="project_path",
+            help="path to the Django project")
+    parser.add_option("-r", "--recipient", dest="recipient",
+            help="accepted recipient")
+    parser.add_option("-s", "--sender", dest="sender",
+            help="accepted sender")
+
+    return parser.parse_args()
+
+
+def ensure_config_options():
+    """Ensure the required CLI options are present."""
+    if not __APP__:
+        sys.exit("Must supply a Django app.")
+    elif not __PROJECT_PATH__:
+        sys.exit("Must supply the path to the Django project.")
+    elif not __RECIPIENT__:
+        sys.exit("Must supply a recipient.")
+    elif not __SENDER__:
+        sys.exit("Must supply a sender.")
+
+    # Add the project to the Python Path and load the app's settings.
+    sys.path.append(__PROJECT_PATH__)
+    sys.path.append(__PROJECT_PATH__ + "/../")
+    os.environ["DJANGO_SETTINGS_MODULE"] = "%s.settings" % os.path.basename(
+            __PROJECT_PATH__)
+
+
+def ensure_allowed():
+    """Ensure sender is permitted to send to recipient."""
+    if __SENDER__ != __HEADERS__["sender"]:
+        sys.exit("Access Denied: Invalid Sender")
+    elif __RECIPIENT__ != __HEADERS__["original_recipient"]:
+        sys.exit("Access Denied: Invalid Recipient")
+
+
+def load_models():
+    """Load and return the app's models."""
+    from django.db import models  # Import after DJANGO_SETTINGS_MODULE is set
+
+    return (models.get_model(__APP__, "Post"),
+            models.get_model(__APP__, "Category"))
+
+
+def find_category(model, category):
+    """Find and return the category ID."""
+    try:
+        return int(model.objects.filter(name=category)[0].id)
+    except IndexError:
+        sys.exit("Category not found.")
+
+
+def publish_post(model, category_id, title, body, attachments):
+    """Publish the new post to the DB."""
+    if len(attachments) > 0:
+        # TODO(jk0): Add support for multiple attachments.
+        original_path = "%s%s" % (settings.MEDIA_URL, attachments[0][0])
+        thumbnail_path = "%s%s" % (settings.MEDIA_URL, attachments[0][1])
+        attachment_href = "<a href=\"%s\" class=\"lightbox\">" \
+                "<img src=\"%s\" width=\"300\" height=\"224\" alt=\"%s\">" \
+                "</a>" % (original_path, thumbnail_path, title)
+
+    # If there are attachments and no body, only link the attachments.
+    if len(body) <= 1 and len(attachments) > 0:
+        body = attachment_href
+    # If there is a body and attachments, include both.
+    elif len(body) > 1 and len(attachments) > 0:
+        body = "%s\n\n%s" % (attachment_href, body)
+
+    slug = defaultfilters.slugify(title)
+    post = model(title=title, slug=slug, date=datetime.now(), body=body,
+            published=True)
+    post.save()
+
+    # Give the post a category.
+    post.categories = [category_id]
+    post.save()
+
+
+if __name__ == "__main__":
+    OPTIONS, ARGS = build_options()
+
+    __APP__ = OPTIONS.app
+    __PROJECT_PATH__ = OPTIONS.project_path
+    __RECIPIENT__ = OPTIONS.recipient
+    __SENDER__ = OPTIONS.sender
+
+    ensure_config_options()
+
+    # Postfix sends messages via stdin.
+    MSG = Parser().parse(sys.stdin)
+
+    # Enforce ACLs and parse the email's headers.
+    __HEADERS__ = capture_headers(MSG)
+    ensure_allowed()
+
+    # Extract email body and attachment filenames.
+    BODY, ATTACHMENTS = walk_email(MSG, settings.MEDIA_ROOT)
+
+    # Load the app's models and the category ID.
+    POST_MODEL, CATEGORY_MODEL = load_models()
+    CATEGORY_ID = find_category(CATEGORY_MODEL, __HEADERS__["category"])
+
+    # Publish the new post to the DB.
+    publish_post(POST_MODEL, CATEGORY_ID, __HEADERS__["subject"], BODY,
+            ATTACHMENTS)
