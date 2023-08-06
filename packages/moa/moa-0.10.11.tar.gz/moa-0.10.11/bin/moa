@@ -1,0 +1,329 @@
+#!/usr/bin/env python
+# 
+# Copyright 2009, 2010 Mark Fiers, Plant & Food Research
+# 
+# This file is part of Moa - http://github.com/mfiers/Moa
+# 
+# Moa is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+# 
+# Moa is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with Moa.  If not, see <http://www.gnu.org/licenses/>.
+# 
+"""
+Moa executable
+
+This script is a command dispatcher for all Moa functionality.
+
+Run order
+
+ * define & load plugins
+ * plugin run 'defineCommands'
+ * plugin run 'defineOptions'
+ * __main__
+ 
+    * plugin run 'prepare_1'
+    * bg - then fork
+       * Forking
+       
+    
+ *    
+ * prepare_1_hook
+
+ 1) check if we're going to backgound - if yes, do so & exit
+ 2) check if this is a recursive run - if yes - start recursion
+
+"""
+
+import os
+import sys
+import optparse
+import textwrap
+
+#moa specific libs
+import moa.job
+import moa.utils
+import moa.version
+import moa.plugin
+import moa.commands
+
+#the system configuration is available as a global from the
+#sysConf module
+from moa.sysConf import sysConf
+
+## Initialize the logger
+import moa.logger as l
+
+## A hack to set verbosity before reading command line arguments
+if '-v' in sys.argv: moa.logger.setVerbose()
+
+sysConf.rc = 0
+## Initialze the plugins
+pluginHandler = moa.plugin.PluginHandler()
+sysConf.pluginHandler = pluginHandler
+## Command definitions
+sysConf.commands = moa.commands.Commands()
+pluginHandler.run('defineCommands')
+
+
+## defining a usage message
+USAGE = "Usage: {{bold}}{{green}}%prog {{blue}}[options] COMMAND ARGUMENTS{{reset}}\n\n"
+moaCommandNames = sysConf.commands.keys()
+moaCommandNames.sort()
+
+commandsG = []
+commandsJ = []
+
+for _c in moaCommandNames:
+    if sysConf.commands[_c].get('private', False):
+        continue
+    if sysConf.commands[_c].get('needsJob',  True):
+        commandsJ.append([_c, sysConf.commands[_c]['desc']])
+    else:
+        commandsG.append([_c, sysConf.commands[_c]['desc']])
+
+commandsG.sort()
+commandsJ.sort()
+USAGE += "Universal Moa commands:\n"
+for c, d in commandsG:
+    USAGE += "\n".join(
+        textwrap.wrap(
+            '{{bold}}%15s{{reset}} : %s' % (c, d),
+            initial_indent=' ',
+            subsequent_indent = ' ' * 19)) + "\n"
+
+USAGE += "\nJob specific Moa commands:\n"
+for c,d  in commandsJ:
+    USAGE += "\n".join(
+        textwrap.wrap(
+            '{{bold}}%15s{{reset}} : %s' % (c, d),
+            initial_indent=' ',
+            subsequent_indent = ' ' * 19)) + "\n"
+
+
+## define & parse command line options  
+parser = optparse.OptionParser(usage=moa.ui.fformat(USAGE, f='jinja'))
+
+parser.add_option(
+    '-f', '--force', dest='force', action='store_true',
+    help='Force an action, if applicable.')
+
+parser.add_option(
+    "-v", "--verbose", dest="verbose", action="store_true",
+    help="Verbose output")
+
+parser.add_option(
+    "-s", "--silent", dest="silent", action="store_true",
+    help="Be very silent")
+
+parser.add_option(
+    "--bg", dest="background", action="store_true",
+    help="Run moa in the background (implies -s)")
+
+parser.add_option(
+    "--profile", dest="profile", action="store_true",
+    help="Run the profiler")
+
+parser.add_option("-r", "--recursive", dest="recursive",
+                  help="Perfom action recursively", action='store_true')
+
+## See if the pluginHandler have anything to add to the optparse instance:
+sysConf.parser = parser
+pluginHandler.run('defineOptions')
+    
+def run_3(wd):
+    """
+    instantiate the job & prepare & run - either defer to a callback
+    or the job itself
+    """
+
+    #make sure we're in the correct wd for the rest of the invocation
+    os.chdir(wd)
+
+    #see if we can update the job
+    moa.version.fixOld(wd)
+
+    #create a job object
+    job = moa.job.Job(wd)
+    sysConf.job = job
+
+    ## Aks the job & backend if they want to add to the options
+    try:
+        job.defineOptions(parser)
+    except optparse.OptionConflictError:
+        pass
+    
+    ## Parse the options
+    sysConf.options, sysConf.args = parser.parse_args()
+
+    ## Proper setting of verbosity - after parsing of the command line
+    if sysConf.options.verbose:
+        moa.logger.setVerbose()
+
+    ## Determine command to run:
+    if len(sysConf.args) > 0:
+        command = sysConf.args[0]
+        newargs = sysConf.args[1:]
+    else:
+        command = 'status'
+        newargs = []
+
+    sysConf.newargs = newargs
+    sysConf.originalCommand = command        
+
+    #see if it is all callback
+    if command in sysConf.commands:
+        if not sysConf.commands[command].has_key('call'):
+            moa.ui.exitError("Invalid command - no callback %s" % command) 
+
+        l.debug("using a callback for moa %s" % command)
+
+        ### Run plugin initialization step 3 - just before execution
+        pluginHandler.run('prepare_3')
+        pluginHandler.run("pre%s" % command.capitalize())
+        pluginHandler.runCallback(job, command)
+        pluginHandler.run("post%s" % command.capitalize())
+        pluginHandler.run('finish')
+
+    elif not job.isMoa():
+        moa.ui.exitError("Unknown command, not in a Moa dir")
+    else:
+        #No callback, defer this to the backend
+        job.execute(command,
+                    verbose = sysConf.options.verbose,
+                    silent = sysConf.options.silent)
+
+
+
+
+def run_recursive(wd):
+    """
+    Run through the subdirs (depth first) and execute all moa jobs
+    """
+    pluginHandler.run('prepare_recursive')
+    for path, dirs, files in os.walk(wd):
+        dirs.sort() #make sure the dirs are sorted
+        if '.moa' in dirs:
+            moa.ui.message("Executing '%s' in %s" % (" ".join(sys.argv), path))
+            run_3(path)
+        else:
+            # moa.ui.message("skipping %s" % path)
+            pass
+            
+        #remove all '.' directories -
+        drem = [ x for x in dirs if x[0] == '.' ]
+        [ dirs.remove(t) for t in drem]
+    pluginHandler.run('post_recursive')
+
+    
+def run_2():
+    """
+    Are we going to do a recursive run?: check if -r is in the arguments...
+
+    If recursive - check if the command given is a plugin callback or not
+    plugin callbacks can have a recursive mode:
+
+    * global - allow recursivity to be handled here
+    * local - the callback handles recursive behaviour
+    * none - no recursive operation for this template
+
+    non plugin callbacks (commands handled by the backends) are always
+    'global'
+    """
+    
+    pluginHandler.run('prepare_recursion')
+
+    wd = os.getcwd()
+    if not '-r' in sys.argv:
+        #not recursive - go directly to stage 3
+        run_3(wd)
+    else:
+        #default mode is global
+        recurseMode = 'global'
+
+        # check if the command allows for recursive execution
+        # therefore - a quick & dirty approach to getting the
+        # command name - we haven't properly parsed the
+        # arguments yet
+        command = sysConf.default_command
+        tas = [x for x in sys.argv[1:] if not x[0] == '-']
+        if len(tas) > 0: command = tas[0]
+
+        if command in sysConf.commands:
+            recurseMode = sysConf.commands[command].get('recursive', 'none')
+        else:
+            recurseMode = 'global'
+            
+        if recurseMode == 'global':
+            run_recursive(wd)
+        else:
+            run_3(wd)
+    pluginHandler.run('post_recursion')
+
+
+def run_1():
+    """
+    Stage 1 - are we switching to the background?
+
+    if --bg is defined: fork & exit.
+
+    """
+    pluginHandler.run('prepare_background')
+    
+    #quick check: are we're backgrounding:
+    if '--bg' in sys.argv:
+        sysConf.options.silent = True
+        child = os.fork()
+        if child != 0:
+            # This is the parent thread - exit now - all
+            sysConf.childPid = child
+            pluginHandler.run("background_exit")
+            moa.ui.message("starting background run")
+            sys.exit(0)
+
+    #go to the next stage!
+    run_2()
+
+    pluginHandler.run('post_background')
+
+## Main dispatcher
+if __name__ == "__main__":
+    """
+    Main run routing - not much has been prepared yet
+    """
+    try:
+        if '--profile' in sys.argv:
+            import tempfile
+            tf = tempfile.NamedTemporaryFile(delete=False)
+            tf.close()
+            try:
+                import cProfile
+                import pstats
+                cProfile.run('run_1()', tf.name)
+                p = pstats.Stats(tf.name)
+                moa.ui.message("Profiler output")
+                p.sort_stats('cumulative').print_stats(20)
+                
+            except ImportError:
+                moa.ui.exitError("Cannot run the profiler - make sure it is properly installed")
+            
+        else:
+            run_1()
+    except KeyboardInterrupt:
+        sysConf.rc = -1
+        pluginHandler.run("post_interrupt")
+        moa.ui.warn("Interrupted")
+        sys.exit(-1)
+    except Exception, e:
+        sysConf.rc = -1
+        pluginHandler.run("post_error")
+        moa.ui.warn("Encountered a run error?")
+        raise
+
