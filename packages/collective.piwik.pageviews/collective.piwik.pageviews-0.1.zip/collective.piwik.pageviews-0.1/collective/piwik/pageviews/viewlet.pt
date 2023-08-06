@@ -1,0 +1,73 @@
+<div id="pageviews"></div>
+<div id="pageviews_unique"></div>
+<script>
+
+var hits = 0;
+var unique = 0;
+
+var re = /\/+$/;
+//for urls with slash(es) on the end
+
+var page_url = document.location.href.split('?')[0].replace(re, "");
+
+
+var page_id = page_url.split('/').slice(-1);
+
+if (String(page_id) == page_url.replace('http://', '')) {
+    page_id = "";
+    page_url = page_url + "/";
+}
+//for the index page
+
+function getPageViews() {
+    jq.getScript(pkBaseURL + '?module=API&method=Actions.getPageUrls&idSite=' + site_id + '&period=year&date=last100&format=json&filter_column_recursive=label&filter_pattern_recursive='+ page_id + '&expanded=1&jsoncallback=playcountercb');
+}
+
+function findUrl(year) { 
+
+    for(var level in year) {
+        if (typeof year[level]['url'] != 'undefined') {
+             if (year[level]['url'] == page_url) {            
+                  hits += year[level]['nb_hits'];
+                  unique += year[level]['nb_visits'];
+                  }      
+           }
+     
+        else {
+           findUrl(year[level]['subtable']);       
+           }
+    } 
+} 
+
+
+
+window.playcountercb = function(jdata){
+
+for(var year in jdata)
+    {
+    if (jdata[year].length > 0) {
+
+
+        for(var entry in jdata[year]){
+            if (typeof jdata[year][entry] != 'undefined') { 
+                if (typeof jdata[year][entry]['url'] != 'undefined' && jdata[year][entry]['url'] == page_url) {
+                    hits += jdata[year][entry]['nb_hits'];
+                        unique += jdata[year][entry]['nb_visits'];            
+                }
+            }
+ 
+        }
+    findUrl(jdata[year][0]['subtable']);
+        }
+    }
+
+//piwik API should really be fixed to allow pageViews by just providing the url, on an easier way...then all
+//these UGLY and confusing for loops and functions will be removed...
+
+jq('#pageviews').html('pagehits:' + hits);
+jq('#pageviews_unique').html('unique hits:' + unique);
+};
+
+jq(window).load(function() { getPageViews(); });
+
+</script>
