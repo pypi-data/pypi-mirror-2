@@ -1,0 +1,19 @@
+This package patches the web application server Zope to work around
+https://bugs.launchpad.net/zope2/+bug/740831.
+
+The bug causes Zope to deliver wrong responses after a request using
+``Response.write`` has suffered a ``ConflictError``. The patch
+prevents Zope from retrying such requests and logs an error message when it
+tries. The bug effect is thus limited to a single request.
+
+Note that even with this patch Zope does not behave fully correctly: in
+case of a ``ConflictError``, it may
+deliver a (maybe partial) response even though the transaction has
+been aborted. The client does not get feedback for the transaction rollback.
+The only indication is the log record written.
+
+``Response.write`` is inherently unsafe in the face of ``ConflictError``.
+The only reliable fix is not to use it at all.
+
+
+The (monkey) patch gets installed when this package is imported.
