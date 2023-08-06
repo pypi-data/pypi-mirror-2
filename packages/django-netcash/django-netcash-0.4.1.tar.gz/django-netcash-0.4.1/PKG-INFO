@@ -1,0 +1,188 @@
+Metadata-Version: 1.0
+Name: django-netcash
+Version: 0.4.1
+Summary: A pluggable Django application for integrating netcash.co.za payment system.
+Home-page: http://bitbucket.org/kmike/django-netcash/
+Author: Mikhail Korobov
+Author-email: kmike84@gmail.com
+License: MIT license
+Download-URL: http://bitbucket.org/kmike/django-netcash/get/tip.gz
+Description: ==============
+        django-netcash
+        ==============
+        
+        A pluggable Django application for integrating netcash.co.za payment system.
+        
+        Install
+        =======
+        
+        ::
+        
+            $ pip install django-netcash
+        
+        or ::
+        
+            $ easy_install django-netcash
+        
+        or ::
+        
+            $ hg clone http://bitbucket.org/kmike/django-netcash/
+            $ cd django-netcash
+            $ python setup.py install
+        
+        
+        Then add 'netcash' to INSTALLED_APPS and execute ::
+        
+            $ python manage.py syncdb
+        
+        or (if South is in use) ::
+        
+            $ python manage.py migrate
+        
+        If South is used then the NetcashGateway instance will be created. Otherwise
+        go to admin and add the NetcashGateway instance. It is neccessary to have
+        at least one NetcashGateway instance in DB.
+        
+        Settings
+        ========
+        
+        Specify your credentials in settings.py:
+        
+        * ``NETCASH_USERNAME``
+        * ``NETCASH_PASSWORD``
+        * ``NETCASH_PIN``
+        * ``NETCASH_TERMINAL_NUMBER``
+        
+        If your web server is behind reverse proxy you should also specify
+        ``NETCASH_IP_HEADER`` option. It's a ``request.META`` key with client ip address
+        (default is 'REMOTE_ADDR').
+        
+        You also have to setup your Netcash account on netcash.co.za. Login into the
+        admin panel, go to 'credit cards' section then go to 'Adjust Gateway Defaults'
+        and then paste your Data URL. Data URL can be found in django admin changelist
+        page for NetcashGateway model.
+        
+        Usage
+        =====
+        
+        Payment form
+        ------------
+        
+        netcash.forms.NetcashForm can be used to construct the html form. It is
+        a helper form for html output and it shouldn't perform any validation.
+        
+        Pass all the fields to form 'initial' argument. Form also has an optional
+        'user' parameter: it is the User instance the order is purchased by. If
+        'user' is specified, 'm_9' (cardholder email address) will be filled
+        automatically if it is not passed with 'initial'.
+        
+        Example::
+        
+            # views.py
+        
+            from django.shortcuts import get_object_or_404
+            from django.views.generic.simple import direct_to_template
+            from django.contrib.auth.decorators import login_required
+        
+            from netcash.forms import NetcashForm
+        
+            @login_required
+            def pay_with_netcash(request, order_id)
+        
+                # Order model have to be defined by user, it is not a part
+                # of django-netcash
+                order = get_object_or_404(Order, pk = order_id)
+        
+                form = NetcashForm(initial={
+        
+                    # required params:
+                    'p3': 'description of the goods',
+                    'p4': order.total,
+        
+                    # optional params:
+        
+                    # 'p10': '/cancel/button/url',
+                    # 'Budget': 'Y',  # will display the budget option in the Gateway popup
+                    # 'm_4': 'extra param 1',
+                    # 'm_5': 'extra param 2',
+                    # 'm_6': 'extra param 3',
+                    # 'm_9': order.user.email # cardholder email address
+                }, user=order.user)
+        
+                return direct_to_template(request, 'pay_with_netcash.html', {'form': form})
+        
+        
+        The template::
+        
+            {% extends 'base.html' %}
+        
+            {% block content %}
+                <form action="{{ form.target }}" method="POST">
+                    <p>{{ form.as_p }}</p>
+                    <p><input type="submit" value="Pay by Credit Card"></p>
+                </form>
+            {% endblock %}
+        
+        The {{ form.as_p }} output will be a number of ``<input type='hidden'>`` tags.
+        
+        NetcashForm has a 'target' attribute with Netcash URL.
+        
+        Please note that it's up to you to implement the order processing logic.
+        Order handling should be performed in ``netcash.signals.data`` signal handler.
+        
+        ``netcash.signals.data`` signal
+        -------------------------------
+        
+        When Netcash posts data to Data URL ``netcash.signals.data`` signal is sent.
+        This signal won't be sent for suspicious data (when request is coming from
+        untrusted ip or form validation fails).
+        
+        Signal subscribers will get an 'order' argument with ``NetcashOrder`` instance.
+        
+        Example::
+        
+            import netcash.signals
+        
+            def data_received(sender, **kwargs):
+                netcash_order = kwargs['order']
+        
+                if netcash_order.TransactionAccepted: # order is paid
+                    amount = netcash_order.Amount
+                    # your business logic
+                    # ...
+                else: # order is not paid
+                    # your business logic
+                    # ...
+        
+            netcash.signals.data.connect(data_received)
+        
+        
+        urls.py
+        -------
+        
+        In order to get Data URL, Accept URL and Reject URL up and running,
+        include netcash.urls in your urls.py::
+        
+            urlpatterns = patterns('',
+                #...
+                url(r'^netcash/', include('netcash.urls')),
+                #...
+            )
+        
+        Templates
+        ---------
+        
+        * ``netcash/accept.html`` - Accept URL page. Has an 'order' variable in
+          template context with NetcashOrder instance.
+        
+        * ``netcash/accept.html`` - Reject URL page. Has an 'order' variable in
+          template context with NetcashOrder instance.
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Django
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
