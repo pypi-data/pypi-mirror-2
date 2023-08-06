@@ -1,0 +1,195 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+  xml:lang="en"
+  lang="en"
+  xmlns:tal="http://xml.zope.org/namespaces/tal"
+  xmlns:metal="http://xml.zope.org/namespaces/metal"
+  xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+  metal:use-macro="here/prefs_main_template/macros/master"
+  i18n:domain="plonefileszip">
+
+
+  <tal:comment replace="nothing">
+    ###########################
+    Configlet for PloneFilesZip
+    ###########################
+    # Copyright (c) 2003-2006 Ingeniweb SAS
+
+    # This software is subject to the provisions of the GNU General Public
+    # License, Version 2.0 (GPL).  A copy of the GPL should accompany this
+    # distribution.  THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL
+    # EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT
+    # LIMITED TO, THE IMPLIED WARRANTIES OF TITLE, MERCHANTABILITY,
+    # AGAINST INFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE
+    $Id: prefs_files_zip_form.cpt 35340 2007-01-04 12:32:42Z thomasdesvenain $
+  </tal:comment>
+
+
+  <metal:top-slot fill-slot="top_slot"
+    tal:define="dummy python:request.set('disable_border',1)" />
+
+  <metal:content fill-slot="prefs_configlet_content">
+
+    <div class="documentContent" id="region-content">
+      <a name="documentContent"></a>
+
+      <div metal:use-macro="here/global_statusmessage/macros/portal_message">
+        Portal status message
+      </div>
+
+      <div class="configlet"
+        tal:define="portal_fileszip portal/portal_fileszip;
+        errors options/state/getErrors">
+
+        <h1>Plone Files Zip</h1>
+
+        <a href=""
+          class="link-parent"
+          tal:attributes="href string: $portal_url/plone_control_panel"
+          i18n:domain="plone"
+          i18n:translate="label_up_to_plone_setup">
+          Up to Site Setup
+        </a>
+
+        <form action="personalize"
+          method="post"
+          enctype="multipart/form-data"
+          class="enableUnloadProtection"
+          tal:attributes="action template_id"
+          i18n:domain="plonefileszip"
+          tal:define="translate nocall:here/translate;">
+
+          <fieldset>
+
+            <legend i18n:translate="legend_files_zip_prefs">Select your PloneFilesZip preferences</legend>
+
+            <div class="field">
+              <label for="zippablePortalTypes"
+                i18n:translate="label_select_portal_types">Included portal types</label>
+              <div class="formHelp"
+                i18n:translate="help_select_portal_types">
+                Select the portal types which file (like) fields will
+                provide files to the ZIP archives.
+              </div>
+
+              <select name="zippablePortalTypes"
+                id="zippablePortalTypes"
+                multiple="multiple"
+                tal:define="zippables portal_fileszip/potentialZippablePortalTypes;
+                selected_zippables portal_fileszip/zippablePortalTypes;">
+                <tal:loop repeat="portal_type zippables">
+                  <option value="#" selected="#"
+                    tal:attributes="value portal_type;
+                    selected python:test(portal_type in selected_zippables, 'selected', nothing)"
+                    tal:content="python:'%s (%s)' % (translate(portal_type, default=portal_type), portal_type)">
+                    portal type
+                  </option>
+                </tal:loop>
+              </select>
+            </div>
+
+            <div class="field">
+              <input class="noborder" id="includeRDF" name="includeRDF" type="checkbox" checked="#"
+                tal:attributes="checked python:test(portal_fileszip.includeRDF, 'checked', nothing)" />
+              <label for="includeRDF"
+                i18n:translate="label_include_rdf">Include RDF files?</label>
+              <div class="formHelp">
+                <span i18n:translate="help_include_rdf">
+                  Do you want to include content DC metadata in RDF files into the ZIP archives ?
+                </span>
+                <a href="http://dublincore.org/documents/dcmes-xml/" target="_blank">
+                  http://dublincore.org/documents/dcmes-xml/
+                </a>
+              </div>
+            </div>
+
+            <div class="field">
+
+                <label i18n:translate="structure_policy_label">Zip Inner Structure Policy</label>
+                <span class="fieldRequired" title="Required" i18n:domain="plone"
+                i18n:attributes="title title_required;"
+                i18n:translate="label_required">(Required)</span>
+
+                <div class="formHelp" i18n:translate="structure_policy_help">Choose how inner trees of downloaded zip files will be built</div>
+                <table i18n:domain="plonefileszip">
+
+                <span tal:repeat="policy_info python:portal_fileszip.getInnerStructurePoliciesInfos().values()" omit-tag="">
+                    <tr>
+                    <td>
+                        <input class="noborder"
+                           name="innerStructurePolicy"
+                           tal:attributes="
+                                    id policy_info/id;
+                                    value policy_info/id;
+                                    checked python: (policy_info['id']==portal_fileszip.innerStructurePolicy) or nothing"
+                           type="radio" />
+                     </td>
+                     <td>
+                        <label tal:attributes="for policy_info/id"
+                               tal:content="python:translate(policy_info['label_msgid'], default=policy_info['label'])">Policy title</label>
+                      </td>
+                      <tr>
+                        <td></td>
+                        <td>
+                        <span class="formHelp"
+                              tal:content="python:translate(policy_info['help_msgid'], default=policy_info['help'], domain='plonefileszip')"
+                              tal:attributes="msgid policy_info/help_msgid">Help for policy</span>
+                        </td>
+                      </tr>
+                </span>
+                </table>
+            </div>
+            <div class="field"
+              tal:define="error errors/zipCharset | nothing"
+              tal:attributes="class python:test(error, 'field error', 'field')">
+              <label for="zipCharset" i18n:translate="label_zip_charset">File names charset</label>
+              <span class="fieldRequired" title="Required" i18n:domain="plone"
+                i18n:attributes="title title_required;"
+                i18n:translate="label_required">(Required)</span>
+              <div class="formHelp" i18n:translate="help_zip_charset">
+                Please select a charset for the file names in the zip
+                archive. 'cp1252' will suit in most cases (Windows
+                users) but you might prefer another one.
+              </div>
+
+              <div tal:content="error">Validation error output</div>
+
+              <input type="text"
+                id="zipCharset"
+                name="zipCharset"
+                size="25"
+                tabindex=""
+                value="#"
+                tal:attributes="value request/zipCharset | portal_fileszip/zipCharset;
+                tabindex tabindex/next;"
+                />
+
+            </div>
+
+            <div class="formControls" i18n:domain="plone">
+              <input class="context"
+                tabindex=""
+                type="submit"
+                value="Save"
+                name="form.button.Save"
+                i18n:attributes="value label_save;"
+                tal:attributes="tabindex tabindex/next;"
+                />
+              <input class="standalone"
+                tabindex=""
+                type="submit"
+                value="Cancel"
+                name="form.button.Cancel"
+                i18n:attributes="value label_cancel;"
+                tal:attributes="tabindex tabindex/next;"
+                />
+            </div>
+
+            <input type="hidden" name="form.submitted" value="1" />
+
+          </fieldset>
+        </form>
+
+      </div>
+    </div>
+  </metal:content>
+</html>
