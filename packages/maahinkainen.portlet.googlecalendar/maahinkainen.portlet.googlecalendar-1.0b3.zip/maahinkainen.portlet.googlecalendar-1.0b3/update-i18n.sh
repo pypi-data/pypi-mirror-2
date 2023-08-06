@@ -1,0 +1,3 @@
+#!/bin/sh
+i18ndude rebuild-pot --pot maahinkainen/portlet/googlecalendar/locales/maahinkainen.portlet.googlecalendar.pot --create maahinkainen.portlet.googlecalendar maahinkainen/portlet/googlecalendar
+i18ndude sync --pot maahinkainen/portlet/googlecalendar/locales/maahinkainen.portlet.googlecalendar.pot maahinkainen/portlet/googlecalendar/locales/*/LC_MESSAGES/maahinkainen.portlet.googlecalendar.po
