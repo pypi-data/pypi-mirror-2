@@ -1,0 +1,89 @@
+from datetime import datetime
+import hashlib
+from couchdbkit import *
+from formalchemy.ext.couchdb import Document
+from {{package}}.model.meta import Session, contain, db
+
+def encrypt_value(value):
+    return hashlib.sha1(value).hexdigest()
+
+class NotAuthenticated(Exception):pass
+
+class Permission(Document):
+    name = StringProperty(30) # undocumented
+    description = StringProperty(255) # undocumented
+    
+    def __repr__(self):
+        return self.name
+    
+    __unicode__ = __repr__
+
+class Group(Document):
+    name = StringProperty(30) # undocumented
+    description = StringProperty(255) # undocumented
+    created = DateTimeProperty() # undocumented
+    active = BooleanProperty() # undocumented
+    permissions = SchemaListProperty(Permission)
+    
+    def __repr__(self):
+        return self.name
+    
+    __unicode__ = __repr__
+
+class User(Document):
+    username = StringProperty(30) # undocumented
+    password = StringProperty(40) # undocumented
+    password_check = StringProperty(40) # undocumented
+    email = StringProperty(255) # undocumented
+    created = DateTimeProperty() # undocumented
+    active = BooleanProperty() # undocumented
+    groups = SchemaListProperty(Group)
+    
+    def __repr__(self):
+        return self.username
+    
+    __unicode__ = __repr__
+    @classmethod
+    def authenticate(cls, username, password):
+        """Use view ``auth/user_by_name`` to check authentification.
+        Return a :class:`~repoze.what.plugins.couchdbkit.documents.User` object on success.
+        """
+        users = cls.view('auth/user_by_name', key=username)
+        for user in users:
+            if user and user.active and encrypt_value(password) == user.password:
+                return user
+            break
+        raise NotAuthenticated
+    
+    def validate_password(self, user, password):
+        return encrypt_value(password) == user.password
+    
+    def encrypt_password(self):
+        if self.password and self.password != self.password_check:
+            self.password = encrypt_value(self.password)
+            self.password_check = self.password
+    
+    @property
+    def permissions(self):
+        permissions = set()
+        for g in self.groups:
+            permissions = permissions | set(g.permissions)
+        return permissions
+    
+    @property
+    def permission_names(self):
+        return [p.name for p in self.permissions]
+    
+    def has_permission(self, perm):
+        return (perm in self.permission_names)
+    
+    def save(self, **kwargs):
+        self.encrypt_password()
+        Document.save(self, **kwargs)
+    
+
+contain(db, User, Permission, Group)
+
+__all__=['User', 'Permission', 'Group', 'NotAuthenticated']
+
+# Overwritten by Shabti couchdbkit template

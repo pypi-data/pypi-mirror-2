@@ -1,0 +1,54 @@
+from repoze.who.plugins.friendlyform import FriendlyFormPlugin
+from repoze.who.plugins.auth_tkt import AuthTktCookiePlugin
+from repoze.what.middleware import setup_auth
+from repoze.what.plugins import couchdbkit
+from {{package}}.model.meta import db
+from {{package}}.model import User
+
+loginform = FriendlyFormPlugin(
+    '/login/index',                             # arg - login_form_url
+    login_handler_path = '/login/welcome_back', # arg - login_handler_path
+    post_login_url = '/login/see_you_later',    # The URL/path to the post-login 
+                                                # page, if any.
+    logout_handler_path = '/login/see_you_later',    # arg - logout_handler_path
+    post_logout_url = '/login/see_you_later',   # The URL/path to the post-logout 
+                                                # page, if any.
+    rememberer_name = 'cookie',                 # arg - rememberer_name
+    )
+
+cookie = AuthTktCookiePlugin('secret')
+
+def add_auth(app, skip_authentication):
+    """Add authentication and authorization middleware to the ``app``."""
+
+    authenticator=couchdbkit.Authenticator(db, klass=User)
+
+    groups = couchdbkit.GroupAdapter(db)
+    groups = {'all_groups': groups}
+
+    identifiers=[("form", loginform), ('cookie', cookie)]
+    challengers=[("form", loginform)]
+
+    authenticators=[("accounts", authenticator)]
+    mdproviders=[("accounts", couchdbkit.MDPlugin(db, klass=User))]
+
+    permissions = {'all_perms': couchdbkit.PermissionAdapter(db)}
+
+    return setup_auth(app,
+                      groups,
+                      permissions,
+                      identifiers=identifiers,
+                      authenticators=authenticators,
+                      challengers=challengers,
+                      mdproviders=mdproviders)
+
+
+def get_user():
+    from pylons import request
+    """Return the current user's database object."""
+    if 'repoze.who.identity' in request.environ:
+        return request.environ.get('repoze.who.identity')['user']
+    else:
+        return None
+    
+# Overwritten by Shabti couchdbkit template

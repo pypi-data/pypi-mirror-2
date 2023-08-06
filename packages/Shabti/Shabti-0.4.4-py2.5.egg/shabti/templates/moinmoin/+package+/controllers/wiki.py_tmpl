@@ -1,0 +1,46 @@
+# -*- coding: utf-8 -*-
+import pylons
+from pylons import config as appconfig, request, tmpl_context as c
+from {{package}}.lib.base import BaseController
+from {{package}}.lib.helpers import dcmeta
+
+import StringIO, urllib
+
+import logging
+log = logging.getLogger(__name__)
+import sys, os
+sys.path.insert(0, appconfig['moindir']+'/config')
+
+try:
+    from MoinMoin.server.server_wsgi import WsgiConfig, moinmoinApp
+except ImportError:
+    from MoinMoin.wsgiapp import application as moinmoinApp
+else:
+    class Config(WsgiConfig):
+        pass
+    config = Config() # you MUST create an instance
+
+class WikiController(BaseController):
+    def __before__(self):
+        c.dcmeta = dcmeta(title="Untitled")
+    
+    
+    def index(self):
+        request._current_obj().headers['x-moin-location'] = '/wiki/'
+        return moinmoinApp(request.environ, self.start_response)
+    
+    
+    def moinpage(self, *args, **kwargs):
+        # Thanks to ianbicking for identifying both the necessity for and
+        # the description of this workaround for reconstituting wsgi.input
+        if request.environ.get('paste.parsed_formvars', False):
+            wsgi_input = urllib.urlencode(
+                request.environ['paste.parsed_formvars'][0], True)
+            request.environ['wsgi.input'] = StringIO.StringIO(wsgi_input)
+            request.environ['CONTENT_LENGTH'] = len(wsgi_input)
+        # Uncomment this if you're using PrefixMiddleware
+        # request.environ['SCRIPT_NAME'] = ''
+        request.environ['PATH_INFO'] = request.environ['PATH_INFO'].__str__()
+        request._current_obj().headers['x-moin-location'] = '/wiki/'
+        return moinmoinApp(request.environ, self.start_response)
+    

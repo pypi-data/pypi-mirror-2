@@ -1,0 +1,426 @@
+# -*- coding: utf-8 -*-
+import logging
+from pylons import url, request, tmpl_context as c
+from pylons.controllers.util import abort, redirect, log
+from pylons.decorators import jsonify, validate as pvalidate
+import formencode
+from formencode import validators
+from sqlalchemy import *
+from sqlalchemy.sql import and_
+from tw.mods.pylonshf import validate
+from tw.api import WidgetBunch
+from {{package}}.lib.base import BaseController, render
+from {{package}}.lib.decorators import authorize
+from {{package}}.lib.auth.permissions import HasPermission, SignedIn
+from {{package}}.lib import antispam
+from {{package}}.lib.helpers import dcmeta, get_object_or_404
+from {{package}} import model
+from {{package}}.forms.blogsettings import *
+log = logging.getLogger(__name__)
+
+debug = 1
+
+class Settings(object):
+    def __init__(self, admin=1, default_blog=1):
+        self.admin = admin
+        self.default_blog = default_blog
+
+settings = Settings(admin=1, default_blog=1)
+#settings = Settings.get(1)
+
+blogsettings_form = BlogSettingsForm('blogsettings_form', location = "headbottom")
+# ----------------------------------------------------------------
+# --
+# --
+# --
+# -- Blog Administration facility
+# --
+# --
+# --
+# ----------------------------------------------------------------
+
+class BlogadminController(BaseController):
+    # Interface for managing an individual blog
+    
+    # Integrate with Authkit
+    #require = identity.has_permission('can_admin')
+    # @authorize(HasPermission('can_admin'))
+    @authorize(SignedIn())
+    def __before__(self):
+        c.dcmeta = dcmeta(title="Blog Admin", description="Blog Admin page")
+    
+    def fake_auth(self, obj):
+        if debug > 1: log.debug("FakeAuth with: %s" % (obj))
+        return True
+    
+    def authedit(self, bid):
+        cart=model.Session.query(model.Blog).get(bid)
+        identity = c.user
+        # log.debug("kick: identity.current.user: %s cart owner %s settings.admin: %s" % \
+        #             (c.user, cart.owner, settings.admin))
+        if c.user != cart.owner and c.user.id != settings.admin:
+            abort(403)
+    
+    # @authorize(HasPermission('can_admin'))
+    def dash(self, bid=None):
+        if not bid: bid = settings.default_blog
+        dc = dcmeta(title='Blog Store, Dashboard')
+        if debug > 1: log.debug("BlogAdminController dash: %s %s" % (args, pformat(kw)))
+        self.authedit(bid)
+        c.comments = model.Comment.get_last(3)
+        c.posts = model.Post.get_last(3)
+        c.blog= model.Session.query(model.Blog).get(bid)
+        c.admincheck = self.fake_auth
+        c.blogadminmenu = ""
+        return render('blog/blog_admin/dash.mako')
+    
+    def manage(self, bid):
+        return self.manage_posts(bid)
+    
+    def index(self):
+        return self.blogs()
+    
+    
+    # ---- Blog management-related stuff --------------------------------------
+    def blogs(self):
+        """
+        Produces a list of blogs for management
+        """
+        c.bloggers = model.Session.query(model.User).all()
+        c.blogs = model.Session.query(model.Blog).all()
+        c.ag = model.Session.query(model.Group).filter(model.Group.name=="admin")
+        c.beldict = dcmeta(title='Blog Store, Select point')
+        log.debug("admincontrol:blogs default blog=[%s] curadmin=[%s]" % \
+                      (settings.default_blog, settings.admin))
+        c.defblog = settings.default_blog
+        c.blog=get_object_or_404(model.Blog, id=settings.default_blog)
+        c.curadmin=settings.admin
+        return render('/blog/admin/blogs.mako')
+    
+    def delete_blog(self, bid):
+        """
+        Delete a specific blog
+        """
+        validator = validators.Int()
+        validator.to_python(bid)
+        if settings.default_blog == bid:
+             # turbogears.flash('Cannot delete default blog!')
+             pass
+        else:
+            b = get_object_or_404(model.Blog, id=bid)
+            model.Session.delete(b)
+            model.Session.commit()
+        return redirect('/blogadmin/blogs')
+    
+    
+    # Auth decoractor required
+    # Form validation decorator required
+    # REST restriction required
+    def create_blog(self, *args, **kwargs):
+        """
+        Create a new blog
+        """
+        form = request.environ.get('webob._parsed_post_vars')[0]
+        bn = form.get('name')
+        bt = form.get('tagline', 'insert witty tagline here')
+        bo = get_object_or_404(model.User, id=form['owner'])
+        newblog = model.Blog(name=bn,tagline=bt,owner=bo)
+        model.Session.add(newblog)
+        model.Session.commit()
+        return redirect('/blogadmin/%s/manage'%newblog.id)
+    
+    
+    # ---- User-related stuff -------------------------------------------------
+    def users(self, *args, **kw):
+        c.dc = dcmeta(title='Blog Store, Select user')
+        c.users=model.Session.query(model.User).all()
+        c.groups=model.Session.query(model.Group).all()
+        return render('/blog/admin/users.mako')
+    
+    def user_info(self, uid):
+        z = {}
+        for p in model.Group.select():
+            z[p.group_name] = { 'id':p.id, 'desc':p.display_name }
+        ns = dict(user=User.get(uid), allgroup=z)
+    
+    def set_admin(self, **kwargs):
+        session = create_session()
+        settings.admin = User.get(kwargs['aid'])
+        session.flush()
+        ns = dict()
+    
+    def set_default(self, **kwargs):
+        session = create_session()
+        settings.default_blog = int(kwargs['defblog'])
+        session.flush()
+        ns = dict()
+    
+    
+    # ---- model.Post-related stuff -------------------------------------------------
+    def manage_posts(self, bid):
+        if debug > 1: log.debug("ManagePosts %s %s" % (args, pformat(kw)))
+        from tw.forms.datagrid import DataGrid
+        from tw.mods.pylonshf import render as twrender
+        self.authedit(bid)
+        c.blog = get_object_or_404(model.Blog,id=bid)
+        c.dcmeta = dcmeta(title='%s, Manage posts' % c.blog.name)
+        # To do more complicated stuff use ElementTree as a construction kit.
+        # def makeTeamLink(team):
+        #     link = ElementTree.Element('a',
+        #                                href='/team/%d' % team.id)
+        #     link.text = team
+        #     return link
+        post_fields = [('Id', 'id'),
+                        ('Modification time', 'modification_time'),
+                        ('Title', 'title'),
+                        ('Tags **** Length of', 'tags'),
+                        ('Comments ***** Length of', 'comments'),
+                        ('Published', 'published'),
+                        ('Author', 'author_name'),
+                        ('View', 'get_view_link'),
+                        ('Edit', 'get_edit_link'),
+                        ('Delete', 'get_delete_link')]
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.admincheck=self.fake_auth
+        c.posts=c.blog.posts
+        c.posts_widget=DataGrid(fields=post_fields)
+        resp = twrender('/blog/blog_admin/manage_posts.mako')
+        # return render('turboblog.blog_admin.manage_posts', **ns)
+        return resp
+    
+    def delete_post(self, bid, pid):
+        self.authedit(bid)
+        post = get_object_or_404(model.Post, id=pid)
+        model.Session.delete(post)
+        model.Session.commit()
+        return redirect('blogadmin_manage', bid=bid.decode('utf8'))
+    
+    def new_post(self, bid):
+        kw = request.POST
+        self.authedit(bid)
+        u = validators.URL(add_http=False, check_exists=False)
+        for tburl in request.POST.get('trackback_url','').split(' '):
+            if tburl:
+                # FIXME: what is supposed to happen to this?
+                print u.to_python(tburl)
+        user = c.user
+        blog = model.Blog.get(bid)
+        pub = 'publish' in kw
+        edit = ('edit' in kw) or ('publishedit' in kw)
+        if edit:
+            p = model.Post.get(kw['post_id'])
+            p.title = kw['post_title']
+            p.content = kw['content']
+            p.published = 'publishedit' in kw
+            p.trackback_urls = kw['trackback_url']
+        else:
+            p = model.Post(title="New post",
+                     content='',
+                     author=user,
+                     published=pub,
+                     blog=blog,
+                     trackback_urls = '')
+        model.Session.commit()
+        if p.published:
+            p.send_trackbacks()
+        return redirect('/blogadmin/%d/manage'%blog.id)
+    
+    def write(self, bid, pid):
+        if not bid: bid = setting.default_blog
+        self.authedit(bid)
+        c.blog = get_object_or_404(model.Blog, id=bid)
+        c.post = None
+        if pid:
+            c.post = get_object_or_404(model.Post, id=pid)
+            c.edit = c.post != None
+        else:
+            c.edit = c.post != None
+            c.title = "Write"
+            c.post_title = "Title here"
+            c.post_content = "Content here"
+        if c.edit:
+            c.title = "Edit"
+            c.post_id = c.post.id
+            c.post_title = c.post.title
+            c.post_content = c.post.content
+        c.dcmeta = dcmeta(title='Blog Store, Write blog')
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.admincheck=self.fake_auth
+        c.fancy_editing=False
+        return render('/blog/blog_admin/write.mako')
+    
+    
+    # ---- Comment-related stuff ----------------------------------------------
+    def manage_comments(self, bid,):
+        dc = dcmeta(title='Blog Store, Manage comments')
+        self.authedit(bid)
+        c.blog=model.Blog.get(bid)
+        reqenvkeys = request.GET.keys()
+        mass = False
+        if 'mode' in request.GET.keys():
+            c.mass = request.GET['mode'] == 'mass'
+            try:
+                c.mass = int(c.mass)
+            except:
+                c.mass = 0
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.admincheck=self.fake_auth
+        return render('/blog/blog_admin/manage_comments.mako')
+    
+    def delete_comment(self, *args, **kw):
+        self.authedit(kw)
+        session = create_session()
+        c = Comment.get(kw['cid'])
+        c.destroySelf()
+        session.flush()
+        return url('/blogadmin/%s/manage_comments'%kw['bid'])
+    
+    def edit_comment(self, bid, cid):
+        self.authedit(bid)
+        c = Comment.get(cid)
+        return url('/blogadmin/%s/manage_comments'%bid)
+    
+    def delete_comments(self, *args, **kw):
+        self.authedit(kw)
+        session = create_session()
+        for cid in kw['delete_comments[]']:
+            c = Comment.get(cid)
+            c.destroySelf()
+        session.flush()
+        return redirect('/blogadmin/%s/manage_comments'%kw['bid'])
+    
+    
+    # ---- Tag-related stuff -------------------------------------------------
+    def manage_tags(self, bid):
+        c.dcmeta = dcmeta(title='Blog Store, Tag management')
+        self.authedit(bid)
+        c.blog = get_object_or_404(model.Blog, id=bid)
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.admincheck = self.fake_auth
+        return render('/blog/blog_admin/manage_tags.mako')
+    
+    def rename_tag(self, *args, **kw):
+        self.authedit(kw)
+        session = create_session()
+        blog=model.Blog.get(kw['bid'])
+        tag = Tag.get(kw['tid'])
+        tag.name = kw['tag']
+        session.flush()
+        return url('/blogadmin/%s/manage_tags'%kw['bid'])
+    
+    def add_tag(self, *args, **kw):
+        self.authedit(kw)
+        session = create_session()
+        blog=model.Blog.get(kw['bid'])
+        tag = Tag(name=kw['tag'], blogID=blog.id)
+        blog.tags.append(tag)
+        session.flush()
+        return url('/blogadmin/%s/manage_tags'%kw['bid'])
+    
+    def delete_tag(self, *args, **kw):
+        self.authedit(kw)
+        session = create_session()
+        blog=model.Blog.get(kw['bid'])
+        tag = Tag.get(kw['tid'])
+        tag.deleteMe()
+        session.flush()
+        return redirect('/blogadmin/%s/manage_tags'%kw['bid'])
+    
+    
+    # ---- Settings-related stuff ---------------------------------------------
+    def settings(self, bid):
+        if debug: log.debug("BlogAdminController settings called")
+        return self.settings_general(bid)
+    
+    def settings_general(self, bid):
+        if debug: log.debug("BlogAdminController settings_general called")
+        self.authedit(bid)
+        c.blog=get_object_or_404(model.Blog, id=bid)
+        c.title = dcmeta(title='General settings for %s' % c.blog.name)
+        c.admincheck=self.fake_auth
+        c.w = WidgetBunch()
+        c.w.form = blogsettings_form
+        c.legend = "General setting for %s" % c.blog.name
+        c.value = c.blog
+        c.action = url('save_general_settings', bid=bid)
+        
+        return render('/blog/blog_admin/blog_settings_general.mako')
+        # return render('/blog/blog_admin/settings_general.mako')
+    
+    def settings_comments(self, bid):
+        if debug: log.debug("BlogAdminController settings_comments called")
+        self.authedit(bid)
+        c.blog=get_object_or_404(model.Blog, id=bid)
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.title = 'Comments settings for %s' % c.blog.name
+        c.dcmeta = dcmeta(title=c.title)
+        c.admincheck=self.fake_auth
+        return render('/blog/blog_admin/settings_comments.mako')
+    
+    def settings_reading(self, bid):
+        if debug: log.debug("BlogAdminController settings_reading called")
+        self.authedit(bid)
+        c.blog=get_object_or_404(model.Blog, id=bid)
+        # admincheck = turbogears.identity.conditions.has_permission
+        c.title = 'Reading settings for %s' % c.blog.name
+        c.dcmeta = dcmeta(title=c.title)
+        c.admincheck=self.fake_auth
+        return render('blog/blog_admin/settings_reading.mako')
+    
+    def update_settings(self, *args, **kw):
+        if debug: log.debug("Update settings args: %s kw:%s" % (args, kw))
+        try:
+            blog = model.Blog.get(kw['bid'])
+            if blog.owner != kw['admin']: blog.owner = kw['admin']
+            if blog.name != kw['blogname']: blog.name = kw['blogname']
+            if blog.tagline != kw['blogdescription']: blog.tagline = kw['blogdescription']
+            if blog.theme != kw['theme']: blog.theme = kw['theme']
+            session.save()
+        except Exception, msg:
+            log.debug("Update settings error %s %s, %s" % (msg, args, kw))
+        return self.settings_general(*args, **kw)
+    
+    
+    # ---- User-related stuff -------------------------------------------------
+    # Not required on voyage
+    def user_create(self, *args, **kw):
+        groups = kw['groups'].split(',')
+        validators.FieldsMatch('psw', 'psw2').to_python(kw)
+        session = create_session()
+        u=User(id=kw['login'],
+               display_name=kw['fullname'],
+               password=kw['psw'],
+               email_address=kw['email'],
+               avatar=None,
+               about='')
+        for g in groups:
+            log.debug("Adding user: %s" % g)
+            # print 'adding: ',g
+            u.addGroup(model.Group.get_by(group_id=g))
+        session.flush()
+        ns = dict(user_id=u.id,display_name=kw['fullname'])
+    
+    def user_delete(self, *args, **kw):
+        session = create_session()
+        User.delete(kw['uid'])
+        session.flush()
+        ns = dict()
+    
+    def user_update(self, *args, **kw):
+        groups = kw['groups'].split(',')
+        validators.FieldsMatch('psw', 'psw2').to_python(kw)
+        session = create_session()
+        u = User.get(kw['uid'])
+        u.email_address = email_address=kw['email']
+        u.display_name=kw['fullname']
+        u.password=kw['psw']
+        for g in u.groups[:]:
+            u.removeGroup(g)
+        for g in groups:
+            u.addGroup(model.Group.get_by(group_id=g))
+        session.flush()
+        ns = dict(user_id=u.id,display_name=kw['fullname'])
+    
+
+
+

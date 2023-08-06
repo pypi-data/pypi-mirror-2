@@ -1,0 +1,123 @@
+from unittest import TestCase
+import os
+import sys
+import logging
+import pylons
+from pylons.i18n.translation import _get_translator
+from paste.deploy import loadapp
+from pylons import url
+from paste.script.appinstall import SetupCommand
+from routes.util import URLGenerator
+from webtest import TestApp
+import pylons.test
+import datetime
+import hashlib
+from couchdb.design import ViewDefinition
+from couchdb.client import Database, Server, Document, ViewResults, Row
+from {{package}}.config.environment import load_environment
+from {{package}}.model import *
+from {{package}} import model
+
+SetupCommand('setup-app').run([pylons.test.pylonsapp.config['__file__']])
+
+log = logging.getLogger(__name__)
+
+environ = {}
+here_dir = os.path.dirname(os.path.abspath(__file__))
+conf_dir = os.path.dirname(os.path.dirname(here_dir))
+
+
+class TestModel(TestCase):
+    server = pylons.test.pylonsapp.config['{{package}}.server']
+    # testdbname = '{{package}}_test'
+    testdbname = 'shabti_template_test'
+    def setUp(self):
+        # log.debug("******* On setUp entry: databases in server %s" % (list(server)))
+        # Change teardown to True if the database
+        # exists and is to be torn down and re-created
+        databases = self.server
+        teardown = True
+        if teardown and self.testdbname in databases:
+            try:
+                del self.server[self.testdbname]
+            except Exception, msg:
+                pass
+            db = self.server.create(self.testdbname)
+        elif not self.testdbname in databases:
+            try:
+                db = self.server.create(self.testdbname)
+            except Exception, msg:
+                db = self.server[self.testdbname]
+        else:
+            db = pylons.test.pylonsapp.config['{{package}}.db']
+        self.db = db
+        gadmin = model.user.Group(
+                name = u"Administrators",
+                description = u"Administration group",
+                created = datetime.datetime.utcnow(),
+                active = True)
+        gadmin.store(self.db)
+        
+        gadmin_retrieved = model.Group.load(self.db, gadmin.id)
+        admin = model.user.User(
+                    displayname = u"admin", 
+                    password=hashlib.sha1("admin").hexdigest(),
+                    password_check=hashlib.sha1("admin").hexdigest(), 
+                    email="admin@example.com",
+                    created = datetime.datetime.utcnow(),
+                    active = True)
+        admin.groups.append(gadmin.id)
+        admin.store(self.db)
+        gadmin_retrieved.users.append(admin.id)
+        gadmin_retrieved.store(self.db)
+        ViewDefinition.sync_many(self.db, [
+            model.User.by_displayname,
+            model.User.by_email,
+            model.Group.by_name, 
+            model.Permission.by_name,
+        ])
+    
+    
+    def tearDown(self):
+        if self.testdbname in self.server:
+            self.server.delete(self.testdbname)
+    
+
+
+class TestController(TestModel):
+    
+    def __init__(self, *args, **kwargs):
+        wsgiapp = loadapp('config:test.ini', relative_to=conf_dir)
+        config = wsgiapp.config
+        pylons.app_globals._push_object(config['pylons.app_globals'])
+        pylons.config._push_object(config)
+        
+        # Initialize a translator for tests that utilize i18n
+        translator = _get_translator(pylons.config.get('lang'))
+        pylons.translator._push_object(translator)
+        
+        url._push_object(URLGenerator(config['routes.map'], environ))
+        self.app = TestApp(wsgiapp)
+        TestCase.__init__(self, *args, **kwargs)
+    
+
+
+class TestAuthenticatedController(TestModel):
+    
+    def __init__(self, *args, **kwargs):
+        wsgiapp = loadapp('config:test.ini', relative_to=conf_dir)
+        config = wsgiapp.config
+        pylons.app_globals._push_object(config['pylons.app_globals'])
+        pylons.config._push_object(config)
+        
+        # Initialize a translator for tests that utilize i18n
+        translator = _get_translator(pylons.config.get('lang'))
+        pylons.translator._push_object(translator)
+        
+        url._push_object(URLGenerator(config['routes.map'], environ))
+        self.app = TestApp(wsgiapp, 
+                extra_environ=dict(REMOTE_USER='admin'))
+        TestCase.__init__(self, *args, **kwargs)
+    
+
+# --- Overwritten by Shabt auth_couchdb template

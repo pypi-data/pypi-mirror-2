@@ -1,0 +1,61 @@
+import logging
+from fa.jquery.pylons import ModelsController
+from webhelpers.paginate import Page
+from {{package}}.lib.base import BaseController, render
+from {{package}} import model
+from {{package}} import forms
+from {{package}}.model import meta
+{{if shabti_auth_repozewhat}}
+from repoze.what.predicates import has_permission
+from repoze.what.plugins.pylonshq import ActionProtector
+{{elif shabti_auth}}
+from {{package}}.lib.decorators import authorize
+from {{package}}.lib.auth.permissions import SignedIn
+{{endif}}
+
+log = logging.getLogger(__name__)
+
+from pylons import request, response, url, session, tmpl_context as c
+from pylons.controllers.util import abort
+
+class AdminControllerBase(BaseController):
+    model = model # where your SQLAlchemy mappers are
+    forms = forms # module containing FormAlchemy fieldsets definitions
+
+{{if shabti_auth_repozewhat}}
+    # # Uncomment this to impose an authentication requirement
+    # @ActionProtector(in_group('administrators')
+    # def __before__(self):
+    #     pass
+{{elif shabti_auth}}
+    # # Uncomment this to impose an authentication requirement
+    # @authorize(SignedIn())
+    # def __before__(self):
+    #     pass
+{{endif}}
+
+    def Session(self): # Session factory
+        return meta.Session
+
+{{if shabti_couchdbkit}}
+    def get_page(self, **kwargs):
+        model = self.get_model()
+        collection = meta.Session.query(model).all()
+        return super(AdminControllerBase, self).get_page(collection=collection)
+{{else}}
+    ## customize the query for a model listing
+    # def get_page(self, **kwargs):
+    #     if self.model_name == 'Foo':
+    #         collection = meta.Session.query(model.Foo).order_by(model.Foo.bar)
+    #         kwargs['collection'] = collection
+    #     return super(AdminControllerBase, self).get_page(**kwargs)
+{{endif}}
+
+AdminController = ModelsController(AdminControllerBase,
+                                   prefix_name='admin',
+                                   member_name='model',
+                                   collection_name='models',
+                                  )
+
+# Added by Shabti formalchemy template
+

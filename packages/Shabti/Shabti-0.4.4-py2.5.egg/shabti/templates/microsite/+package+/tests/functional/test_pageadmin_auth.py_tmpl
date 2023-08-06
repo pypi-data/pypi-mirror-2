@@ -1,0 +1,97 @@
+# microsite/tests/functional/test_pageadmin_auth
+from pylons import url
+from {{package}}.model import *
+from {{package}}.tests import *
+
+class TestPageAuthAdminController(TestAuthenticatedController):
+    def test_authorised_page_GET_allowed(self):
+        """PageAuthAdmin (microsite): authorised page GET requests are permitted"""
+        response = self.app.get(url('pages', id=2))
+        
+        assert response.status_int == 200
+    
+    
+    def test_authorised_page_GET_nonexistent_prohibited(self):
+        """PageAuthAdmin (microsite): authorised but improper page GET requests are prohibited"""
+        response = self.app.get(url('show_page', id=20),
+                                status=404,
+                                expect_errors=True)
+        
+        assert response.status_int == 404
+    
+    
+    def test_authorised_page_GET_update_prohibited(self):
+        """PageAuthAdmin (microsite): authorised page GET update requests are prohibited"""
+        response = self.app.get(url('save_page', id='1'),
+                                params={'title': 'Foobar'},
+                                status=404,
+                                expect_errors=True)
+        
+        assert response.status_int == 404
+    
+    
+    def test_authorised_page_GET_delete_prohibited(self):
+        """PageAuthAdmin (microsite): authorised page GET delete requests are prohibited"""
+        response = self.app.get(url('delete_page', id=2),
+                                status=404,
+                                expect_errors=True)
+                                
+        assert Session.query(Page).get(2) != None
+    
+    
+    def test_authorised_page_DELETE_nonexistent_prohibited(self):
+        """PageAuthAdmin (microsite): authorised deletions of non-existent users are prohibited"""
+        response = self.app.delete(url('delete_page', id='4'),
+                                    status=404,
+                                    expect_errors=True)
+        
+        assert response.status_int == 404
+    
+    
+    def test_authorised_page_PUT_update_allowed(self):
+        """PageAuthAdmin (microsite): authorised page POST updated requests are permitted"""
+        
+        d = dict(title=u"FooBar", 
+                 _method="PUT",
+                 author='1',
+                 slug='home',
+                 content=u'Replaced')
+        
+        response = self.app.post(url('save_page', id=1),
+                                 params=d)
+        
+        newresponse = response.follow()
+        
+        title1 = newresponse.forms.get('page_form'
+                                        ).fields.get('title', '')[0].value
+            
+        assert title1 == 'FooBar'
+    
+    
+    def test_authorised_page_POST_create_allowed(self):
+        """PageAuthAdmin (microsite): authorised page PUT(POST) create requests are permitted"""
+        # Step one, retrieve the resource from /user/new ..
+        response = self.app.get(url('new_page'))
+        
+        form = response.forms.get('new_page_form')
+        
+        d = dict(title=u"FooBar FAQ", 
+                 slug=u'faq',
+                 content=u'Added')
+        
+        # Step two, insert the new values
+        for k in d.keys():
+            form.set(k, d[k])
+        
+        # Step 4, submit the form and test the database for
+        # the expected addition
+        res = form.submit()
+        
+        newpages = Session.query(Page).filter_by(title=u'FooBar FAQ').all()
+        
+        assert len(newpages) == 1
+        
+        assert newpages[0].title == u'FooBar FAQ'
+    
+
+# --- Added by Shabti microsite template
