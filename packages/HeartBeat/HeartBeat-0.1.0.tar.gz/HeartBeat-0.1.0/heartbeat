@@ -1,0 +1,73 @@
+#! /usr/bin/env python
+# -----------------------------------------------------------------------------
+#    HeartBeat - Yet Another HeartBeat Server
+#    Copyright (C) 2011 Some Hackers In Town
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# -----------------------------------------------------------------------------
+import sys
+import socket
+from optparse import OptionParser
+
+from hbeat.server import HBProtocol
+
+
+parser = OptionParser()
+parser.set_defaults(
+    port='8998',
+    host='127.0.0.1',
+    debug=False,
+    secret=None,
+    hostname=None,
+)
+
+parser.add_option('--port', dest='port',
+                  help="Send heartbeat to remote PORT.")
+parser.add_option('--remote', dest='host',
+                  help="Send heartbeat to remote HOST.")
+parser.add_option('--secret', dest='secret',
+                  help="Use SECRET word to make checksum.")
+parser.add_option('--hostname', dest='hostname',
+                  help="Send packet with HOSTNAME as identifier to remote host")
+parser.add_option('--debug', dest='debug', action="store_true",
+                  help="Activate debug mode.")
+
+options, args = parser.parse_args()
+
+PORT = int(options.port)
+HOST = options.host
+HOSTNAME = options.hostname
+SECRET = options.secret
+STATUS = 1
+data = None
+try:
+    packet = HBProtocol(secret=SECRET, status=STATUS, host=HOSTNAME)
+    data = packet.create_packet()
+except TypeError, e:
+    print e
+    sys.exit(1)
+
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+# Connect to server and send data
+sock.connect((HOST, PORT))
+sock.send(data)
+received = sock.recv(1)
+sock.close()
+if options.debug:
+    print "Sent:       %s" % data
+    print "Received:   %s" % ord(received)
+
