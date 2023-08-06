@@ -1,0 +1,218 @@
+Metadata-Version: 1.0
+Name: munin.async
+Version: 0.5
+Summary: Munin plugins for zc.async.
+Home-page: http://plone.org/products/munin.async
+Author: Jarn AS
+Author-email: info@jarn.com
+License: GPL
+Description: 
+        
+        Introduction
+        ------------
+        
+        This package provides munin plugins for monitoring `zc.async`_ queues.
+        
+        It uses `gocept.munin`_ for plugin registration and was based on `munin.zope`_. Please refer to its
+        documentation if you want to write new plugins.
+        
+        
+        Plugins
+        -------
+        
+        Currently there is 3 plugins available providing:
+        
+        * Size of the job queue
+        
+        and
+        
+        * Started jobs in the poll interval.
+        * Successful jobs in the poll interval.
+        * Failed jobs in the poll interval
+        * Jobs with yet unknown state in the poll interval.
+        
+        and 
+        
+        * time it took to run the longest successful job
+        * time it took to run the shortest successful job
+        * time it took to run the longest failed job
+        * time it took to run the shortest failed job
+        
+        
+        How to use it
+        -------------
+        
+        * First include the package in your buildout `instance` slot::
+        
+            [instance]
+            ...
+            eggs =
+                ...
+                munin.async
+            zcml =
+                ...
+                munin.async
+        
+        * To create the pluging helper script you'll also need to include the
+          following, additional section and extend your `parts` definition::
+        
+            [buildout]
+            parts =
+                ...
+                munin
+        
+            [munin]
+            recipe = zc.recipe.egg
+            eggs = munin.async
+            arguments = http_address='${worker:http-address}', user='${worker:user}'
+        
+          The `arguments` option is used to pass configuration values to the generated
+          helper script, which is then used as the actual munin plugin (see below).
+          Any settings for `ip-address`, `http-address`, `port-base` and `user` given
+          in the `instance` section should be repeated here, separated by commas.
+        
+            .. |---| unicode:: U+2014  .. em dash
+        
+          Please be aware, that the variable names use underscores instead of dashes
+          here |---| the following list shows all supported settings and their
+          respective default values:
+        
+          * ip_address='<ip-address>'    ['localhost']
+          * http_address=<http-address>  [8080]
+          * port_base=<port-base>        [0]
+          * user=<user-credentials>      [n.a.]
+        
+          Either literal values or references to the `worker` part can be used here,
+          i.e. "http_address='${worker:http-address}', user='${worker:user}'".
+          Please note that the resulting line will be verbosely copied into the
+          generated `bin/munin` script, so the extra quoting is required.
+        
+        * When monitoring more than one worker instance, i.e. in a ZEO setup, separate
+          helper scripts need to be generated.  In order to do so the `scripts`
+          option of `zc.recipe.egg` can be used like so::
+        
+            [buildout]
+            parts =
+                ...
+                munin1
+                munin2
+        
+            [munin1]
+            recipe = zc.recipe.egg
+            eggs = munin.async
+            scripts = munin=munin1
+            arguments = http_address='${worker1:http-address}', user='${worker1:user}'
+        
+            [munin2]
+            recipe = zc.recipe.egg
+            eggs = munin.async
+            scripts = munin=munin2
+            arguments = http_address='${worker2:http-address}', user='${worker2:user}'
+        
+          The necessary symlinks can then be created with each of the scripts in turn
+          (see below).  Please note, that in this case you should explicitly provide
+          at least a differing `prefix` argument.
+        
+          Now you should be able to call the plugins as follows:
+        
+          * http://localhost:8080/@@munin.async.plugins/zcasyncqueuesize to get information on how many jobs completed successfully or failed.
+          * http://localhost:8080/@@munin.async.plugins/zcasyncjobstatistics to get information on how many jobs completed successfully or failed.
+          * http://localhost:8080/@@munin.async.plugins/zcasynctimestatistics to get information on max/min time jobs needed to complete.
+        
+          Please note that for security reasons the view requires the `View management
+          screens` permission.
+        
+        * Next you need to make symlinks from the helper script inside your
+          buildout's `bin/` to the munin plugin directory.  The helper script itself
+          can assist you with this::
+        
+            $ bin/munin install /opt/munin/etc/plugins [<prefix>] [<suffix>]
+        
+          This will install the necessary symlinks in the given directory using
+          either the provided prefix and suffix or else the hostname and current
+          directory to assemble their names (see below).
+        
+          Alternatively, you may also install the desired symlinks yourself::
+        
+            $ cd /opt/munin/etc/plugins
+            $ ln -s ~/zope/bin/munin company_zcasyncqueuesize_worker1
+            $ ln -s ~/zope/bin/munin company_zcasyncjobstatistics_worker1
+            $ ln -s ~/zope/bin/munin company_zcasynctimestatistics_worker1
+        
+          Here `/opt/munin/etc/plugins` is your munin directory, `~/zope/` is the
+          root directory of your buildout, `company` a placeholder for an arbitrary 
+          prefix and `worker1` the name which will be shown in munin.
+        
+        * Finally configure the plugin in munin (this step can be skipped if you have
+          correctly set up the `arguments` option as described in step 2 above)::
+        
+            $ cd /opt/munin/etc/plugin-conf.d/
+            $ vi munin.async.conf
+            ... [company_*_site1]
+            ... env.AUTH myuser:myuser
+            ... env.URL http://localhost:8080/@@munin.async.plugins/%s
+        
+          Here `myuser:myuser` are your Zope user credentials and `localhost:8080`
+          your site url.  Please check `munin`_ for more information about plugin
+          configuration.
+        
+        
+        References
+        ----------
+        * `zc.async`_ at pypi
+        * `munin.zope`_ at pypi
+        * `gocept.munin`_ at pypi
+        * `munin`_ project
+        
+          .. _zc.async: http://pypi.python.org/pypi/zc.async/
+          .. _munin.zope: http://pypi.python.org/pypi/munin.zope/
+          .. _gocept.munin: http://pypi.python.org/pypi/gocept.munin/
+          .. _munin: http://munin.projects.linpro.no/
+        
+        Changelog
+        =========
+        
+        0.5 - 2011-03-04
+        ----------------
+        
+        * Measure the correct queue lengths (not the poll lengths) in the job
+          queue browserview.
+          [mj]
+        
+        0.4 - 2011-03-04
+        ----------------
+        
+        * Corrected a typo in the new plugin graph definition.
+          [mj]
+        
+        0.3 - 2011-03-04
+        ----------------
+        
+        * Add a graph for the job queue size (total of all queues)
+          [mj]
+        
+        0.2 - 2010-12-14
+        ----------------
+        
+        * Initial release to pypi
+          [ggozad]
+        
+        0.1 - 2010-08-31
+        ----------------
+        
+        * Initial release
+          [ggozad, stefan]
+        
+Keywords: plone zope munin monitoring zc.async
+Platform: Any
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python
+Classifier: Framework :: Plone
+Classifier: Framework :: ZODB
+Classifier: Framework :: Zope2
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Programming Language :: Python
+Classifier: Topic :: System :: Networking :: Monitoring
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
