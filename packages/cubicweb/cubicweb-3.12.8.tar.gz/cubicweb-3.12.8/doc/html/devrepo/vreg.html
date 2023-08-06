@@ -1,0 +1,488 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>2. The VRegistry, selectors and application objects &mdash; CubicWeb 3.12.7</title>
+    <link rel="stylesheet" href="../_static/lglb-sphinx-doc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '3.12.7',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="CubicWeb 3.12.7" href="../index.html" />
+    <link rel="up" title="Repository development" href="index.html" />
+    <link rel="next" title="3. Data model" href="datamodel/index.html" />
+    <link rel="prev" title="1.3. Available cubes" href="cubes/available-cubes.html" /> 
+  </head>
+  <body>
+<div class="header">
+ <a href="http://www.cubicweb.org">
+  <img alt="cubicweb logo" src="../_static/cubicweb.png"/>
+ </a>
+</div>
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../modindex.html" title="Global Module Index"
+             accesskey="M">modules</a> |</li>
+        <li class="right" >
+          <a href="datamodel/index.html" title="3. Data model"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="cubes/available-cubes.html" title="1.3. Available cubes"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Repository development</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="#">2. The VRegistry, selectors and application objects</a><ul>
+<li><a class="reference external" href="#the-vregistry">2.1. The <cite>VRegistry</cite></a><ul>
+<li><a class="reference external" href="#details-of-the-recording-process">2.1.1. Details of the recording process</a></li>
+<li><a class="reference external" href="#api-for-objects-registration">2.1.2. API for objects registration</a></li>
+<li><a class="reference external" href="#runtime-objects-selection">2.1.3. Runtime objects selection</a></li>
+<li><a class="reference external" href="#api-for-objects-selections">2.1.4. API for objects selections</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#the-appobject-class">2.2. The <cite>AppObject</cite> class</a></li>
+<li><a class="reference external" href="#base-selectors">2.3. Base selectors</a><ul>
+<li><a class="reference external" href="#bare-selectors">2.3.1. Bare selectors</a></li>
+<li><a class="reference external" href="#result-set-selectors">2.3.2. Result set selectors</a></li>
+<li><a class="reference external" href="#entity-selectors">2.3.3. Entity selectors</a></li>
+<li><a class="reference external" href="#logged-user-selectors">2.3.4. Logged user selectors</a></li>
+<li><a class="reference external" href="#web-request-selectors">2.3.5. Web request selectors</a></li>
+<li><a class="reference external" href="#other-selectors">2.3.6. Other selectors</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="cubes/available-cubes.html"
+                                  title="previous chapter">1.3. Available cubes</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="datamodel/index.html"
+                                  title="next chapter">3. Data model</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/devrepo/vreg.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="../search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-cubicweb.appobject">
+<h1>2. The VRegistry, selectors and application objects<a class="headerlink" href="#module-cubicweb.appobject" title="Permalink to this headline">¶</a></h1>
+<p>This chapter deals with some of the  core concepts of the <em>CubicWeb</em> framework
+which make it different from other frameworks (and maybe not easy to
+grasp at a first glance). To be able to do advanced development with
+<em>CubicWeb</em> you need a good understanding of what is explained below.</p>
+<p>This chapter goes deep into details. You don&#8217;t have to remember them
+all but keep it in mind so you can go back there later.</p>
+<p>An overview of AppObjects, the VRegistry and Selectors is given in the
+<a class="reference external" href="../intro/concepts.html#vregistryintro"><em>Registries and application objects</em></a> chapter.</p>
+<div class="section" id="the-vregistry">
+<h2>2.1. The <cite>VRegistry</cite><a class="headerlink" href="#the-vregistry" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>VRegistry</cite> can be seen as a two-level dictionary. It contains
+all dynamically loaded objects (subclasses of <a class="reference internal" href="#appobject"><em>The AppObject class</em></a>) to
+build a <em>CubicWeb</em> application. Basically:</p>
+<ul class="simple">
+<li>the first level key returns a <em>registry</em>. This key corresponds to the
+<cite>__registry__</cite> attribute of application object classes</li>
+<li>the second level key returns a list of application objects which
+share the same identifier. This key corresponds to the <cite>__regid__</cite>
+attribute of application object classes.</li>
+</ul>
+<p>A <em>registry</em> holds a specific kind of application objects. There is
+for instance a registry for entity classes, another for views, etc...</p>
+<p>The <cite>VRegistry</cite> has two main responsibilities:</p>
+<ul class="simple">
+<li>being the access point to all registries</li>
+<li>handling the registration process at startup time, and during automatic
+reloading in debug mode.</li>
+</ul>
+<div class="section" id="details-of-the-recording-process">
+<span id="appobjectrecording"></span><h3>2.1.1. Details of the recording process<a class="headerlink" href="#details-of-the-recording-process" title="Permalink to this headline">¶</a></h3>
+<p id="index-26">On startup, <em>CubicWeb</em> loads application objects defined in its library
+and in cubes used by the instance. Application objects from the
+library are loaded first, then those provided by cubes are loaded in
+dependency order (e.g. if your cube depends on an other, objects from
+the dependency will be loaded first). The layout of the modules or packages
+in a cube  is explained in <a class="reference external" href="cubes/layout.html#cubelayout"><em>Standard structure for a cube</em></a>.</p>
+<p>For each module:</p>
+<ul class="simple">
+<li>by default all objects are registered automatically</li>
+<li>if some objects have to replace other objects, or have to be
+included only if some condition is met, you&#8217;ll have to define a
+<cite>registration_callback(vreg)</cite> function in your module and explicitly
+register <strong>all objects</strong> in this module, using the api defined
+below.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Once the function <cite>registration_callback(vreg)</cite> is implemented in a module,
+all the objects from this module have to be explicitly registered as it
+disables the automatic objects registration.</p>
+</div>
+</div>
+<div class="section" id="api-for-objects-registration">
+<h3>2.1.2. API for objects registration<a class="headerlink" href="#api-for-objects-registration" title="Permalink to this headline">¶</a></h3>
+<p>Here are the registration methods that you can use in the <cite>registration_callback</cite>
+to register your objects to the <cite>VRegistry</cite> instance given as argument (usually
+named <cite>vreg</cite>):</p>
+<dl class="method">
+<dt id="cubicweb.cwvreg.CubicWebVRegistry.register_all">
+<tt class="descclassname">CubicWebVRegistry.</tt><tt class="descname">register_all</tt><big>(</big><em>objects</em>, <em>modname</em>, <em>butclasses=()</em><big>)</big><a class="headerlink" href="#cubicweb.cwvreg.CubicWebVRegistry.register_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>register all <cite>objects</cite> given. Objects which are not from the module
+<cite>modname</cite> or which are in <cite>butclasses</cite> won&#8217;t be registered.</p>
+<p>Typical usage is:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">vreg</span><span class="o">.</span><span class="n">register_all</span><span class="p">(</span><span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">__name__</span><span class="p">,</span> <span class="p">(</span><span class="n">ClassIWantToRegisterExplicitly</span><span class="p">,))</span>
+</pre></div>
+</div>
+<p>So you get partially automatic registration, keeping manual registration
+for some object (to use
+<tt class="xref docutils literal"><span class="pre">register_and_replace()</span></tt> for
+instance)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.cwvreg.CubicWebVRegistry.register_and_replace">
+<tt class="descclassname">CubicWebVRegistry.</tt><tt class="descname">register_and_replace</tt><big>(</big><em>obj</em>, <em>replaced</em>, <em>registryname=None</em><big>)</big><a class="headerlink" href="#cubicweb.cwvreg.CubicWebVRegistry.register_and_replace" title="Permalink to this definition">¶</a></dt>
+<dd>register <cite>obj</cite> application object into <cite>registryname</cite> or
+<cite>obj.__registry__</cite> if not specified. If found, the <cite>replaced</cite> object
+will be unregistered first (else a warning will be issued as it&#8217;s
+generally unexpected).</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.cwvreg.CubicWebVRegistry.register">
+<tt class="descclassname">CubicWebVRegistry.</tt><tt class="descname">register</tt><big>(</big><em>obj</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.cwvreg.CubicWebVRegistry.register" title="Permalink to this definition">¶</a></dt>
+<dd><p>register <cite>obj</cite> application object into <cite>registryname</cite> or
+<cite>obj.__registry__</cite> if not specified, with identifier <cite>oid</cite> or
+<cite>obj.__regid__</cite> if not specified.</p>
+<p>If <cite>clear</cite> is true, all objects with the same identifier will be
+previously unregistered.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.cwvreg.CubicWebVRegistry.unregister">
+<tt class="descclassname">CubicWebVRegistry.</tt><tt class="descname">unregister</tt><big>(</big><em>obj</em>, <em>registryname=None</em><big>)</big><a class="headerlink" href="#cubicweb.cwvreg.CubicWebVRegistry.unregister" title="Permalink to this definition">¶</a></dt>
+<dd>unregister <cite>obj</cite> application object from the registry <cite>registryname</cite> or
+<cite>obj.__registry__</cite> if not specified.</dd></dl>
+
+<p>Examples:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># web/views/basecomponents.py</span>
+<span class="k">def</span> <span class="nf">registration_callback</span><span class="p">(</span><span class="n">vreg</span><span class="p">):</span>
+   <span class="c"># register everything in the module except SeeAlsoComponent</span>
+   <span class="n">vreg</span><span class="o">.</span><span class="n">register_all</span><span class="p">(</span><span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">__name__</span><span class="p">,</span> <span class="p">(</span><span class="n">SeeAlsoVComponent</span><span class="p">,))</span>
+   <span class="c"># conditionally register SeeAlsoVComponent</span>
+   <span class="k">if</span> <span class="s">&#39;see_also&#39;</span> <span class="ow">in</span> <span class="n">vreg</span><span class="o">.</span><span class="n">schema</span><span class="p">:</span>
+       <span class="n">vreg</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">SeeAlsoVComponent</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, we register all application object classes defined in the module
+except <cite>SeeAlsoVComponent</cite>. This class is then registered only if the &#8216;see_also&#8217;
+relation type is defined in the instance&#8217;schema.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># goa/appobjects/sessions.py</span>
+<span class="k">def</span> <span class="nf">registration_callback</span><span class="p">(</span><span class="n">vreg</span><span class="p">):</span>
+   <span class="n">vreg</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">SessionsCleaner</span><span class="p">)</span>
+   <span class="c"># replace AuthenticationManager by GAEAuthenticationManager</span>
+   <span class="n">vreg</span><span class="o">.</span><span class="n">register_and_replace</span><span class="p">(</span><span class="n">GAEAuthenticationManager</span><span class="p">,</span> <span class="n">AuthenticationManager</span><span class="p">)</span>
+   <span class="c"># replace PersistentSessionManager by GAEPersistentSessionManager</span>
+   <span class="n">vreg</span><span class="o">.</span><span class="n">register_and_replace</span><span class="p">(</span><span class="n">GAEPersistentSessionManager</span><span class="p">,</span> <span class="n">PersistentSessionManager</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, we explicitly register classes one by one:</p>
+<ul class="simple">
+<li>the <cite>SessionCleaner</cite> class</li>
+<li>the <cite>GAEAuthenticationManager</cite> to replace the <cite>AuthenticationManager</cite></li>
+<li>the <cite>GAEPersistentSessionManager</cite> to replace the <cite>PersistentSessionManager</cite></li>
+</ul>
+<p>If at some point we register a new appobject class in this module, it won&#8217;t be
+registered at all without modification to the <cite>registration_callback</cite>
+implementation. The previous example will register it though, thanks to the call
+to the <cite>register_all</cite> method.</p>
+</div>
+<div class="section" id="runtime-objects-selection">
+<span id="selection"></span><h3>2.1.3. Runtime objects selection<a class="headerlink" href="#runtime-objects-selection" title="Permalink to this headline">¶</a></h3>
+<p>Now that we have all application objects loaded, the question is : when
+I want some specific object, for instance the primary view for a given
+entity, how do I get the proper object ? This is what we call the
+<strong>selection mechanism</strong>.</p>
+<p>As explained in the <a class="reference external" href="../intro/concepts.html#concepts"><em>The Core Concepts of CubicWeb</em></a> section:</p>
+<ul class="simple">
+<li>each application object has a <strong>selector</strong>, defined by its
+<cite>__select__</cite> class attribute</li>
+<li>this selector is responsible to return a <strong>score</strong> for a given context<ul>
+<li>0 score means the object doesn&#8217;t apply to this context</li>
+<li>else, the higher the score, the better the object suits the context</li>
+</ul>
+</li>
+<li>the object with the highest score is selected.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>When no single object has the highest score, an exception is raised in development
+mode to let you know that the engine was not able to identify the view to
+apply. This error is silenced in production mode and one of the objects with
+the highest score is picked.</p>
+<p class="last">In such cases you would need to review your design and make sure
+your selectors or appobjects are properly defined. Such an error is
+typically caused by either forgetting to change the __regid__ in a
+derived class, or by having copy-pasted some code.</p>
+</div>
+<p>For instance, if you are selecting the primary (<cite>__regid__ =
+&#8216;primary&#8217;</cite>) view (<cite>__registry__ = &#8216;views&#8217;</cite>) for a result set
+containing a <cite>Card</cite> entity, two objects will probably be selectable:</p>
+<ul class="simple">
+<li>the default primary view (<cite>__select__ = is_instance(&#8216;Any&#8217;)</cite>), meaning
+that the object is selectable for any kind of entity type</li>
+<li>the specific <cite>Card</cite> primary view (<cite>__select__ = is_instance(&#8216;Card&#8217;)</cite>,
+meaning that the object is selectable for Card entities</li>
+</ul>
+<p>Other primary views specific to other entity types won&#8217;t be selectable in this
+case. Among selectable objects, the <cite>is_instance(&#8216;Card&#8217;)</cite> selector will return a higher
+score since it&#8217;s more specific, so the correct view will be selected as expected.</p>
+</div>
+<div class="section" id="api-for-objects-selections">
+<span id="selectionapi"></span><h3>2.1.4. API for objects selections<a class="headerlink" href="#api-for-objects-selections" title="Permalink to this headline">¶</a></h3>
+<p>Here is the selection API you&#8217;ll get on every registry. Some of them, as the
+&#8216;etypes&#8217; registry, containing entity classes, extend it. In those methods,
+<cite>*args, **kwargs</cite> is what we call the <strong>context</strong>. Those arguments are given to
+selectors that will inspect their content and return a score accordingly.</p>
+<dl class="method">
+<dt id="cubicweb.vregistry.Registry.select">
+<tt class="descclassname">Registry.</tt><tt class="descname">select</tt><big>(</big><em>_Registry__oid</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.vregistry.Registry.select" title="Permalink to this definition">¶</a></dt>
+<dd><p>return the most specific object among those with the given oid
+according to the given context.</p>
+<p>raise <tt class="xref docutils literal"><span class="pre">ObjectNotFound</span></tt> if not object with id &lt;oid&gt; in &lt;registry&gt;</p>
+<p>raise <tt class="xref docutils literal"><span class="pre">NoSelectableObject</span></tt> if not object apply</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.vregistry.Registry.select_or_none">
+<tt class="descclassname">Registry.</tt><tt class="descname">select_or_none</tt><big>(</big><em>_Registry__oid</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.vregistry.Registry.select_or_none" title="Permalink to this definition">¶</a></dt>
+<dd>return the most specific object among those with the given oid
+according to the given context, or None if no object applies.</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.vregistry.Registry.possible_objects">
+<tt class="descclassname">Registry.</tt><tt class="descname">possible_objects</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.vregistry.Registry.possible_objects" title="Permalink to this definition">¶</a></dt>
+<dd>return an iterator on possible objects in this registry for the given
+context</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.vregistry.Registry.object_by_id">
+<tt class="descclassname">Registry.</tt><tt class="descname">object_by_id</tt><big>(</big><em>oid</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.vregistry.Registry.object_by_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>return object with the <cite>oid</cite> identifier. Only one object is expected
+to be found.</p>
+<p>raise <tt class="xref docutils literal"><span class="pre">ObjectNotFound</span></tt> if not object with id &lt;oid&gt; in &lt;registry&gt;</p>
+<p>raise <tt class="xref docutils literal"><span class="pre">AssertionError</span></tt> if there is more than one object there</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="the-appobject-class">
+<span id="appobject"></span><h2>2.2. The <cite>AppObject</cite> class<a class="headerlink" href="#the-appobject-class" title="Permalink to this headline">¶</a></h2>
+<p>The AppObject class is the base class for all dynamically loaded objects
+(application objects) accessible through the vregistry.</p>
+<p>We can find a certain number of attributes and methods defined in this class and
+common to all the application objects.</p>
+<dl class="class">
+<dt id="cubicweb.appobject.AppObject">
+<em class="property">class </em><tt class="descclassname">cubicweb.appobject.</tt><tt class="descname">AppObject</tt><big>(</big><em>req</em>, <em>**extra</em><big>)</big><a class="headerlink" href="#cubicweb.appobject.AppObject" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is the base class for CubicWeb application objects which are
+selected according to a context (usually at least a request and a result
+set).</p>
+<p>The following attributes should be set on concret appobject classes:</p>
+<dl class="docutils">
+<dt><tt class="xref docutils literal"><span class="pre">__registry__</span></tt></dt>
+<dd>name of the registry for this object (string like &#8216;views&#8217;,
+&#8216;templates&#8217;...)</dd>
+<dt><tt class="xref docutils literal"><span class="pre">__regid__</span></tt></dt>
+<dd>object&#8217;s identifier in the registry (string like &#8216;main&#8217;,
+&#8216;primary&#8217;, &#8216;folder_box&#8217;)</dd>
+<dt><tt class="xref docutils literal"><span class="pre">__select__</span></tt></dt>
+<dd>class&#8217;selector</dd>
+</dl>
+<p>Moreover, the <cite>__abstract__</cite> attribute may be set to True to indicate that a
+class is abstract and should not be registered.</p>
+<p>At selection time, the following attributes are set on the instance:</p>
+<dl class="docutils">
+<dt><tt class="xref docutils literal"><span class="pre">_cw</span></tt></dt>
+<dd>current request</dd>
+<dt><tt class="xref docutils literal"><span class="pre">cw_extra_kwargs</span></tt></dt>
+<dd>other received arguments</dd>
+</dl>
+<p>And also the following, only if <cite>rset</cite> is found in arguments (in which case
+rset/row/col will be removed from <cite>cwextra_kwargs</cite>):</p>
+<dl class="docutils">
+<dt><tt class="xref docutils literal"><span class="pre">cw_rset</span></tt></dt>
+<dd>context result set or None</dd>
+<dt><tt class="xref docutils literal"><span class="pre">cw_row</span></tt></dt>
+<dd>if a result set is set and the context is about a particular cell in the
+result set, and not the result set as a whole, specify the row number we
+are interested in, else None</dd>
+<dt><tt class="xref docutils literal"><span class="pre">cw_col</span></tt></dt>
+<dd>if a result set is set and the context is about a particular cell in the
+result set, and not the result set as a whole, specify the col number we
+are interested in, else None</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<ul class="last">
+<li><p class="first">do not inherit directly from this class but from a more specific class
+such as <cite>AnyEntity</cite>, <cite>EntityView</cite>, <cite>AnyRsetView</cite>, <cite>Action</cite>...</p>
+</li>
+<li><p class="first">to be recordable, a subclass has to define its registry (attribute
+<cite>__registry__</cite>) and its identifier (attribute <cite>__regid__</cite>). Usually
+you don&#8217;t have to take care of the registry since it&#8217;s set by the base
+class, only the identifier <cite>id</cite></p>
+</li>
+<li><p class="first">application objects are designed to be loaded by the vregistry and
+should be accessed through it, not by direct instantiation, besides
+to use it as base classe.</p>
+</li>
+<li><p class="first">When we inherit from <cite>AppObject</cite> (even not directly), you <em>always</em> have
+to use <strong>super()</strong> to get the methods and attributes of the superclasses,
+and not use the class identifier.</p>
+<p>For example, instead of writting:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Truc</span><span class="p">(</span><span class="n">PrimaryView</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">):</span>
+        <span class="n">PrimaryView</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You must write:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Truc</span><span class="p">(</span><span class="n">PrimaryView</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Truc</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">arg1</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="base-selectors">
+<h2>2.3. Base selectors<a class="headerlink" href="#base-selectors" title="Permalink to this headline">¶</a></h2>
+<p>Selectors are scoring functions that are called by the registry to tell whenever
+an appobject can be selected in a given context. Selector sets are for instance
+the glue that tie views to the data model. Using them appropriately is an
+essential part of the construction of well behaved cubes.</p>
+<p>Of course you may have to write your own set of selectors as your needs grows and
+you get familiar with the framework (see <em class="xref">CustomSelectors</em>).</p>
+<p>Here is a description of generic selectors provided by CubicWeb that should suit
+most of your needs.</p>
+<div class="section" id="bare-selectors">
+<h3>2.3.1. Bare selectors<a class="headerlink" href="#bare-selectors" title="Permalink to this headline">¶</a></h3>
+<p>Those selectors are somewhat dumb, which doesn&#8217;t mean they&#8217;re not (very) useful.</p>
+<dl class="class">
+<dt id="cubicweb.appobject.yes">
+<em class="property">class </em><tt class="descclassname">cubicweb.appobject.</tt><tt class="descname">yes</tt><big>(</big><em>score=0.5</em><big>)</big><a class="headerlink" href="#cubicweb.appobject.yes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the score given as parameter, with a default score of 0.5 so any
+other selector take precedence.</p>
+<p>Usually used for appobjects which can be selected whatever the context, or
+also sometimes to add arbitrary points to a score.</p>
+<p>Take care, <cite>yes(0)</cite> could be named &#8216;no&#8217;...</p>
+</dd></dl>
+
+</div>
+<div class="section" id="result-set-selectors">
+<h3>2.3.2. Result set selectors<a class="headerlink" href="#result-set-selectors" title="Permalink to this headline">¶</a></h3>
+<p>Those selectors are looking for a result set in the context (&#8216;rset&#8217; argument or
+the input context) and match or not according to its shape. Some of these
+selectors have different behaviour if a particular cell of the result set is
+specified using &#8216;row&#8217; and &#8216;col&#8217; arguments of the input context or not.</p>
+</div>
+<div class="section" id="entity-selectors">
+<h3>2.3.3. Entity selectors<a class="headerlink" href="#entity-selectors" title="Permalink to this headline">¶</a></h3>
+<p>Those selectors are looking for either an <cite>entity</cite> argument in the input context,
+or entity found in the result set (&#8216;rset&#8217; argument or the input context) and
+match or not according to entity&#8217;s (instance or class) properties.</p>
+</div>
+<div class="section" id="logged-user-selectors">
+<h3>2.3.4. Logged user selectors<a class="headerlink" href="#logged-user-selectors" title="Permalink to this headline">¶</a></h3>
+<p>Those selectors are looking for properties of the user issuing the request.</p>
+</div>
+<div class="section" id="web-request-selectors">
+<h3>2.3.5. Web request selectors<a class="headerlink" href="#web-request-selectors" title="Permalink to this headline">¶</a></h3>
+<p>Those selectors are looking for properties of <em>web</em> request, they can not be
+used on the data repository side.</p>
+</div>
+<div class="section" id="other-selectors">
+<h3>2.3.6. Other selectors<a class="headerlink" href="#other-selectors" title="Permalink to this headline">¶</a></h3>
+<p>You&#8217;ll also find some other (very) specific selectors hidden in other modules
+than <tt class="xref docutils literal"><span class="pre">cubicweb.selectors</span></tt>.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../modindex.html" title="Global Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="datamodel/index.html" title="3. Data model"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="cubes/available-cubes.html" title="1.3. Available cubes"
+             >previous</a> |</li>
+        <li><a href="../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="index.html" >Repository development</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2001-2010, Logilab.
+      Last updated on Jun 21, 2011.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.6.
+    </div>
+  </body>
+</html>
