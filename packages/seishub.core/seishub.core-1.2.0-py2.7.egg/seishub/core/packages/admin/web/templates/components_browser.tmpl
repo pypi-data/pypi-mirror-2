@@ -1,0 +1,107 @@
+#def JAVASCRIPT
+  <script type="text/javascript" src="/yui2/build/yahoo-dom-event/yahoo-dom-event.js"></script>
+  <script type="text/javascript" src="/yui2/build/treeview/treeview-min.js"></script>
+  <script type="text/javascript" src="/yui2/build/connection/connection-min.js"></script>
+  <script type="text/javascript" src="/yui2/build/json/json-min.js"></script> 
+#end def JAVASCRIPT
+#def CSS
+  <link rel="stylesheet" type="text/css" href="/yui2/assets/treeview-menu.css" />
+  <link rel="stylesheet" type="text/css" href="/yui2/assets/treeview-sprite.css" />
+#end def CSS
+
+<div id="infobox">
+  <h2>Legend</h2>
+  <span class="icon icon-package">XML Package</span>
+  <span class="icon icon-resourcetype">XML Resource Type</span>
+  <span class="icon icon-resource">XML Resource</span>
+  <span class="icon icon-folder">Folder</span>
+  <span class="icon icon-file">File</span>  
+  <span class="icon icon-mapping">Mapper</span>
+  <span class="icon icon-property">Property</span>
+  <!--<span class="icon icon-alias">Alias</span>-->
+  <span class="icon icon-index">Index</span>
+</div>
+
+<h1>Component Browser</h1>
+
+<div id="treediv"></div>
+
+
+<script type="text/javascript">
+/* <![CDATA[ */
+
+  (function() { 
+    var tree;
+    
+    function loadNodeData(node, fnLoadComplete) {
+      var nodeTitle = decodeURI(node.title);
+      var sUrl = nodeTitle + '?format=admin';
+      var elements = ['folder', 'package', 'resourcetype', 'mapping-folder', 
+                      'property', 'alias', 'mapping', 'resource', 'index', 
+                      'file', 'xmlroot'];
+      
+      //prepare our callback object
+      var callback = {
+        success: function(oResponse) {
+          if (oResponse.responseText) {
+            var data = []; 
+            data = YAHOO.lang.JSON.parse(oResponse.responseText);
+            for (var j=0; j<elements.length; j++) { 
+              var element = elements[j];
+              var items = data[element];
+              if (!items) {
+                continue;
+              }
+              for (var i=0; i<items.length; i++) {
+                var item = items[i];
+                var text = decodeURIComponent(item.substr(item.lastIndexOf('/')+1));
+                if (element=='resource' || element=='file') {
+                  var tmp = new YAHOO.widget.TextNode({label:text, target:"_blank"}, node, false);
+                  tmp.href = "$resturl" + item;
+                  tmp.title = item;
+                  tmp.isLeaf = 1;
+                  tmp.labelStyle = "icon icon-"+element;
+                } else if (element=='index') {
+                  var tmp = new YAHOO.widget.HTMLNode('<span class="htmlnodelabel">'+item+'<\/span>', node, false, true);
+                  tmp.isLeaf = 1;
+                  tmp.title = item;
+                  tmp.contentStyle = "icon icon-index";
+                } else {
+                  var tmp = new YAHOO.widget.TextNode({label:text, target:"_blank"}, node, false);
+                  tmp.href = "$resturl" + item + "?format=xhtml";
+                  tmp.title = item;
+                  tmp.labelStyle = "icon icon-"+element;
+                }
+              }
+            }
+          }
+          oResponse.argument.fnLoadComplete();
+        },
+        failure: function(oResponse) {
+          oResponse.argument.fnLoadComplete();
+        },
+        argument: {
+          "node": node,
+          "fnLoadComplete": fnLoadComplete
+        },
+        timeout: 3000
+      };
+      YAHOO.util.Connect.asyncRequest('GET', sUrl, callback);
+    }
+    
+    function treeInit() {
+      tree = new YAHOO.widget.TreeView("treediv");
+      tree.setDynamicLoad(loadNodeData, 1);
+      var root = tree.getRoot();
+      // root node
+      var tmp = new YAHOO.widget.TextNode("/", root, true);
+      tmp.labelStyle = "icon icon-folder";
+      tmp.href = "$resturl?format=xhtml";
+      tmp.title = "/";
+      tree.draw();
+    }
+    YAHOO.util.Event.onDOMReady(treeInit);
+  })();  
+
+/* ]]> */
+</script>
