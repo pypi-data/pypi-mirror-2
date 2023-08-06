@@ -1,0 +1,326 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Flask-Admin &mdash; Flask-Admin v0.0.1a documentation</title>
+    <link rel="stylesheet" href="_static/flasky.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.0.1a',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Flask-Admin v0.0.1a documentation" href="#" /> 
+  </head>
+  <body>
+  
+  
+  <div class=indexwrapper>
+  
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-flaskext.admin">
+<span id="flask-admin"></span><h1>Flask-Admin<a class="headerlink" href="#module-flaskext.admin" title="Permalink to this headline">¶</a></h1>
+<p>Flask-Admin aims to be a flexible, customizable web-based interface to
+your datastore. Currently, Flask-Admin only works with SQLAlchemy
+declarative models but support for additional datastores will be added
+in future versions.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Flask-Admin will only work with versions of Flask 0.7 or above.</p>
+</div>
+<div class="section" id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
+<p>Create some SQLAlchemy declarative models using <cite>SQLAlchemy</cite> or
+<cite>Flask-SQLAlchemy</cite>:</p>
+<div class="highlight-python"><pre> engine = create_engine('sqlite://', convert_unicode=True)
+ Base = declarative_base(bind=engine)
+
+ class Student(Base):
+     __tablename__ = 'student'
+
+     id = Column(Integer, primary_key=True)
+     name = Column(String(120), unique=True)
+
+     def __repr__(self):
+         return self.name
+
+class Teacher(Base):
+     __tablename__ = 'teacher'
+
+     id = Column(Integer, primary_key=True)
+     name = Column(String(120), unique=True)
+
+     def __repr__(self):
+         return self.name</pre>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The __repr__ method of your model class will be used to describe
+specific instances of your models models in things like the list
+view. If you don&#8217;t set it the default __repr__ method will look
+something like <cite>&lt;__main__.Student object at 0x1bb1490&gt;</cite>, which
+won&#8217;t be very useful for distinguishing which model instance is
+which.</p>
+</div>
+<p>Then create a blueprint using those models and your sqlalchemy
+session:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">db_session</span> <span class="o">=</span> <span class="n">scoped_session</span><span class="p">(</span><span class="n">sessionmaker</span><span class="p">(</span>
+    <span class="n">autocommit</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">autoflush</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+    <span class="n">bind</span><span class="o">=</span><span class="n">engine</span><span class="p">))</span>
+
+<span class="n">admin_blueprint</span> <span class="o">=</span> <span class="n">admin</span><span class="o">.</span><span class="n">create_admin_blueprint</span><span class="p">(</span>
+     <span class="p">(</span><span class="n">Student</span><span class="p">,</span> <span class="n">Teacher</span><span class="p">),</span> <span class="n">db_session</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The first argument to <tt class="docutils literal"><span class="pre">create_admin_blueprint</span></tt> can have two forms:
+it can either be some python iterable like a list or tuple, or it can
+be a python module that contains your models. The second argument is
+the sqlalchemy session that will be used to access the database. By
+default, Flask-Admin will not expose the primary keys of your
+models. This is usually a good idea if you are using a primary key
+that doesn&#8217;t have any meaning outside of the database, like an
+auto-incrementing integer, because changing a primary key changes the
+nature of foreign key relationships. If you want to expose primary
+key, set <tt class="docutils literal"><span class="pre">exclude_pks=False</span></tt> in the <tt class="docutils literal"><span class="pre">create_admin_blueprint</span></tt> call.</p>
+<p>Next, register this blueprint on your Flask app:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">app</span><span class="o">.</span><span class="n">register_blueprint</span><span class="p">(</span><span class="n">admin_blueprint</span><span class="p">,</span> <span class="n">url_prefix</span><span class="o">=</span><span class="s">&#39;/admin&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now the admin interface is set up. If you are running the app with the
+built-in development server via <tt class="docutils literal"><span class="pre">app.run()</span></tt>, then it would be
+available at <a class="reference external" href="http://localhost:5000/admin">http://localhost:5000/admin</a> . See the <cite>examples</cite>
+directory of the flask-admin source code for some applications that
+that demonstrate ideas of how to configure the admin.</p>
+</div>
+<div class="section" id="a-note-on-init">
+<h2>A note on __init__<a class="headerlink" href="#a-note-on-init" title="Permalink to this headline">¶</a></h2>
+<p>Your model classes must be able to be initialized without any
+arguments. For example, this works because the name argument is
+optional:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Person</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">(</span><span class="mi">120</span><span class="p">),</span> <span class="n">unique</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+</pre></div>
+</div>
+<p>But the following will not work because in this latter case, the
+__init__ method of <tt class="docutils literal"><span class="pre">User()</span></tt> <cite>requires</cite> a name:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Person</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">(</span><span class="mi">120</span><span class="p">),</span> <span class="n">unique</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="flask-admin-endpoints">
+<h2>Flask-Admin Endpoints<a class="headerlink" href="#flask-admin-endpoints" title="Permalink to this headline">¶</a></h2>
+<p>If you want to refer to views in Flask-Admin, the following endpoints
+are available:</p>
+<dl class="docutils">
+<dt><cite>url_for(&#8216;admin.index&#8217;)</cite></dt>
+<dd>returns the url for the index view</dd>
+<dt><cite>url_for(&#8216;admin.list_view&#8217;, model_name=&#8217;some_model&#8217;)</cite></dt>
+<dd>returns the list view for a given model</dd>
+<dt><cite>url_for(&#8216;admin.edit&#8217;, model_name=&#8217;some_model&#8217;, model_key=primary_key)</cite></dt>
+<dd>returns the url for the page used for editing a specific model
+instance</dd>
+<dt><cite>url_for(&#8216;admin.add&#8217;, model_name=&#8217;some_model&#8217;)</cite></dt>
+<dd>returns the url for the adding a new model instance</dd>
+<dt><cite>url_for(&#8216;admin.delete&#8217;, model_name=&#8217;some_model&#8217;, model_key=primary_key)</cite></dt>
+<dd>returns the url for the page used for deleting a specific model
+instance</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">You can use the <tt class="docutils literal"><span class="pre">name</span></tt> argument in <tt class="docutils literal"><span class="pre">create_admin_blueprint()</span></tt> to
+set the name of the blueprint. For example if
+<tt class="docutils literal"><span class="pre">name=&quot;my_named_admin&quot;</span></tt>, then the endpoint for the index becomes
+<tt class="docutils literal"><span class="pre">'my_named_admin.index'</span></tt>. This is necessary if you are going to
+use multiple distinct admin blueprints within the same app.</p>
+</div>
+</div>
+<div class="section" id="custom-templates-and-static-files">
+<h2>Custom Templates and Static Files<a class="headerlink" href="#custom-templates-and-static-files" title="Permalink to this headline">¶</a></h2>
+<p>Using Flask blueprints makes customizing the admin interface really
+easy. Flask-Admin comes with a default set of templates and static
+files. You can customize as much of the interface as you&#8217;d like by
+just overriding any files you&#8217;d like to change. To do this, just
+create them in the templates and/or static directories of your
+app. Refer to the documentation on Flask blueprints for more. There is
+also an example of this in <cite>examples/authentication/view_decorator.py</cite></p>
+</div>
+<div class="section" id="custom-forms">
+<h2>Custom Forms<a class="headerlink" href="#custom-forms" title="Permalink to this headline">¶</a></h2>
+<p>Flask-Admin uses the WTForms library to automatically generate the
+form that will be used to add a new instance of a model or edit an
+existing model instance. There may be cases where the automatically
+generated form isn&#8217;t what you want, so you can also create a custom
+form for Flask-Admin to use for a given model.</p>
+<p>For example, consider the following model of a User that stores hashed
+passwords:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">Base</span> <span class="o">=</span> <span class="n">declarative_base</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">User</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="n">__tablename__</span> <span class="o">=</span> <span class="s">&#39;user&#39;</span>
+
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">username</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">(</span><span class="mi">80</span><span class="p">),</span> <span class="n">unique</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">_password_hash</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="s">&#39;password&#39;</span><span class="p">,</span> <span class="n">String</span><span class="p">(</span><span class="mi">80</span><span class="p">),</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">is_active</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Boolean</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="n">is_active</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">username</span> <span class="o">=</span> <span class="n">username</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="n">password</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_active</span> <span class="o">=</span> <span class="n">is_active</span>
+
+    <span class="k">def</span> <span class="nf">check_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">check_password_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pw_hash</span><span class="p">,</span> <span class="n">password</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">password</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_password_hash</span>
+
+    <span class="nd">@password.setter</span>
+    <span class="k">def</span> <span class="nf">password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_password_hash</span> <span class="o">=</span> <span class="n">generate_password_hash</span><span class="p">(</span><span class="n">password</span><span class="p">)</span>
+
+    <span class="n">password</span> <span class="o">=</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&#39;_password_hash&#39;</span><span class="p">,</span> <span class="n">descriptor</span><span class="o">=</span><span class="n">password</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">username</span>
+</pre></div>
+</div>
+<p>To allow this model to be used with a typical password and
+confirmation field form, you could create the following form:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">UserForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Form for creating or editting User object (via the admin). Define</span>
+<span class="sd">    any handling of fields here. This form class also has precedence</span>
+<span class="sd">    when rendering forms to a webpage, so the model-generated fields</span>
+<span class="sd">    will come after it.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">username</span> <span class="o">=</span> <span class="n">TextField</span><span class="p">(</span><span class="s">u&#39;User name&#39;</span><span class="p">,</span>
+                         <span class="p">[</span><span class="n">validators</span><span class="o">.</span><span class="n">required</span><span class="p">(),</span>
+                          <span class="n">validators</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="nb">max</span><span class="o">=</span><span class="mi">80</span><span class="p">)])</span>
+    <span class="n">password</span> <span class="o">=</span> <span class="n">PasswordField</span><span class="p">(</span><span class="s">&#39;Change Password&#39;</span><span class="p">,</span>
+                             <span class="p">[</span><span class="n">validators</span><span class="o">.</span><span class="n">optional</span><span class="p">(),</span>
+                              <span class="n">validators</span><span class="o">.</span><span class="n">equal_to</span><span class="p">(</span><span class="s">&#39;confirm_password&#39;</span><span class="p">)])</span>
+    <span class="n">confirm_password</span> <span class="o">=</span> <span class="n">PasswordField</span><span class="p">()</span>
+    <span class="n">is_active</span> <span class="o">=</span> <span class="n">BooleanField</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And just use the model_forms argument when calling
+<tt class="docutils literal"><span class="pre">create_admin_blueprint</span></tt> to associate this form with the User
+model:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">admin_blueprint</span> <span class="o">=</span> <span class="n">admin</span><span class="o">.</span><span class="n">create_admin_blueprint</span><span class="p">(</span>
+    <span class="p">(</span><span class="n">User</span><span class="p">,),</span> <span class="n">db_session</span><span class="p">,</span> <span class="n">model_forms</span><span class="o">=</span><span class="p">{</span><span class="s">&#39;User&#39;</span><span class="p">:</span> <span class="n">UserForm</span><span class="p">})</span>
+</pre></div>
+</div>
+<p>Now the UserForm will be used for editing and adding a new user. If
+the form passes the validation checks, then password will propagate to
+the User model and will be hashed and stored the password in the
+database.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Due to the way that forms are generated, the order of input fields
+is difficult to control. This is something that is expected to
+improve in future versions, but for now a custom form is also the
+only way to specify the order of form fields.</p>
+</div>
+</div>
+<div class="section" id="api">
+<h2>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="flaskext.admin.create_admin_blueprint">
+<tt class="descclassname">flaskext.admin.</tt><tt class="descname">create_admin_blueprint</tt><big>(</big><em>models</em>, <em>db_session</em>, <em>name='admin'</em>, <em>model_forms=None</em>, <em>exclude_pks=True</em>, <em>list_view_pagination=25</em>, <em>view_decorator=None</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#flaskext.admin.create_admin_blueprint" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a blueprint that provides the admin interface views. The
+blueprint that is returned will still need to be registered to
+your flask app. Additional parameters will be passed to the
+blueprint constructor.</p>
+<p>The parameters are:</p>
+<dl class="docutils">
+<dt><cite>models</cite></dt>
+<dd>Either a module or an iterable that contains the SQLAlchemy
+models that will be made available through the admin
+interface.</dd>
+<dt><cite>db_session</cite></dt>
+<dd>A SQLAlchemy session that has been set up and bound to an
+engine. See the documentation on using Flask with SQLAlchemy
+for more information on how to set that up.</dd>
+<dt><cite>name</cite></dt>
+<dd>Specify the name for your blueprint. The name of the blueprint
+preceeds the view names of the endpoints, if for example you
+want to refer to the views using <tt class="docutils literal"><span class="pre">url_for()</span></tt>. If you are
+using multiple admin blueprints, it is necessary to set this
+value to something different for each admin module so the
+admin templates can find the correct views.</dd>
+<dt><cite>model_forms</cite></dt>
+<dd>A dict with model names as keys, mapped to WTForm Form objects
+that should be used as forms for creating and editing
+instances of these models.</dd>
+<dt><cite>exclude_pks</cite></dt>
+<dd>A Boolean value that specifies whether or not to automatically
+exclude fields representing the primary key from Flask-Admin
+rendered forms. The default is True.</dd>
+<dt><cite>list_view_pagination</cite></dt>
+<dd>The number of model instances that will be shown in the list
+view if there are more than this number of model
+instances.</dd>
+<dt><cite>view_decorator</cite></dt>
+<dd>A decorator function that will be applied to each admin view
+function.  In particular, you might want to set this to a
+decorator that handles authentication
+(e.g. login_required). See the
+authentication/view_decorator.py for an example of how this
+might be used.</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+    <a href="http://github.com/''"><img style="position: fixed; top: 0; right: 0; border: 0;"
+    src="http://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub" /></a>
+  
+
+  
+  </div>
+  
+
+  </body>
+</html>
