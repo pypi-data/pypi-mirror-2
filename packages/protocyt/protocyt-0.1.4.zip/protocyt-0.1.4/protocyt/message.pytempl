@@ -1,0 +1,186 @@
+% for message in this.messages_order:
+${this.messages[message].render(state)}
+% endfor
+
+% from 'common.pytempl' import message_extra_args, signal, with_type_debug with context
+
+${this.title(' ', this.name)}
+
+cdef inline void serialize_${this.fullname}(object array, object self):
+
+% for index in sorted(this.fields_by_index):
+    % set field = this.fields_by_index[index]
+
+    % if field.kind == 'required':
+
+    serialize_type(array, ${field.get_tag(state)}, ${field.index})
+        % if field.type in field.TYPE_TAG:
+    serialize_${field.type}(array, self.${field.name})
+        % else:
+            % set message = state.find_name(field.type)
+    serialize_with_length_${message.fullname}(array, self.${field.name})
+        % endif
+
+    % elif field.kind == 'repeated':
+
+        % if field.is_packed(state):
+    serialize_type(array, 2, ${field.index}) # 2 is for packed repeated types
+    field_buff = bytearray()
+    for item in self.${field.name}:
+            % if field.type in field.TYPE_TAG:
+        serialize_${field.type}(field_buff, item)
+            % else:
+                % set message = state.find_name(field.type)
+        serialize_with_length_${message.fullname}(field_buff, item)
+            % endif
+    serialize_uint64(array, PyByteArray_GET_SIZE(field_buff))
+    PySequence_InPlaceConcat(array, field_buff)
+        % else
+    for item in self.${field.name}:
+        serialize_type(array, ${field.get_tag(state)}, ${field.index})
+            % if field.type in field.TYPE_TAG:
+        serialize_${field.type}(array, item)
+            % else:
+                % set message = state.find_name(field.type)
+        serialize_with_length_${message.fullname}(array, item)
+            % endif
+        % endif
+
+    % elif field.kind == 'optional':
+
+    if getattr(self, "${field.name}", ${field.get_default_value(state)}) != ${field.get_default_value(state)}:
+        serialize_type(array, ${field.get_tag(state)}, ${field.index})
+        % if field.type in field.TYPE_TAG:
+        serialize_${field.type}(array, self.${field.name})
+        % else:
+            % set message = state.find_name(field.type)
+        serialize_with_length_${message.fullname}(array, self.${field.name})
+        % endif
+
+    % endif
+% else
+    pass
+% endfor
+
+cdef inline void serialize_with_length_${this.fullname}(object array, object self):
+    buff = bytearray()
+    serialize_${this.fullname}(buff, self);
+    serialize_uint64(array, PyByteArray_GET_SIZE(buff))
+    PySequence_InPlaceConcat(array, buff)
+
+##~ ________________________________________________________________________ ~##
+
+cdef parsefunc __table_${this.fullname}[${this.max_index+1}]
+    % for index in range(0, this.max_index+1):
+        % if index in this.fields_by_index:
+            % set decoder = this.fields_by_index[index].get_deserializer_name(state)
+        % else:
+            % set decoder = 'NULL'
+        % endif
+__table_${this.fullname}[${index}] = ${decoder}
+    % endfor
+
+cdef char *__names_${this.fullname}[${this.max_index+1}]
+    % for index in range(0, this.max_index+1):
+        % if index in this.fields_by_index:
+__names_${this.fullname}[${index}] = "${this.fields_by_index[index].name}"
+        % else:
+__names_${this.fullname}[${index}] = NULL
+        % endif
+    % endfor
+
+cdef char __special_${this.fullname}[${this.max_index+1}]
+    % for index in range(0, this.max_index+1):
+        % if index in this.fields_by_index:
+__special_${this.fullname}[${index}] = ${this.fields_by_index[index].get_special_options(state)}
+        % else:
+__special_${this.fullname}[${index}] = 0
+        % endif
+    % endfor
+
+
+cdef object deserialize_${this.fullname}(char **pointer, char *end, ${message_extra_args(state)}):
+    cdef uint64_t n, t, size
+    cdef uint32_t type
+    cdef object self = object.__new__(${this.fullname})
+    cdef char *other_start
+    cdef parsefunc decoder
+    cdef char *name
+% if this.in_debug(state):
+    cdef char *__start_debug
+% endif
+
+% for index, field in this.fields_repeated:
+    self.${field.name} = []
+% endfor
+% for number, field in this.fields_optional:
+% if field.get_default_value(state) != None:
+    self.${field.name} = ${field.get_default_value(state)}
+% endif
+% endfor
+    ${signal('enter', repr(this.fullname))}
+    while pointer[0]<end:
+% call with_type_debug('type', indent=2, define=False)
+        if raw_deserialize_type(pointer, end, &type):
+            raise makeDecodeError(pointer[0], "Can't deserialize type tag at [{0}] for value in message `${this.fullname}`")
+% endcall
+        n = type >> 3
+        t = type & 7
+        if n <= ${this.max_index}:
+            name = __names_${this.fullname}[n]
+            if name != NULL:
+                ${signal('field', 'name', indent=4)}
+                decoder = __table_${this.fullname}[n]
+                if t == 2:
+% call with_type_debug('size', indent=5, define=False)
+                    if raw_deserialize_uint64(pointer, end, &size):
+                        raise makeDecodeError(pointer[0], "Can't deserialize lengts of field at [{0}] for message `${this.fullname}`")
+% endcall
+                    if pointer[0] + size > end:
+                        raise makeDecodeError(pointer[0], "Lengts of field at [{0}] goes outside message `${this.fullname}` boundaries")
+                    value = decoder(pointer, pointer[0] + size, ${message_extra_args(state)})
+                else:
+                    value = decoder(pointer, end, ${message_extra_args(state)})
+                if __special_${this.fullname}[n] == 1: # unpacked repeated
+                    container = PyObject_GetAttrString(self, name)
+                    PyList_Append(container, value)
+                else:
+                    PyObject_SetAttrString(self, name, value)
+                continue
+        ${signal('field', 'name', indent=2)}
+        if t>5:
+            raise makeDecodeError(pointer[0], "Invalid field tag at [{0}]")
+        decoder = __decoder_bytype[t]
+        if decoder == NULL:
+            raise makeDecodeError(pointer[0], "Can't deserialize field by default deserializer at [{0}] for message `${this.fullname}`")
+        if t == 2:
+            if raw_deserialize_uint64(pointer, end, &size):
+                raise makeDecodeError(pointer[0], "Can't deserialize lengts of field at [{0}] for message `${this.fullname}`")
+            decoder(pointer, pointer[0] + size, ${message_extra_args(state)})
+        else:
+            decoder(pointer, end, ${message_extra_args(state)})
+    ${signal('exit', repr(this.fullname))}
+    return self
+
+cdef object repeat_deserialize_${this.fullname}(char **pointer, char *end, ${message_extra_args(state)}):
+    cdef object value = []
+    cdef uint64_t size
+    while pointer[0] < end:
+        if raw_deserialize_uint64(pointer, end, &size):
+            raise makeDecodeError(pointer[0], "Can't deserialize lengts of field of type `${this.fullname}` at [{0}]")
+        value.append(deserialize_${this.fullname}(
+            pointer, pointer[0] + size, ${message_extra_args(state)}))
+    return value
+
+cdef object wrapped_deserialize_${this.fullname}(object array, ${message_extra_args(state)}):
+    cdef char *buff = PyByteArray_AS_STRING(array)
+    cdef char *start = buff
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    cdef object result
+    cdef object pointer
+    try:
+        result = deserialize_${this.fullname}(&buff, buff + size, ${message_extra_args(state)})
+    except InternalDecodeError as error:
+        pointer = PyLong_FromUnsignedLongLong(<uint64_t>start)
+        raise DecodeError(error.args[0] - pointer, error.args[1])
+    return result
