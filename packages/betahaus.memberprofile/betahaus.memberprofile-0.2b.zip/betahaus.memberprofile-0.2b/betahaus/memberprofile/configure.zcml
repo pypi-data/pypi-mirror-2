@@ -1,0 +1,69 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:genericsetup="http://namespaces.zope.org/genericsetup"
+    xmlns:five="http://namespaces.zope.org/five"
+    xmlns:cmf="http://namespaces.zope.org/cmf"
+	xmlns:i18n="http://namespaces.zope.org/i18n"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    i18n_domain="betahaus.memberprofile">
+
+    <five:registerPackage package="." initialize=".initialize" />
+
+    <i18n:registerTranslations directory="locales" />
+    
+    <include package=".browser" />
+    <include package=".content" />
+
+    <cmf:registerDirectory
+      name="betahaus_memberprofile_skins"/>
+
+    <!-- Adapters -->
+	<adapter
+	    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+	    factory=".adapters.MemberProfileSettingsAdapter"
+	    provides=".interfaces.IMemberProfileSettingsAdapter"
+	    />
+
+    <adapter
+        for="betahaus.memberprofile.content.interfaces.IMemberProfile"
+        factory=".adapters.MemberProfileCompleteAdapter"
+        provides=".interfaces.IProfileComplete"
+        />
+
+    <!-- Plone 4 event subscriber -->
+    <subscriber 
+        for="betahaus.memberprofile.content.interfaces.IMemberProfile
+             zope.lifecycleevent.interfaces.IObjectAddedEvent"
+        handler=".handlers.memberarea_added"
+		zcml:condition="have plone-4"
+        />
+
+    <subscriber 
+        for="betahaus.memberprofile.content.interfaces.IMemberProfile
+             Products.Archetypes.interfaces.IObjectEditedEvent"
+        handler=".handlers.sync_name"
+        />
+
+    <subscriber 
+        for="betahaus.memberprofile.content.interfaces.IMemberProfile
+             Products.Archetypes.interfaces.IObjectInitializedEvent"
+        handler=".handlers.sync_name"
+        />
+
+    <genericsetup:registerProfile
+      name="default"
+      title="Betahaus Member profile"
+      directory="profiles/default"
+      description="Installs member profile content type and sets the site up with some defaults."
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      />
+
+    <genericsetup:importStep
+      name="betahaus.memberprofile.profile_default"
+      title="Betahaus MemberProfile default import steps"
+      description="Various import steps that are not handled by GS import/export handlers."
+      handler="betahaus.memberprofile.setuphandlers.profile_default">
+        <depends name="skins"/>
+    </genericsetup:importStep>
+
+</configure>
