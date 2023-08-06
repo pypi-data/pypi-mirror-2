@@ -1,0 +1,55 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="collective.salesforce.query">
+<body>
+    <div metal:fill-slot="main">
+        <tal:main-macro metal:define-macro="main">
+        <tal:data tal:define="headers view/getHeaders;
+                             entries python:view.getEntries();
+                             listing_mode python:view.listing_mode(entries)">
+
+            <tal:details tal:condition="not:listing_mode">
+
+                <span tal:define="entry_id python:entries[0]['Id'];
+                                  details_view nocall:context/@@salesforcedetails_view"
+                      tal:replace="structure python:details_view(simple=True,item_id=entry_id)" />
+            </tal:details>
+
+            <tal:listing tal:condition="listing_mode">
+                <ul>
+                    <li tal:condition="view/update_allowed">
+                        <a tal:attributes="href string:${context/absolute_url}/update"
+                           i18n:translate="label_sfquery_update">
+                            Update <span i18n:name="datatype_name" tal:content="context/datatype"/>s (call to SalesForce)
+                        </a>
+                    </li>
+                </ul>
+
+                <table class="listing"
+                       tal:condition="entries">
+                    <tr>
+                        <th tal:repeat="header headers"
+                            tal:content="python:header[1].label"/>
+                    </tr>
+                    <tal:block repeat="entry entries">
+                    <tr tal:define="oddrow repeat/entry/odd;"
+                        tal:attributes="class python:view.test(oddrow,'odd','even')">
+                        <td tal:repeat="header headers">
+                            <a tal:condition="repeat/header/start"
+                               tal:attributes="href string:${view/context/absolute_url}/salesforcedetails_view?item_id=${entry/Id}"
+                               tal:content="python: str(entry[header[0]]) or '(view)'"/>
+                            <span tal:condition="not:repeat/header/start"
+                                  tal:replace="python: entry[header[0]]"/>
+                        </td>
+                    </tr>
+                    </tal:block>
+                </table>
+                <p tal:condition="not:entries"
+                   i18n:translate="label_sf_no_entries">There are no <span i18n:name="datatype_name" tal:replace="context/datatype"/>s to show</p>
+            </tal:listing>
+        </tal:data>
+
+        </tal:main-macro>
+    </div></body>
+</html>
