@@ -1,0 +1,232 @@
+<dl xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+    xmlns:tal="http://xml.zope.org/namespaces/tal"
+    xmlns:metal="http://xml.zope.org/namespaces/metal"
+    i18n:domain="SimpleBlog"
+    class="portlet SimpleBlogPortlet">
+	<tal:portlet 
+		define="startpoint view/getStartpointForSearch;
+					inBlog python:startpoint.portal_type=='Blog';
+					solo python:0;
+					plone_view context/@@plone;
+					getIcon nocall:plone_view/getIcon;">
+		<dt class="portletHeader" 
+			tal:condition="inBlog">
+			<span class="portletTopLeft"></span>
+				<a tal:attributes="href startpoint/absolute_url;
+					title startpoint/title_or_id"
+				tal:content="startpoint/title_or_id"/>
+			<span class="portletTopRight"></span>
+		</dt>
+		<dt class="portletHeader" 
+			tal:condition="not: inBlog">
+			<span class="portletTopLeft"></span>
+			Blog
+			<span class="portletTopRight"></span>
+		</dt>
+		<tal:calendar condition="view/showCalendar">
+			<tal:block define="portal_url context/@@plone_portal_state/portal_url;
+							query_string view/getQueryString;
+							url_quote_plus nocall:view/url_quote_plus;
+							showPrevMonth view/showPrevMonth;
+							showNextMonth view/showNextMonth;
+							year view/year;">
+			
+				<dt class="portletHeader blogCalendar top">
+					<a href="#" rel="nofollow"
+					   title="Previous month"
+					   tal:define="prevMonthMonth view/prevMonthMonth;
+								   prevMonthYear view/prevMonthYear"
+					   tal:attributes="id python:showPrevMonth and 'calendar-previous' or '';
+									   href python:'?%smonth:int=%d&amp;year:int=%d&amp;orig_query=%s' % (query_string, prevMonthMonth, prevMonthYear, url_quote_plus(query_string)); 
+									   class string:kssCalendarChange kssattr-year-${prevMonthYear} kssattr-month-${prevMonthMonth} calendarPrevious;"
+					   tal:condition="showPrevMonth"
+					   i18n:attributes="title title_previous_month;">&laquo;</a>
+			
+					<span i18n:translate="" tal:omit-tag="">
+						<span i18n:name="monthname"
+							  tal:content="view/monthName"
+							  tal:omit-tag="">monthname</span>
+						<span i18n:name="year"
+							  tal:content="year"
+							  tal:omit-tag="">year</span>
+					</span>
+			
+					<a href="#" rel="nofollow"
+					   title="Next month"
+					   tal:define="nextMonthMonth view/nextMonthMonth;
+								   nextMonthYear view/nextMonthYear"
+					   tal:attributes="id python:showNextMonth and 'calendar-next' or '';
+									   href python:'?%smonth:int=%d&amp;year:int=%d&amp;orig_query=%s' % (query_string, nextMonthMonth, nextMonthYear, url_quote_plus(query_string));
+									   class string:kssCalendarChange kssattr-year-${nextMonthYear} kssattr-month-${nextMonthMonth} calendarNext;"
+					   tal:condition="showNextMonth"
+					   i18n:attributes="title title_next_month;">&raquo;</a>
+				</dt>
+			
+				<dd class="portletItem blogCalendar">
+					<table class="ploneCalendar"
+						   summary="Calendar"
+						   i18n:domain="plone"
+						   i18n:attributes="summary summary_calendar;">
+						<caption class="hiddenStructure"
+								 tal:content="view/monthName">Month name</caption>
+						<thead>
+							<tr class="weekdays"><tal:data tal:repeat="weekday view/getWeekdays"
+									><th scope="col"
+										 tal:content="weekday">Su</th
+								></tal:data>
+							</tr>
+						</thead>
+						<tbody>
+							<tr tal:repeat="week view/getEventsForCalendar"
+								><tal:block repeat="day week"
+									><tal:day define="daynumber day/day;"
+										><tal:isday condition="daynumber"
+											><tal:block define="day_event day/event;
+																is_today day/is_today"
+												><td class="event"
+													tal:condition="day_event"
+													tal:attributes="class python:is_today and 'todayevent' or 'event'"
+												   ><strong><a href=""
+													   tal:attributes="href string:${portal_url}/search?${view/getReviewStateString}start.query:record:list:date=${day/date_string}+23%3A59%3A59&amp;start.range:record=max&amp;end.query:record:list:date=${day/date_string}+00%3A00%3A00&amp;end.range:record=min;
+																	   title day/eventstring;"
+													   tal:content="daynumber">
+													   31
+												   </a
+												></strong></td
+												><tal:notdayevent tal:condition="not: day_event"
+													><td tal:condition="python:is_today"
+														 class="todaynoevent"><strong 
+														 tal:content="daynumber">31</strong></td
+													><td tal:condition="python:not is_today"
+														 tal:content="daynumber">31</td
+												></tal:notdayevent
+											></tal:block
+										></tal:isday
+										><tal:notisday condition="not: daynumber"
+											><td></td
+										></tal:notisday
+									></tal:day
+								></tal:block>
+							</tr>
+						</tbody>
+			
+					</table>
+					<tal:end condition="python:not (view.showRecent or view.showCategories)">
+						<span class="portletBottomLeft"></span>
+						<span class="portletBottomRight"></span>
+					</tal:end>
+				</dd>
+			</tal:block>
+		</tal:calendar>
+	
+		<tal:recent condition="view/showRecent">
+			<tal:block  define="recent  python:view.collectEntries(startpoint);">
+				<dt i18n:translate="recent_additions" 
+					  class="portletHeader blogCalendar" 
+					  tal:attributes="class python:view.showCalendar and 'portletHeader blogCalendar' or 'portletHeader blogCalendar top'">
+						Recent additions
+				</dt>
+				<tal:entries tal:repeat="entry recent">
+					<dd class="" 
+						tal:define="oddrow repeat/entry/even;
+									item_type entry/portal_type;
+									item_icon python:getIcon(entry);" 
+						tal:attributes="class python:oddrow and  'portletItem odd' or 'portletItem even'">
+						<a href="#" 
+						   tal:attributes="href entry/absolute_url;" 
+										   title="entry">
+							<img tal:replace="structure item_icon/html_tag" />
+							<tal:title content="entry/pretty_title_or_id">
+								Title
+							</tal:title>
+						</a>
+					</dd>
+				</tal:entries>
+				<tal:no-items condition="not: recent">
+					<dd class="portletItem odd">
+						<span i18n:translate="no_published_blog_entries">No blog entries are published.</span>
+						<tal:end condition="not: view/showCategories">
+							<span class="portletBottomLeft"></span>
+							<span class="portletBottomRight"></span>
+						</tal:end>
+					</dd>
+				</tal:no-items>
+				<dd class="portletFooter" tal:condition="recent"
+				     tal:attributes="class python:((view.showCategories or view.showComments) and 'portletFooter odd') or 'portletFooter'">
+					<a href="#" tal:attributes="href view/more_recent_link" 
+								   title="more..."
+								   i18n:attributes="title box_morelink"
+								   i18n:translate="box_morelink"
+								   i18n:domain="plone">More...</a>
+					<tal:end condition="python:not (view.showCategories or view.showComments)">
+						<span class="portletBottomLeft"></span>
+						<span class="portletBottomRight"></span>
+					</tal:end>
+				</dd>
+			</tal:block>
+		</tal:recent>
+		<tal:comments condition="view/showComments">
+			<tal:block tal:define="results view/getComments" condition="results">
+			   <dt class="portletHeader"
+					tal:attributes="class python:((view.showRecent or view.showCalender) and 'portletHeader blogCalendar') or 'portletHeader blogCalendar top'"
+					i18n:translate="recent_comments">
+					Recent Comments
+				</dt>
+				<tal:replies tal:repeat="item results">
+					<dd class="portletContent odd"
+						 tal:define="oddrow repeat/item/even;
+										 item_icon python:getIcon(item);
+										 result_url item/getURL;"
+						 tal:attributes="class python:oddrow and  'portletItem odd' or 'portletItem even'">
+						<a href="#"
+						   tal:attributes="href result_url">
+							 <img tal:replace="structure item_icon/html_tag" />
+								 <tal:title content="item/pretty_title_or_id">
+									 Title
+								 </tal:title>					  
+						 </a>
+					</dd>
+				</tal:replies>
+				<dd class="portletFooter" tal:condition="results"
+					 tal:attributes="class python:view.showCategories and 'portletFooter odd' or 'portletFooter'">
+					<a href="#" tal:attributes="href view/more_comments_link" 
+								   title="more..."
+								   i18n:attributes="title box_morelink"
+								   i18n:translate="box_morelink"
+								   i18n:domain="plone">More...</a>
+					<tal:end condition="not: view/showCategories">
+						<span class="portletBottomLeft"></span>
+						<span class="portletBottomRight"></span>
+					</tal:end>
+				</dd>			
+			</tal:block>
+		</tal:comments>
+		<tal:categories condition="view/showCategories">
+			<tal:block tal:define="cats python:view.getAvailableCategories(startpoint)">
+				<dt i18n:translate="blog_categories" class="portletHeader blogCalendar"
+				      tal:attributes="class python:((view.showRecent or view.showCalendar or view.showComments) and 'portletHeader blogCalendar') or 'portletHeader blogCalendar top'">
+					Categories
+				</dt>
+				<tal:cats tal:repeat="cat python:view.getSortedKeys(cats)">
+					<dd class="" 
+						tal:define="oddrow repeat/cat/odd;
+									 pss modules/Products.PythonScripts.standard;
+									 quotedCat python:pss.url_quote(cat)"
+						tal:attributes="class python:oddrow and  'portletItem odd' or 'portletItem even'">
+			
+						<a tal:condition="python:cats[cat]>0"  href="#" 
+									   tal:attributes="href python:view.cat_search_link(quotedCat);
+													   title cat" 
+									   title="category"><span tal:content="cat"/></a>
+									<span tal:condition="python:cats[cat]==0" tal:content="cat"/> 
+									(<span tal:content="python:cats[cat]"/>)
+						<tal:end condition="repeat/cat/end">
+							<span class="portletBottomLeft"></span>
+							<span class="portletBottomRight"></span>
+						</tal:end>
+					</dd>
+				</tal:cats>
+			</tal:block>
+		</tal:categories>
+	</tal:portlet>
+</dl>
