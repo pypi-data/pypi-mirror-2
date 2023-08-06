@@ -1,0 +1,715 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Design &mdash; ToscaWidgets 2 v2.0b5 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '2.0b5',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ToscaWidgets 2 v2.0b5 documentation" href="index.html" />
+    <link rel="next" title="tw2.devtools" href="devtools.html" />
+    <link rel="prev" title="TurboGears 2 Tutorial" href="turbogears.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="devtools.html" title="tw2.devtools"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="turbogears.html" title="TurboGears 2 Tutorial"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b5 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="design">
+<h1>Design<a class="headerlink" href="#design" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="widget-overview">
+<h2>Widget Overview<a class="headerlink" href="#widget-overview" title="Permalink to this headline">¶</a></h2>
+<p>The main purpose of a widget is to display a functional control within an HTML page. A widget has a template to generate its own HTML, and a set of parameters that control how it will be displayed. It can also reference resources - JavaScript or CSS files that support the widget.</p>
+<p>When defining Widgets, some parameters with be static - they will stay constant for the whole lifetime of the application. Some parameters are dynamic - they may change for every request. To ensure thread-safety, a separate widget instance is created for every request, and dynamic parameters are only set on an instance. Static parameters are set by subclassing a widget. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># Initialisation</span>
+<span class="k">class</span> <span class="nc">MyWidget</span><span class="p">(</span><span class="n">Widget</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="s">&#39;myid&#39;</span>
+
+<span class="c"># In a request</span>
+<span class="n">my_widget</span> <span class="o">=</span> <span class="n">MyWidget</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+<span class="n">my_widget</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="s">&#39;my value&#39;</span>
+</pre></div>
+</div>
+<p>To make initialisation more concise, the <tt class="docutils literal"><span class="pre">__new__</span></tt> method on <tt class="docutils literal"><span class="pre">Widget</span></tt> is overriden, so it creates subclasses, rather than instances. The following code is equivalent to that above:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># Initialisation</span>
+<span class="n">MyWidget</span> <span class="o">=</span> <span class="n">Widget</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s">&#39;myid&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In practice, you will rarely need to explictly create an instance, using <tt class="docutils literal"><span class="pre">req()</span></tt>. If the <tt class="docutils literal"><span class="pre">display</span></tt> or <tt class="docutils literal"><span class="pre">validate</span></tt> methods are called on a Widget class, they automatically create an instance. For example, the following are equivalent:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># Explicit creation</span>
+<span class="n">my_widget</span> <span class="o">=</span> <span class="n">MyWidget</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+<span class="n">my_widget</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="s">&#39;my value&#39;</span>
+<span class="n">my_widget</span><span class="o">.</span><span class="n">display</span><span class="p">()</span>
+
+<span class="c"># Implicit creation</span>
+<span class="n">MyWidget</span><span class="o">.</span><span class="n">display</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s">&#39;my value&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this headline">¶</a></h3>
+<p>The parameters are how the user of the widget controls its display and behaviour. Parameters exist primarily for documentation purposes, although they do have some run-time effects. When creating widgets, it&#8217;s important to decide on a convenient set of parameters for the user of the widget, and to document these.</p>
+<p>A parameter definition looks like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.core</span> <span class="kn">as</span> <span class="nn">twc</span>
+<span class="k">class</span> <span class="nc">MyTextField</span><span class="p">(</span><span class="n">twc</span><span class="o">.</span><span class="n">Widget</span><span class="p">):</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="n">twc</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">&#39;The size of the field&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+    <span class="n">validator</span> <span class="o">=</span> <span class="n">twc</span><span class="o">.</span><span class="n">LengthValidator</span><span class="p">(</span><span class="nb">max</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+    <span class="n">highlight</span> <span class="o">=</span> <span class="n">twc</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s">&#39;Region to highlight&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this case, <tt class="xref py py-class docutils literal"><span class="pre">TextField</span></tt> gets all the parameters of its base class, <tt class="xref py py-class docutils literal"><span class="pre">tw2.core.widget</span></tt> and defines a new parameter - <tt class="xref py py-attr docutils literal"><span class="pre">size</span></tt>. A widget can also override parameter in its base class, either with another <a class="reference internal" href="#tw2.core.Param" title="tw2.core.Param"><tt class="xref py py-class docutils literal"><span class="pre">tw2.core.Param</span></tt></a> instance, or a new default value.</p>
+<dl class="class">
+<dt id="tw2.core.Param">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">Param</tt><big>(</big><em>description=Default</em>, <em>default=Default</em>, <em>request_local=Default</em>, <em>attribute=Default</em>, <em>view_name=Default</em><big>)</big><a class="headerlink" href="#tw2.core.Param" title="Permalink to this definition">¶</a></dt>
+<dd><p>A parameter for a widget.</p>
+<dl class="docutils">
+<dt><cite>description</cite></dt>
+<dd>A string to describe the parameter. When overriding a parameter
+description, the string can include <tt class="docutils literal"><span class="pre">$$</span></tt> to insert the previous
+description.</dd>
+<dt><cite>default</cite></dt>
+<dd>The default value for the parameter. If no defalt is specified,
+the parameter is a required parameter. This can also be specified
+explicitly using tw.Required.</dd>
+<dt><cite>request_local</cite></dt>
+<dd>Can the parameter be overriden on a per-request basis? (default:
+True)</dd>
+<dt><cite>attribute</cite></dt>
+<dd>Should the parameter be automatically included as an attribute?
+(default: False)</dd>
+<dt><cite>view_name</cite></dt>
+<dd>The name used for the attribute. This is useful for attributes like
+<em>class</em> which are reserved names in Python. If this is None, the name
+is used. (default: None)</dd>
+</dl>
+<p>The class takes care to record which arguments have been explictly
+specifed, even if to their default value. If a parameter from a base
+class is updated in a subclass, arguments that have been explicitly
+specified will override the base class.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.Variable">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">Variable</tt><big>(</big><em>description=Default</em>, <em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.Variable" title="Permalink to this definition">¶</a></dt>
+<dd><p>A variable - a parameter that is passed from the widget to the template,
+but cannot be controlled by the user. These do not appear in the concise
+documentation for the widget.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.ChildParam">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">ChildParam</tt><big>(</big><em>description=Default</em>, <em>default=Default</em>, <em>request_local=Default</em>, <em>attribute=Default</em>, <em>view_name=Default</em><big>)</big><a class="headerlink" href="#tw2.core.ChildParam" title="Permalink to this definition">¶</a></dt>
+<dd><p>A parameter that applies to children of this widget</p>
+<p>This is useful for situations such as a layout widget, which adds a
+<tt class="xref py py-attr docutils literal"><span class="pre">label</span></tt> parameter to each of its children. When a Widget subclass is
+defined with a parent, the widget picks up the defaults for any child
+parameters from the parent.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.ChildVariable">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">ChildVariable</tt><big>(</big><em>description=Default</em>, <em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.ChildVariable" title="Permalink to this definition">¶</a></dt>
+<dd><p>A variable that applies to children of this widget</p>
+</dd></dl>
+
+</div>
+<div class="section" id="code-hooks">
+<h3>Code Hooks<a class="headerlink" href="#code-hooks" title="Permalink to this headline">¶</a></h3>
+<p>Subclasses of Widget can override the following methods. It is not recommended to override any other methods, e.g. display, validate, __init__.</p>
+<dl class="classmethod">
+<dt id="tw2.core.widgets.Widget.post_define">
+<em class="property">classmethod </em><tt class="descclassname">Widget.</tt><tt class="descname">post_define</tt><big>(</big><big>)</big><a class="headerlink" href="#tw2.core.widgets.Widget.post_define" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a class method, that is called when a subclass of this Widget
+is created. Process static configuration here. Use it like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyWidget</span><span class="p">(</span><span class="n">LeafWidget</span><span class="p">):</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">post_define</span><span class="p">(</span><span class="n">cls</span><span class="p">):</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span>  <span class="s">&#39;id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">id</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">&#39;my&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">pm</span><span class="o">.</span><span class="n">ParameterError</span><span class="p">(</span><span class="s">&quot;id must start with &#39;my&#39;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>post_define should always cope with missing data - the class may be an
+abstract class. There is no need to call super(), the metaclass will do
+this automatically.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tw2.core.widgets.Widget.prepare">
+<tt class="descclassname">Widget.</tt><tt class="descname">prepare</tt><big>(</big><big>)</big><a class="headerlink" href="#tw2.core.widgets.Widget.prepare" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is an instance method, that is called just before the Widget is
+displayed. Process request-local configuration here. For
+efficiency, widgets should do as little work as possible here.
+Use it like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyWidget</span><span class="p">(</span><span class="n">Widget</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyWidget</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="s">&#39;My: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<p><strong>Mutable Members</strong></p>
+<p>If a widget&#8217;s <tt class="xref py py-meth docutils literal"><span class="pre">prepare()</span></tt> method modifies a mutable member on the widget, it must take care not to modify a class member, as this is not thread safe. In general, the code should call <tt class="xref py py-attr docutils literal"><span class="pre">self.safe_modify(member_name)</span></tt>, which detects class members and creates a copy on the instance. Users of widgets should be aware that if a mutable is set on an instance, the widget may modify this. The most common case of a mutable member is <tt class="xref py py-attr docutils literal"><span class="pre">attrs</span></tt>. While this arrangement is thread-safe and reasonably simple, copying may be bad for performance. In some cases, widgets may deliberately decide not to call <tt class="xref py py-meth docutils literal"><span class="pre">safe_modify()</span></tt>, if the implications of this are understood.</p>
+</div>
+</div>
+<div class="section" id="widget-hierarchy">
+<h2>Widget Hierarchy<a class="headerlink" href="#widget-hierarchy" title="Permalink to this headline">¶</a></h2>
+<p>Widgets can be arranged in a hierarchy. This is useful for applications like layouts, where the layout will be a parent widget and fields will be children of this. There are four roles a widget can take in the hierarchy, depending on the base class used:</p>
+<dl class="class">
+<dt id="tw2.core.Widget">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">Widget</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.Widget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all widgets.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.CompoundWidget">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">CompoundWidget</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.CompoundWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>A widget that has an arbitrary number of children, this is common for
+layout components, such as <tt class="xref py py-class docutils literal"><span class="pre">tw2.forms.TableLayout</span></tt>.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.RepeatingWidget">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">RepeatingWidget</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.RepeatingWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>A widget that has a single child, which is repeated an arbitrary number
+of times, such as <tt class="xref py py-class docutils literal"><span class="pre">tw2.forms.GridLayout</span></tt>.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.DisplayOnlyWidget">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">DisplayOnlyWidget</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.DisplayOnlyWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>A widget that has a single child. The parent widget is only used for display
+purposes; it does not affect value propagation or validation. This is used
+by widgets like <tt class="xref py py-class docutils literal"><span class="pre">tw2.forms.FieldSet</span></tt>.</p>
+</dd></dl>
+
+<p><strong>Value Propagation</strong></p>
+<p>An important feature of the hierarchy is value propagation. When the value is set for a compound or repeating widget, this causes the value to be set for the child widgets. In general, a leaf widget takes a scalar type as a value, a compound widget takes a dict or an  object, and a repeating widget takes a list.</p>
+<p>The hierarchy also affects the generation of compound ids, and validation.</p>
+<p><strong>Identifier</strong></p>
+<p>In general, a widget needs to have an identifier. Without an id, it cannot participate in value propagation or validation, and it does not get an HTML id attribute. There are some exceptions to this:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Some widgets do not need an id (e.g. Label, Spacer) and provide a default id of None.</li>
+<li>The child of a RepeatingWidget must not have an id.</li>
+<li>An id can be specified either on a DisplayOnlyWidget, or it&#8217;s child, but not both. The widget that does not have the id specified automatically picks it up from the other.</li>
+</ul>
+</div></blockquote>
+<p>Compound IDs are formed by joining the widget&#8217;s id with those of its ancestors. These are used in two situations:</p>
+<blockquote>
+<div><ul class="simple">
+<li>For the HTML id attribute, and also the name attribute for form fields</li>
+<li>For the URL path a controller widget is registered at</li>
+</ul>
+</div></blockquote>
+<p>The separator is a colon (:), resulting in compound ids like &#8220;form:sub_form:field&#8221;. <strong>Note</strong> this causes issues with CSS and will be changed shortly, and made configurable.</p>
+<p>In generel, the id on a DisplayOnlyWidget is not included in the compound id. However, when generating the compound id for a DisplayOnlyWidget, the id is included. In addition <em>id_suffix</em> is appended, to avoid generating duplicate IDs. The <em>id_suffix</em> is not appended for URL paths, to keep the paths short. There is a risk of duplicate IDs, but this is not expected to be a problem in practice.</p>
+<p>For children of a RepeatingWidget, the repetition is used instead of the id, for generating the compound HTML id. For the URL path, the element is skipped entirely.</p>
+<p><strong>Deep Children</strong></p>
+<p>This is a feature that helps have a form layout that doesn&#8217;t exactly match the database layout. For example, we might have a sinlge database table, with fields like title, customer, start_date, end_date. We want to display this in a Form that&#8217;s broken up into two FieldSets. Without deep children, the FieldSets would have to have ids, and field makes would be dotted, like info.title. The deep children feature lets us set the id to None:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="k">class</span> <span class="nc">child</span><span class="p">(</span><span class="n">twc</span><span class="o">.</span><span class="n">CompoundWidget</span><span class="p">):</span>
+        <span class="k">class</span> <span class="nc">info</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableFieldSet</span><span class="p">):</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">title</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+            <span class="n">customer</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+        <span class="k">class</span> <span class="nc">dates</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableFieldSet</span><span class="p">):</span>
+            <span class="nb">id</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">start_date</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+            <span class="n">end_date</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>When a value like <tt class="docutils literal"><span class="pre">{'title':</span> <span class="pre">'my</span> <span class="pre">title'}</span></tt> is passed to MyForm, this will propagate correctly.</p>
+</div>
+<div class="section" id="template">
+<h2>Template<a class="headerlink" href="#template" title="Permalink to this headline">¶</a></h2>
+<p>Every widget has a template, this is core to the widget concept. ToscaWidgets aims to support any templating engine that support the <tt class="docutils literal"><span class="pre">buffet</span></tt> interface, which is an initiative by the TurboGears project to create a standard interface for template libraries. In practice, there are more differences between template engines than the buffet interface standardises. So, ToscaWidgets has some template-language hooks, and support is primarily for: Genshi, Mako, Kid and Cheetah.</p>
+<p>The <tt class="xref py py-attr docutils literal"><span class="pre">template</span></tt> parameter takes the form <tt class="docutils literal"><span class="pre">engine_name:template_path</span></tt>. The <tt class="docutils literal"><span class="pre">engine_name</span></tt> is the name that the template engine defines in the <tt class="docutils literal"><span class="pre">python.templating.engines</span></tt> entry point, e.g. <tt class="docutils literal"><span class="pre">genshi</span></tt> or <tt class="docutils literal"><span class="pre">mako</span></tt>. The <tt class="docutils literal"><span class="pre">template_path</span></tt> is a string the engine can use to locate the template; usually this is dot-notation that mimics the semantics of Python&#8217;s import statement, e.g. <tt class="docutils literal"><span class="pre">myapp.templates.mytemplate</span></tt>. Genshi templates allow specifications like <tt class="docutils literal"><span class="pre">./template.html</span></tt> which is beneficial for simple applications.</p>
+<p>It is also possible to allow your widget to utilize multiple templates, or to have TW2 support any template language you provide a template for.  To do this, simply leave the name of the template engine off of the template parameter, and TW2 will select the appropriate template, based on specifications in the TW2 middleware.</p>
+<p>For instance, you might have a form.mak and a form.html template (mako and genshi). TW2 will render the mako template if mako is listed ahead of genshi in the middleware config&#8217;s <tt class="docutils literal"><span class="pre">preferred_rendering_engines</span></tt>.  See the documentation regarding <a class="reference internal" href="#middleware"><em>Middleware</em></a> for more information on how to set up your middleware for desired output.</p>
+<dl class="class">
+<dt id="tw2.core.template.EngineManager">
+<em class="property">class </em><tt class="descclassname">tw2.core.template.</tt><tt class="descname">EngineManager</tt><a class="headerlink" href="#tw2.core.template.EngineManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages template engines. An instance is automatically created on each
+<tt class="xref py py-class docutils literal"><span class="pre">tw.core.TwMiddleware</span></tt> instance. Users should not access
+this class directly.</p>
+<dl class="method">
+<dt id="tw2.core.template.EngineManager.render">
+<tt class="descname">render</tt><big>(</big><em>template</em>, <em>displays_on</em>, <em>dct</em><big>)</big><a class="headerlink" href="#tw2.core.template.EngineManager.render" title="Permalink to this definition">¶</a></dt>
+<dd><p>Render a template (passed in the form &#8220;engine_name:template_path&#8221;)
+in a suitable way for inclusion in a template of the engine specified
+in <tt class="docutils literal"><span class="pre">displays_on</span></tt>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tw2.core.template.EngineManager._get_adaptor_renderer">
+<tt class="descname">_get_adaptor_renderer</tt><big>(</big><em>src</em>, <em>dst</em>, <em>template</em><big>)</big><a class="headerlink" href="#tw2.core.template.EngineManager._get_adaptor_renderer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a function that will that processes a template appropriately,
+given the source and destination engine names.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="resources">
+<h2>Resources<a class="headerlink" href="#resources" title="Permalink to this headline">¶</a></h2>
+<p>Widgets often need to access resources, such as JavaScript or CSS files. A key feature of widgets is the ability to automatically serve such resources, and insert links into appropriate sections of the page, e.g. <tt class="docutils literal"><span class="pre">&lt;HEAD&gt;</span></tt>. There are several parts to this:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Widgets can define resources they use, using the <tt class="xref py py-attr docutils literal"><span class="pre">resources</span></tt> parameter.</li>
+<li>When a Widget is displayed, it registers resources in request-local storage, and with the resource server.</li>
+<li>The resource injection middleware detects resources in request-local storage, and rewrites the generated page to include appropriate links.</li>
+<li>The resource server middleware serves static files used by widgets</li>
+<li>Widgets can also access resources at display time, e.g. to get links</li>
+</ul>
+</div></blockquote>
+<p><strong>Defining Resources</strong></p>
+<p>To define a resource, just add a <tt class="xref py py-class docutils literal"><span class="pre">tw2.core.Resource</span></tt> subclass to the widget&#8217;s <tt class="xref py py-attr docutils literal"><span class="pre">resources</span></tt> parameter. It is also possible to append to <tt class="xref py py-attr docutils literal"><span class="pre">resources</span></tt> from within the <tt class="xref py py-meth docutils literal"><span class="pre">prepare()</span></tt> method. The following resource types are available:</p>
+<dl class="class">
+<dt id="tw2.core.CSSLink">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">CSSLink</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.CSSLink" title="Permalink to this definition">¶</a></dt>
+<dd><p>A CSS style sheet.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.JSLink">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">JSLink</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.JSLink" title="Permalink to this definition">¶</a></dt>
+<dd><p>A JavaScript source file.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.JSSource">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">JSSource</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.JSSource" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inline JavaScript source code.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="tw2.core.JSFuncCall">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">JSFuncCall</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.JSFuncCall" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inline JavaScript function call.</p>
+</dd></dl>
+
+<p>Resources are widgets, but follow a slightly different lifecycle. Resource subclasses are passed into the <tt class="xref py py-attr docutils literal"><span class="pre">resources</span></tt> parameter. An instance is created for each request, but this is only done at the time of the parent Widget&#8217;s <tt class="xref py py-meth docutils literal"><span class="pre">display()</span></tt> method. This gives widgets a chance to add dynamic resources in their <tt class="xref py py-meth docutils literal"><span class="pre">prepare()</span></tt> method.</p>
+</div>
+<div class="section" id="middleware">
+<span id="id1"></span><h2>Middleware<a class="headerlink" href="#middleware" title="Permalink to this headline">¶</a></h2>
+<p>The WSGI middleware has three functions:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Request-local storage</li>
+<li>Configuration</li>
+<li>Resource injection</li>
+</ul>
+</div></blockquote>
+<p><strong>Configuration</strong></p>
+<p>In general, ToscaWidgets configuration is done on the middleware instance. At the beginning of each request, the middleware stores a reference to itself in request-local storage. So, during a request, a widget can consult request-local storage, and get the configuration for the middleware active in that request. This allows multiple applications to use ToscaWidgets, with different configurations, in a single Python environment.</p>
+<p>Configuration is passed as keyword arguments to the middleware constructor. The available parameters are:</p>
+<dl class="class">
+<dt id="tw2.core.middleware.Config">
+<em class="property">class </em><tt class="descclassname">tw2.core.middleware.</tt><tt class="descname">Config</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.middleware.Config" title="Permalink to this definition">¶</a></dt>
+<dd><p>ToscaWidgets Configuration Set</p>
+<dl class="docutils">
+<dt><cite>translator</cite></dt>
+<dd>The translator function to use. (default: no-op)</dd>
+<dt><cite>default_engine</cite></dt>
+<dd>The main template engine in use by the application. Widgets with no
+parent will display correctly inside this template engine. Other
+engines may require passing displays_on to <tt class="xref py py-meth docutils literal"><span class="pre">Widget.display()</span></tt>.
+(default:string)</dd>
+<dt><cite>inject_resoures</cite></dt>
+<dd>Whether to inject resource links in output pages. (default: True)</dd>
+<dt><cite>serve_resources</cite></dt>
+<dd>Whether to serve static resources. (default: True)</dd>
+<dt><cite>res_prefix</cite></dt>
+<dd>The prefix under which static resources are served. This must start
+and end with a slash. (default: /resources/)</dd>
+<dt><cite>res_max_age</cite></dt>
+<dd>The maximum time a cache can hold the resource. This is used to
+generate a Cache-control header. (default: 3600)</dd>
+<dt><cite>serve_controllers</cite></dt>
+<dd>Whether to serve controller methods on widgets. (default: True)</dd>
+<dt><cite>controller_prefix</cite></dt>
+<dd>The prefix under which controllers are served. This must start
+and end with a slash. (default: /controllers/)</dd>
+<dt><cite>bufsize</cite></dt>
+<dd>Buffer size used by static resource server. (default: 4096)</dd>
+<dt><cite>params_as_vars</cite></dt>
+<dd>Whether to present parameters as variables in widget templates. This
+is the behaviour from ToscaWidgets 0.9. (default: False)</dd>
+<dt><cite>debug</cite></dt>
+<dd>Whether the app is running in development or production mode.
+(default: True)</dd>
+<dt><cite>validator_msgs</cite></dt>
+<dd>A dictionary that maps validation message names to messages. This lets
+you override validation messages on a global basis. (default: {})</dd>
+<dt><cite>encoding</cite></dt>
+<dd>The encoding to decode when performing validation (default: utf-8)</dd>
+<dt><cite>auto_reload_templates</cite></dt>
+<dd>Whether to automatically reload changed templates. Set this to False in
+production for efficiency. If this is None, it takes the same value as
+debug. (default: None)</dd>
+<dt><cite>preferred_rendering_engines</cite></dt>
+<dd>List of rendering engines in order of preference.
+(default: [&#8216;mako&#8217;,&#8217;genshi&#8217;,&#8217;kid&#8217;,&#8217;cheetah&#8217;])</dd>
+<dt><cite>strict_engine_selection</cite></dt>
+<dd>If set to true, TW2 will only select rendering engines from within your
+preferred_rendering_engines, otherwise, it will try the default list if
+it does not find a template within your preferred list. (default: True)</dd>
+<dt><cite>rendering_engine_lookup</cite></dt>
+<dd>A dictionary of file extensions you expect to use for each type of template engine.
+(default: {&#8216;mako&#8217;:&#8217;mak&#8217;, &#8216;genshi&#8217;:&#8217;html&#8217;, &#8216;cheetah&#8217;:&#8217;tmpl&#8217;, &#8216;kid&#8217;:&#8217;kid&#8217;})</dd>
+<dt><cite>script_name</cite></dt>
+<dd>A name to prepend to the url for all resource links (different from res_prefix, as it may
+Be shared across and entire wsgi app.
+(default: &#8216;&#8217;)</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="declarative-instantiation">
+<h2>Declarative Instantiation<a class="headerlink" href="#declarative-instantiation" title="Permalink to this headline">¶</a></h2>
+<p>Instantiating compound widgets can result in less-than-beautiful code. To help alleviate this, widgets can be defined declaratively, and this is the recommended approach. A definition looks like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MovieForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableForm</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">HiddenField</span><span class="p">()</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+    <span class="n">desc</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">(</span><span class="n">rows</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Any class members that are subclasses of Widget become children. All the children get their <tt class="docutils literal"><span class="pre">id</span></tt> from the name of the member variable. Note: it is important that all children are defined like <tt class="docutils literal"><span class="pre">id</span> <span class="pre">=</span> <span class="pre">twf.HiddenField()</span></tt> and not <tt class="docutils literal"><span class="pre">id</span> <span class="pre">=</span> <span class="pre">twf.HiddenField</span></tt>. Otherwise, the order of the children will not be preserved.</p>
+<p>It is possible to define children that have the same name as parameters, using this syntax. However, doing so does prevent a widget overriding a parameter, and defining a child with the same name. If you need to do this, you must use a throwaway name for the member variable, and specify the id explicitly, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MovieForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableForm</span><span class="p">):</span>
+    <span class="n">resources</span> <span class="o">=</span> <span class="p">[</span><span class="n">my_resource</span><span class="p">]</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">HiddenField</span><span class="p">()</span>
+    <span class="n">noname</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s">&#39;resources&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Nesting and Inheritence</strong></p>
+<p>Nested declarative definitions can be used, like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="k">class</span> <span class="nc">child</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableLayout</span><span class="p">):</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">()</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">Label</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s">&#39;this is a test&#39;</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Inheritence is supported - a subclass gets the children from the base class, plus any defined on the subclass. If there&#8217;s a name clash, the subclass takes priority. Multiple inheritence resolves name clashes in a similar way. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyFields</span><span class="p">(</span><span class="n">twc</span><span class="o">.</span><span class="n">CompoundWidget</span><span class="p">):</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">()</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">Label</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s">&#39;this is a test&#39;</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">TableFields</span><span class="p">(</span><span class="n">MyFields</span><span class="p">,</span> <span class="n">twf</span><span class="o">.</span><span class="n">TableLayout</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span> <span class="nc">ListFields</span><span class="p">(</span><span class="n">MyFields</span><span class="p">,</span> <span class="n">twf</span><span class="o">.</span><span class="n">ListLayout</span><span class="p">):</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Proxying children</strong></p>
+<p>Without this feature, double nesting of classes is often necessary, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="k">class</span> <span class="nc">child</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableLayout</span><span class="p">):</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Proxying children means that if <tt class="xref py py-class docutils literal"><span class="pre">RepeatingWidget</span></tt> or <tt class="xref py py-class docutils literal"><span class="pre">DisplayOnlyWidget</span></tt> have <tt class="xref py py-attr docutils literal"><span class="pre">children</span></tt> set, this is passed to their <tt class="xref py py-attr docutils literal"><span class="pre">child</span></tt>. The following is equivalent to the definition above:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+    <span class="n">child</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TableLayout</span><span class="p">()</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>And this is used by classes like <tt class="xref py py-class docutils literal"><span class="pre">TableForm</span></tt> and <tt class="xref py py-class docutils literal"><span class="pre">TableFieldSet</span></tt> to allow the user more concise widget definitions:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableForm</span><span class="p">):</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextArea</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Automatic ID</strong></p>
+<p>Sub classes of <tt class="xref py py-class docutils literal"><span class="pre">Page</span></tt> that do not have an id, will have the id automatically set to the name of the class. This can be disabled by setting <tt class="xref py py-attr docutils literal"><span class="pre">_no_autoid</span></tt> on the class. This only affects that specific class, not any subclasses.</p>
+</div>
+<div class="section" id="widgets-as-controllers">
+<h2>Widgets as Controllers<a class="headerlink" href="#widgets-as-controllers" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes widgets will want to define controller methods. This is particularly useful for Ajax widgets. Any widget can have a <tt class="xref py py-meth docutils literal"><span class="pre">request()</span></tt> method, which is called with a WebOb <tt class="xref py py-class docutils literal"><span class="pre">Request</span></tt> object, and must return a WebOb <tt class="xref py py-class docutils literal"><span class="pre">Response</span></tt> object, like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyWidget</span><span class="p">(</span><span class="n">twc</span><span class="o">.</span><span class="n">Widget</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="s">&#39;my_widget&#39;</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">request</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">req</span><span class="p">):</span>
+        <span class="n">resp</span> <span class="o">=</span> <span class="n">webob</span><span class="o">.</span><span class="n">Response</span><span class="p">(</span><span class="n">request</span><span class="o">=</span><span class="n">req</span><span class="p">,</span> <span class="n">content_type</span><span class="o">=</span><span class="s">&quot;text/html; charset=UTF8&quot;</span><span class="p">)</span>
+        <span class="c"># ...</span>
+        <span class="k">return</span> <span class="n">resp</span>
+</pre></div>
+</div>
+<p>For the <tt class="xref py py-meth docutils literal"><span class="pre">request()</span></tt> method to be called, the widget must be registered with the <tt class="xref py py-class docutils literal"><span class="pre">ControllersApp</span></tt> in the middleware. By default, the path is constructed from /controllers/, and the widget&#8217;s id. A request to /controllers/ refers to a widget with id <tt class="docutils literal"><span class="pre">index</span></tt>. You can specify <tt class="xref py py-attr docutils literal"><span class="pre">controllers_prefix</span></tt> in the configuration.</p>
+<p>For convenience, widgets that have a <tt class="xref py py-meth docutils literal"><span class="pre">request()</span></tt> method, and an <tt class="xref py py-attr docutils literal"><span class="pre">id</span></tt> will be registered automatically. By default, this uses a global <tt class="xref py py-class docutils literal"><span class="pre">ControllersApp</span></tt> instance, which is also the default controllers_app for <tt class="xref py py-func docutils literal"><span class="pre">make_middleware()</span></tt>. If you want to use multiple controller applications in a single python instance, you will need to override this. Set <tt class="xref py py-attr docutils literal"><span class="pre">tw2_controllers</span></tt> as a global variable, and this will affect all widgets defined in that module. Set this to None to disable automatic registration. You can also manually register widgets:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">mw</span> <span class="o">=</span> <span class="n">twc</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">request_local</span><span class="p">()[</span><span class="s">&#39;middleware&#39;</span><span class="p">]</span>
+<span class="n">mw</span><span class="o">.</span><span class="n">controllers</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyWidget</span><span class="p">,</span> <span class="s">&#39;mywidget&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Methods to override</strong></p>
+<blockquote>
+<div><dl class="docutils">
+<dt><cite>view_request</cite></dt>
+<dd>Instance method - get self and req. load from db</dd>
+<dt><cite>validated_request</cite></dt>
+<dd>Class method - get cls and validated data</dd>
+<dt><cite>ajax_request</cite></dt>
+<dd>Return python data that is automatically converted to an ajax response</dd>
+</dl>
+</div></blockquote>
+</div>
+<div class="section" id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Permalink to this headline">¶</a></h2>
+<p>One of the main features of any forms library is the vaidation of form input, e.g checking that an email address is valid, or that a user name is not already taken. If there are validation errors, these must be displayed to the user in a helpful way. Many validation tasks are common, so these should be easy for the developer, while less-common tasks are still possible.</p>
+<p><strong>Conversion</strong></p>
+<p>Validation is also responsible for conversion to and from python types. For example, the DateValidator takes a string from the form and produces a python date object. If it is unable to do this, that is a validation failure.</p>
+<p>To keep related functionality together, validators also support coversion from python to string, for display. This should be complete, in that there are no python values that cause it to fail. It should also be precise, in that converting from python to string, and back again, should always give a value equal to the original python value. The converse is not always true, e.g. the string &#8220;1/2/2004&#8221; may be converted to a python date object, then back to &#8220;01/02/2004&#8221;.</p>
+<p><strong>Validation Errors</strong></p>
+<p>When there is an error, all fields should still be validated and multiple errors displayed, rather than stopping after the first error.</p>
+<p>When validation fails, the user should see the invalid values they entered. This is helpful in the case that a field is entered only slightly wrong, e.g. a number entered as &#8220;2,000&#8221; when commas are not allowed. In such cases, conversion to and from python may not be possible, so the value is kept as a string. Some widgets will not be able to display an invalid value (e.g. selection fields); this is fine, they just have to do the best they can.</p>
+<p>When there is an error is some fields, other valid fields can potentially normalise their value, by converting to python and back again (e.g. 01234 -&gt; 1234). However, it was decided to use the original value in this case.</p>
+<p>In some cases, validation may encounter a major error, as if the web user has tampered with the HTML source. However, we can never be completely sure this is the case, perhaps they have a buggy browser, or caught the site in the middle of an upgrade. In these cases, validation will produce the most helpful error messages it can, but not attempt to identify which field is at fault, nor redisplay invalid values.</p>
+<p><strong>Required Fields</strong></p>
+<p>If a field has no value, if defaults to <tt class="xref docutils literal"><span class="pre">None</span></tt>. It is down to that field&#8217;s validator to raise an error if the field is required. By default, fields are not required. It was considered to have a dedicated <tt class="docutils literal"><span class="pre">Missing</span></tt> class, but this was decided against, as <tt class="xref docutils literal"><span class="pre">None</span></tt> is already intended to convey the absence of data.</p>
+<p><strong>Security Consideration</strong></p>
+<p>When a widget is redisplayed after a validation failure, it&#8217;s value is derived from unvalidated user input. This means widgets must be &#8220;safe&#8221; for all input values. In practice, this is almost always the case without great care, so widgets are assumed to be safe.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">If a particular widget is not safe in this way, it must override <tt class="xref py py-meth docutils literal"><span class="pre">_validate()</span></tt> and set <tt class="xref py py-attr docutils literal"><span class="pre">value</span></tt> to <em>None</em> in case of error.</p>
+</div>
+<p><strong>Validation Messages</strong></p>
+<p>When validation fails, the validator raises <tt class="xref py py-class docutils literal"><span class="pre">ValidationError</span></tt>. This must be passed the short message name, e.g. &#8220;required&#8221;. Each validator has a dictionary mapping short names to messages that are presented to the user, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msgs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;tooshort&#39;</span><span class="p">:</span> <span class="s">&#39;Value is too short&#39;</span><span class="p">,</span>
+    <span class="s">&#39;toolong&#39;</span><span class="p">:</span> <span class="s">&#39;Value is too long&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Messages can be overridden on a global basis, using <tt class="xref py py-attr docutils literal"><span class="pre">validator_msgs</span></tt> on the middleware configuration. For example, the user may prefer &#8220;Value is required&#8221; instead of the default &#8220;Enter a value&#8221; for a missing field.</p>
+<p>A Validator can also rename mesages, by specifying a tuple in the <tt class="xref py py-attr docutils literal"><span class="pre">msgs</span></tt> dict. For example, <tt class="xref py py-class docutils literal"><span class="pre">ListLengthValidator</span></tt> is a subclass of <tt class="xref py py-class docutils literal"><span class="pre">LengthValidator</span></tt> which raises either <tt class="docutils literal"><span class="pre">tooshort</span></tt> or <tt class="docutils literal"><span class="pre">toolong</span></tt>. However, it&#8217;s desired to have different message names, so that any global override would be applied separately. The following <tt class="xref py py-attr docutils literal"><span class="pre">msgs</span></tt> dict is used:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">msgs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;tooshort&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s">&#39;list_tooshort&#39;</span><span class="p">,</span> <span class="s">&#39;Select at least $min&#39;</span><span class="p">),</span>
+    <span class="s">&#39;toolong&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s">&#39;list_toolong&#39;</span><span class="p">,</span> <span class="s">&#39;Select no more than $max&#39;</span><span class="p">),</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Within the messages, tags like <tt class="docutils literal"><span class="pre">$min</span></tt> are substituted with the corresponding attribute from the validator. It is not possible to specify the value in this way; this is to discourage using values within messages.</p>
+<p><strong>FormEncode</strong></p>
+<p>Earlier versions of ToscaWidgets used FormEncode for validation and there are good reasons for this. Some aspects of the design work very well, and FormEncode has a lot of clever validators, e.g. the ability to check that a post code is in the correct format for a number of different countries.</p>
+<p>However, there are challenges making FormEncode and ToscaWidgets work together. For example, both libraries store the widget hierarchy internally. This makes implementing some features (e.g. <tt class="docutils literal"><span class="pre">strip_name</span></tt> and <tt class="xref py py-class docutils literal"><span class="pre">tw2.dynforms.HidingSingleSelectField</span></tt>) difficult. There are different needs for the handling of unicode, leading ToscaWidgets to override some behaviour. Also, FormEncode just does not support client-side validation, a planned feature of ToscaWidgets 2.</p>
+<p>ToscaWidgets 2 does not rely on FormEncode. However, developers can use FormEncode validators for individual fields. The API is compatible in that <tt class="xref py py-meth docutils literal"><span class="pre">to_python()</span></tt> and <tt class="xref py py-meth docutils literal"><span class="pre">from_python()</span></tt> are called for conversion, and <tt class="xref py py-class docutils literal"><span class="pre">formencode.Invalid</span></tt> is caught. Also, if FormEncode is installed, the <tt class="xref py py-class docutils literal"><span class="pre">ValidationError</span></tt> class is a subclass of <tt class="xref py py-class docutils literal"><span class="pre">formencode.Invalid</span></tt>.</p>
+<div class="section" id="using-validators">
+<h3>Using Validators<a class="headerlink" href="#using-validators" title="Permalink to this headline">¶</a></h3>
+<p>There&#8217;s two parts to using validators. First, specify validators in the widget definition, like this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">RegisterUser</span><span class="p">(</span><span class="n">twf</span><span class="o">.</span><span class="n">TableForm</span><span class="p">):</span>
+    <span class="n">validator</span> <span class="o">=</span> <span class="n">twc</span><span class="o">.</span><span class="n">MatchValidator</span><span class="p">(</span><span class="s">&#39;email&#39;</span><span class="p">,</span> <span class="s">&#39;confirm_email&#39;</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+    <span class="n">email</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">TextField</span><span class="p">(</span><span class="n">validator</span><span class="o">=</span><span class="n">twc</span><span class="o">.</span><span class="n">EmailValidator</span><span class="p">)</span>
+    <span class="n">confirm_email</span> <span class="o">=</span> <span class="n">twf</span><span class="o">.</span><span class="n">PasswordField</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>You can specify a validator on any widget, either a class or an instance. Using an instance lets you pass parameters to the validator. You can code your own validator by subclassing <a class="reference internal" href="#tw2.core.Validator" title="tw2.core.Validator"><tt class="xref py py-class docutils literal"><span class="pre">tw2.core.Validator</span></tt></a>. All validators have at least these parameters:</p>
+<dl class="class">
+<dt id="tw2.core.Validator">
+<em class="property">class </em><tt class="descclassname">tw2.core.</tt><tt class="descname">Validator</tt><big>(</big><em>**kw</em><big>)</big><a class="headerlink" href="#tw2.core.Validator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for validators</p>
+<dl class="docutils">
+<dt><cite>required</cite></dt>
+<dd>Whether empty values are forbidden in this field. (default: False)</dd>
+<dt><cite>strip</cite></dt>
+<dd>Whether to strip leading and trailing space from the input, before
+any other validation. (default: True)</dd>
+</dl>
+<p>To create your own validators, sublass this class, and override any of:
+<tt class="xref py py-meth docutils literal"><span class="pre">to_python()</span></tt>, <tt class="xref py py-meth docutils literal"><span class="pre">validate_python()</span></tt>, or <tt class="xref py py-meth docutils literal"><span class="pre">from_python()</span></tt>.</p>
+</dd></dl>
+
+<p>Second, when the form values are submitted, call <tt class="xref py py-meth docutils literal"><span class="pre">validate()</span></tt> on the outermost widget. Pass this a dictionary of the request parameters. It will call the same method on all contained widgets, and either return the validated data, with all conversions applied, or raise <tt class="xref py py-class docutils literal"><span class="pre">tw2.core.ValidationError</span></tt>. In the case of a validation failure, it stores the invalid value and an error message on the affected widget.</p>
+</div>
+<div class="section" id="implementation">
+<h3>Implementation<a class="headerlink" href="#implementation" title="Permalink to this headline">¶</a></h3>
+<p>A two-pass approach is used internally, although this is generally hidden from the developer. When <tt class="xref py py-meth docutils literal"><span class="pre">Widget.validate()</span></tt> is called it first calls:</p>
+<dl class="function">
+<dt id="tw2.core.validation.unflatten_params">
+<tt class="descclassname">tw2.core.validation.</tt><tt class="descname">unflatten_params</tt><big>(</big><em>params</em><big>)</big><a class="headerlink" href="#tw2.core.validation.unflatten_params" title="Permalink to this definition">¶</a></dt>
+<dd><p>This performs the first stage of validation. It takes a dictionary where
+some keys will be compound names, such as &#8220;form:subform:field&#8221; and converts
+this into a nested dict/list structure. It also performs unicode decoding,
+with the encoding specified in the middleware config.</p>
+</dd></dl>
+
+<p>If this fails, there is no attempt to determine which parameter failed; the whole submission is considered corrupt. If the root widget has an <tt class="docutils literal"><span class="pre">id</span></tt>, this is stripped from the dictionary, e.g. <tt class="docutils literal"><span class="pre">{'myid':</span> <span class="pre">{'param':'value',</span> <span class="pre">...}}</span></tt> is converted to <tt class="docutils literal"><span class="pre">{'param':'value',</span> <span class="pre">...}</span></tt>. A widget instance is created, and stored in request local storage. This allows compatibility with existing frameworks, e.g. the <tt class="docutils literal"><span class="pre">&#64;validate</span></tt> decorator in TurboGears. There is a hook in <tt class="xref py py-meth docutils literal"><span class="pre">display()</span></tt> that detects the request local instance. After creating the instance, validate works recursively, using the <tt class="xref py py-meth docutils literal"><span class="pre">_validate()</span></tt>.</p>
+<dl class="method">
+<dt id="tw2.core.Widget._validate">
+<tt class="descclassname">Widget.</tt><tt class="descname">_validate</tt><big>(</big><em>value</em>, <em>state=None</em><big>)</big><a class="headerlink" href="#tw2.core.Widget._validate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inner validation method; this is called by validate and should not be 
+called directly. Overriding this method in widgets is discouraged; a
+custom validator should be coded instead. However, in some circumstances
+overriding is necessary.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tw2.core.RepeatingWidget._validate">
+<tt class="descclassname">RepeatingWidget.</tt><tt class="descname">_validate</tt><big>(</big><em>value</em>, <em>state=None</em><big>)</big><a class="headerlink" href="#tw2.core.RepeatingWidget._validate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value must either be a list or None. Each item in the list is
+passed to the corresponding child widget for validation. The resulting
+list is passed to this widget&#8217;s validator. If any of the child widgets
+produces a validation error, this widget generates a &#8220;childerror&#8221; 
+failure.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tw2.core.CompoundWidget._validate">
+<tt class="descclassname">CompoundWidget.</tt><tt class="descname">_validate</tt><big>(</big><em>value</em>, <em>state=None</em><big>)</big><a class="headerlink" href="#tw2.core.CompoundWidget._validate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value must be a dict, or None. Each item in the dict is passed to
+the corresponding child widget for validation, with special 
+consideration for _sub_compound widgets. If a child returns
+vd.EmptyField, that value is not included in the resulting dict at all,
+which is different to including None. Child widgets with a key are
+passed the validated value from the field the key references. The
+resulting dict is validated by this widget&#8217;s validator. If any child
+widgets produce an errors, this results in a &#8220;childerror&#8221; failure.</p>
+</dd></dl>
+
+<p>Both <tt class="xref py py-meth docutils literal"><span class="pre">_validate()</span></tt> and <tt class="xref py py-meth docutils literal"><span class="pre">validate_python()</span></tt> take an optional state argument. <tt class="xref py py-class docutils literal"><span class="pre">CompoundWidget</span></tt> and <tt class="xref py py-class docutils literal"><span class="pre">RepeatingWidget</span></tt> pass the partially built dict/list to their child widgets as state. This is useful for creating validators like <tt class="xref py py-class docutils literal"><span class="pre">MatchValidator</span></tt> that reference sibling values. If one of the child widgets fails validation, the slot is filled with an <tt class="xref py py-class docutils literal"><span class="pre">Invalid</span></tt> instance.</p>
+</div>
+</div>
+<div class="section" id="general-considerations">
+<h2>General Considerations<a class="headerlink" href="#general-considerations" title="Permalink to this headline">¶</a></h2>
+<p><strong>Request-Local Storage</strong></p>
+<p>ToscaWidgets needs access to request-local storage. In particular, it&#8217;s important that the middleware sees the request-local information that was set when a widget is instatiated, so that resources are collected correctly.</p>
+<p>The function tw2.core.request_local returns a dictionary that is local to the current request. Multiple calls in the same request always return the same dictionary. The default implementation of request_local is a thread-local system, which the middleware clears before and after each request.</p>
+<p>In some situations thread-local is not appropriate, e.g. twisted. In this case the application will need to monkey patch request_local to use appropriate request_local storage.</p>
+<p><strong>pkg_resources</strong></p>
+<p>tw2.core aims to take advantage of pkg_resources where it is available, but not to depend on it. This allows tw2.core to be used on Google App Engine. pkg_resources is used in two places:</p>
+<blockquote>
+<div><ul class="simple">
+<li>In ResourcesApp, to serve resources from modules, which may be zipped eggs. If pkg_resources is not available, this uses a simpler system that does not support zipped eggs.</li>
+<li>In EngingeManager, to load a templating engine from a text string, e.g. &#8220;genshi&#8221;. If pkg_resources is not available, this uses a simple, built-in mapping that covers the most common template engines.</li>
+</ul>
+</div></blockquote>
+<p><strong>Framework Interface</strong></p>
+<p>ToscaWidgets is designed to be standalone WSGI middeware and not have any framework interactions. However, when using ToscaWidgets with a framework, there are some configuration settings that need to be consistent with the framework, for correct interaction. Future vesions of ToscaWidgets may include framework-specific hooks to automatically gather this configuration. The settings are:</p>
+<blockquote>
+<div><ul class="simple">
+<li>default_view - the template engine used by the framework. When root widgets are rendered, they will return a type suitable for including in this template engine. This setting is not needed if only Page widgets are used as root widgets, as there is no containing template in that case.</li>
+<li>translator - needed for ToscaWidget to use the same i18n function as the framework.</li>
+</ul>
+</div></blockquote>
+<p><strong>Unit Tests</strong></p>
+<p>To run the tests, in <tt class="docutils literal"><span class="pre">tw2.devtools/tests</span></tt> issue:</p>
+<div class="highlight-python"><pre>nosetests --with-doctest --doctest-extension=.txt</pre>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Design</a><ul>
+<li><a class="reference internal" href="#widget-overview">Widget Overview</a><ul>
+<li><a class="reference internal" href="#parameters">Parameters</a></li>
+<li><a class="reference internal" href="#code-hooks">Code Hooks</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#widget-hierarchy">Widget Hierarchy</a></li>
+<li><a class="reference internal" href="#template">Template</a></li>
+<li><a class="reference internal" href="#resources">Resources</a></li>
+<li><a class="reference internal" href="#middleware">Middleware</a></li>
+<li><a class="reference internal" href="#declarative-instantiation">Declarative Instantiation</a></li>
+<li><a class="reference internal" href="#widgets-as-controllers">Widgets as Controllers</a></li>
+<li><a class="reference internal" href="#validation">Validation</a><ul>
+<li><a class="reference internal" href="#using-validators">Using Validators</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#general-considerations">General Considerations</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="turbogears.html"
+                        title="previous chapter">TurboGears 2 Tutorial</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="devtools.html"
+                        title="next chapter">tw2.devtools</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/design.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="devtools.html" title="tw2.devtools"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="turbogears.html" title="TurboGears 2 Tutorial"
+             >previous</a> |</li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b5 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Paul Johnston, Alberto Valverde &amp; Contributors.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
