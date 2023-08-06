@@ -1,0 +1,107 @@
+Metadata-Version: 1.0
+Name: pyfactory
+Version: 0.3.0
+Summary: Generic model factory framework
+Home-page: https://kiip.github.com/pyfactory/
+Author: Mitchell Hashimoto
+Author-email: mitchell@kiip.me
+License: MIT License
+Description: PyFactory
+        =========
+        
+        PyFactory is a library for writing generic model factories useful
+        for unit testing.
+        
+        Example
+        -------
+        
+        Basic Example
+        ~~~~~~~~~~~~~
+        
+        The example below shows a very simple example. Say somewhere in our
+        tests we need various instances of ``User`` objects. In our tests we
+        would simply write the following to create a user::
+        
+            user = UserFactory().create("basic")
+        
+        The PyFactory code necessary to make this happen is shown below. Note
+        that the ``ModelBuilder`` created would only have to be done once.
+        
+        ::
+        
+            from pyfactory import Factory, schema
+        
+            import models
+        
+            class ModelBuilder(object):
+                """
+                The model builder is responsible for knowing how to build
+                and create models based on their attributes. This is what
+                allows PyFactory to be completely model-agnostic.
+                """
+        
+                @classmethod
+                def build(cls, model_cls, attrs):
+                    return model_cls(attributes)
+        
+                @classmethod
+                def create(cls, model_cls, attrs):
+                    result = cls.build(model_cls, attrs)
+                    result.save()
+                    return result
+        
+            class UserFactory(Factory):
+                """
+                This shows a simple factory which creates a type of User.
+                """
+        
+                _model = models.user.User
+                _model_builder = ModelBuilder
+        
+                @schema()
+                def basic(self):
+                    return {
+                        "first_name": "Test",
+                        "last_name": "User",
+                    }
+        
+        Associations
+        ~~~~~~~~~~~~
+        
+        In any application, models typically have associations. Let's look at
+        the case where we have a ``Post`` model which is written by a ``User``.
+        If we want a valid ``Post`` object in our tests, once again we only need
+        to do the following::
+        
+            post = PostFactory().create("basic")
+        
+        And the PyFactory factories to make this possible are equally simple::
+        
+            class PostFactory(Factory):
+                @schema()
+                def basic(self):
+                    return {
+                        "title": "Fake Title",
+                        "body": "Lorem ipsum...",
+                        "author_id": association(UserFactory(), "basic", "id")
+                    }
+        
+        Attribute Overrides
+        ~~~~~~~~~~~~~~~~~~~
+        
+        Given the above examples, what if you already had a ``User`` that you
+        wanted as a post author? Well, its simple to override attributes by
+        just passing the override attributes as additional keyword arguments
+        to the factory method::
+        
+            author = # Pretend we got an author somewhere
+            post = PostFactory().create("basic", author_id=author.id)
+        
+Keywords: factory,pyfactory,model
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Testing
