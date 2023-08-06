@@ -1,0 +1,100 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      i18n:domain="PyConBrasil">
+
+<body>
+<metal:macro define-macro="css">
+    <metal:block tal:condition="python:here.portal_membership.isAnonymousUser()"
+                 tal:define="dummy python:request.set('disable_border',1)" />
+</metal:macro>
+<metal:macro define-macro="body"
+        tal:define="helper nocall:context/aq_parent/@@pythonbrasil_helper;
+                    price python:helper.price(here);
+                    unit_price python:helper.unit_price(here);
+                    price_print python:helper.formataValor(price);">
+
+    <div tal:replace="structure provider:plone.abovecontentbody" />
+
+    <p>
+       <strong>Local de origem:</strong>
+       <tal:cidade content="context/getCidade" />,
+       <tal:estado content="context/getEstado" />
+    </p>
+
+    <p>
+       <strong>Situa&ccedil;&atilde;o do pagamento da inscri&ccedil;&atilde;o:</strong>
+       <tal:paga tal:content="python:context.getPaga() and 'paga' or 'pendente'"
+                 tal:on-error="string:isenta" />
+    </p>
+
+    <div>
+        <span><strong>Participantes:</strong></span>
+        <ul tal:define="participantes here/getParticipantes">
+            <li tal:repeat="participante participantes"> 
+                <span tal:content="participante/nome">Fulano de tal</span>
+            </li>
+        </ul>
+    </div>
+
+    <div>
+        <span><strong>Valor:</strong></span> <span tal:replace="price_print">R$150.00</span>
+    </div>
+    <div tal:condition="python:not context.getPaga()" 
+         tal:define="pagseguro helper/dadosPagSeguro">
+
+        <p>
+           Esta inscri&ccedil;&atilde;o ainda n&atilde;o est&aacute; paga. Clique no
+           bot&atilde;o abaixo para ser redirecionado ao site de cobran&ccedil;a.
+        </p>
+
+        <form 
+              tal:attributes="action pagseguro/url"
+              action="https://pagseguro.uol.com.br/checkout/checkout.jhtml"
+              tal:define="now python:DateTime()"
+              method="post" target="_new">
+
+            <input type="hidden" 
+                    tal:attributes="value pagseguro/email"
+                    name="email_cobranca" value="inscricoes@pythonbrasil.org.br" />
+            <input type="hidden" name="encoding" value="UTF-8" />
+            <input type="hidden" name="tipo" value="CP" />
+            <input type="hidden" name="moeda" value="BRL" />
+            <input type="hidden" name="item_id_1" value="1" />
+            <input type="hidden" name="item_quant_1" value="1" 
+                  tal:attributes="value context/quantity"/>
+            <input type="hidden" 
+                  tal:attributes="value pagseguro/description"
+                  name="item_descr_1" value="Inscrição PythonBrasil[6]" />
+
+            <input type="hidden" 
+                  tal:attributes="value unit_price"
+                  name="item_valor_1" 
+                  value="2500"/>
+
+            <input type="hidden" name="ref_transacao" value="UID"
+                   tal:attributes="value context/UID" />
+
+            <input type="hidden" name="cliente_nome" value="Nome"
+                   tal:attributes="value context/getRazao_social" />
+
+            <input type="hidden" name="cliente_email" value="E-mail"
+                   tal:attributes="value context/getEmail" />
+
+            <input type="hidden" name="cliente_cidade" value="Cidade"
+                   tal:attributes="value context/getCidade" />
+
+            <input type="hidden" name="cliente_uf" value="UF"
+                   tal:attributes="value context/getEstado" />
+
+            <input type="image" src="https://p.simg.uol.com.br/out/pagseguro/i/botoes/carrinhoproprio/btnFinalizaBR.jpg" 
+                   name="submit" alt="Pague com PagSeguro - é rápido, grátis e seguro!">
+
+        </form>
+        <br/>
+       
+    </div>
+
+</metal:macro>
+
+</body>
+</html>
