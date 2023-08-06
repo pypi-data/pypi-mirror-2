@@ -1,0 +1,227 @@
+DSE - Simplified "bulk" insert/update/delete for Django
+=======================================================
+
+
+Version : 2.0.0-BETA #3
+Author : Thomas Weholt <thomas@weholt.org>
+License : GPL v3.0
+Status : BETA
+Url : https://bitbucket.org/weholt/dse2
+Docs at http://readthedocs.org/docs/dse/en/latest/index.html
+
+
+Background
+----------
+
+NB! This is the first beta release of DSE v.2.0.0 - a rewrite of DSE, now django only.
+When the beta version 2.0.0 is tested some more it will replace the 1.x-branch.
+It also contains some backwards incompatible changes, mainly renaming the add_items
+method to just add. It also features caching of items to delete as well. All the
+code not related to django has been removed as well, so it's now a django only project.
+
+* DSE is available for one reason - to insert/update lots of data as fast as possible.
+
+* DSE vs Django ORM: typical speed gain is around 10X. 
+
+* DSE is aware of default values specified in your Django models and will use 
+those if no value is given for a field in an insert statement.
+
+* DSE caches SQL-statements, both inserts and updates, and executes them when 
+a specified number of statements has been prepared or when it`s told manually to flush
+cached statements to the database. The actual sql execution is done using 
+DB API cursor.executemany and this is much faster than executing SQL-statements 
+in sequence and way faster than using the Django ORM.
+
+* DSE uses a dictionary to specify what fields to update. It differs between
+update and insert statements by looking for a key similar to the primary key for
+a given model.
+
+* DSE will try to execute as many statements as possible, but will detect update
+statements where only a few sql fields/columns are updated and execute those 
+statements individually.
+
+* My hope is to see something like this in the django core.
+
+
+Installation
+------------
+
+pip install dse
+
+or
+
+hg clone https://bitbucket.org/weholt/dse2
+
+
+Example usage
+-------------
+
+You got a model like::
+
+    gender =  (('M', 'Male'), ('F', 'Female'))
+    
+    class Person(models.Model):
+        name = models.CharField(max_length = 30)
+        age = models.IntegerField(default = 30)
+        sex = models.CharField(max_length = 1, choices = gender, default = 'M')
+
+Using dse::
+
+    import dse
+    dse.patch_models() # Monkey patch all your models and expose dse for all models:
+
+    with Person.dse as d:
+        for name, age, sex in (('Thomas', 36, 'M'), ('Joe', 40, 'M'), ('Jane', 28, 'F')):
+             d.add(dict(name = name, age = age, sex = sex))
+
+Nothing will be inserted into the database before the loop is done ( or you 
+insert 1000 items ). Then the items will be inserted using cursor.executemany, 
+using plain SQL - no ORM in sight.
+
+DSE features singletons (NB! very experimental, no locking/thread support yet!)::
+
+    import dse.singleton
+    
+    p1 = dse.singleton.Models.Person()
+    p2 = dse.singleton.Models.Person()
+    print p1 is p2 # should print True
+    p1.add(dict(name = 'Joe'))
+    p2.flush()
+    print Person.objects.all().count() # should print 1
+    
+Singletons makes it possible to cache entries across sections of code and cache 
+even more data, hitting the db less.
+
+DSE using default values defined in your model::
+    
+    with Person.dse as d:    
+        # Adding an item, just defining a name and using the default values from the model:
+        d.add({'name': 'John'})
+
+        # Overriding the default values? Just specify a valid value
+        d.add({'name': 'Thomas', 'age': 36, 'sex': 'M'})
+
+        # Update record with id = 1 and set its name to John. This will trigger 
+        # a SQL-statement for this update alone, since not all columns are specified:
+        d.add({'id': 1, 'name': 'John'})
+  
+To use delayed execution of SQL statements::
+
+    Person.dse.add({'id': 2, 'name': 'Al Capone'}) # will NOT trigger anything
+    Person.dse.add({'id': 3, 'name': 'John Dillinger'}) # will NOT trigger anything
+    Person.dse.add({'name': 'Scarface'}) # will NOT trigger anything
+    Person.dse.flush() # will execute both update statements and insert a record for "Scarface"
+
+Say you want to update all records with some calculated value, something you 
+couldn`t find a way to do in SQL. Using dse this is easy and fast::
+
+    with Person.dse as d:    
+        # Use Djangos ORM to generate dictionaries to use in DSE; objects.all().values().
+        for item in Person.objects.all().values():
+            item['somevar'] = calculated_value
+            d.add(item)
+
+I`ve recieved some questions about transaction handling. Below is an simple example, 
+but I`m looking into other ways of handling transactions as well::
+ 
+    from django.db import transaction
+    import dse
+
+    @transaction.commit_manually
+    def some_method():
+        with SomeModel.dse as d:
+            for item in somelist:
+                SomeModel.dse.add(
+                  {'some_column': item.some_value,
+                   'another_column': item.another_value})    
+        transaction.commit()
+
+You can also cache items to delete::
+
+    with foo.dse as d:
+        for person in person.objects.all():
+            if person.likes_perl:
+                foo.dse.delete(person.id) # won't trigger anything
+    # here all cached items for deletions are deleted using plain SQL, no orm.
+        
+DSE caches id's and deletes them when 1000 items are cached or flush/close are called.
+It uses sql similar to "delete from tablename where id in (<list of ids>)".
+
+
+Performance compared to the django orm
+--------------------------------------
+
+Lots of updates:
+DSE : 0.116728067398 seconds.
+ORM : 15.0528171062 seconds.
+
+Lots of inserts:
+DSE: 0.0825960636139 seconds.
+ORM: 0.830269098282 seconds.
+
+Iterate of objects and updating them:
+DSE: 0.817410230637 seconds.
+ORM: 60.4543881416 seconds.
+
+Delete lots of objects:
+DSE: 0.495353937149 seconds.
+ORM: 13.3724360466 seconds.
+
+You can see the code for the test producing these numbers here:
+https://bitbucket.org/weholt/dse2/src/dbd87b0e2cdb/tests/performance_tests.py
+
+
+Release notes
+-------------
+
+2.0.0-BETA#1 : started refactoring DSE to remove all non-django specific code, mostly to gain speed and simply code.
+
+1.0.2 : reconnect if cursor is dead.
+
+1.0.1 : fixed issue #9 "Factory can eat up memory" reported by vangheem. When finding fields related to a table only the top row is fetched.
+
+1.0.0 : Version bump. Added unittest for issue #8.
+
+1.0.0-RC1 : updated README.txt. 
+
+0.9.4 : - PEP8 and pyflake.
+
+0.9.3 : - Fixed issue #7: dse causes django-debug-toolbar to crash. Thanks to ringemup for pointing that out. Added some docstrings.
+
+0.9.2 : - Corrected type in usage.rst and README.txt.
+
+0.9.1 : - Refactored code even more, added usage.rst, singleton support in the singleton-package and some performance tests. Models not monkey patched be default anymore, must call dse.patch_models().
+
+0.9.0 : - Refactored code and cleaned up tests folder. Focus on getting singleton support in before 1.0.0. And more tests.
+
+0.8.2 : - added 'pysqlite2' to _DBMAP. Thanks to David Marble for 0.8.1 and 0.8.2.
+
+0.8.1 : - attempt to fix quoting problems with fields on postgresql.
+
+0.8.0 : - fixed crash when more than one database connection has been configured. No ModelFactory will be triggered.
+
+0.7.0 : - don`t remember.
+
+0.6.0 : - added support for the with-statement.
+        - added an ModelDelayedExecutor-instance to each model, so you can do Model.dse.add_item
+          instead of dse.ModelFactory.Model.add_item.
+        - renamed dse.modelfactory to dse.ModelFactory to be more style-compliant.
+
+0.5.1 : just some notes on transaction handling.
+
+0.5.0 :
+    - added modelfactory. Upon first import a modelfactory will be created in the DSE module. It`s basically just a
+    helper-class containing ModelDelayedExecutor-instances for all models in all apps found in INSTALLED_APPS in
+    settings.py.
+    - to change the default item limit before automatic execution of cached SQL statements to 10000 instead of the default 1000::
+
+    import dse
+    dse.ITEM_LIMIT = 10000
+
+0.4.0 :
+    - fixed serious bug when using mass updates. Using cursor.executemany is only possible when values
+    for all columns are specified. If only values for a subset of the columns is specified that will be
+    executed as a seperate SQL-call. NOTE! Using dex.get_items() or Djangos Model.objects.values() will give you
+    all the fields.
+    - code clean-up.
+    - added custom exceptions; UpdateManyException, UpdateOneException and InsertManyException.
