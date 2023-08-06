@@ -1,0 +1,333 @@
+#! /usr/bin/env python
+
+__doc__ = """csvs: Frontend for CSVSee
+
+Usage::
+
+    csvs [command] [options]
+
+Command may be::
+
+    graph
+    grep
+    grinder
+
+Run ``csvs [command]`` with no further arguments to get help.
+"""
+usage = __doc__
+
+
+import sys
+
+from csvsee import utils
+from csvsee.graph import Graph
+from csvsee import grinder
+
+class UsageError (Exception):
+    pass
+
+
+def graph_command(args):
+    """
+    graph: Generage graphs from .csv data files.
+
+    Usage::
+
+        csvs graph filename.csv [-options] ["Column 1"] ["Column 2"] ...
+
+    Where filename.csv contains comma-separated values, with column names in the
+    first row, and all subsequent arguments are regular expressions that may match
+    one or more column names.
+
+    Options:
+
+        -x "<column name>"
+            An expression matching the column you want to use for your X-axis.
+            If this is omitted, the first column of the .csv file will be used
+            as the X-axis coordinate.
+
+        -dateformat "<format string>"
+            Interpret the timestamp as a date in the given format. Examples:
+                %m/%d/%y %I:%M:%S %p: 12/10/09 3:45:56 PM (Grinder logs)
+                %m/%d/%Y %H:%M:%S.%f: 12/10/2009 15:45:56.789 (Perfmon)
+            See http://docs.python.org/library/datetime.html for valid formats.
+            By default, the date format will be guessed based on the first row of
+            the .csv file. If the X-column is NOT a date, use -dateformat ""
+
+        -title "Title"
+            Set the title label for the graph. By default, the .csv filename
+            is used as the graph title.
+
+        -save "filename.(png|svg|pdf)"
+            Save the graph to a file. Default is to show the graph in a viewer.
+
+        -linestyle "<format string>"
+            Define the style of lines plotted on the graph. Examples are:
+                "-"  Solid line (Default)
+                "."  Point marker
+                "o"  Circle marker
+                "o-" Circle + solid lines
+            See the Matplotlib Axes.plot documentation for available styles:
+            http://matplotlib.sourceforge.net/api/axes_api.html#matplotlib.axes.Axes.plot
+
+        -xlabel "Label string"
+            Use the given string as the label of the X axis. If omitted, the
+            name of the X-column is used.
+
+        -ylabel "Label string"
+            Use the given string as the label of the Y axis. If omitted, the
+            prefix common to all the given column names is used.
+
+        -ymax <number>
+            Set the maximum Y-value beyond which the graph is cropped. By default,
+            maximum Y-value is determined by the maximum value present in the data.
+
+        -truncate <number>
+            Truncate the column labels to <number> characters. By default,
+            no truncation is done.
+
+        -top <number>
+            Graph only the top <number> columns, based on the average of
+            all values in matching columns.
+
+        -peak <number>
+            Graph only the top <number> columns, based on the highest peak
+            value in matching columns.
+
+        -drop <number>
+            When used in conjunction with -top or -peak, this causes the top
+            <number> of columns to be omitted. For example, -top 10 -drop 5
+            will skip the top 5 maximum columns, and graph the next 10.
+
+        -gmtoffset [+/-]<hours>
+            Adjust timestamps if they are not in GMT. For example, if the
+            timestamps are GMT-6, use -gmtoffset +6 to make the graph display
+            them as GMT times.
+
+        -zerotime
+            Adjust all timestamps so the graph starts at 00:00.
+
+    If no column names are given, then all columns are graphed. To graph only
+    specific columns, provide one or more column expressions after the .csv
+    filename and any options. Column names are given as regular expressions,
+    allowing you to match multiple columns.
+
+    Examples:
+
+        csvgraph.py data.csv
+            Graph all columns found in data.csv, using the first column
+            as the X-axis.
+
+        csvgraph.py data.csv -top 5
+            Graph the 5 columns with the highest average value
+
+        csvgraph.py data.csv "^Response.*"
+            Graph all columns beginning with the word "Response"
+
+        csvgraph.py data.csv A B C
+            Graph columns "A", "B", and "C". Note that these are regular
+            expressions, and will actually match all columns containing "A", all
+            columns containing "B", and all columns containing "C".
+
+    If the first column is a date field, then the X axis will be displayed in HH:MM
+    format. Otherwise, all columns must be numeric (integer or floating-point).
+    """
+    # CSV file is always the first argument
+    csv_file = args.pop(0)
+    if not csv_file.lower().endswith('.csv'):
+        raise UsageError("First argument must be a filename with .csv extension.")
+
+    # Create Graph for this csv file
+    graph = Graph(csv_file)
+
+    save_file = ''
+
+    # Get any -options that follow
+    while args and args[0].startswith('-'):
+        opt = args.pop(0).lstrip('-')
+        if opt in graph.strings:
+            graph[opt] = args.pop(0)
+
+        elif opt in graph.ints:
+            graph[opt] = int(args.pop(0))
+
+        elif opt in graph.floats:
+            graph[opt] = float(args.pop(0))
+
+        elif opt in graph.bools:
+            graph[opt] = True
+
+        elif opt == '-save':
+            save_file = args.pop(0)
+
+        else:
+            raise UsageError("Unknown option: %s" % opt)
+
+    # Get column expressions (all remaining arguments, if any)
+    if args:
+        graph['y'] = args
+
+    # Generate the graph
+    graph.generate()
+    if save_file:
+        graph.save(save_file)
+    else:
+        graph.show()
+
+
+def grep_command(args):
+    """
+    grep: Create a .csv file by counting the number of occurrences of
+    text strings in one or more timestamped text files.
+
+    Usage::
+
+        csvs grep <file1> <file2> -match <expr1> <expr2> -out <report.csv> [-options]
+
+    Options::
+
+        -seconds <number>
+            Report match frequency with a granularity of <number> seconds. The
+            default is 60 seconds (1 minute); that is, each line of the .csv
+            output will include the count of all matches during each minute.
+
+        -dateformat "<format string>"
+            Interpret date/time using the given format. If omitted, the format
+            is inferred by guessing.
+            See http://docs.python.org/library/datetime.html for valid formats.
+
+    """
+    # TODO: Regular expressions
+
+    # Need at least five arguments
+    if len(args) < 5:
+        raise UsageError()
+
+    infiles = []
+    matches = []
+    csvfile = ''
+    dateformat = ''
+    seconds = 60
+
+    # Get input filenames until an -option is reached
+    while args and not args[0].startswith('-'):
+        infiles.append(args.pop(0))
+
+    while args:
+        opt = args.pop(0)
+        if opt == '-match':
+            while not args[0].startswith('-'):
+                matches.append(args.pop(0))
+        elif opt == '-out':
+            csvfile = args.pop(0)
+        elif opt == '-dateformat':
+            dateformat = args.pop(0)
+        elif opt == '-seconds':
+            seconds = int(args.pop(0))
+        else:
+            raise UsageError("Unknown option: '%s'" % opt)
+
+    # Search all the given files for matching text, and write the results to
+    # csvfile, with the first column being the timestamp, and remaining columns
+    # being the number of times each match was found.
+    outfile = open(csvfile, 'w')
+    heading = '"Timestamp","%s"' % '","'.join(matches)
+    outfile.write(heading + '\n')
+    for (timestamp, counts) in utils.grep_files(infiles, matches, dateformat, seconds):
+        line = '%s' % timestamp
+        for match in matches:
+            line += ',%s' % counts[match]
+        outfile.write(line + '\n')
+    outfile.close()
+    print("Wrote '%s'" % csvfile)
+
+
+def grinder_command(args):
+    """grinder: Generate a .csv report of data from Grinder log files.
+
+    Usage::
+
+        csvs grinder [-options] <out_file> <data_files ...> <csv_prefix>
+
+    Options::
+
+        -seconds <number>
+            Summarize statistics over an interval of <number> seconds.
+            Default is 60-second intervals.
+
+    This will generate one .csv file for each of several important statistics.
+    """
+    # Defaults
+    resolution = 60
+
+    # Get any -options
+    while args and args[0].startswith('-'):
+        opt = args.pop(0)
+        if opt == '-seconds':
+            resolution = int(args.pop(0))
+        else:
+            raise UsageError("Unknown option: '%s'" % opt)
+
+    # Need at least three positional arguments
+    if len(args) < 3:
+        raise UsageError()
+
+    # Get positional arguments
+    out_file = args[0]
+    data_files = args[1:-1]
+    csv_prefix = args[-1]
+
+    # Generate the report
+    report = grinder.Report(resolution, out_file, *data_files)
+
+    # Write one .csv file for each statistic
+    for stat in grinder.Test.all_stats:
+        csv_filename = "%s_%s.csv" % (csv_prefix, stat.replace(' ', '_'))
+        print("Writing %s" % csv_filename)
+        report.write_csv(stat, csv_filename)
+
+
+# Commands and the function that handles them
+command_functions = {
+    'graph': graph_command,
+    'grep': grep_command,
+    'grinder': grinder_command,
+}
+
+
+def exit_msg(usage, text=''):
+    """Print usage notes along with a message, then exit the application.
+    """
+    print(usage)
+    if text:
+        print(text)
+    sys.exit(1)
+
+
+# Main program
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        exit_msg(usage)
+
+    args = sys.argv[1:]
+    command = args.pop(0)
+
+    # If command is not known, print usage and exit
+    if command not in command_functions:
+        exit_msg(usage, "Unknown command: '%s'" % command)
+
+    # Get the appropriate function
+    function = command_functions[command]
+
+    # If there are no arguments, display help and exit
+    if not args:
+        print(function.__doc__)
+        sys.exit(0)
+
+    # Run the command and catch errors
+    try:
+        command_functions[command](args)
+    except UsageError, message:
+        exit_msg(function.__doc__, message)
+
+
