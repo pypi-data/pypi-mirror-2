@@ -1,0 +1,257 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Telnet Client Example &mdash; circuits v1.3 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="circuits v1.3 documentation" href="../index.html" />
+    <link rel="up" title="Examples" href="../examples.html" />
+    <link rel="next" title="IRC Bot Example" href="ircbot.html" />
+    <link rel="prev" title="Echo Server Example" href="echoserver.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="ircbot.html" title="IRC Bot Example"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="echoserver.html" title="Echo Server Example"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">circuits v1.3 documentation</a> &raquo;</li>
+          <li><a href="../examples.html" accesskey="U">Examples</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="telnet-client-example">
+<h1>Telnet Client Example<a class="headerlink" href="#telnet-client-example" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference download internal" href="../_downloads/telnet.py"><tt class="xref download docutils literal"><span class="pre">telnet.py</span></tt></a></p>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">optparse</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostname</span>
+ 
+<span class="kn">from</span> <span class="nn">circuits.io</span> <span class="kn">import</span> <span class="n">stdin</span>
+<span class="kn">from</span> <span class="nn">circuits</span> <span class="kn">import</span> <span class="n">handler</span><span class="p">,</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">circuits</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">systemVersion</span>
+<span class="kn">from</span> <span class="nn">circuits.net.sockets</span> <span class="kn">import</span> <span class="n">TCPClient</span><span class="p">,</span> <span class="n">UNIXClient</span><span class="p">,</span> <span class="n">Connect</span><span class="p">,</span> <span class="n">Write</span>
+
+<span class="n">USAGE</span> <span class="o">=</span> <span class="s">&quot;%prog [options] host [port]&quot;</span>
+<span class="n">VERSION</span> <span class="o">=</span> <span class="s">&quot;%prog v&quot;</span> <span class="o">+</span> <span class="n">systemVersion</span>
+
+<span class="k">def</span> <span class="nf">parse_options</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">USAGE</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">VERSION</span><span class="p">)</span>
+   
+    <span class="n">opts</span><span class="p">,</span> <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+   
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">,</span> <span class="mi">1</span>
+   
+    <span class="k">return</span> <span class="n">opts</span><span class="p">,</span> <span class="n">args</span>
+   
+<span class="k">class</span> <span class="nc">Telnet</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+   
+    <span class="n">channel</span> <span class="o">=</span> <span class="s">&quot;telnet&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Telnet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+   
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="bp">self</span> <span class="o">+=</span> <span class="n">UNIXClient</span><span class="p">(</span><span class="n">channel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">channel</span><span class="p">)</span>
+                <span class="n">host</span> <span class="o">=</span> <span class="n">dest</span> <span class="o">=</span> <span class="n">port</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">dest</span> <span class="o">=</span> <span class="p">(</span><span class="n">dest</span><span class="p">,)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span><span class="s">&quot;Path </span><span class="si">%s</span><span class="s"> not found&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span> <span class="o">+=</span> <span class="n">TCPClient</span><span class="p">(</span><span class="n">channel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">channel</span><span class="p">)</span>
+            <span class="n">host</span><span class="p">,</span> <span class="n">port</span> <span class="o">=</span> <span class="n">args</span>
+            <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">port</span><span class="p">)</span>
+            <span class="n">dest</span> <span class="o">=</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span>
+   
+        <span class="k">print</span> <span class="s">&quot;Trying </span><span class="si">%s</span><span class="s"> ...&quot;</span> <span class="o">%</span> <span class="n">host</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">Connect</span><span class="p">(</span><span class="o">*</span><span class="n">dest</span><span class="p">),</span> <span class="s">&quot;connect&quot;</span><span class="p">)</span>
+   
+    <span class="k">def</span> <span class="nf">connected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">print</span> <span class="s">&quot;Connected to </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">host</span>
+   
+    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="nb">type</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="nb">type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">traceback</span> <span class="o">=</span> <span class="bp">None</span>
+   
+        <span class="k">print</span> <span class="s">&quot;ERROR: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">value</span>
+   
+    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">print</span> <span class="n">data</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+   
+    <span class="nd">@handler</span><span class="p">(</span><span class="s">&quot;read&quot;</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s">&quot;stdin&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">stdin_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">Write</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="s">&quot;write&quot;</span><span class="p">)</span>
+   
+<span class="n">opts</span><span class="p">,</span> <span class="n">args</span> <span class="o">=</span> <span class="n">parse_options</span><span class="p">()</span>
+<span class="p">(</span><span class="n">Telnet</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">+</span> <span class="n">stdin</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</td></tr></table></div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="echoserver.html"
+                        title="previous chapter">Echo Server Example</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="ircbot.html"
+                        title="next chapter">IRC Bot Example</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/examples/telnet.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="ircbot.html" title="IRC Bot Example"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="echoserver.html" title="Echo Server Example"
+             >previous</a> |</li>
+        <li><a href="../index.html">circuits v1.3 documentation</a> &raquo;</li>
+          <li><a href="../examples.html" >Examples</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, James Mills.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
