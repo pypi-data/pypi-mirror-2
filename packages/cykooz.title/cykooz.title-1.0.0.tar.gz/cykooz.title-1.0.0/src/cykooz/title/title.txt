@@ -1,0 +1,68 @@
+============
+cykooz.title
+============
+
+This package implements adapters for adapting any object to ITitle interface.
+
+Let's do some imports we will use later.
+
+  >>> import zope.interface
+  >>> import zope.component
+  >>> from zope.annotation.interfaces import IAttributeAnnotatable
+  >>> from zope.dublincore.interfaces import IZopeDublinCore
+  >>> from zope.container.interfaces import IContained
+  >>> from cykooz.title.interfaces import ITitle
+  >>> from cykooz.title import adapters
+  
+Let's register the adapters, this is normally done in configure.zcml:
+
+  >>> zope.component.provideAdapter(adapters.ClassName2TitleAdapter)
+  >>> zope.component.provideAdapter(adapters.Contained2TitleAdapter)
+  >>> zope.component.provideAdapter(adapters.ZDC2TitleAdapter)
+
+Implement test object:
+
+  >>> class SomeClass(object):
+  ...     zope.interface.implements(zope.interface.Interface)
+  >>> some_object = SomeClass()
+
+Get title from class name:
+
+  >>> ITitle(some_object).title
+  u'SomeClass'
+
+Now change the test object so that it provide IContained:
+
+  >>> zope.interface.directlyProvides(some_object, IContained)
+  >>> some_object.__name__ = u'NameInContainer'
+  >>> ITitle(some_object).title
+  u'NameInContainer'
+
+Change the test object so that is provide only IAttributeAnnotatable:
+
+  >>> zope.interface.directlyProvides(some_object, IAttributeAnnotatable)
+  >>> IZopeDublinCore(some_object).title
+  u''
+
+If object do not provide IContained and field 'title' of IZopeDublinCore is empty
+then ITitle adapter return class name of object:
+
+  >>> ITitle(some_object).title
+  u'SomeClass'
+
+Now change the test object so that it also provide IContained:
+
+  >>> zope.interface.alsoProvides(some_object, IContained)
+  >>> ITitle(some_object).title
+  u'NameInContainer'
+
+Set field 'title' of IZopeDublinCore:
+
+  >>> IZopeDublinCore(some_object).title = u'ZopeDublinCore Title'
+  >>> IZopeDublinCore(some_object).title
+  u'ZopeDublinCore Title'
+
+Test adapter:
+
+  >>> ITitle(some_object).title
+  u'ZopeDublinCore Title'
