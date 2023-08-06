@@ -1,0 +1,81 @@
+#!/usr/bin/env python2
+# coding:utf-8
+
+# pyInputStats - An application for mouse and keyboard statistics
+# Copyright (C) 2011  Daniel Nögel
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3 of the License.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import gtk
+import gobject
+
+gtk.gdk.threads_init()
+
+from pyinputstatsmodules import collector
+from pyinputstatsmodules import database as db
+from pyinputstatsmodules import gui
+from pyinputstatsmodules import helpers
+
+class Main(object):
+    def __init__(self):
+        self.collector = collector.DataCollector()
+        gobject.timeout_add(60*1000, self.update)
+
+        with db.DatabaseConnector() as dh:
+            pixels, clicks, keys = dh.get_stats()
+            if pixels is None:
+                pixels = 0
+            if clicks is None:
+                clicks = 0
+            if keys is None:
+                keys = 0
+            self.current_data = (pixels, clicks, keys)
+            
+        self.gui = gui.GUI(self)
+
+    def update(self):
+        data = self.collector.get_data()
+        if data:
+            with db.DatabaseConnector() as dh:
+                #~ for char, count in dh.get_char_stats():
+                    #~ print helpers.get_char(char), count
+                print "Updating database"
+                data["keys_pressed"] = [(helpers.translate_keys(*i[0]), i[1]) for i in data["keys_pressed"].iteritems()]
+                dh.insert(data)
+                pixels, clicks, keys = dh.get_stats()
+                if pixels is None:
+                    pixels = 0
+                if clicks is None:
+                    clicks = 0
+                if keys is None:
+                    keys = 0
+                self.current_data = (pixels, clicks, keys)
+                #~ print self.current_data
+        return True
+        
+    def get_data_fast(self):
+        pixels, clicks, keys = self.current_data
+        c = self.collector
+        return (pixels+c.total_distance, clicks+c.total_buttons, keys+c.total_keys)
+    
+    def quit(self, ev=None):
+        self.update()
+        gtk.main_quit()
+        self.collector.quit()
+        
+if __name__ == "__main__":
+    Main()
+    gtk.main()
+
+
+
