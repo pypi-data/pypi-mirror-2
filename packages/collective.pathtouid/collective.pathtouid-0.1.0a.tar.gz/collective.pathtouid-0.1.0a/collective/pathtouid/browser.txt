@@ -1,0 +1,49 @@
+How all this works
+==================
+
+First of all, let's test that simple HREF or SRC attribute are fixed to  UID
+using **pathToUID** function.
+
+    >>> from zope.component import getUtility
+    >>> from collective.pathtouid.interfaces import IUIDConverted
+    >>> self.loginAsPortalOwner()
+    
+Lets create some site structure for our tests.
+    
+    >>> self.portal.invokeFactory(id='foo', type_name='Folder')
+    'foo'        
+    >>> folder = getattr(self.portal, 'foo')
+    >>> self.portal.invokeFactory(id='target-doc', type_name='Document')
+    'target-doc'
+    >>> folder.invokeFactory(id='inline-img', type_name='Image')
+    'inline-img'
+    >>> doc = getattr(self.portal, 'target-doc')
+    >>> image = getattr(folder, 'inline-img')
+    
+Now, how can change a text with the transformation?
+    
+    >>> text = '''abc href="/plone/target-doc" def
+    ... ghi src="/plone/foo/inline-img" lmn'''
+    >>> converter = getUtility(IUIDConverted)
+    >>> convertedText = converter.absolutePathToUID(text)
+    >>> print convertedText
+    abc href="resolveuid/..." def
+    ghi src="resolveuid/..." lmn
+    >>> doc.UID() in convertedText
+    True
+    >>> image.UID() in convertedText
+    True
+
+The utility must also work for relative path (like the one that Kupu and TinyMCE generate).
+
+    >>> self.portal.invokeFactory(id='doc', type_name='Document')
+    'doc'
+    >>> doc = getattr(self.portal, 'doc')
+    >>> doc.edit(text='<p><a class="internal-link" href="foo/inline-img">Link to image</a></p>')
+    >>> convertedText = converter.relativePathToUID(doc.getText(), doc)
+    >>> print convertedText
+    <p><a class="internal-link" href="resolveuid/...">Link to image</a></p>
+    >>> image.UID() in convertedText
+    True
+
+That's all.
