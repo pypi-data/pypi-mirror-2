@@ -1,0 +1,102 @@
+#!/Users/pdc/Projects/texturepacker/bin/python
+# encoding: utf-8
+"""
+maketexture.py
+
+Created by Damian Cugley on 2011-02-03.
+Copyright (c) 2011 Alleged Literature. All rights reserved.
+"""
+
+import sys
+import os
+
+sys.path[1:1] = [os.path.dirname(os.path.dirname(__file__))]
+
+import getopt
+
+import json
+import yaml
+from texturepacker import Mixer, minecraft_texture_pack_dir_path
+
+VERSION = '0.1 2011-02-21'
+
+
+help_message = '''
+{argv0} [-v] [ --output=FILE | - ] FILE
+{argv0} [-v] [ --output=DIR | --install ] FILE...
+{argv0} --help
+{argv0} --version
+'''
+
+
+class Usage(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+    try:
+        try:
+            opts, args = getopt.getopt(argv[1:], "ho:vV", ["help", "output=", 'version', 'install'])
+        except getopt.error, msg:
+            raise Usage(msg)
+
+        mixer = Mixer()
+        verbose = 0
+        out_arg = None
+
+        # option processing
+        for opt, arg in opts:
+            if opt == "-v":
+                verbose += 1
+            elif opt in ("-h", "--help"):
+                print >>sys.stderr, help_message.format(argv0=os.path.split(argv[0])[1])
+                return 0
+            elif opt in ("-V", "--version"):
+                print >>sys.stderr, VERSION
+                return 0
+            elif opt in ("-o", "--output"):
+                out_arg = arg
+            elif opt == '--install':
+                out_arg = minecraft_texture_pack_dir_path()
+            else:
+                raise Usage('Unexpected option {0!r}'.format(opt))
+
+        for arg in args:
+            suf = os.path.splitext(arg)[1]
+            if suf == '.json':
+                with open(arg, 'rb') as strm:
+                    recipe = json.load(strm)
+            elif suf in ['.yaml', '.yml', '.tprx']:
+                with open(arg, 'rb') as strm:
+                    recipe = yaml.load(strm)
+            else:
+                raise Usage('{0!r}: expected file name ending in one of .tprx, .yaml, .yml, .json'.format(arg))
+
+            base = 'file://' + os.path.abspath(arg)
+            pack = mixer.make(recipe, base=base)
+            if out_arg == '-':
+                pack.write_to(sys.stdout)
+                out_arg = None
+            else:
+                out_file = os.path.splitext(arg)[0] + '.zip'
+                if out_arg:
+                    if os.path.isdir(out_arg):
+                        out_file = os.path.join(out_arg, os.path.basename(out_file))
+                    else:
+                        out_file = out_arg
+                        out_arg = None
+                pack.write_to(out_file)
+                if verbose:
+                    print >>sys.stderr, 'Wrote ZIP to', out_file
+
+    except Usage, err:
+        print >> sys.stderr, sys.argv[0].split("/")[-1] + ": " + str(err.msg)
+        print >> sys.stderr, "\t for help use --help"
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
