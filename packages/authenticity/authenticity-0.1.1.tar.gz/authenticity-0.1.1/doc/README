@@ -1,0 +1,226 @@
+Authenticity is a simple OpenID Provider running under Apache's
+mod_python. It's aim is to be easy to use, flexible and in the future to
+provide a fully featured OpenID Provider implementation. As
+python-openid is used at its core, Authenticity supports OpenID 1.0, 1.1
+and 2.0.
+
+The copyright information is available on Debian systems in
+/usr/share/doc/authenticity/copyright and in Authenticity's source in
+debian/copyright.
+
+Table of Contents
+1. Features
+2. Installation
+3. Configuration
+4. Testing
+5. Administration
+6. Security
+7. Future
+
+
+1. Features
+-----------
+
+Authenticity supports OpenID 1.0, 1.1 and 2.0. It can currently only be
+used with LDAP as its backend, so users need to be stored in a LDAP
+directory. However, there are plans to support multiple backends in the
+future.
+
+Another feature of Authenticity is that it allows the easy customization
+of the pages it displays. Have a look at README.Templates to find out
+more about how this can be done.
+
+The user experience is quite simple: each time a user wants to login
+with his OpenID identifier, he gets redirected to a page which asks for
+his username and password. There is currently no support for sessions
+(the user needs to enter his credentials each time), preferences
+(remember choices for some OpenID consumers), fine grained access to
+what gets sent to the OpenID consumer or other user centric features.
+Have a look at the TODO document which lists the future plans for
+Authenticity. Any other suggestions for improvements are very much
+welcome: just open a new ticket on http://projects.cnix.ro/authenticity.
+
+
+2. Installation
+---------------
+
+On Debian/Ubuntu systems, installation can be easily done from a Debian
+repository. You can do the following:
+ Step 1. Grab the public key to verify the packages.
+host:~# curl -O https://debian.cnix.ro/cnix.gpg
+host:~# apt-key add cnix.gpg
+host:~# rm cnix.gpg
+ Step 2. Add the Debian repository to /etc/apt/sources.list
+deb http://debian.cnix.ro unstable main contrib
+ Step 3. Install Authenticity
+host:~# aptitude update
+host:~# aptitude install authenticity
+
+On other systems, you will first need to install the dependencies:
+ * Python 2.6 or 2.7 (http://python.org)
+ * Apache 2 (http://httpd.apache.org)
+ * mod_python (http://www.modpython.org/)
+ * python-genshi (http://genshi.edgewall.org/)
+ * python-ldap (http://www.python-ldap.org/)
+ * python-openid (https://github.com/openid/python-openid)
+ * pytohn-zope.interface (https://github.com/openid/python-openid)
+
+Then get Authenticity from http://projects.cnix.ro/authenticity, go into
+the source's root directory and execute:
+host:~# python setup.py install
+
+Then copy the provided config.ini to /etc/authenticity/ (the file needs
+to be readable by the user Apache is running as).
+
+
+3. Configuration
+----------------
+
+The second step in setting up Authenticity (after installation, of
+course) is configuring Apache to send requests to Authenticity. You can
+either choose a path such as /authenticity and redirect HTTP requests
+matching this path from all virtual hosts to Authenticity or have a
+separate VirtualHost just for your OpenID Provider and have Authenticity
+running under openid.example.org, for example.
+
+On Debian system, /etc/apache2/conf.d/authenticity is created. You can
+also have a look at /usr/share/doc/authenticity/apache.virtual.conf.
+After installation, Authenticity is already serving requests on
+/authenticity under any hostname the server is accepting.
+
+On other systems, have a look at apache.conf and doc/apache.virtual.conf
+example files. The important thing to remember is that requests should
+be handled by mod_python and that the PythonHandler should be set to
+authenticity::mp_handler. Information about configuring Apache is
+outside the scope of this document.
+
+Authenticity can be configured either from /etc/authenticity/config.ini,
+from the Apache configuration using PythonOption or a combination of
+both.
+
+All the supported options are documented in the provided config.ini
+file. The options in the global config.ini file can be overridden using
+PythonOption directives which take the form:
+
+PythonOption authenticity.<Section>.<option> "<value>"
+
+For example, the server_path option from the General section can be
+specified in the Apache configuration as:
+
+PythonOption authenticity.General.server_path "/authenticity"
+
+Please take the time to read through the configuration file. The
+defaults do NOT work as you need to at least specify either
+search_format or search_base under the LDAP section (there are no
+sensible default values).
+
+
+4. Testing
+----------
+
+You can obviously test Authenticity with any OpenID consumer. Identity
+pages which can be used as OpenID identifiers are provided as
+/id/$username. For example, if you setup Authenticity on
+openid.example.org, Alice's OpenID identifier would be:
+
+http://openid.example.org/id/alice
+
+If you don't want to test with a real OpenID consumer, python-openid
+comes with a nice consumer example (on Debian systems, this can be found
+in /usr/share/doc/python-openid/examples). Just fire it up with
+something like:
+
+user@host:/usr/share/doc/python-openid/examples$ ./consumer.py \
+> --host server.lan --port 8000
+
+And open http://server.lan:8000 on your browser.
+
+Of course, you can use any identifiers you would like with Authenticity,
+just have a look at the identifier_formats option under the Identity
+section. An easy way to provide better looking identifiers for your
+users, such as http://id.example.org/alice, is to use Apache to
+internally redirect requests for http://id.example.org/$username to
+http://openid.example.org/id/$username (if whereever else you've setup
+Authenticity). Then configurare Authenticity to allow these new
+identifiers:
+
+[Identity]
+identifier_formats = http://id.example.org/$username
+
+and you're all set. Or you can use your own identity pages, just specify
+the OpenID provider URL to /server under Authenticity's path. For
+example, if Authenticity is serving requests under
+
+https://secure.example.org/authenticity
+
+you can add the following elements in the (X)HTML identity pages:
+
+<link rel="openid.server"
+  href="https://secure.example.org/authenticity/server"/>
+<link rel="openid2.provider"
+  href="https://secure.example.org/authenticity/server"/>
+
+or in the XRDS document:
+
+<?xml version="1.0" encoding="UTF-8"?>
+<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">
+    <XRD>
+        <Service priority="0">
+            <Type>http://specs.openid.net/auth/2.0/signon</Type>
+            <Type>http://openid.net/signon/1.0</Type>
+            <URI>https://secure.example.org/authenticity/server</URI>
+        </Service>
+    </XRD>
+</xrds:XRDS>
+
+Since you are interested in OpenID (I suppose...), you should read the
+OpenID specifications available at: http://openid.net/developers/specs/
+
+
+5. Administration
+-----------------
+
+Given that Authenticity is currently in Alpha stage, it is possible that
+certain options will change their default values. It is also possible
+that minor modifications in the way the templates work will also be
+made. Therefore, before Authenticity becomes stable enough (Beta
+release), please read the NEWS file before any upgrade to find out if
+anything needs to be done to ensure a smooth upgrade. Actually, reading
+the NEWS file is always a good idea so make sure this becomes a habbit
+:-).
+
+Authenticity logs several messages, such as successful and unsuccessful
+login attempts at the notice level. In addition, to allow easy
+debugging, the request processing is logged in detail at the debug
+level. You can specify which messages are sent to the log file using the
+LogLevel Apache directive. You should probably set it to notice during
+normal operation.
+
+If you found any bugs please submit them on the project's website as a
+new ticket: http://projects.cnix.ro/authenticity . Any other comments
+should currently go to my mailbox, luci@cnix.ro.
+
+
+6. Security
+-----------
+
+Authenticity is an OpenID provider and thus security is a very important
+aspect. Please read the README.Security file for more information. I
+mean it!
+
+
+7. Future
+---------
+
+Authenticity is under active development. You can have a look at the
+TODO file for more information about how Authenticity will evolve in the
+near future.
+
+In the long-term, Authenticity will probably move to its own deamon, a
+change which will address the security considerations explained in
+README.Security in a more clean fashion.
+
+If you have any suggestions for improving Authenticity, please feel free
+to either e-mail me at luci@cnix.ro or open a ticket on
+http://projects.cnix.ro/authenticity.
+

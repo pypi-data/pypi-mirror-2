@@ -1,0 +1,181 @@
+Authenticity Template Support
+
+Authenticity supports templating by using the Genshi template engine. A
+template is a directory containing 4 XML files, possibly a configuration
+file and any other support data (such as images, css/javascript files
+etc.).
+
+Table of contents
+1. Page templates
+2. Configuration
+
+
+1. Page templates
+-----------------
+There are four page templates supported, which must be XML files
+conforming to the Genshi Markup Template language. These are called:
+ * about.xml: this is served at the root of the server path and on the
+   /server URI if an OpenID request was not received.
+ * error.xml: this is served whenever an error occurs.
+ * identity.xml: this is served to show information about users and as
+   content for the user identifier URLs.
+ * login.xml: this is served when a user wants to authenticate on an
+   OpenID consumer website.
+
+1.1 Processing instructions
+The templates can contain the following processing instructions:
+ * authenticity.output-type: this must be one of xhtml, html, xml or
+   plain. Please see the Genshi documentation for more information about
+   these values. The default value is xhtml. Example:
+   <?authenticity.output-type xhtml?>
+ * authenticity.content-type: this must contain the MIME type which will
+   be sent to the user agent in the Content-Type header. This must not
+   contain a charset parameter as one will always be added by
+   Authenticity. The default value is application/xhtml+xml. Example:
+   <?authenticity.content-type application/xhtml+xml?>
+ * authenticity.xml_declaration: this must contain either on or off and
+   specifies whether an XML declaration will be sent as part of the
+   output. This only applies for the xhtml output-type; it is ignored in
+   all other cases. The default value is off. Example:
+   <?authenticity.xml_declaration on?>
+
+1.2 Variables
+All the templates have access to the following variables:
+ * request: An object describing the HTTP request for which the template
+   is generating a response. The following attributes are available:
+    - method: the HTTP method, 'GET', 'POST' etc.
+    - uri: the path of the request, relative to the server's root.
+    - query: a dictionary containing the query arguments
+    - fragment: the fragment of the URL retrieved
+    - hostname: the hostname of the URL retrieved
+    - secure: a bool describing whether SSL/TLS is used
+    - client: an (address, port) tuple from which the request originated
+ * context: An object describing the context in which the HTTP request
+   is processed. The following attributes and methods are available:
+    - authenticity_homepage: The URL of Authenticity's homepage.
+    - authenticity_version: The version of Authenticity currently
+      running.
+    - page_title: The title that should be displayed on the page.
+    - realm_name: The name of the organization/service/whatever.
+      Something which should assure the user where he's entering his
+      password.
+    - server_admin: The e-mail address of the server administrator as
+      configured in Apache using the ServerAdmin directive.
+    - server_base: The base URL where the server receives requests.
+    - server_path: The base path where the server receives requests.
+    - construct_url(path, path_only=True):  Returns a URL for the
+      resource identified by path. An absolute path (one which starts
+      with /) is taken relative to the server path, while a relative
+      path is taken relative to the parent directory of the resource in
+      the current request.
+    - login_url(path_only=True): The URL where the login request should
+      be POSTed.
+    - openid_server_url(path_only=True): The URL where the server
+      handles OpenID requests.
+    - server_xrds_url(path_only=True): The URL where the server's XRDS
+      document is served.
+    - user_id_url(username, path_only=True): The URL where the
+      information about a user is served.
+    - user_xrds_url(username, path_only=True): The URL where the XRDS
+      document for a user is served.
+ * head_elements: This value should be included in the <head> (X)HTML
+   element. It contains the OpenID delegation elements required the page
+   in question.
+
+In addition, each template has access to additional variables relevent
+for itself.
+
+1.2.1 The about.xml template
+This template does not have access to any additional variables.
+
+1.2.2 The error.xml template
+This template has access to the following additional variables:
+ * error: The error message which should be displayed to the user.
+
+1.2.3 The identity.xml template
+This template has access to the following additional variables:
+ * identity: An object describing the identity of the user and having
+   the following attributes:
+    - username
+    - nickname
+    - email
+    - fullname
+    - birthday (YYYY-MM-DD format)
+    - gender ('M' or 'F')
+    - postcode
+    - country
+    - language
+    - timezone
+    - name: fullname or nickname or username, which is available first.
+   All except username can be None.
+
+1.2.4 The login.xml template
+This template has access to the following additional variables:
+ * error: If this variables is not None, it contains an error which
+   should be displayed to the user (for example: Invalid credentials).
+ * trust_root: The site for which the user is authenticating.
+ * id_select: A bool; if True, the user did not enter an identifier and
+   should be asked which one to use from the list provided by
+   identifier_formats. Otherwise, claimed_identifier and identifier
+   should be used to show the user which identity he is authenticating
+   for.
+ * claimed_identifier: The identifier the user will be known as on the
+   site he is authenticating to.
+ * identifier: The identifier local to the OpenID Provider the user is
+   authenticating for.
+ * identifier_formats: A list containing identifiers the user can select
+   from.
+ * original_request: A string which contains the OpenID request and must
+   be sent in the form.
+ * sreg_requested: Whether personal data was requested using the simple
+   registration extension.
+ * policy_url: A URL where the OpenID consumer shows information about
+   how the user's personal data will be used. Can be None.
+ * send_sreg_data: A bool indicating the default value for the state of
+   the checkbox for sending personal data.
+ * username: The default value for the username field.
+
+
+2. Configuration
+----------------
+The template can configure the way it's used by Authenticity's core
+using a configuration file named template.ini in the template's
+directory. It has the same syntax as Authenticity's configuration file.
+The following sections are supported.
+
+2.1 General section
+This section defines the following options:
+ * public_directories: A list of directory names which will be mapped to
+   the server path. For example, considering that Authenticity runs
+   under https://secure.example.org/authenticity, the template contains
+   the following directory structure:
+
+   images/user.png
+   style/css/default.css
+   about.xml
+   error.xml
+   identity.xml
+   login.xml
+   template.ini
+
+   and template.ini contains the following:
+
+   [General]
+   public_directories = images, style
+
+   then requests for:
+
+   https://secure.example.org/authenticity/images/user.png
+   https://secure.example.org/authenticity/style/css/default.css
+
+   will access the template's resources.
+
+   These resources can be referenced from templates by using the
+   context.construct_url method. For example:
+
+   context.construct_url('/images/user.png', path_only=True)
+   returns '/authenticity/images/user.png'
+
+   context.construct_url('/images/user.png', path_only=True)
+   returns 'https://secure.example.org/authenticity/images/user.png'
+
