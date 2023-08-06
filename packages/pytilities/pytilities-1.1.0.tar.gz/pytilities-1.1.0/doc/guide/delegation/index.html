@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Delegation &mdash; Pytilities 1.1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="Pytilities 1.1.0 documentation" href="../../" />
+    <link rel="up" title="Programming guide" href="../" />
+    <link rel="next" title="Descriptors" href="" />
+    <link rel="prev" title="Aspect oriented programming tools" href="" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Descriptors"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="#" title="Aspect oriented programming tools"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../">Pytilities 1.1.0 documentation</a> &raquo;</li>
+          <li><a href="../" accesskey="U">Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="delegation">
+<h1>Delegation<a class="headerlink" href="#delegation" title="Permalink to this headline">¶</a></h1>
+<p>Pytilities delegation utilities help in applying the concept of
+<a class="reference external" href="http://en.wikipedia.org/wiki/Delegation_%28programming%29">delegation</a>
+to your code, it makes delegation less tedious so you are less tempted to use
+inheritance.</p>
+<div class="section" id="delegationaspect">
+<h2>DelegationAspect<a class="headerlink" href="#delegationaspect" title="Permalink to this headline">¶</a></h2>
+<p>The most basic tool to help you is the <cite>DelegationAspect</cite>, it&#8217;s usage and use is
+best shown by example. Imagine you are making a game. You have a Player, an Enemy
+and a Box class. These all have health, can take damage and be destroyed. We
+decide to centralise this code in a Destructible class. As Player, Enemy and
+Box will have other characteristics as well we decide not to simply inherit
+from the Destructible but give ourselves the extra flexibility by giving each
+of them a Destructible instance and delegate calls on the public object to it.</p>
+<p>Normally, you&#8217;d have to write:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Player</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span> <span class="o">=</span> <span class="n">Destructible</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">take_damage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">amount</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">take_damage</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span>
+
+    <span class="nd">@getter</span>
+    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">health</span>
+
+    <span class="nd">@health.setter</span>
+    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">health</span> <span class="o">=</span> <span class="n">value</span>
+
+<span class="c"># repeat above code for Enemy and Box</span>
+</pre></div>
+</div>
+<p>With DelegationAspect you can narrow it down to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">DelegationAspect</span>
+
+<span class="k">class</span> <span class="nc">Player</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span> <span class="o">=</span> <span class="n">Destructible</span><span class="p">()</span>
+
+<span class="c"># make a new Aspect that will delegate any access to take_damage and health</span>
+<span class="c"># to the object it is applied to, to the _destructible attribute on that</span>
+<span class="c"># class</span>
+<span class="c">#</span>
+<span class="c"># first parameter: a descriptor that returns the object to delegate to</span>
+<span class="c"># second parameter: which attributes to delegate</span>
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="n">AttributeDescriptor</span><span class="p">(</span><span class="s">&#39;_destructible&#39;</span><span class="p">),</span>
+                                     <span class="p">(</span><span class="s">&#39;take_damage&#39;</span><span class="p">,</span> <span class="s">&#39;health&#39;</span><span class="p">))</span>
+<span class="n">delegation_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">Player</span><span class="p">)</span>
+
+<span class="c"># do the same for Enemy and Player, note you can reuse the aspect for all 3</span>
+</pre></div>
+</div>
+<p>Using DelegationAspect, the code is more maintainable, and still readable even
+though it&#8217;s shorter.</p>
+<p>Note: For those wondering, AttributeDescriptor and various other special
+descriptors will be explained in the <a class="reference external" href="../descriptors">next part of the guide</a>.</p>
+</div>
+<div class="section" id="delegation-profiles">
+<h2>Delegation Profiles<a class="headerlink" href="#delegation-profiles" title="Permalink to this headline">¶</a></h2>
+<p>Instead of specifying the attributes to delegate directly, you may want to use
+the <cite>in_profile</cite> and <cite>profile_carrier</cite> decorators to generate delegation
+<cite>Profile</cite> instances for you instead. A Profile is roughly equivalent to
+specifying a group of attributes (it&#8217;s actually far more powerful).</p>
+<p>A lengthy example to explain the decorators:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">profile_carrier</span><span class="p">,</span> <span class="n">in_profile</span>
+
+<span class="c"># profile_carrier is required by in_profile decorators,</span>
+<span class="c"># it stores generated profiles in Destructible.attribute_profiles</span>
+<span class="c"># which is a dict of profile name to Profile instance</span>
+<span class="nd">@profile_carrier</span>
+<span class="k">class</span> <span class="nc">Dispatcher</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c"># an event dispatcher (cfr observer pattern)</span>
+    <span class="c"># not included in any profile</span>
+    <span class="k">def</span> <span class="nf">__remove_handlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">owner</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="c"># not included in any profile</span>
+    <span class="k">def</span> <span class="nf">foo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="c"># included in &quot;public&quot; profile</span>
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">add_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">handler</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="c"># included in &quot;default&quot; profile</span>
+    <span class="nd">@in_profile</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">keyword_args</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">remove_handlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">remove_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">handler</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">has_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">(</span><span class="s">&quot;public&quot;</span><span class="p">)</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">events</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+    <span class="nd">@in_profile</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">register_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">event_names</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c"># omitted actual code for clarity</span>
+
+<span class="c"># advanced profile usage:</span>
+<span class="n">profiles</span> <span class="o">=</span> <span class="n">Dispatcher</span><span class="o">.</span><span class="n">attribute_profiles</span>
+<span class="c"># have default include all attributes of public</span>
+<span class="c"># if we didn&#39;t, default would only contain &#39;dispatch&#39; and &#39;register_events&#39;</span>
+<span class="n">profiles</span><span class="p">[</span><span class="s">&#39;default&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="n">profiles</span><span class="p">[</span><span class="s">&#39;public&#39;</span><span class="p">]</span>
+<span class="c"># Profiles support most set operators</span>
+</pre></div>
+</div>
+<p>With all the above defined you could now make one of your classes look like an
+event dispatcher, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">DelegationAspect</span>
+
+<span class="k">class</span> <span class="nc">Player</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dispatcher</span> <span class="o">=</span> <span class="n">Dispatcher</span><span class="p">()</span>
+
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="n">AttributeDescriptor</span><span class="p">(</span><span class="s">&#39;_destructible&#39;</span><span class="p">),</span>
+                                     <span class="n">Dispatcher</span><span class="o">.</span><span class="n">attribute_profiles</span><span class="p">[</span><span class="s">&#39;public&#39;</span><span class="p">])</span>
+<span class="n">delegation_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">Player</span><span class="p">)</span>
+
+<span class="n">player</span> <span class="o">=</span> <span class="n">Player</span><span class="p">()</span>
+<span class="n">player</span><span class="o">.</span><span class="n">events</span>  <span class="c"># this now returns all events that player might send out</span>
+<span class="n">player</span><span class="o">.</span><span class="n">dispatch</span><span class="p">(</span><span class="s">&#39;walked&#39;</span><span class="p">)</span>  <span class="c"># this will give an attribute not found error as</span>
+                           <span class="c"># it&#39;s not included in the public profile</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="advanced-attribute-mapping-with-profile">
+<h2>Advanced attribute mapping with Profile<a class="headerlink" href="#advanced-attribute-mapping-with-profile" title="Permalink to this headline">¶</a></h2>
+<p>Profiles also allow you to delegate to different named attributes, e.g.:</p>
+<div class="highlight-python"><pre># in this example we'll try to map the top left coordinates of a rectangle to
+# a vector (x,y coord)
+
+class Rectangle(object):
+    # has a Vector instance for its top left (and another for its bottom
+    # right)
+
+class Vector(object):
+    # has x, y properties
+
+profile = Profile()
+profile.add_mappings('rwd', **{'left' : 'x', 'top' : 'y'})
+
+delegation_aspect = DelegationAspect(AttributeDescriptor('top_left'), profile)
+delegation_aspect.apply(Rectangle)
+
+r = Rectangle()
+r.top = 1  # this now sets its top_left.y to 1</pre>
+</div>
+<p>Profile also allows you to map just read access, or write access, or delete
+access, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># The following example is rather abstract;</span>
+<span class="c"># to be honest, I forgot why you might need this</span>
+
+<span class="k">class</span> <span class="nc">Delegate</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="nd">@getter</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;delegated&#39;</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">Vector</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delegate</span> <span class="o">=</span> <span class="n">Delegate</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="nd">@getter</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;original&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span>
+
+    <span class="nd">@x.setter</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;original&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">value</span>
+
+<span class="n">profile</span> <span class="o">=</span> <span class="n">Profile</span><span class="p">()</span>
+<span class="c"># delegate only read access</span>
+<span class="n">profile</span><span class="o">.</span><span class="n">add_mappings</span><span class="p">(</span><span class="s">&#39;r&#39;</span><span class="p">,</span> <span class="s">&#39;x&#39;</span><span class="p">)</span>  <span class="c"># note you can also use in_profile(modifiers=&#39;r&#39;)</span>
+
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="n">AttributeDescriptor</span><span class="p">(</span><span class="s">&#39;delegate&#39;</span><span class="p">),</span> <span class="n">profile</span><span class="p">)</span>
+<span class="n">delegation_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">Vector</span><span class="p">)</span>
+
+<span class="n">v</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>  <span class="c"># prints delegated</span>
+<span class="n">v</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c"># prints original</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Delegation</a><ul>
+<li><a class="reference internal" href="#delegationaspect">DelegationAspect</a></li>
+<li><a class="reference internal" href="#delegation-profiles">Delegation Profiles</a></li>
+<li><a class="reference internal" href="#advanced-attribute-mapping-with-profile">Advanced attribute mapping with Profile</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href=""
+                        title="previous chapter">Aspect oriented programming tools</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href=""
+                        title="next chapter">Descriptors</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/guide/delegation.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search/" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Descriptors"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="#" title="Aspect oriented programming tools"
+             >previous</a> |</li>
+        <li><a href="../../">Pytilities 1.1.0 documentation</a> &raquo;</li>
+          <li><a href="../" >Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Tim Diels (limyreth).
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre.
+    </div>
+  </body>
+</html>

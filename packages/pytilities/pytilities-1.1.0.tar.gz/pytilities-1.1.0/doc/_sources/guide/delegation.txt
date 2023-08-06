@@ -1,0 +1,213 @@
+Delegation
+==========
+
+Pytilities delegation utilities help in applying the concept of 
+`delegation <http://en.wikipedia.org/wiki/Delegation_%28programming%29>`_ 
+to your code, it makes delegation less tedious so you are less tempted to use 
+inheritance.
+
+DelegationAspect
+----------------
+
+The most basic tool to help you is the `DelegationAspect`, it's usage and use is
+best shown by example. Imagine you are making a game. You have a Player, an Enemy
+and a Box class. These all have health, can take damage and be destroyed. We
+decide to centralise this code in a Destructible class. As Player, Enemy and
+Box will have other characteristics as well we decide not to simply inherit
+from the Destructible but give ourselves the extra flexibility by giving each
+of them a Destructible instance and delegate calls on the public object to it.
+
+Normally, you'd have to write::
+
+  class Player(object):
+      def __init__(self):
+          self._destructible = Destructible()
+
+      def take_damage(self, amount):
+          self._destructible.take_damage(amount)
+
+      @getter
+      def health(value):
+          return self._destructible.health
+
+      @health.setter
+      def health(self, value):
+          self._destructible.health = value
+
+  # repeat above code for Enemy and Box
+
+With DelegationAspect you can narrow it down to::
+
+  from pytilities.delegation import DelegationAspect
+
+  class Player(object):
+      def __init__(self):
+          self._destructible = Destructible()
+
+  # make a new Aspect that will delegate any access to take_damage and health
+  # to the object it is applied to, to the _destructible attribute on that
+  # class
+  #
+  # first parameter: a descriptor that returns the object to delegate to
+  # second parameter: which attributes to delegate
+  delegation_aspect = DelegationAspect(AttributeDescriptor('_destructible'),
+                                       ('take_damage', 'health'))
+  delegation_aspect.apply(Player)
+
+  # do the same for Enemy and Player, note you can reuse the aspect for all 3
+
+Using DelegationAspect, the code is more maintainable, and still readable even
+though it's shorter. 
+
+Note: For those wondering, AttributeDescriptor and various other special 
+descriptors will be explained in the `next part of the guide <../descriptors>`_.
+
+
+Delegation Profiles
+-------------------
+
+Instead of specifying the attributes to delegate directly, you may want to use
+the `in_profile` and `profile_carrier` decorators to generate delegation 
+`Profile` instances for you instead. A Profile is roughly equivalent to 
+specifying a group of attributes (it's actually far more powerful).
+
+A lengthy example to explain the decorators::
+
+  from pytilities.delegation import profile_carrier, in_profile
+
+  # profile_carrier is required by in_profile decorators,
+  # it stores generated profiles in Destructible.attribute_profiles
+  # which is a dict of profile name to Profile instance
+  @profile_carrier 
+  class Dispatcher(object):  # an event dispatcher (cfr observer pattern)
+      # not included in any profile
+      def __remove_handlers(self, event, owner):
+          pass  # omitted actual code for clarity
+
+      # not included in any profile
+      def foo(self):
+          pass  # omitted actual code for clarity
+
+      # included in "public" profile
+      @in_profile("public")
+      def add_handler(self, event_name, handler, owner = None):
+          pass  # omitted actual code for clarity
+
+      # included in "default" profile
+      @in_profile()
+      def dispatch(self, event_name, *args, **keyword_args):
+          pass  # omitted actual code for clarity
+
+      @in_profile("public")
+      def remove_handlers(self, event_name=None, owner=None):
+          pass  # omitted actual code for clarity
+
+      @in_profile("public")
+      def remove_handler(self, event_name, handler, owner = None):
+          pass  # omitted actual code for clarity
+
+      @in_profile("public")
+      def event(self, event_name, owner = None):
+          pass  # omitted actual code for clarity
+
+      @in_profile("public")
+      def has_event(self, event_name):
+          pass  # omitted actual code for clarity
+
+      @in_profile("public")
+      @property
+      def events(self):
+          pass  # omitted actual code for clarity
+
+      @in_profile()
+      def register_events(self, *event_names):
+          pass  # omitted actual code for clarity
+
+  # advanced profile usage:
+  profiles = Dispatcher.attribute_profiles
+  # have default include all attributes of public
+  # if we didn't, default would only contain 'dispatch' and 'register_events'
+  profiles['default'] |= profiles['public']
+  # Profiles support most set operators
+
+With all the above defined you could now make one of your classes look like an
+event dispatcher, e.g.::
+
+  from pytilities.delegation import DelegationAspect
+
+  class Player(object):
+      def __init__(self):
+          self._dispatcher = Dispatcher()
+
+  delegation_aspect = DelegationAspect(AttributeDescriptor('_destructible'),
+                                       Dispatcher.attribute_profiles['public'])
+  delegation_aspect.apply(Player)
+
+  player = Player()
+  player.events  # this now returns all events that player might send out
+  player.dispatch('walked')  # this will give an attribute not found error as
+                             # it's not included in the public profile
+
+
+Advanced attribute mapping with Profile
+---------------------------------------
+
+Profiles also allow you to delegate to different named attributes, e.g.::
+
+  # in this example we'll try to map the top left coordinates of a rectangle to
+  # a vector (x,y coord)
+
+  class Rectangle(object):
+      # has a Vector instance for its top left (and another for its bottom
+      # right)
+
+  class Vector(object):
+      # has x, y properties
+
+  profile = Profile()
+  profile.add_mappings('rwd', **{'left' : 'x', 'top' : 'y'})
+
+  delegation_aspect = DelegationAspect(AttributeDescriptor('top_left'), profile)
+  delegation_aspect.apply(Rectangle)
+
+  r = Rectangle()
+  r.top = 1  # this now sets its top_left.y to 1
+
+
+Profile also allows you to map just read access, or write access, or delete
+access, e.g.::
+
+  # The following example is rather abstract;
+  # to be honest, I forgot why you might need this
+
+  class Delegate(object):
+      @getter
+      def x(self):
+          print('delegated')
+
+  class Vector(object):
+      def x(self):
+          self.delegate = Delegate()
+          self._x = 0
+
+      @getter
+      def x(self):
+          print('original')
+          return self._x
+
+      @x.setter
+      def x(self, value):
+          print('original')
+          self._x = value
+
+  profile = Profile()
+  # delegate only read access
+  profile.add_mappings('r', 'x')  # note you can also use in_profile(modifiers='r')
+
+  delegation_aspect = DelegationAspect(AttributeDescriptor('delegate'), profile)
+  delegation_aspect.apply(Vector)
+
+  v = Vector()
+  print(v.x)  # prints delegated
+  v.x = 1  # prints original
+

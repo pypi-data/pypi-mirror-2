@@ -1,0 +1,165 @@
+Descriptors
+===========
+
+Pytilities provides various handy descriptors, for example a property that's
+bound to a particular instance, just as bound methods are bound to a particular
+instance.
+
+The following describes each descriptor one by one, starting off with the two
+you'll most often want to use.
+
+Descriptor of literal
+---------------------
+Some pytilities' functionality demands you give it a descriptor. In order to
+get a descriptor of a literal, use::
+
+    property(lambda self: literal)
+
+AttributeDescriptor
+-------------------
+In cases where you need to give access to a regular attribute via a descriptor,
+you can use `AttributeDescriptor`. It makes an attribute look like a 
+descriptor.
+
+AttributeDescriptor(name) is equivalent to::
+
+    property(
+        lambda self: getattr(self, attr_name),
+        lambda self, value: setattr(self, attr_name, value),
+        lambda self: delattr(self, attr_name)
+    )
+
+BoundDescriptor and DereferencedBoundDescriptor
+-----------------------------------------------
+`BoundDescriptor` binds an instance to a descriptor, just as instances are bound
+to bound methods. You can make bound properties with these, but it applies to
+any descriptor in general.
+
+An example::
+
+    from pytilities.descriptors import BoundDescriptor
+    from pytilities.geometry import Vector
+
+    class A(object): pass
+    class B(object): pass
+
+    descriptor_to_bind_to = property(lambda s: s.x)
+
+    a = A()
+    a.x = 'a value'
+    B.x = BoundDescriptor(
+            descriptor_to_bind_to,
+            a)  # the instance to bind
+
+    b = B()
+    b.x  # returns 'a value'
+
+In some cases you'll want to have an extra level of indirection to get to your
+instance or descriptor that you want to bind. For these cases you can use
+`DereferencedBoundDescriptor`. Dereferencing in this context means to get the
+value of the given descriptor and then use that return value as
+descriptor/instance.
+
+An example::
+
+    from pytilities.descriptors import DereferencedBoundDescriptor
+    from pytilities.geometry import Vector
+
+    class Rectangle(object):
+        def __init__(self):
+          self._top_left = Vector()
+
+    Rectangle.left = DereferencedBoundDescriptor(
+        # s is the instance on which the bound descriptor resides
+        # each of these are reevaluated on each call
+        property(lambda s: Vector.x),  
+        property(lambda s: s._top_left)
+
+    r = Rectangle()
+    r.left = 1  # this eventually executes r._top_left.x = 1
+    print(r.left)  # this prints r._top_left.x, which is 1
+
+
+DereferencedDescriptor
+----------------------
+`DereferencedDescriptor` wraps around another descriptor and upon access will
+get the value of that descriptor and then perform the access on that return.
+This really is best explained using an example::
+
+    from pytilities.descriptors import DereferencedDescriptor
+
+    # have a class with two properties x and y to choose from with
+    # selected_property, you can then modify the content of the chosen prop
+    # with z
+    class A(object):
+        def __init__(self):
+            self._x = 0
+            self._y = 1
+            self._selected_property = A.x
+
+        @property
+        def x(self):
+            return self._x
+
+        @x.setter
+        def x(self, value):
+            self._x = value
+
+        @property
+        def y(self):
+            return self._y
+
+        @x.setter
+        def y(self, value):
+            self._y = value
+
+        @property
+        def selected_property(self):
+            return self._selected_property
+
+        @selected_property.setter
+        def selected_property(self, value):
+            self._selected_property = value
+
+    A.z = DereferencedDescriptor(A.selected_property)
+
+    a = A()
+    a.z  # prints 0, is the same as doing a descriptor get on a.selected_property's return
+    a.z = 2  # is the same as doing a descriptor set on a.selected_property's return
+    a.z  # prints 2
+    a.selected_property = A.y
+    a.z  # prints 1, selected_property now returns A.y for us to work with
+
+
+RestrictedDescriptor
+--------------------
+
+`RestrictedDescriptor` offers a restricted view onto a descriptor, hiding its
+get, set and/or delete.
+
+For example::
+
+    from pytilities.descriptors import RestrictedDescriptor
+
+    class A(object):
+        def __init__(self):
+            self._x = 0
+
+        @property
+        def x(self):
+            return self._x
+
+        @x.setter
+        def x(self, value):
+            self._x = value
+
+    # make a view that allows get and delete
+    A.y = RestrictedDescriptor(A.x, set_ = False)
+
+    a = A()
+
+    print(a.x)  # prints 0
+    a.x = 2
+    print(a.y)  # prints 2
+    a.y = 4  # throws an AttributeError
+
