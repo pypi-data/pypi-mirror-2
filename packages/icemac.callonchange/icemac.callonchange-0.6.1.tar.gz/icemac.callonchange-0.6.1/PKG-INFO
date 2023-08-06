@@ -1,0 +1,334 @@
+Metadata-Version: 1.0
+Name: icemac.callonchange
+Version: 0.6.1
+Summary: Call a command when a directory or file has changed. (Mac OS only)
+Home-page: http://pypi.python.org/icemac.callonchange
+Author: Michael Howitz
+Author-email: icemac@gmx.net
+License: ZPL 2.1
+Description: 
+        
+        icemac.callonchange calls a specific command when a directory or
+        something in it has changed. It was developed to ease test driven
+        development (TDD): it can call the test case under development each
+        time the test case or the developed code changes.
+        
+        .. contents::
+        
+        
+        Requirements
+        ============
+        
+        * Mac OS X 10.5+ (Leopard)
+        * Python 2.4 till 2.7
+        
+        General usage
+        =============
+        
+        Usage: callonchange [options] path utility [utility arguments]
+        
+        callonchange invokes *utility* with its *utility arguments* when
+        *path* or something in it changes.
+        
+        Options:
+          --version     show program's version number and exit
+          -h, --help    show this help message and exit
+          -e EXTENSION  only call utility on changes of a file with this extension
+                        (option might be used multiple times)
+          -q            Do not display any output of callonchange. (Still displays the
+                        output of the utility.)
+        
+        
+        *EXTENSION* might be specified with or without a leading dot:
+        
+          ``-e .py`` is equal to ``-e py`` is equal to ``-epy``
+        
+        **Caution:** optional arguments must be specified *before* the
+        positional arguments (path and utility). Arguments specified after the
+        positional arguments are taken as arguments of the utility.
+        
+        
+        Usage as script
+        ===============
+        
+        Installation
+        ------------
+        
+        To install callonchange as script call::
+        
+          $ python setup.py install
+        
+        or install it using a package manager like easy_install or pip.
+        
+        Call as script
+        --------------
+        
+        To call it as a script add the path to the directory to be observed
+        and the command (script or program) to be called when the directory or
+        something in it has changed.
+        
+        Example to call ``xeyes`` when a file with the extension `log` has
+        changed in `/var/log` enter::
+        
+          $ callonchange -e log /var/log xeyes
+        
+        **Caution:** In this example `xeyes` is called on every new entry in
+        the log file.
+        
+        
+        In buildout
+        ===========
+        
+        There is a recipe in the package which eases installation using
+        buildout.
+        
+        Installation with default arguments
+        -----------------------------------
+        
+        Add a section to your buildout to generate a script for callonchange
+        (don't forget to add it to the parts!)::
+        
+          [coc]
+          recipe = icemac.callonchange
+        
+        This creates a callonchange script with default arguments. These are::
+        
+          '-e', 'py', '-e', 'zcml', '-e', 'pt', '-e', 'txt', 'src', 'bin/test', '-cv'
+        
+        Which means: observe in the `src` directory files with the extensions
+        py, zcml, pt and txt. Call ``bin/test`` with the arguments cv (verbose
+        and color) on changes.
+        
+        Installation with customized arguments
+        --------------------------------------
+        
+        To override the default arguments add an `arguments` parameter to the
+        buildout section::
+        
+          [coc]
+          recipe = icemac.callonchange
+          name = coc
+          arguments = 'Products', 'bin/ztest'
+        
+        This means: The created script will be named `coc`. When called it
+        will observe the `Products` directory and call ``bin/ztest`` on
+        changes.
+        
+        
+        Usage as buildout script
+        ------------------------
+        
+        You can add additional parameters when you call the generated script::
+        
+          $ bin/callonchange -t testObserver
+        
+        When you use the default arguments in the buildout section, this
+        command line calls ``bin/test -cv -t testObserver`` on each change of
+        py, zcml, pt or txt files in the `src` directory.
+        
+        Stopping callonchange
+        =====================
+        
+        To stop a running callonchange instance hit ^C (Control-C).
+        
+        
+        Runing the tests
+        ================
+        
+        To run the tests of icemac.callonchange call::
+        
+          $ python setup.py test
+        
+        or use buildout::
+        
+          $ python bootstrap.py
+          $ bin/buildout
+          $ bin/test
+        
+        or use callonchange itself::
+        
+          $ python bootstrap.py
+          $ bin/buildout
+          $ bin/callonchange
+        
+        In the last version you have to change something inside the `src`
+        directory of the package so the observer lets the tests run.
+        
+        
+        Thanks
+        ======
+        
+        Thanks to Malte Borch for the great MacFSEvents_ which
+        icemac.callonchange is based on.
+        
+        .. _MacFSEvents: http://pypi.python.org/pypi/MacFSEvents
+        
+        Similar tools
+        =============
+        
+        (Sorted by the time I got to know them.)
+        
+        * pest_: "Auto tester for python" Seems to be designed to run tests
+          and nothing else. Has growl integration. Current version (1.0.3) has
+          no automatic tests.
+        
+        * sniffer_: "An automatic test runner. Supports nose out of the box."
+          Supports Linux, Windows and Mac OS X. But in current version (0.1.5)
+          Windows is untested. Current version has no automatic tests.
+        
+        * autonose_: "continuous test tracker / runner for nosetests" Seems to
+          focus on nose tests. Version 0.1.5 only acts on changes of python
+          files. Detects file changes not using file system events. So it is
+          slow on larger code bases.
+        
+        * PyZen_: "Continuous testing for paranoid developers." Seems to be tightly
+          integrated into python's `unittest` framework and Django. Detects file
+          changes using comparison of file modification time stamps. So it is slow
+          on larger code bases. Version 0.1 has no automatic tests.
+        
+        * Flask-Zen_: "Flask-Script commands to integrate with PyZen." Light layer
+          around PyZen to integrate it into Flask. Version 0.1 has no automatic
+          tests.
+        
+        * nosier_: "Monitors paths and upon detecting changes runs the specified
+          command" It is however limited to Linux 2.6 since it depends on the
+          inotify facility. Uses black lists and white lists for files thos changes
+          sould be tracked and has some other nice features. Version 1.1 has no
+          automatic tests.
+        
+        * supcut_: "Simple unobtrusive Python continuous unit testing" It is limited
+          to Linux as it depends on inotify. Expects some of its template files are
+          installed in `/usr/share/doc/python-supcut/examples`. Although it always
+          talks about running nose tests, it might be used for arbitrary calls,
+          too. Can send e-mails about test run. Version 0.5.1 has no automatic
+          tests.
+        
+        
+        .. _pest: http://pypi.python.org/pypi/pest
+        .. _sniffer: http://pypi.python.org/pypi/sniffer
+        .. _autonose: http://pypi.python.org/pypi/autonose
+        .. _PyZen: http://pypi.python.org/pypi/PyZen
+        .. _Flask-Zen: http://pypi.python.org/pypi/Flask-Zen
+        .. _nosier: http://pypi.python.org/pypi/nosier
+        .. _supcut: http://pypi.python.org/pypi/supcut
+        
+        Ideas
+        =====
+        
+        - It would be nice to have predefined argument lines (profiles) even
+          when not using buildout. They could be stored in the home directory
+          of the user. (Should support profiles which reverence other
+          profiles.)
+        
+        - In buildout recipe: default script name should be section name.
+        
+        - A minimal time between calls (delay) might be nice, so a change does not
+          result in a call of the utility when it occurred during the delay time.
+        
+        - The options of callonchange should have long variants, too.
+        
+        - White list/black list approach of nosier seems to be nice.
+        
+        - Configurable inital run of the utility would be nice.
+        
+        - When observing large trees for changes of files with a specific extension,
+          starting up the script can take while as the whole tree has to to be
+          scanned once. During this start up period changes are not yet handled, so
+          a message would be nice when start up is done.
+        
+        - http://pypi.python.org/pypi/watchdog could be a way to get callonchange
+          running on Linux and Windows, too.
+        
+        Changelog
+        =========
+        
+        0.6.1 (2010-12-11)
+        ------------------
+        
+        - Made tests more robust.
+        
+        - Added more similar tools to the list.
+        
+        
+        0.6 (2010-07-28)
+        ----------------
+        
+        - Added compatibility with Python 2.4.
+        
+        - Now officially supporting Python 2.6 and 2.7, too.
+        
+        
+        0.5 (2010-07-21)
+        ----------------
+        
+        - Added `--version` option to callonchange.
+        
+        - Added another similar tool to the list.
+        
+        
+        0.4 (2010-07-16)
+        ----------------
+        
+        - When the utility gets called a messge is displayed. This can be
+          omitted by specifying the `-q` option for callonchange.
+        
+        - When the utility is not found or another OSError occurred when
+          calling the utility callonchange is now stopped.
+        
+        
+        0.3.2 (2010-07-14)
+        ------------------
+        
+        - Added list of similar tools.
+        
+        
+        0.3.1 (2010-07-10)
+        ------------------
+        
+        - Fixed incorrect handling of the `find-links` buildout parameter.
+        
+        
+        0.3 (2010-07-07)
+        ----------------
+        
+        - Added abbility to specify file extensions so only files with these
+          extensions will be observed.
+        
+        - Added a `name` parameter to the recipe to control the name of the
+          generated script, e. g. allowing more than one icemac.callonchange
+          script in a buildout.
+        
+        
+        0.2 (2010-07-04)
+        ----------------
+        
+        - Added buildout recipe to ease integration with buildout
+          projects. (See section `In buildout`_.)
+        
+        
+        0.1 (2010-07-02)
+        ----------------
+        
+        - Initial release.
+        
+        
+        
+Keywords: mac os event fs filesystem call change command tdd test driven development
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Environment :: MacOS X
+Classifier: Framework :: Buildout
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Natural Language :: English
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.4
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: Utilities
