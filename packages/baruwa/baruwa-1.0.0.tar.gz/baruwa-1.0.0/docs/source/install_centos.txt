@@ -1,0 +1,95 @@
+.. _installcentos:
+
+=====================
+Baruwa on Centos/RHEL
+=====================
+
+Configure MailScanner
+=====================
+
+:ref:`Configure <mailscanner>` MailScanner if you have not already done so.
+
+Install EPEL
+============
+
+The EPEL repo provides packages which are in Fedora but no yet
+included in RHEL/CENTOS. Django is shipped by the EPEL repo.
+Instructions on installing it can be found on `EPEL <http://fedoraproject.org/wiki/EPEL/FAQ#howtouse>`_
+
+Baruwa rpm install
+==================
+
+Due to the fact that the shipped MySQLdb module shipped on 
+Centos/RHEL is too old, do not install python-mysql install 
+MySQLdb from source instead::
+
+	# cd /usr/local/src
+	# wget http://garr.dl.sourceforge.net/sourceforge/mysql-python/MySQL-python-1.2.2.tar.gz
+	# tar xvzf MySQL-python-1.2.2.tar.gz
+	# yum install gcc python-devel mysql-devel
+	# cd MySQL-python-1.2.2
+	# python setup.py build
+	# python setup.py install
+
+Now proceed and install the other dependencies::
+
+    # yum install python-IPy python-GeoIP Django mod_wsgi python-uuid python-lxml
+
+Install the python-reportlab rpm from `topdog-software <http://www.topdog-software.com/oss/python-reportlab/>`_::
+
+	# rpm -Uvh python-reportlab-2.3-2.i386.rpm
+
+Download the Baruwa rpm from `topdog-software.com <http://www.topdog-software.com/oss/baruwa/>`_
+and install::
+
+    # rpm -Uvh --nodeps baruwa-<version>.noarch.rpm
+
+Create the database::
+
+    # mysqladmin -u root -p create baruwa
+
+Create the database user::
+
+    mysql> GRANT ALL ON baruwa.* TO baruwa@localhost IDENTIFIED BY '<password>';
+    mysql> flush privileges;
+
+Configure Baruwa
+================
+
+Edit the baruwa settings.py::
+
+	# baruwa_path=$(python2.4 -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")
+	# vi $baruwa_path/setttings.py
+
+And set the mysql database details::
+
+    DATABASE_ENGINE = 'mysql'           
+    DATABASE_NAME = 'baruwa'             
+    DATABASE_USER = 'baruwa'             
+    DATABASE_PASSWORD = '<baruwa_password>'         
+    DATABASE_HOST = 'localhost'    
+
+Create the baruwa admin user and populate the database::
+
+	# $baruwa_path/baruwa/manage.py syncdb       
+
+Edit the settings.py file and make the baruwa specific changes to suit
+your install::
+
+	# vi $baruwa_path/setttings.py
+
+**Setup Web server**
+
+Edit your apache configurations to enable virtual hosting if
+not enabled already. Then set the correct hostname in 
+/etc/httpd/conf.d/baruwa.conf::
+
+    # change to your hostname
+    ServerName baruwa-alpha.local
+
+Make sure mod_wsgi is enabled, uncomment the following line in
+/etc/httpd/conf.d/wsgi.conf::
+
+    LoadModule wsgi_module modules/mod_wsgi.so
+    
+Restart apache and point your browser to the hostname url.
