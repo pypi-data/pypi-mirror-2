@@ -1,0 +1,970 @@
+diff -r a37c7290ccc8 docs/changes/changes.txt
+--- a/docs/changes/changes.txt	Sun Apr 25 15:54:28 2010 +0200
++++ b/docs/changes/changes.txt	Tue Mar 08 23:00:46 2011 +0100
+@@ -1,3 +1,9 @@ Release 0.3:
++Release 0.3.1:
++------------
++
++- Fix bug in referencing to external books when xref.hypermarkup=1.
++
++
+ Release 0.3:
+ ------------
+ 
+diff -r a37c7290ccc8 docs/version.xml
+--- a/docs/version.xml	Sun Apr 25 15:54:28 2010 +0200
++++ b/docs/version.xml	Tue Mar 08 23:00:46 2011 +0100
+@@ -1,1 +1,1 @@
+-<emphasis>devel</emphasis>
++<emphasis>0.3</emphasis>
+diff -r a37c7290ccc8 lib/dbtexmf/dblatex/grubber/util.py
+--- a/lib/dbtexmf/dblatex/grubber/util.py	Sun Apr 25 15:54:28 2010 +0200
++++ b/lib/dbtexmf/dblatex/grubber/util.py	Tue Mar 08 23:00:46 2011 +0100
+@@ -5,7 +5,11 @@ by the modules for various tasks.
+ by the modules for various tasks.
+ """
+ 
+-import md5
++try:
++    import hashlib
++except ImportError:
++    # Fallback for python 2.4:
++    import md5 as hashlib
+ import os
+ from msg import _, msg
+ 
+@@ -14,7 +18,7 @@ def md5_file(fname):
+     """
+     Compute the MD5 sum of a given file.
+     """
+-    m = md5.new()
++    m = hashlib.md5()
+     file = open(fname)
+     for line in file.readlines():
+         m.update(line)
+diff -r a37c7290ccc8 lib/dbtexmf/dblatex/texcodec.py
+--- a/lib/dbtexmf/dblatex/texcodec.py	Sun Apr 25 15:54:28 2010 +0200
++++ b/lib/dbtexmf/dblatex/texcodec.py	Tue Mar 08 23:00:46 2011 +0100
+@@ -38,6 +38,7 @@ class TexCodec:
+               "\xa5": r"$\yen$",
+               # "\xa6": r"\textbrokenbar{}",
+               "\xac": r"\ensuremath{\lnot}",
++              # "\xad": r"", # FIXME: bug around soft hyphen...
+               "\xb0": r"\textdegree{}",
+               "\xb1": r"\ensuremath{\pm}",
+               "\xb2": r"$^2$",
+@@ -128,8 +129,12 @@ def main():
+     import sys
+     c = LatexCodec()
+     f = open(sys.argv[1])
++    text = ""
+     for line in f:
+-        c.encode(c.decode(line))
+-        
++        text += c.encode(c.decode(line))
++        if text:
++            sys.stdout.write(text)
++
++
+ if __name__ == "__main__":
+     main()
+diff -r a37c7290ccc8 xsl/biblio.xsl
+--- a/xsl/biblio.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/biblio.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -461,6 +461,11 @@
+ <!-- abbrev not displayed  -->
+ <xsl:template match="abbrev" mode="bibliography.mode"/>
+ 
++<!-- want latex label anchors -->
++<xsl:template match="anchor" mode="bibliography.mode">
++  <xsl:apply-templates select="."/>
++</xsl:template>
++
+ 
+ <xsl:template match="biblioset" mode="bibliography.mode">
+   <xsl:if test="author|authorgroup">
+diff -r a37c7290ccc8 xsl/common/lib.xsl
+--- a/xsl/common/lib.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/common/lib.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -13,6 +13,23 @@
+ <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+ 
+ <!-- Only an excerpt of the original file -->
++
++<xsl:template name="dot.count">
++  <!-- Returns the number of "." characters in a string -->
++  <xsl:param name="string"/>
++  <xsl:param name="count" select="0"/>
++  <xsl:choose>
++    <xsl:when test="contains($string, '.')">
++      <xsl:call-template name="dot.count">
++        <xsl:with-param name="string" select="substring-after($string, '.')"/>
++        <xsl:with-param name="count" select="$count+1"/>
++      </xsl:call-template>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:value-of select="$count"/>
++    </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
+ 
+ <xsl:template name="pi-attribute">
+   <xsl:param name="pis" select="processing-instruction('BOGUS_PI')"/>
+diff -r a37c7290ccc8 xsl/inlined.xsl
+--- a/xsl/inlined.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/inlined.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -440,9 +440,26 @@
+ </xsl:template>
+ 
+ <xsl:template match="quote">
+-  <xsl:call-template name="gentext.nestedstartquote"/>
+-  <xsl:call-template name="inline.charseq"/>
+-  <xsl:call-template name="gentext.nestedendquote"/>
++  <xsl:variable name="depth">
++    <xsl:call-template name="dot.count">
++      <xsl:with-param name="string">
++        <xsl:number level="multiple"/>
++      </xsl:with-param>
++    </xsl:call-template>
++  </xsl:variable>
++
++  <xsl:choose>
++    <xsl:when test="$depth mod 2 = 0">
++      <xsl:call-template name="gentext.startquote"/>
++      <xsl:call-template name="inline.charseq"/>
++      <xsl:call-template name="gentext.endquote"/>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:call-template name="gentext.nestedstartquote"/>
++      <xsl:call-template name="inline.charseq"/>
++      <xsl:call-template name="gentext.nestedendquote"/>
++    </xsl:otherwise>
++  </xsl:choose>
+ </xsl:template>
+ 
+ <xsl:template match="varname">
+diff -r a37c7290ccc8 xsl/newtbl.xsl
+--- a/xsl/newtbl.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/newtbl.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -37,11 +37,17 @@
+         <xsl:copy-of select="$colspec/colspec[@colnum = $colnum]"/>
+       </xsl:when>
+       <xsl:otherwise>
++        <xsl:variable name="natwidth">
++          <xsl:call-template name="natural-width">
++            <xsl:with-param name="autowidth" select="$autowidth"/>
++            <xsl:with-param name="colnum" select="$colnum"/>
++          </xsl:call-template>
++        </xsl:variable>
++ 
+         <colspec colnum='{$colnum}' align='{$align}' star='1'
+                  rowsep='{$rowsep}' colsep='{$colsep}' 
+                  colwidth='\newtblstarfactor'>
+-          <xsl:if test="contains($autowidth,'default') or
+-                        contains($autowidth,'all')">
++          <xsl:if test="$natwidth = 1">
+             <xsl:attribute name="autowidth">1</xsl:attribute>
+           </xsl:if>
+         </colspec>
+@@ -53,6 +59,7 @@
+       <xsl:with-param name="rowsep" select="$rowsep"/>
+       <xsl:with-param name="colsep" select="$colsep"/>
+       <xsl:with-param name="cols" select="$cols"/>
++      <xsl:with-param name="autowidth" select="$autowidth"/>
+       <xsl:with-param name="colspec" select="$colspec"/>
+     </xsl:call-template>
+   </xsl:if>
+@@ -144,6 +151,24 @@
+ </xsl:template>
+ 
+ 
++<!-- Evaluate from the autowidth statement if the current column width
++     is its natural size determined by the column cells contents -->
++<xsl:template name="natural-width">
++  <xsl:param name="autowidth"/>
++  <xsl:param name="colnum" select="1"/>
++
++  <xsl:choose>
++  <xsl:when test="not(string(@colwidth)) and 
++                  (contains($autowidth,'default') or
++                   contains($autowidth,'all'))">1</xsl:when>
++  <xsl:when test="contains(@colwidth,'*') and
++                  contains($autowidth,'all')">1</xsl:when>
++  <xsl:when test="contains(concat($autowidth,' '),concat(' ',$colnum,' ')) and
++                  contains($autowidth,'column')">1</xsl:when>
++  <xsl:otherwise>0</xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
++
+ 
+ <!-- Ensure each column has a colspec and each colspec has a valid column -->
+ <!-- number, width, alignment, colsep, rowsep -->
+@@ -153,9 +178,26 @@
+   <xsl:param name="colsep"/>
+   <xsl:param name="rowsep"/>
+   <xsl:param name="autowidth"/>
+-  
++
++  <xsl:variable name="natwidth">
++    <xsl:call-template name="natural-width">
++      <xsl:with-param name="autowidth" select="$autowidth"/>
++      <xsl:with-param name="colnum">
++         <xsl:choose><xsl:when test="@colnum">
++           <xsl:value-of select="@colnum"/>
++         </xsl:when>
++         <xsl:otherwise>
++           <xsl:value-of select="$colnum"/>
++         </xsl:otherwise></xsl:choose>
++      </xsl:with-param>
++    </xsl:call-template>
++  </xsl:variable>
++
+   <xsl:copy>
+     <xsl:for-each select="@*"><xsl:copy/></xsl:for-each>
++    <xsl:if test="$natwidth = 1">
++      <xsl:attribute name="autowidth">1</xsl:attribute>
++    </xsl:if>
+     <xsl:if test="not(@colnum)">
+       <xsl:attribute name="colnum"><xsl:value-of select="$colnum"/>
+       </xsl:attribute>
+@@ -184,18 +226,11 @@
+           <xsl:with-param name="width" select="substring-before(@colwidth, '*')"/>
+         </xsl:call-template>
+       </xsl:attribute>
+-      <xsl:if test="contains($autowidth,'all')">
+-        <xsl:attribute name="autowidth">1</xsl:attribute>
+-      </xsl:if>
+     </xsl:if>
+     <!-- No colwidth specified? Assume '*' -->
+     <xsl:if test="not(string(@colwidth))">
+       <xsl:attribute name="colwidth">\newtblstarfactor</xsl:attribute>
+       <xsl:attribute name="star">1</xsl:attribute>
+-      <xsl:if test="contains($autowidth,'default') or
+-                    contains($autowidth,'all')">
+-        <xsl:attribute name="autowidth">1</xsl:attribute>
+-      </xsl:if>
+     </xsl:if>
+     <xsl:if test="not(@align)">
+       <xsl:attribute name="align"><xsl:value-of select="$align"/>
+@@ -384,11 +419,12 @@
+   <xsl:param name="frame"/>
+   <xsl:param name="rowcolor"/>
+   <xsl:param name="entries"/>
+-  
++  <xsl:param name="tabletype"/>
++
+   <xsl:variable name="cols" select="count($colspec/*)"/>
+-  
++ 
+   <xsl:if test="$colnum &lt;= $cols">
+-    
++
+     <xsl:variable name="entry"
+                   select="$entries/*[self::entry or self::entrytbl]
+                                     [@colstart=$colnum and @rowend &gt;= $rownum]"/>
+@@ -408,6 +444,7 @@
+         <xsl:with-param name="frame" select="$frame"/>
+         <xsl:with-param name="rowcolor" select="$rowcolor"/>
+         <xsl:with-param name="entries" select="$entries"/>
++        <xsl:with-param name="tabletype" select="$tabletype"/>
+       </xsl:apply-templates>
+       </xsl:when><xsl:otherwise>
+       <!-- Get any span for this entry -->
+@@ -549,6 +586,10 @@
+           <xsl:when test="../@valign">
+             <xsl:value-of select="../@valign"/>
+           </xsl:when>
++          <!-- Then parent tbody|thead -->
++          <xsl:when test="../../@valign">
++            <xsl:value-of select="../../@valign"/>
++          </xsl:when>
+         </xsl:choose>
+       </xsl:variable>
+ 
+@@ -620,6 +661,9 @@
+             <xsl:value-of select="$bgcolor"/>
+           </xsl:attribute>
+         </xsl:if>
++        <xsl:attribute name="tabletype">
++          <xsl:value-of select="$tabletype"/>
++        </xsl:attribute>
+         <!-- Process the output here, to stay in the document context. -->
+         <!-- In RTF entries the document links/refs are lost -->
+         <xsl:element name="output">
+@@ -638,6 +682,7 @@
+           <xsl:with-param name="rownum" select="$rownum"/>
+           <xsl:with-param name="rowcolor" select="$rowcolor"/>
+           <xsl:with-param name="entries" select="$entries"/>
++          <xsl:with-param name="tabletype" select="$tabletype"/>
+         </xsl:call-template>
+       </xsl:if>
+       
+@@ -650,6 +695,7 @@
+         <xsl:with-param name="frame" select="$frame"/>
+         <xsl:with-param name="rowcolor" select="$rowcolor"/>
+         <xsl:with-param name="entries" select="$entries"/>
++        <xsl:with-param name="tabletype" select="$tabletype"/>
+       </xsl:apply-templates>
+     </xsl:otherwise></xsl:choose>
+   </xsl:if>  <!-- $colnum <= $cols -->
+@@ -964,6 +1010,7 @@
+           <xsl:with-param name="frame" select="$frame"/>
+           <xsl:with-param name="rowcolor" select="$rowcolor"/>
+           <xsl:with-param name="entries" select="exsl:node-set($oldentries)"/>
++          <xsl:with-param name="tabletype" select="$tabletype"/>
+         </xsl:apply-templates>
+       </xsl:when>
+       <xsl:otherwise>
+@@ -1081,6 +1128,119 @@
+   </xsl:if>
+ </xsl:template>
+ 
++<xsl:template name="tbl.colwidth2">
++  <xsl:param name="col"/>
++  <xsl:param name="colend"/>
++  <xsl:param name="colspec"/>
++  
++  <xsl:value-of select="$colspec/colspec[@colnum=$col]/@fixedwidth"/>
++  
++  <xsl:if test="$col &lt; $colend">
++    <xsl:text>+</xsl:text>
++    <xsl:call-template name="tbl.colwidth2">
++      <xsl:with-param name="col" select="$col + 1"/>
++      <xsl:with-param name="colend" select="$colend"/>
++      <xsl:with-param name="colspec" select="$colspec"/>
++    </xsl:call-template>
++  </xsl:if>
++</xsl:template>
++
++
++<xsl:template match="entry|entrytbl" mode="width.colfmt">
++  <xsl:param name="colspec"/>
++  <xsl:param name="color"/>
++  <xsl:param name="rsep"/>
++
++  <!-- Color in pre-command -->
++  <xsl:if test="$color != ''">
++    <xsl:value-of select="concat('>{',$color,'}')"/>
++  </xsl:if>
++
++  <!-- Get the column width -->
++  <xsl:variable name="width">
++    <xsl:call-template name="tbl.colwidth">
++      <xsl:with-param name="col" select="@colstart"/>
++      <xsl:with-param name="colend" select="@colend"/>
++      <xsl:with-param name="colspec" select="$colspec"/>
++    </xsl:call-template>
++    <xsl:if test="$rsep = ''">
++      <xsl:text>+\arrayrulewidth</xsl:text>
++    </xsl:if>
++    <xsl:if test="@coloff = 0">
++      <xsl:text>+2\tabcolsep</xsl:text>
++    </xsl:if>
++  </xsl:variable>
++  
++  <xsl:choose>
++    <xsl:when test="@valign = 'top'">
++      <xsl:text>p</xsl:text>
++    </xsl:when>
++    <xsl:when test="@valign = 'bottom'">
++      <xsl:text>b</xsl:text>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:text>m</xsl:text>
++    </xsl:otherwise>
++  </xsl:choose>
++  
++  <xsl:text>{</xsl:text>
++  <xsl:value-of select="$width"/>
++  <xsl:text>}</xsl:text>
++</xsl:template>
++
++<xsl:template match="entry|entrytbl" mode="widthx.colfmt">
++  <xsl:param name="colspec"/>
++  <xsl:param name="color"/>
++
++  <xsl:variable name="stars" 
++                select="sum(exsl:node-set($colspec)/colspec
++                            [@colnum &gt;= current()/@colstart and 
++                             @colnum &lt;= current()/@colend]/@star)"/>
++
++  <!-- Get the column fixed width part -->
++  <xsl:variable name="width">
++    <xsl:call-template name="tbl.colwidth2">
++      <xsl:with-param name="col" select="@colstart"/>
++      <xsl:with-param name="colend" select="@colend"/>
++      <xsl:with-param name="colspec" select="$colspec"/>
++    </xsl:call-template>
++  </xsl:variable>
++
++  <xsl:choose>
++  <xsl:when test="$stars = 0">
++    <xsl:if test="$color != ''">
++      <xsl:value-of select="concat('>{',$color,'}')"/>
++    </xsl:if>
++    <!-- Only a fixed width -->
++    <xsl:choose>
++      <xsl:when test="@valign = 'top'">
++        <xsl:text>p</xsl:text>
++      </xsl:when>
++      <xsl:when test="@valign = 'bottom'">
++        <xsl:text>b</xsl:text>
++      </xsl:when>
++      <xsl:otherwise>
++        <xsl:text>m</xsl:text>
++      </xsl:otherwise>
++    </xsl:choose>
++    
++    <xsl:text>{</xsl:text>
++    <xsl:value-of select="$width"/>
++    <xsl:text>}</xsl:text>
++  </xsl:when>
++  <xsl:otherwise>
++    <xsl:text>>{</xsl:text>
++    <xsl:value-of select="$color"/>
++    <xsl:text>\setlength\hsize{</xsl:text>
++    <xsl:if test="$width != ''">
++      <xsl:value-of select="$width"/>
++      <xsl:text>+</xsl:text>
++    </xsl:if>
++    <xsl:value-of select="$stars"/>
++    <xsl:text>\hsize}}X</xsl:text>
++  </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
+ 
+ 
+ <!-- Generate a latex column specifier, possibly surrounded by '|' -->
+@@ -1111,48 +1271,37 @@
+   </xsl:if>
+ 
+   <!-- Column color? -->
+-  <xsl:if test="@bgcolor != ''">
+-    <xsl:text>>{\columncolor</xsl:text>
+-    <xsl:call-template name="get-color">
+-      <xsl:with-param name="color" select="@bgcolor"/>
+-    </xsl:call-template>
+-    <xsl:text>}</xsl:text>
+-  </xsl:if>
++  <xsl:variable name="color">
++    <xsl:if test="@bgcolor != ''">
++      <xsl:text>\columncolor</xsl:text>
++      <xsl:call-template name="get-color">
++        <xsl:with-param name="color" select="@bgcolor"/>
++      </xsl:call-template>
++    </xsl:if>
++  </xsl:variable>
+   
+   <xsl:choose>
+-  <xsl:when test="not($autowidth)">  
+-    <!-- Get the column width -->
+-    <xsl:variable name="width">
+-      <xsl:call-template name="tbl.colwidth">
+-        <xsl:with-param name="col" select="@colstart"/>
+-        <xsl:with-param name="colend" select="@colend"/>
++  <xsl:when test="not($autowidth)">
++    <xsl:choose>
++    <xsl:when test="@tabletype = 'tabularx'">
++      <xsl:apply-templates select="." mode="widthx.colfmt">
+         <xsl:with-param name="colspec" select="$colspec"/>
+-      </xsl:call-template>
+-      <xsl:if test="$rsep = ''">
+-        <xsl:text>+\arrayrulewidth</xsl:text>
+-      </xsl:if>
+-      <xsl:if test="@coloff = 0">
+-        <xsl:text>+2\tabcolsep</xsl:text>
+-      </xsl:if>
+-    </xsl:variable>
+-    
+-    <xsl:choose>
+-      <xsl:when test="@valign = 'top'">
+-        <xsl:text>p</xsl:text>
+-      </xsl:when>
+-      <xsl:when test="@valign = 'bottom'">
+-        <xsl:text>b</xsl:text>
+-      </xsl:when>
+-      <xsl:otherwise>
+-        <xsl:text>m</xsl:text>
+-      </xsl:otherwise>
++        <xsl:with-param name="color" select="$color"/>
++      </xsl:apply-templates>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:apply-templates select="." mode="width.colfmt">
++        <xsl:with-param name="colspec" select="$colspec"/>
++        <xsl:with-param name="color" select="$color"/>
++        <xsl:with-param name="rsep" select="$rsep"/>
++      </xsl:apply-templates>
++    </xsl:otherwise>
+     </xsl:choose>
+-    
+-    <xsl:text>{</xsl:text>
+-    <xsl:value-of select="$width"/>
+-    <xsl:text>}</xsl:text>
+   </xsl:when>
+   <xsl:otherwise>
++    <xsl:if test="$color != ''">
++      <xsl:value-of select="concat('>{',$color,'}')"/>
++    </xsl:if>
+     <xsl:choose>
+       <xsl:when test="@align = 'left'">l</xsl:when>
+       <xsl:when test="@align = 'right'">r</xsl:when>
+@@ -1214,6 +1363,56 @@
+     </xsl:otherwise>
+   </xsl:choose>
+ 
++</xsl:template>
++
++
++<xsl:template name="tbl.sizes">
++  <xsl:param name="colspec"/>
++  <xsl:param name="width"/>
++
++  <!-- Now get latex to calculate the 'spare' width of the table -->
++  <!-- (Table width - widths of all specified columns - gaps between columns) -->
++  <xsl:text>\setlength{\newtblsparewidth}{</xsl:text>
++  <xsl:value-of select="$width"/>
++  <xsl:for-each select="exsl:node-set($colspec)/*">
++    <xsl:if test="@fixedwidth">
++      <xsl:text>-</xsl:text>
++      <xsl:value-of select="translate(@fixedwidth,'+','-')"/>
++    </xsl:if>
++    <xsl:text>-2\tabcolsep</xsl:text>
++  </xsl:for-each>
++  <xsl:text>}%&#10;</xsl:text>
++  
++  <!-- Now get latex to calculate widths of cols with starred colwidths -->
++  
++  <xsl:variable name="numunknown" 
++                select="sum(exsl:node-set($colspec)/colspec/@star)"/>
++  <!-- If we have at least one such col, then work out how wide it should -->
++  <!-- be -->
++  <xsl:if test="$numunknown &gt; 0">
++    <xsl:text>\setlength{\newtblstarfactor}{\newtblsparewidth / \real{</xsl:text>
++    <xsl:value-of select="$numunknown"/>
++    <xsl:text>}}%&#10;</xsl:text>
++  </xsl:if>
++</xsl:template>
++
++
++<!-- tabularx vertical alignment setup, global to the whole table -->
++<xsl:template name="tbl.valign.x">
++  <xsl:param name="valign"/>
++
++  <xsl:variable name="valign.param">
++    <xsl:choose>
++    <xsl:when test="$valign = 'top'"><xsl:text>p</xsl:text></xsl:when>
++    <xsl:when test="$valign = 'bottom'"><xsl:text>b</xsl:text></xsl:when>
++    <!-- default vertical alignment -->
++    <xsl:otherwise><xsl:text>m</xsl:text></xsl:otherwise>
++    </xsl:choose>
++  </xsl:variable>
++
++  <xsl:text>\def\tabularxcolumn#1{</xsl:text>
++  <xsl:value-of select="$valign.param"/>
++  <xsl:text>{#1}}</xsl:text>
+ </xsl:template>
+ 
+ 
+@@ -1351,32 +1550,20 @@
+   
+   <!-- Get all the spanspecs as an RTF -->
+   <xsl:variable name="spanspec" select="spanspec"/>
+-  
+-  <!-- Now get latex to calculate the 'spare' width of the table -->
+-  <!-- (Table width - widths of all specified columns - gaps between columns) -->
+-  <xsl:text>\setlength{\newtblsparewidth}{</xsl:text>
+-  <xsl:value-of select="$width"/>
+-  <xsl:for-each select="exsl:node-set($colspec)/*">
+-    <xsl:if test="@fixedwidth">
+-      <xsl:text>-</xsl:text>
+-      <xsl:value-of select="translate(@fixedwidth,'+','-')"/>
+-    </xsl:if>
+-    <xsl:text>-2\tabcolsep</xsl:text>
+-  </xsl:for-each>
+-  <xsl:text>}%&#10;</xsl:text>
+-  
+-  <!-- Now get latex to calculate widths of cols with starred colwidths -->
+-  
+-  <xsl:variable name="numunknown" 
+-                select="sum(exsl:node-set($colspec)/colspec/@star)"/>
+-  <!-- If we have at least one such col, then work out how wide it should -->
+-  <!-- be -->
+-  <xsl:if test="$numunknown &gt; 0">
+-    <xsl:text>\setlength{\newtblstarfactor}{\newtblsparewidth / \real{</xsl:text>
+-    <xsl:value-of select="$numunknown"/>
+-    <xsl:text>}}%&#10;</xsl:text>
++
++  <xsl:if test="$tabletype != 'tabularx'">
++    <xsl:call-template name="tbl.sizes">
++      <xsl:with-param name="colspec" select="$colspec"/>
++      <xsl:with-param name="width" select="$width"/>
++    </xsl:call-template>
+   </xsl:if>
+ 
++  <xsl:if test="$tabletype = 'tabularx'">
++    <xsl:call-template name="tbl.valign.x">
++      <xsl:with-param name="valign" select="tbody/@valign"/>
++    </xsl:call-template>
++  </xsl:if>
++  
+   <!-- Start the next table on a new line -->
+   <xsl:if test="preceding::tgroup">
+     <xsl:text>&#10;</xsl:text>
+@@ -1385,13 +1572,40 @@
+   <!-- Start the table declaration -->
+   <xsl:text>\begin{</xsl:text>
+   <xsl:value-of select="$tabletype"/>
+-  <xsl:text>}{</xsl:text>
+-  
+-  <!-- The initial column definition -->
+-  <xsl:for-each select="exsl:node-set($colspec)/*">
+-    <xsl:text>l</xsl:text>
+-  </xsl:for-each>
+   <xsl:text>}</xsl:text>
++
++  <xsl:choose>
++  <xsl:when test="$tabletype = 'tabularx'">
++    <xsl:text>{</xsl:text>
++    <xsl:value-of select="$width"/>
++    <xsl:text>}{</xsl:text>
++    <xsl:for-each select="exsl:node-set($colspec)/*">
++      <xsl:choose>
++      <xsl:when test="@star">
++        <xsl:text>&gt;{\hsize=</xsl:text>
++        <xsl:if test="@fixedwidth">
++          <xsl:value-of select="@fixedwidth"/>
++          <xsl:text>+</xsl:text>
++        </xsl:if>
++        <xsl:value-of select="@star"/>
++        <xsl:text>\hsize}X</xsl:text>
++      </xsl:when>
++      <xsl:otherwise>
++        <xsl:text>l</xsl:text>
++      </xsl:otherwise>
++      </xsl:choose>
++    </xsl:for-each>
++    <xsl:text>}</xsl:text>
++  </xsl:when>
++  <xsl:otherwise>
++    <xsl:text>{</xsl:text>
++    <!-- The initial column definition -->
++    <xsl:for-each select="exsl:node-set($colspec)/*">
++      <xsl:text>l</xsl:text>
++    </xsl:for-each>
++    <xsl:text>}</xsl:text>
++  </xsl:otherwise>
++  </xsl:choose>
+ 
+   <xsl:if test="not(thead)">
+     <xsl:apply-templates select="(ancestor::table
+diff -r a37c7290ccc8 xsl/qandaset.xsl
+--- a/xsl/qandaset.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/qandaset.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -48,18 +48,20 @@
+     </xsl:call-template>
+   </xsl:variable>
+ 
+-  <xsl:call-template name="makeheading">
+-    <xsl:with-param name="level">
+-      <xsl:choose>
+-      <xsl:when test="ancestor::qandaset[title|blockinfo/title|info/title]">
+-        <xsl:value-of select="$l+$lset+1"/>
+-      </xsl:when>
+-      <xsl:otherwise>
+-        <xsl:value-of select="$l+$lset"/>
+-      </xsl:otherwise>
+-      </xsl:choose>
+-    </xsl:with-param>
+-  </xsl:call-template>
++  <xsl:if test="blockinfo/title|info/title|title">
++    <xsl:call-template name="makeheading">
++      <xsl:with-param name="level">
++        <xsl:choose>
++        <xsl:when test="ancestor::qandaset[title|blockinfo/title|info/title]">
++          <xsl:value-of select="$l+$lset+1"/>
++        </xsl:when>
++        <xsl:otherwise>
++          <xsl:value-of select="$l+$lset"/>
++        </xsl:otherwise>
++        </xsl:choose>
++      </xsl:with-param>
++    </xsl:call-template>
++  </xsl:if>
+ 
+   <xsl:apply-templates/>
+ </xsl:template>
+diff -r a37c7290ccc8 xsl/tablen.xsl
+--- a/xsl/tablen.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/tablen.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -20,6 +20,7 @@
+ <xsl:param name="table.title.top" select="'0'"/>
+ <xsl:param name="table.in.float" select="'1'"/>
+ <xsl:param name="table.default.position" select="'[htbp]'"/>
++<xsl:param name="table.default.tabstyle"/>
+ <xsl:param name="default.table.width"/>
+ 
+ 
+@@ -174,6 +175,81 @@
+   <xsl:text>}\tabularnewline&#10;</xsl:text>
+ </xsl:template>
+ 
++<!-- ==================================================================== -->
++
++<xsl:template name="align.environment">
++  <xsl:param name="align"/>
++  <xsl:param name="align-default" select="'center'"/>
++
++  <xsl:choose>
++    <xsl:when test="$align = 'left'">
++      <xsl:text>flushright</xsl:text>
++    </xsl:when>
++    <xsl:when test="$align = 'right'">
++      <xsl:text>flushleft</xsl:text>
++    </xsl:when>
++    <xsl:when test="$align = 'center'">
++      <xsl:text>center</xsl:text>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:value-of select="$align-default"/>
++    </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
++
++<xsl:template name="tbl.align.begin">
++  <xsl:param name="tabletype"/>
++
++  <!-- provision for user-specified alignment -->
++  <xsl:variable name="align" select="'center'"/>
++
++  <xsl:choose>
++  <xsl:when test="$tabletype = 'longtable'">
++    <xsl:choose>
++    <xsl:when test="$align = 'left'">
++      <xsl:text>\raggedright</xsl:text>
++    </xsl:when>
++    <xsl:when test="$align = 'right'">
++      <xsl:text>\raggedleft</xsl:text>
++    </xsl:when>
++    <xsl:when test="$align = 'center'">
++      <xsl:text>\centering</xsl:text>
++    </xsl:when>
++    <xsl:when test="$align = 'justify'"></xsl:when>
++    <xsl:otherwise>
++      <xsl:message>Word-wrapped alignment <xsl:value-of 
++          select="$align"/> not supported</xsl:message>
++    </xsl:otherwise>
++    </xsl:choose>
++  </xsl:when>
++  <xsl:otherwise>
++    <xsl:variable name="alignenv">
++      <xsl:call-template name="align.environment">
++        <xsl:with-param name="align" select="$align"/>
++      </xsl:call-template>
++    </xsl:variable>
++    <xsl:value-of select="concat('\begin{',$alignenv,'}')"/>
++  </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
++
++<xsl:template name="tbl.align.end">
++  <xsl:param name="tabletype"/>
++
++  <!-- provision for user-specified alignment -->
++  <xsl:variable name="align" select="'center'"/>
++
++  <xsl:if test="$tabletype != 'longtable'">
++    <xsl:variable name="alignenv">
++      <xsl:call-template name="align.environment">
++        <xsl:with-param name="align" select="$align"/>
++      </xsl:call-template>
++    </xsl:variable>
++    <xsl:value-of select="concat('\end{',$alignenv,'}')"/>
++  </xsl:if>
++</xsl:template>
++
++<!-- ==================================================================== -->
+ 
+ <xsl:template match="informaltable">
+   <!-- do we need to change text size? -->
+@@ -196,6 +272,13 @@
+   <xsl:variable name="tabletype">
+     <xsl:choose>
+     <xsl:when test="$nested">tabular</xsl:when>
++    <xsl:when test="@tabstyle='tabular' or @tabstyle='tabularx'">
++      <xsl:value-of select="@tabstyle"/>
++    </xsl:when>
++    <xsl:when test="$table.default.tabstyle='tabular' or
++                    $table.default.tabstyle='tabularx'">
++      <xsl:value-of select="$table.default.tabstyle"/>
++    </xsl:when>
+     <xsl:otherwise>longtable</xsl:otherwise>
+     </xsl:choose>
+   </xsl:variable>
+@@ -210,7 +293,11 @@
+   </xsl:if>
+   <xsl:choose>
+   <xsl:when test="not($nested)">
+-    <xsl:text>&#10;{\centering </xsl:text>
++    <xsl:text>&#10;{</xsl:text>
++    <!-- table alignment -->
++    <xsl:call-template name="tbl.align.begin">
++      <xsl:with-param name="tabletype" select="$tabletype"/>
++    </xsl:call-template>
+     <!-- do the actual work -->
+     <xsl:if test="$tabletype='longtable'">
+       <xsl:text>\savetablecounter </xsl:text>
+@@ -221,6 +308,9 @@
+     <xsl:if test="$tabletype='longtable'">
+       <xsl:text>\restoretablecounter%&#10;</xsl:text>
+     </xsl:if>
++    <xsl:call-template name="tbl.align.end">
++      <xsl:with-param name="tabletype" select="$tabletype"/>
++    </xsl:call-template>
+     <xsl:text>}&#10;</xsl:text>
+   </xsl:when>
+   <xsl:otherwise>
+diff -r a37c7290ccc8 xsl/verbatim.xsl
+--- a/xsl/verbatim.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/verbatim.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -9,6 +9,9 @@
+ <xsl:param name="literal.width.ignore">0</xsl:param>
+ <xsl:param name="literal.layout.options"/>
+ <xsl:param name="literal.lines.showall">1</xsl:param>
++<xsl:param name="linenumbering.scope"/>
++<xsl:param name="linenumbering.default"/>
++<xsl:param name="linenumbering.everyNth"/>
+ 
+ 
+ <xsl:template name="verbatim.setup">
+@@ -194,6 +197,19 @@
+   <xsl:value-of select="$env"/>
+   <xsl:text>}&#10;</xsl:text>
+ </xsl:template>
++
++<!-- ==================================================================== -->
++
++<xsl:template name="linenumbering">
++  <xsl:choose>
++    <xsl:when test="@linenumbering='numbered'">1</xsl:when>
++    <xsl:when test="@linenumbering and @linenumbering!='numbered'">0</xsl:when>
++    <xsl:when test="$linenumbering.default='numbered' and 
++                   (contains(concat(' ',$linenumbering.scope,' '),
++                             concat(' ',local-name(.),' ')))">1</xsl:when>
++    <xsl:otherwise>0</xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
+  
+ <xsl:template match="programlisting|screen">
+   <xsl:param name="rnode" select="/"/>
+@@ -222,6 +238,10 @@
+     </xsl:if>
+   </xsl:variable>
+ 
++  <xsl:variable name="linenumbered">
++    <xsl:call-template name="linenumbering"/>
++  </xsl:variable>
++
+   <xsl:variable name="opt">
+     <!-- skip empty endlines -->
+     <xsl:if test="$literal.lines.showall='0'">
+@@ -238,8 +258,13 @@
+       <xsl:text>linewidth=\lstwidth,</xsl:text>
+     </xsl:if>
+     <!-- print line numbers -->
+-    <xsl:if test="@linenumbering='numbered'">
++    <xsl:if test="$linenumbered=1">
+       <xsl:text>numbers=left,</xsl:text>
++      <xsl:if test="number($linenumbering.everyNth) &gt; 1">
++        <xsl:text>stepnumber=</xsl:text>
++        <xsl:value-of select="number($linenumbering.everyNth)"/>
++        <xsl:text>,</xsl:text>
++      </xsl:if>
+     </xsl:if>
+     <!-- find the fist line number to print -->
+     <xsl:choose>
+@@ -392,10 +417,19 @@
+     </xsl:if>
+   </xsl:variable>
+ 
++  <xsl:variable name="linenumbered">
++    <xsl:call-template name="linenumbering"/>
++  </xsl:variable>
++
+   <xsl:variable name="fvopt">
+     <!-- print line numbers -->
+-    <xsl:if test="@linenumbering='numbered'">
++    <xsl:if test="$linenumbered=1">
+       <xsl:text>numbers=left,</xsl:text>
++      <xsl:if test="number($linenumbering.everyNth) &gt; 1">
++        <xsl:text>stepnumber=</xsl:text>
++        <xsl:value-of select="number($linenumbering.everyNth)"/>
++        <xsl:text>,</xsl:text>
++      </xsl:if>
+       <!-- find the fist line number to print -->
+       <xsl:choose>
+       <xsl:when test="@startinglinenumber">
+diff -r a37c7290ccc8 xsl/xref.xsl
+--- a/xsl/xref.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/xref.xsl	Tue Mar 08 23:00:46 2011 +0100
+@@ -70,7 +70,10 @@
+   </xsl:variable>
+ 
+   <xsl:choose>
+-    <xsl:when test="$xref.hypermarkup = 1">
++    <!-- Wrap with an hyperlink if asked and if it is not already a link -->
++    <xsl:when test="$xref.hypermarkup=1 and 
++                    not(contains($markup, '\hyperlink{') or
++                        contains($markup, '\href{'))">
+       <!-- Get the normal markup but replace hot links by counters -->
+       <xsl:variable name="text">
+         <xsl:call-template name="string-replace">
+@@ -399,6 +402,32 @@
+   <xsl:apply-templates select="." mode="xref.text"/>
+ </xsl:template>
+ 
++<!-- ==================================================================== -->
++
++<xsl:template name="xref.nolink">
++
++  <!-- Get the normal markup but replace hot links by counters -->
++  <xsl:variable name="xref.text">
++    <xsl:call-template name="string-replace">
++      <xsl:with-param name="string">
++        <xsl:apply-templates select="."/>
++      </xsl:with-param>
++      <xsl:with-param name="from" select="'\ref{'"/>
++      <xsl:with-param name="to" select="'\ref*{'"/>
++    </xsl:call-template>
++  </xsl:variable>
++
++  <!-- Remove an internal hyperlink wrapper (external links seem ok) -->
++  <xsl:choose>
++    <xsl:when test="starts-with($xref.text, '\hyperlink{')">
++      <xsl:value-of select="substring-after($xref.text, '}')"/>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:value-of select="$xref.text"/>
++    </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
++
+ <!-- Try to have the label from text mode, else get the reference counter -->
+ <xsl:template match="xref" mode="toc.skip">
+   <xsl:variable name="xref.text">
+@@ -410,14 +439,7 @@
+       <xsl:value-of select="$xref.text"/>
+     </xsl:when>
+     <xsl:otherwise>
+-      <!-- Get the normal markup but replace hot links by counters -->
+-      <xsl:call-template name="string-replace">
+-        <xsl:with-param name="string">
+-          <xsl:apply-templates select="."/>
+-        </xsl:with-param>
+-        <xsl:with-param name="from" select="'\ref{'"/>
+-        <xsl:with-param name="to" select="'\ref*{'"/>
+-      </xsl:call-template>
++      <xsl:call-template name="xref.nolink"/>
+     </xsl:otherwise>
+   </xsl:choose>
+ </xsl:template>

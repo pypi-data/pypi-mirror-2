@@ -1,0 +1,60 @@
+diff -r a37c7290ccc8 xsl/common/lib.xsl
+--- a/xsl/common/lib.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/common/lib.xsl	Sun Jan 30 23:32:16 2011 +0100
+@@ -13,6 +13,23 @@
+ <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+ 
+ <!-- Only an excerpt of the original file -->
++
++<xsl:template name="dot.count">
++  <!-- Returns the number of "." characters in a string -->
++  <xsl:param name="string"/>
++  <xsl:param name="count" select="0"/>
++  <xsl:choose>
++    <xsl:when test="contains($string, '.')">
++      <xsl:call-template name="dot.count">
++        <xsl:with-param name="string" select="substring-after($string, '.')"/>
++        <xsl:with-param name="count" select="$count+1"/>
++      </xsl:call-template>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:value-of select="$count"/>
++    </xsl:otherwise>
++  </xsl:choose>
++</xsl:template>
+ 
+ <xsl:template name="pi-attribute">
+   <xsl:param name="pis" select="processing-instruction('BOGUS_PI')"/>
+diff -r a37c7290ccc8 xsl/inlined.xsl
+--- a/xsl/inlined.xsl	Sun Apr 25 15:54:28 2010 +0200
++++ b/xsl/inlined.xsl	Sun Jan 30 23:32:16 2011 +0100
+@@ -440,9 +440,26 @@
+ </xsl:template>
+ 
+ <xsl:template match="quote">
+-  <xsl:call-template name="gentext.nestedstartquote"/>
+-  <xsl:call-template name="inline.charseq"/>
+-  <xsl:call-template name="gentext.nestedendquote"/>
++  <xsl:variable name="depth">
++    <xsl:call-template name="dot.count">
++      <xsl:with-param name="string">
++        <xsl:number level="multiple"/>
++      </xsl:with-param>
++    </xsl:call-template>
++  </xsl:variable>
++
++  <xsl:choose>
++    <xsl:when test="$depth mod 2 = 0">
++      <xsl:call-template name="gentext.startquote"/>
++      <xsl:call-template name="inline.charseq"/>
++      <xsl:call-template name="gentext.endquote"/>
++    </xsl:when>
++    <xsl:otherwise>
++      <xsl:call-template name="gentext.nestedstartquote"/>
++      <xsl:call-template name="inline.charseq"/>
++      <xsl:call-template name="gentext.nestedendquote"/>
++    </xsl:otherwise>
++  </xsl:choose>
+ </xsl:template>
+ 
+ <xsl:template match="varname">
