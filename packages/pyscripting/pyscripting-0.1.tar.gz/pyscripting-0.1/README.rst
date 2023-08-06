@@ -1,0 +1,151 @@
+``pyscripting`` is python module that provides various utilities to make shell
+scripting with python easier.
+
+Getting started
+===============
+
+1. Get ``scripting.py``::
+
+    pip install pyscripting
+
+2. Create your python shell script ``myscript.py``::
+
+    #!/usr/bin/env python
+
+    from scripting import sh
+
+    sh.ls('-l')
+
+3. Use your script::
+
+    chmod +x myscript.py
+    ./myscript.py
+
+Calling external commands
+=========================
+
+There are three ways to call external commands.
+
+If possible, python replacement of an external command will be used.
+Replacements will not be used only in direct calling.
+
+For all replaced commands see `Replaced commands`_.
+
+
+Direct calling
+--------------
+
+Returns exit code.
+
+::
+
+    sh('ls', '-l')
+
+Indirect calling
+----------------
+
+Returns exit code.
+
+::
+
+    sh.ls('-l')
+
+Call and return output
+----------------------
+
+Returns stripped stdout (stderr will not be included).
+
+Using this method, output of command will not be printed to stdout. Before
+returning output, leading white spaces will be stripped.
+
+Don't use this methos for large outputs.
+
+::
+
+    output = sh.get('ls', '-l')
+    print('Output was: %s' % output)
+
+Argument handling
+=================
+
+You can access arguments passed to script using ``argv`` property::
+
+    sh.argv[0] - called script name
+    sh.argv[1] - first argument
+
+.. _Replaced commands:
+
+Replaced commands
+=================
+
+To avoid overhead and for simplicity reasons, some external commands was
+replaced by python's internal functions, which works much faster, that calling
+external command.
+
+
+``basename``
+    Same as external ``basename``.
+
+    Returns string.
+
+``exit``
+    Same as external ``exit``.
+
+``find``
+    Similar to external ``find`` command.
+
+    Returns iterator of all found files.
+
+    Example usage::
+
+        for f in sh.find(type='f', exclude=['*.pyc']):
+            print(f)
+
+``mkdir``
+    Same as external ``mkdir``.
+
+``mkdirs``
+    Same as external ``mkdir -p``.
+
+``test``
+    Similar to external ``test``.
+
+    Returns boolean.
+
+    Example usage::
+
+        if sh.test('-d', '/tmp'):
+            print('/tmp is directory.')
+
+
+Makefile functionality
+======================
+
+Example (``myscript.py``)::
+
+    #!/usr/bin/env python
+
+    from scripting import sh, Makefile
+
+    make = Makefile(sh)
+
+
+    @make('/tmp/myfile.txt')
+    def myrule(target):
+        sh.touch(target)
+
+    @make()
+    def main(target):
+        myrule()
+
+    make.run(main)
+
+Last line ``make.run(main)`` checks ``sys.argv`` and executes specified rule or
+default if no particular rule is specified. ``myrule`` will be executed only,
+if target file ``/tmp/myfile.txt`` does not exists.::
+
+    ./myscript.py
+
+Now call particular rule::
+
+    ./myscript.py myrule
