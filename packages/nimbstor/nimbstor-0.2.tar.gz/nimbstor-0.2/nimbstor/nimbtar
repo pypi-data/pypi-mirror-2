@@ -1,0 +1,144 @@
+#!/usr/pkg/bin/python2.6 -O
+
+import os, sys
+from argparse import ArgumentParser
+from nimbstor import stor_input, stor_output, stor_util
+from nimbstor import combine_backend, directory_backend, imap_backend
+from nimbstor.tar import create_archive, extract_archive, list_archive, search_archive, list_keywords
+
+optparser = ArgumentParser(
+    fromfile_prefix_chars = '@',
+    description = "Store incrementally, compressed and encrypted data failsafe in filesystems, IMAPs or other backends.",
+)
+optparser.add_argument('-P', '--password', help = 'Use this password for crypting.')
+optparser.add_argument('-d', '--storage', required = True, nargs = '+', help = 'Use given storages as archive.')
+optparser.add_argument('-r', '--redundancy', type = int, default = 1, help = 'Store each block this amount of times.')
+optparser.add_argument('-D', '--desc', help = 'Description of the archive.')
+optparser.add_argument('-K', '--keywords', nargs = '+', metavar = 'KWD', help = 'List of keywords for archive.')
+optparser.add_argument('-a', '--archive', metavar = 'ID', help = 'Give the archive ID to use (as parent for creation).')
+
+optgroup1 = optparser.add_mutually_exclusive_group(required = False)
+optgroup1.add_argument('-z', '--gzip', type = int, default = None, metavar = 'LEVEL', help = 'Use GZip for compression.')
+optgroup1.add_argument('-j', '--bzip2', type = int, default = None, metavar = 'LEVEL', help = 'Use BZip2 for compression.')
+optgroup1.add_argument('-Z', '--lzma', type = int, default = None, metavar = 'LEVEL', help = 'Use LZMA for compression (default, level 9).')
+optgroup1.add_argument('-N', '--nocompress', action = 'store_true', help = 'Disable compression.')
+
+optparser.add_argument('-e', '--empty', action = 'store_true', help = 'Empty archive schould be written also.')
+optparser.add_argument('-v', '--verbose', action = 'store_true', help = 'Verbose mode.')
+optparser.add_argument('-C', '--change-directory', help = 'Operate in given directory.')
+
+optgroup2 = optparser.add_mutually_exclusive_group(required = True)
+optgroup2.add_argument('-c', '--create', nargs = '+', metavar = 'FILE', help = 'Create an archive with given files.')
+optgroup2.add_argument('-x', '--extract', nargs = '*', metavar = 'FILE', help = 'Extract an archive fully or only given files.')
+optgroup2.add_argument('-t', '--list', nargs = '*', metavar = 'FILE', help = 'List an archive content fully or only given files.')
+optgroup2.add_argument('-s', '--search', nargs = '*', metavar = 'FILE', help = 'Search for an archive or list all archives.')
+optgroup2.add_argument('--list-keywords', action = 'store_true', help = 'List used keywords with usage count.')
+
+usercfgfile = os.path.join(os.environ.get('HOME', '/'), '.nimbtarrc')
+syscfgfile  = os.path.join('/etc', 'nimbtarrc')
+presets = []
+if os.path.exists(syscfgfile):
+  for conf in file(syscfgfile):
+    presets.extend(optparser.convert_arg_line_to_args(conf.strip()))
+if os.path.exists(usercfgfile):
+  for conf in file(usercfgfile):
+    presets.extend(optparser.convert_arg_line_to_args(conf.strip()))
+options = optparser.parse_args(presets + sys.argv[1:])
+
+if options.change_directory:
+  os.chdir(options.change_directory)
+
+if options.redundancy < 1 or options.redundancy > len(options.storage):
+  sys.stderr.write("Redundancy need to be between 1 and %d.\n" % len(options.storage))
+  sys.exit(0)
+
+if options.lzma != None: compression = ('lzma', options.lzma)
+elif options.gzip != None: compression = ('gzip', options.gzip)
+elif options.bzip2 != None: compression = ('bzip2', options.bzip2)
+elif options.nocompress: compression = (None, 0)
+else: compression = ('lzma', 9)
+
+def create_sub_backend(nimbstor, dir):
+  if dir.startswith('imap:'):
+    proto, host, port, user, password, mailbox = dir.split(':')
+    port = int(port)
+    if options.verbose: print "%s:%s:%d:%s::%s" % (proto, host, port, user, mailbox),
+    return imap_backend(nimbstor, user, password, host, mailbox, port, False)
+  elif dir.startswith('imaps:'):
+    proto, host, port, user, password, mailbox = dir.split(':')
+    port = int(port)
+    if options.verbose: print "%s:%s:%d:%s::%s" % (proto, host, port, user, mailbox),
+    return imap_backend(nimbstor, user, password, host, mailbox, port, True)
+  if options.verbose: print dir,
+  return directory_backend(nimbstor, dir)
+
+def create_backend(nimbstor):
+  if options.verbose:
+    print "Use folowwing backends:",
+  if len(options.storage) == 1:
+    comb = create_sub_backend(nimbstor, options.storage[0])
+    comb.activate()
+    print
+    return comb
+  comb = combine_backend(nimbstor, options.redundancy)
+  for dir in options.storage:
+    create_sub_backend(comb, dir).activate()
+  comb.activate()
+  print
+  return comb
+
+if options.create != None:
+  if not options.desc or not options.keywords:
+    raise SystemError("Description and keywords must be given to create archive.")
+  keywords = [x.lower().strip() for x in options.keywords]
+  desc = options.desc.strip()
+  output = stor_output(options.password, compression, options.archive, desc, keywords, not options.empty)
+  create_backend(output)
+  if os.path.exists('.nimbstor_parent'):
+    parent = open('.nimbstor_parent').read().strip()
+    if len(parent) == 64:
+      if options.verbose:
+	print "Use parent", parent
+      output.set_parent(parent)
+  create_archive(output, options.create, options.verbose)
+  output.close()
+  if output.archive() != None:
+    open('.nimbstor_parent', 'w').write(output.archive())
+  if options.verbose and output.archive() == None:
+    print "No archive created."
+  elif options.verbose:
+    print "Archive", output.archive(), "with size", output.size(), "created."
+elif options.extract != None:
+  input = stor_input(options.password, options.archive)
+  try: create_backend(input)
+  except Exception, err:
+    sys.stderr.write("ERROR: %s\n" % str(err))
+    sys.exit(1)
+  extract_archive(input, options.extract, options.verbose)
+  input.close()
+  open('.nimbstor_parent', 'w').write(input.archive())
+elif options.list != None:
+  input = stor_input(options.password, options.archive)
+  try: create_backend(input)
+  except Exception, err:
+    sys.stderr.write("ERROR: %s\n" % str(err))
+    sys.exit(1)
+  list_archive(input, options.list, options.verbose)
+  input.close()
+elif options.search != None:
+  util = stor_util(options.password)
+  try: create_backend(util)
+  except Exception, err:
+    sys.stderr.write("ERROR: %s\n" % str(err))
+    sys.exit(1)
+  search_archive(util, options.search, options.verbose)
+  util.close()
+elif options.list_keywords != None:
+  util = stor_util(options.password)
+  try: create_backend(util)
+  except Exception, err:
+    sys.stderr.write("ERROR: %s\n" % str(err))
+    sys.exit(1)
+  list_keywords(util, options.verbose)
+else:
+  optparser.print_help()
