@@ -1,0 +1,74 @@
+       
+    1: import unittest2 as unittest
+       
+    1: from zope.component import getUtility
+    1: from zope.schema.interfaces import IVocabularyFactory
+       
+    1: from plone.app.viewletmanager.interfaces import IViewletSettingsStorage
+    1: from plone.app.testing import applyProfile
+       
+    1: from collective.disqus.testing import DISQUS_INTEGRATION_TESTING
+       
+       
+    2: class Test(unittest.TestCase):
+       
+    1:     layer = DISQUS_INTEGRATION_TESTING
+       
+    1:     def setUp(self):
+    3:         self.portal = self.layer['portal']
+       
+    1:     def uninstall(self):
+    3:         applyProfile(self.portal, 'collective.disqus:uninstall')
+       
+    1:     def test_displayviews(self):
+    1:         portal_types = self.layer['portal'].portal_types
+       
+    1:         self.assertIn('disqus_summary_listing',
+    1:                       portal_types.get('Folder').view_methods)
+    1:         self.assertIn('disqus_summary_listing',
+    1:                       portal_types.get('Topic').view_methods)
+       
+    1:         self.uninstall()
+       
+    1:         self.assertNotIn('disqus_summary_listing',
+    1:                          portal_types.get('Folder').view_methods)
+    1:         self.assertNotIn('disqus_summary_listing',
+    1:                          portal_types.get('Topic').view_methods)
+       
+    1:     def test_viewlets(self):
+    1:         storage = getUtility(IViewletSettingsStorage)
+    1:         skins = [skin.token for skin in getUtility(IVocabularyFactory,
+    3:                     'plone.app.vocabularies.Skins')(self.portal)]
+       
+               # plone.comments viewlet should be hidden
+    3:         for skin in skins:
+    2:             if skin in storage._hidden.keys() and \
+    2:                'plone.belowcontent' in storage._hidden[skin]:
+    2:                 self.assertIn('plone.comments',
+    2:                               storage._hidden[skin]['plone.belowcontent'])
+       
+    1:         self.uninstall()
+       
+               # plone.comments viewlet should be unhidden
+               # and collective.disqus hidden
+    3:         for skin in skins:
+    2:             if skin in storage._hidden.keys() and \
+    2:                'plone.belowcontent' in storage._hidden[skin]:
+    2:                 self.assertNotIn('plone.comments',
+    2:                               storage._hidden[skin]['plone.belowcontent'])
+    2:                 self.assertIn('collective.disqus',
+    2:                               storage._hidden[skin]['plone.belowcontent'])
+       
+    1:     def test_controlpanel(self):
+    1:         controlpanel = self.portal.portal_controlpanel
+    1:         self.assertEqual(controlpanel.getActionObject(
+    1:                          'Products/DisqusConfig').visible, 1)
+    1:         self.uninstall()
+    1:         self.assertEqual(controlpanel.getActionObject(
+    1:                          'Products/DisqusConfig').visible, 0)
+       
+       
+    1: def test_suite():
+    1:     suite = unittest.TestSuite()
+    1:     suite.addTest(unittest.makeSuite(Test))
+    1:     return suite
