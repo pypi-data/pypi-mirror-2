@@ -1,0 +1,111 @@
+[buildout]
+index = http://packages.lizardsystem.nl
+find-links =
+unzip = true
+prefer-final = true
+versions = versions
+extensions = buildout.dumppickedversions
+parts =
+    sysegg
+    mkdir
+    django
+    omelette
+    console_scripts
+    pyflakes
+    apacheconf
+    build_static
+    sphinx
+develop = .
+#         local_checkouts/some_trunk_external
+eggs =
+    ${project}
+
+
+[versions]
+# Specific pins
+${project} =
+# Reported by buildout.dumppickedversions
+
+
+[sysegg]
+# Add eggs here that are best handled through OS-level packages.
+recipe = osc.recipe.sysegg
+force-sysegg = true
+eggs =
+    psycopg2
+#    PIL
+#    matplotlib
+#    pyproj
+
+
+[mkdir]
+recipe = z3c.recipe.mkdir
+paths =
+    \${buildout:directory}/var/static
+    \${buildout:directory}/var/media
+    \${buildout:directory}/var/log
+    \${buildout:directory}/var/sqlite
+
+
+[django]
+# Sets up django for testing our application.
+# See http://jacobian.org/writing/django-apps-with-buildout/
+recipe = djangorecipe
+version = 1.2.3
+wsgi = true
+wsgilog = \${buildout:directory}/var/log/django.log
+project = ${package}
+projectegg = ${package}
+settings = developmentsettings
+test = ${package}
+eggs = ${project}
+
+
+[omelette]
+# Creates a nice parts/omelette with our used eggs
+recipe = collective.recipe.omelette
+eggs = \${buildout:eggs}
+
+
+[console_scripts]
+recipe = zc.recipe.egg
+interpreter = python
+eggs =
+    \${buildout:eggs}
+# Development tools
+    coverage
+    eazysvn
+    pep8
+    zc.sourcerelease
+    zest.releaser
+
+
+[pyflakes]
+# Hairy way to install pyflakes: old-style distutils script.
+recipe = zc.recipe.egg
+scripts =
+   pyflakes
+eggs =
+   pyflakes
+entry-points = pyflakes=pkg_resources:run_script
+arguments = 'pyflakes', 'pyflakes'
+
+
+[apacheconf]
+recipe = collective.recipe.template
+input = \${buildout:directory}/etc/${project}.apache.conf.in
+output = \${buildout:directory}/etc/${project}.apache.conf
+
+
+[build_static]
+recipe = iw.recipe.cmd
+on_install = true
+on_update = true
+cmds = \${buildout:bin-directory}/django build_static --noinput
+
+
+[sphinx]
+recipe = collective.recipe.sphinxbuilder
+source = \${buildout:directory}/doc/source
+build = \${buildout:directory}/doc/build
+eggs = \${buildout:eggs}
