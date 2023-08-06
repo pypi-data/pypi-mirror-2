@@ -1,0 +1,351 @@
+================
+Isolation Recipe
+================
+
+This buildout recipe's sole purpose is to isolate distribution packages and
+there dependencies. This packaged was originally developed to be used to
+package Zope2 for the Debian operating system. It can also be used to populate
+a Python enviroment (or virtual environment). This can be handy in situations
+where buildout is required to build the application, but the developer/system
+administrator wants to use the application in typical Python environment.
+
+Isolation of distributions
+==========================
+
+The buildout.recipe.isolation recipe can be used to isolate distributions and
+their dependencies in a single directory. The recipe takes a number of options:
+
+dists
+    A list of distributions to isolate given as one or more setuptools
+    requirement strings. Each requirements string should be given on a
+    separate line.
+
+exclude-dists (optional)
+    A list of distributions that should be excluded from the isolation.
+
+dist-location (optional)
+    A location where the isolated distributions should be put. This option
+    defaults to the name of the recipe and will place itself in the parts
+    directory of the buildout.
+
+script-location (optional)
+    A location where the distribution scripts should be isolated. This option
+    defaults to the part name of the recipe plus '-scripts' (e.g.
+    isolated-scripts for a part named isolated) and will place itself in the
+    parts directory of the buildout.
+
+pth-file-location (optional)
+    A location where a .pth file will be created for this isolation. This
+    defaults to the buildout's current working directory. The resulting .pth
+    file is used during the script generation process to provide a list of
+    distributions that are isolated somewhere else on the file system.
+
+python (optional)
+    The name of a section to get the Python executable from.
+    If not specified, then the buildout python option is used.  The
+    Python executable is found in the executable option of the named
+    section.
+
+extra-pth (optional)
+    A list of .pth files to include as part of the script initiation process.
+    This resolves dependency issues caused by dependency isolation. It is your
+    responsibility to resolve the dependencies either by supplying a .pth file
+    to the python interpreter or by supplying the .pth file as part of this
+    recipe.
+
+exclude-own-pth (optional)
+    A boolean option that that, when set will exclude this recipes generated
+    .pth file from inclusion in scripts. This option is closely tied to
+    pth-file-location and extra-pth. This option is false by default.
+
+Recipe deliverables
+-------------------
+
+- A directory that contains a specified distribution(s) package and its
+  dependency packages.
+- A .pth file that lists the absolute path for each package in the context.
+- A directory that contains the scripts that have been generated from the
+  distribution(s) package and its dependency packages.
+
+How it works
+============
+
+We have a link server that has a number of distributions:
+
+    >>> print get(link_server),
+    <html><body>
+    <a href="bigdemo-0.1-py2.3.egg">bigdemo-0.1-pyN.N.egg</a><br>
+    <a href="demo-0.1-py2.3.egg">demo-0.1-py2.3.egg</a><br>
+    <a href="demo-0.2-py2.3.egg">demo-0.2-py2.3.egg</a><br>
+    <a href="demo-0.3-py2.3.egg">demo-0.3-py2.3.egg</a><br>
+    <a href="demo-0.4c1-py2.3.egg">demo-0.4c1-py2.3.egg</a><br>
+    <a href="demoneeded-1.0.zip">demoneeded-1.0.zip</a><br>
+    <a href="demoneeded-1.1.zip">demoneeded-1.1.zip</a><br>
+    <a href="demoneeded-1.2c1.zip">demoneeded-1.2c1.zip</a><br>
+    <a href="extdemo-1.4.zip">extdemo-1.4.zip</a><br>
+    <a href="index/">index/</a><br>
+    <a href="other-1.0-py2.3.egg">other-1.0-py2.3.egg</a><br>
+    </body></html>
+
+We have a sample buildout.  Let's update it's configuration file to
+install the demo package.
+
+    >>> write(sample_buildout, 'buildout.cfg',
+    ... """
+    ... [buildout]
+    ... parts = demo
+    ...
+    ... [demo]
+    ... recipe = buildout.recipe.isolation
+    ... dists = demo<0.3
+    ... find-links = %(server)s
+    ... index = %(server)s/index
+    ... """ % dict(server=link_server))
+
+In this example, we limited ourselves to revisions before 0.3. We also
+specified where to find distributions using the find-links option.
+
+Let's run the buildout::
+
+    >>> import os
+    >>> print system(buildout), #doctest: +ELLIPSIS
+    Installing demo.
+    Getting distribution for 'demo<0.3'.
+    Got demo 0.2.
+    Getting distribution for 'demoneeded'.
+    Got demoneeded 1.2c1.
+    demo: Copying demo to the destination directory.
+    demo: Copying demoneeded to the destination directory.
+    demo: Generated script '/sample-buildout/parts/demo-scripts/demo'.
+
+Now, if we look at the buildout parts directory for the isolation::
+
+    >>> ls(sample_buildout, 'parts/demo')
+    -  demo-0.2-py2.3.egg
+    -  demo.pth
+    d  demoneeded-1.2c1-py2.3.egg
+
+These distributions have been entered into a .pth file as well. This file
+is not directly useful to the buildout, but has it's place in the python
+environment. The contents of the .pth file will be the absolute path for each
+of the distributions that have been installed into the isolation. Let's have
+a look::
+
+    >>> cat(sample_buildout, 'parts/demo', 'demo.pth')
+    /sample-buildout/parts/demo/demo-0.2-py2.6.egg
+    /sample-buildout/parts/demo/demoneeded-1.2c1-py2.6.egg
+
+By default the name of the .pth files will be the name of the buildout section, which in this case is demo. You can change the name and resulting location of the .pth file using the pth-file-location option.
+
+.. note:: When using the pth-file-location option, the directory that the pth
+   file will reside, must exist prior to running the buildout. If it does not
+   exist, an IOError will be raised and the buildout will fail.
+
+Dependency exclusion
+--------------------
+
+Let's now try a buildout with a slightly larger example that we can use to
+illustrate the exclude dependencies from a certain isolation.
+
+Let's create a new buildout configuration based on the previous one. This
+configuration is setup to isolate the bigdemo distribution and its
+dependencies, but exclude the demoneeded dependency.
+
+    >>> write(sample_buildout, 'buildout.cfg',
+    ... """
+    ... [buildout]
+    ... parts =
+    ...     demoneeded
+    ...     demo
+    ... find-links = %(server)s
+    ... index = %(server)s/index
+    ...
+    ... [demoneeded]
+    ... recipe = buildout.recipe.isolation
+    ... dists = demoneeded
+    ...
+    ... [demo]
+    ... recipe = buildout.recipe.isolation
+    ... dists = bigdemo
+    ... exclude-dists = ${demoneeded:dists}
+    ... """ % dict(server=link_server))
+
+    >>> print system(buildout), #doctest: +ELLIPSIS
+    Uninstalling demo.
+    Installing demoneeded.
+    demoneeded: Copying demoneeded to the destination directory.
+    Installing demo.
+    Getting distribution for 'bigdemo'.
+    Got bigdemo 0.1.
+    Getting distribution for 'demo'.
+    Got demo 0.4c1.
+    demo: Copying demo to the destination directory.
+    demo: Copying bigdemo to the destination directory.
+    demo: Generated script '/sample-buildout/parts/demo-scripts/demo'.
+
+Check the isolated results:
+
+    >>> ls(sample_buildout, 'parts/demo')
+    -  bigdemo-0.1-py2.6.egg
+    -  demo-0.4c1-py2.6.egg
+    -  demo.pth
+    >>> ls(sample_buildout, 'parts/demoneeded')
+    d  demoneeded-1.2c1-py2.6.egg
+    -  demoneeded.pth
+
+Script generation
+-----------------
+
+Some distributions supply command-line scripts with there packages. Buildout
+typically generates these scripts for us, because it needs to supply the built
+packages to to script. It does this by injecting the distribution locations
+into the Python system path. In some cases we do not want to inject anything
+into the Python system path, because we may have deposited the generated .pth
+file in a virtual environment's site-packages directory. While in other cases,
+we might want to supply our .pth file as a mean for import resolution. Let's
+take a closer look at both cases.
+
+For the general case, we will likely want to supply our .pth file to the
+script. Additionally, we will probably want to supply any .pth files that
+dependent isolations may have generated. Here is an example.
+
+    >>> import sys
+    >>> write(sample_buildout, 'buildout.cfg',
+    ... """
+    ... [buildout]
+    ... parts =
+    ...     demoneeded
+    ...     demo
+    ... find-links = %(server)s
+    ... index = %(server)s/index
+    ...
+    ... [system_python]
+    ... executable = %(python)s
+    ...
+    ... [demoneeded]
+    ... recipe = buildout.recipe.isolation
+    ... dists = demoneeded
+    ...
+    ... [demo]
+    ... recipe = buildout.recipe.isolation
+    ... dists = bigdemo
+    ... exclude-dists = ${demoneeded:dists}
+    ... extra-pth = ${demoneeded:pth-file-location}
+    ... python = system_python
+    ... """ % dict(server=link_server, python=sys.executable))
+    >>> print system(buildout), #doctest: +ELLIPSIS
+    Uninstalling demo.
+    Uninstalling demoneeded.
+    Installing demoneeded.
+    demoneeded: Copying demoneeded to the destination directory.
+    Installing demo.
+    demo: Copying demo to the destination directory.
+    demo: Copying bigdemo to the destination directory.
+    demo: Generated script '/sample-buildout/parts/demo-scripts/demo'.
+
+The resulting script should have two .pth files in it. The demo.pth file has
+been defined and generated from the recipe in context. The demoneeded.pth file
+was generated by the demoneeded section and pulled in using the extra-pth
+recipe option.
+
+    >>> if sys.platform == 'win32':
+    ...    script_name = 'demo-script.py'
+    ... else:
+    ...    script_name = 'demo'
+    >>> script_dir = 'parts/demo-scripts'
+    >>> f = open(os.path.join(sample_buildout, script_dir, script_name))
+    >>> shebang = f.readline().strip()
+    >>> if shebang[:3] == '#!"' and shebang[-1] == '"':
+    ...     shebang = '#!'+shebang[3:-1]
+    >>> shebang == '#!' + os.path.realpath(sys.executable)
+    True
+    >>> print f.read(), # doctest: +NORMALIZE_WHITESPACE
+    <BLANKLINE>
+    import sys
+    def pth_injector(pth_file):
+        path_file = open(pth_file, 'r')
+        sys.path[0:0] = [line
+            for line in path_file.read().split('\n')
+            if line is not None]
+    <BLANKLINE>
+    pth_files = ['/sample-buildout/parts/demo/demo.pth', '/sample-buildout/parts/demoneeded/demoneeded.pth']
+    for pth in pth_files:
+        pth_injector(pth)
+    <BLANKLINE>
+    import eggrecipedemo
+    <BLANKLINE>
+    if __name__ == '__main__':
+        eggrecipedemo.main()
+    >>> f.close()
+
+The second case is where we have deposited the .pth files into a virtual environment. Let's setup a *fake* virtual environment structure inside the buildout structure for demonstration sake.
+
+    >>> virtenv = os.path.join(sample_buildout, 'virtenv')
+    >>> mkdir(virtenv)
+    >>> mkdir(virtenv, 'lib')
+    >>> mkdir(virtenv, 'lib', 'python2.6')
+    >>> mkdir(virtenv, 'lib', 'python2.6', 'site-packages')
+    >>> site_pkgs = os.path.join(virtenv, 'lib', 'python2.6', 'site-packages')
+
+All we really need for the purpose of this demonstration is the site-packages
+directory.
+
+    >>> write(sample_buildout, 'buildout.cfg',
+    ... """
+    ... [buildout]
+    ... parts =
+    ...     demoneeded
+    ...     demo
+    ... find-links = %(server)s
+    ... index = %(server)s/index
+    ...
+    ... [system_python]
+    ... executable = %(python)s
+    ...
+    ... [demoneeded]
+    ... recipe = buildout.recipe.isolation
+    ... dists = demoneeded
+    ... pth-file-location = %(site_pkgs)s/demoneeded.pth
+    ...
+    ... [demo]
+    ... recipe = buildout.recipe.isolation
+    ... dists = bigdemo
+    ... exclude-dists = ${demoneeded:dists}
+    ... pth-file-location = %(site_pkgs)s/demo.pth
+    ... exclude-own-pth = trUE
+    ... python = system_python
+    ... """ % dict(server=link_server, python=sys.executable,
+    ...     site_pkgs=site_pkgs))
+    >>> print system(buildout), #doctest: +ELLIPSIS
+    Uninstalling demo.
+    Uninstalling demoneeded.
+    Installing demoneeded.
+    demoneeded: Copying demoneeded to the destination directory.
+    Installing demo.
+    demo: Copying demo to the destination directory.
+    demo: Copying bigdemo to the destination directory.
+    demo: Generated script '/sample-buildout/parts/demo-scripts/demo'.
+
+Now if we print out the demo script, we'll find no mention of the .pth files.
+
+    >>> f = open(os.path.join(sample_buildout, script_dir, script_name))
+    >>> shebang = f.readline().strip()
+    >>> if shebang[:3] == '#!"' and shebang[-1] == '"':
+    ...     shebang = '#!'+shebang[3:-1]
+    >>> shebang == '#!' + os.path.realpath(sys.executable)
+    True
+    >>> print f.read(), # doctest: +NORMALIZE_WHITESPACE
+    <BLANKLINE>
+    import eggrecipedemo
+    <BLANKLINE>
+    if __name__ == '__main__':
+        eggrecipedemo.main()
+    >>> f.close()
+
+Why does this work? If we were to use the virtual environments Python
+executable, it would load the site-packages directory and any .pth files in
+it. This would in turn load the modules we built using the buildout.
+
+.. note:: We aren't actually using the virtual environments Python executable
+   in this test case, but it is a simple matter of changing the executable
+   value in the system_python section of this buildout.cfg.
