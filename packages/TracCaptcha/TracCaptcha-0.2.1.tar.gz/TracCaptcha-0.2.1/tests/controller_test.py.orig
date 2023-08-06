@@ -1,0 +1,100 @@
+# -*- coding: UTF-8 -*-
+# 
+# The MIT License
+# 
+# Copyright (c) 2010 Felix Schwarz <felix.schwarz@oss.schwarz.eu>
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+from trac_captcha.test_util import CaptchaTest
+from trac_captcha.controller import TracCaptchaController
+from trac_captcha.cryptobox import CryptoBox
+
+
+class TracCaptchaControllerTest(CaptchaTest):
+    
+    def setUp(self):
+        self.super()
+        self.controller = TracCaptchaController(self.env)
+        self.assert_false(self.has_permission('anonymous', 'CAPTCHA_SKIP'))
+    
+    def captcha_token(self):
+        return CryptoBox(self.controller.token_key()).generate_token()
+    
+    
+    def test_token_key_from_configuration_always_returned_as_byte_string(self):
+        # all crypto algorithms only work on unicode instances, even if they
+        # only contain ASCII characters
+        self.assert_true(isinstance(self.controller.token_key(), str))
+    
+    def test_can_generate_token_key_if_not_set(self):
+        self.assert_equals('', self.env.config.get('trac-captcha', 'token_key'))
+        self.assert_not_none(self.controller.token_key())
+        
+        stored_token = self.env.config.get('trac-captcha', 'token_key')
+        self.assert_equals(self.controller.token_key(), stored_token)
+    
+    def test_returns_token_key_if_stored_in_config(self):
+        self.env.config.set('trac-captcha', 'token_key', 'foobar')
+        
+        self.assert_equals('foobar', self.controller.token_key())
+    
+    def test_skip_captcha_if_valid_token_found(self):
+        self.env.config.set('trac_captcha', 'token_key', 'foobar')
+        req = self.request('/', __captcha_token=self.captcha_token())
+        self.assert_none(None, req.remote_user)
+        
+        self.assert_true(self.controller.should_skip_captcha(req))
+    
+    def test_ignore_invalid_tokens(self):
+        req = self.request('/', __captcha_token='foobar')
+        self.assert_none(None, req.remote_user)
+        
+        self.assert_false(self.controller.should_skip_captcha(req))
+   
+    def test_can_use_egg_in_plugins_folder(self):
+        import sys
+        egg_file = '/home/fs/Open_Source/trac_captchas/environments/t28_env/plugins/TracCaptcha-0.2-py2.6.egg'
+        sys.path = [egg_file, '/home/fs/Open_Source/trac_captchas/lib', '/home/fs/Open_Source', '/usr/bin', '/home/fs/Open_Source/trac_captchas/eggs/TracDiscussion-0.7-py2.6.egg', '/home/fs/Open_Source/trac_captchas/contrib/tracdiscussion', '/home/fs/Open_Source/trac_captchas/eggs/TracAccountManager-0.2.1dev_r7731-py2.6.egg', '/home/fs/Open_Source/trac_captchas/contrib/accountmanager', '/home/fs/Open_Source/trac/trac_011', '/usr/lib64/python26.zip', '/usr/lib64/python2.6', '/usr/lib64/python2.6/plat-linux2', '/usr/lib64/python2.6/lib-tk', '/usr/lib64/python2.6/lib-old', '/usr/lib64/python2.6/lib-dynload', '/usr/lib64/python2.6/site-packages', '/usr/lib64/python2.6/site-packages/Numeric', '/usr/lib64/python2.6/site-packages/PIL', '/usr/lib64/python2.6/site-packages/gst-0.10', '/usr/lib64/python2.6/site-packages/gtk-2.0', '/usr/lib64/python2.6/site-packages/webkit-1.0', '/usr/lib/python2.6/site-packages', '/usr/lib/python2.6/site-packages/setuptools-0.6c11-py2.6.egg-info']
+        
+        import trac_captcha
+        
+        known_modules = sys.modules.keys()
+        for module_name in known_modules:
+            if module_name == 'trac_captcha.controller':
+                module = sys.modules[module_name]
+                del sys.modules[module_name]
+                del module
+        
+        import trac_captcha
+#        reload(trac_captcha)
+        self.assert_true('.egg' in trac_captcha.__file__)
+        
+        print 'trac_captcha.controller' in sys.modules
+        from trac_captcha.controller import TracCaptchaController
+        # as controller
+        module = __import__(TracCaptchaController.__module__)
+        print 'module', module
+        reload(module)
+        self.assert_true('.egg' in module.__file__)
+        
+        controller = TracCaptchaController(self.env)
+        
+        
+
