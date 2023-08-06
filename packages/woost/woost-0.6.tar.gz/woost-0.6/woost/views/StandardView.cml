@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?py
+from cocktail.html import html5_tag, html5_attr
+from woost.models import Site
+?>
+
+<py:woost.views.BaseView
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:py="http://www.whads.com/ns/cocktail/templates"
+    py:tag="div">
+
+    <?py-class
+    show_user_controls = True
+
+    def get_title(self):
+        return Site.main.home.title
+
+    def get_content_title(self):
+        return getattr(self.publishable, "inner_title", None) or translations(self.publishable)
+    
+    def get_linked_attachments(self):
+        return (attachment
+                for attachment in getattr(self.publishable, "attachments", ())
+                if attachment.is_published())
+    ?>
+
+    <div py:id="header">
+        <?py html5_tag(element, "header") ?>
+
+        <h1 py:id="title_label" py:collapsible="${True}">
+            <py:ready>
+                <?py title = self.get_title() ?>
+                <a py:if="title" href="@{self.cms.uri(Site.main.home)}">${title}</a>
+            </py:ready>
+        </h1>
+
+        <div py:id="identity" py:visible="@{self.show_user_controls and self.user and not self.user.anonymous}">
+            <strong>@{self.identity.visible and translations(self.user) or ""}</strong>
+            <form py:id="logout_form" method="post" action="">
+                <div>
+                    <button py:id="logout_button" name="logout" type="submit">
+                        ${translations("Logout")}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <py:woost.views.LanguageSelector py:id="language_selector"/>
+    </div>
+
+    <div py:id="navigation">
+        <?py html5_tag(element, "nav") ?>
+        <py:woost.views.Menu
+            py:id="menu"
+            py:root_visible="${False}"
+            py:collapsible="${True}"/>
+    </div>
+
+    <div py:id="main">
+        <?py
+        html5_tag(element, "section")
+        html5_attr(element, "role", "main")
+        ?>
+
+        <h2 py:id="content_title_label" py:collapsible="${True}">
+            <py:ready>
+                <?py
+                title = self.get_content_title()
+                if title:
+                    element.append(title)
+                ?>
+            </py:ready>
+        </h2>
+
+        <div py:id="fallback_language_notice" class="notice" py:visible="@{not self.fully_translated}">
+            @{"" if self.fully_translated else translations("woost.views.StandardView fallback language notice", fallback = self.content_language)}
+        </div>
+
+        <?py
+        element.append(self.content)
+        ?>
+
+        <ul py:id="attachments" py:collapsible="${True}">
+            <py:ready>
+                <py:new
+                    py:element="self.create_attachment_entry(attachment)"
+                    py:for="attachment in self.get_linked_attachments()"/>
+            </py:ready>
+        </ul>
+    </div>
+
+    <py:woost.views.EditLink py:def="edit_link" py:visible="@{element.visible and self.show_user_controls}"/>
+
+    <li py:def="attachment_entry" py:args="attachment">
+        <a href="${self.cms.uri(attachment)}" title="${getattr(attachment, 'description', None)}">
+            <img
+                src="${self.cms.icon_uri(attachment, 16)}"
+                alt="${translations('woost.views.StandardView attachment icon description')}"/>
+            <span>${translations(attachment)}</span>
+        </a>
+    </li>
+
+    <div py:id="footer">
+        <?py html5_tag(element, "footer") ?>
+    </div>
+
+</py:woost.views.BaseView>
+
