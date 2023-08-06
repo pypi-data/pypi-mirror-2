@@ -1,0 +1,135 @@
+Metadata-Version: 1.0
+Name: mekk.rtmimport
+Version: 0.1.3
+Summary: Import foreign (at the moment, Nozbe) data to RememberTheMilk
+Home-page: UNKNOWN
+Author: Marcin Kasperski
+Author-email: Marcin.Kasperski@mekk.waw.pl
+License: LGPL
+Description: .. -*- mode: rst; coding: utf-8 -*-
+        
+        ================
+        mekk.rtmimport
+        ================
+        
+        ``mekk.rtmimport`` handles importing data to RememberTheMilk. At the
+        moment it handles importing data exported from Nozbe_, I keep more
+        generic name in case I write other importers in the future.
+        
+        Prerequisities
+        ==============
+        
+        ``mekk.rtmimport`` uses `RtmAPI`_ wrapper library. I had to patch it
+        a bit and 0.3.2 is likely to fail. I hope to have my patches accepted
+        but until newer version is released, one must use `my RtmAPI fork`_
+        (use get source link to download `.zip` file, unpack it, install
+        by `python setup.py install`).
+        
+        .. _RtmAPI: http://pypi.python.org/pypi/RtmAPI
+        .. _my RtmAPI fork: http://bitbucket.org/Mekk/rtmapi
+        
+        From Nozbe to RememberTheMilk
+        =============================
+        
+        Exporting the data from Nozbe
+        -----------------------------
+        
+        Prepare `.json` export of Nozbe_ data. For details see `mekk.nozbe`_
+        but usually you just want to::
+        
+            nozbetool export --json=mynozbedata.json
+        
+        Importing data to RememberTheMilk
+        ---------------------------------
+        
+        First make a test run::
+        
+            rtmimport --nozbe-json=mynozbedata.json --verbose --dry-run
+        
+        (it does not store anything, just prints what it is to do) and verify
+        whether everything seems correct. 
+        
+        Then make actual import::
+        
+            rtmimport --nozbe-json=mynozbedata.json --verbose
+        
+        (or omit `--verbose` if you don't want to track progress, but I
+        recommend you keep it)
+        
+        Note: import can take some time. In case of my big list over
+        not-so-good network it has been running for almost an hour.
+        
+        How the data is converted
+        -------------------------
+        
+        Nozbe projects are saved as RememberTheMilk lists.
+        
+        Nozbe contexts are converted to RememberTheMilk tags. `@` is prepended
+        to their names and non-alphanumeric characters are replaced with
+        dashes (so for example `My home/kitchen` becomes
+        `@My-home-kitchen`). 
+        
+        Next actions are tagged as `Next`.
+        
+        Actions are saved as tasks. Name, due date, recurrence, 
+        estimated cost and completion status are all saved.
+        
+        In case of recurrence, RTM ``every`` mode is used (so the task marked
+        on Nozbe as recurring every week will be spawned 52 times a year by
+        RTM, whether user completes it, or not). If you prefer alternative way
+        (spawning new incarnation whenever previous is completed), edit tasks
+        after import, patch the code (and replace `every` with `after`), or
+        ask me for a commandline flag).
+        
+        As notes are bound to projects on Nozbe, and to tasks on
+        RememberTheMilk, I save notes by creating artificial tasks named "Save
+        this note" (one per every list for which appropriate project had notes)
+        and binding notes to those tasks. This must be handled afterwards
+        using RTM interface, to make sure it happens I mark those tasks as due
+        immediately. Those task are also tagged as `Note`.
+        
+        Limitations
+        -----------
+        
+        Only main context is copied, additional contexts are lost. I don't know
+        how to grab them from Nozbe_ (in case somebody knows how to patch
+        `mekk.nozbe`_ to grab all contexts, I can extend this importer easily
+        to handle them all).
+        
+        Uploads are not copied (= lost). I neither now how to export them from
+        Nozbe, nor RTM is able to handle them.
+        
+        Action name formatting is not available on RememberTheMilk, so if you
+        used constructs like `Visit "the website":http://google.com`, they will
+        show up as is.
+        
+        Sharing information (= information about delegations to other users)
+        is lost. I haven't used this feature so I don't know how do the
+        underlying data look like.
+        
+        Some contexts could probably be converted to locations, not tags, but
+        I don't have an idea how to decide which way to go.
+        
+        Problems and workarounds
+        ------------------------
+        
+        If import process is interrupted, re-running it would make duplicate
+        tasks (there is no duplicate checking, it would be costly). The best
+        way to resolve it is to open .json file in text editor (after making a
+        backup copy of it) and simply cut all actions which were already saved
+        (they are saved in order, so it is just a matter of locating the last
+        action saved before the process was interrupted).
+        
+        Source, bugs, patches
+        =====================
+        
+        Development `is tracked on BitBucket`_.
+        
+        .. _is tracked on BitBucket: http://bitbucket.org/Mekk/rtmimport
+        .. _mekk.nozbe: http://pypi.python.org/pypi/mekk.nozbe/
+        .. _Nozbe: http://nozbe.com
+Keywords: rtm,RememberTheMilk
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
