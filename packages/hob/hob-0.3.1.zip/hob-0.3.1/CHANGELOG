@@ -1,0 +1,212 @@
+0.3.1 - 2010-12-01
+------------------
+
+proto
+~~~~~
+
+* Fixed parsing of default values for enum fields. Some proto files had
+  incorrectly used numbers for default values. This is now supported by
+  looking for the enum entry with the same value.
+
+0.3 - 2010-10-27
+----------------
+
+hob
+~~~
+
+* The -v option is no longer used for version display but for enabling verbosity.
+* Positional arguments now display help text if available.
+* Location of template files has been moved (part of package_data) to solve cross-platform issues.
+
+proto
+~~~~~
+
+* Enum fields can now have default values, the enum value object can be fetched
+  from field.defaultObject() and the raw unparsed text from field.defaultText()
+
+0.2.1 - 2010-10-06
+------------------
+
+* Fixed installation of templates used by hob. Now they should also work when
+  installed in a virtualenv.
+
+0.2 - 2010-10-05
+----------------
+
+hob
+~~~
+
+* Prints the exception text to stderr when an unknown exception occurs instead
+  of dumping backtrace.
+* Added option *--pdb* which will start the python debugger (at error location)
+  whenever an uncaught exception occurs. Useful for debugging purposes.
+* Added option *--profile* which will enable the profiler when executing a
+  command, the results are written to the file specified in the option.
+* Added new command *config* which can be used to display the current config or
+  config files which have been used (*--list-files*).
+* Added support for defining projects files (optional), each project file is
+  another *hob.conf*, any service definitions are extracted from it and replaces
+  the local ones.
+
+  The project can be set to point to another config file, a directory or a name.
+  If it is a directory it will look for *hob.conf* in that directory.
+  If it is a name it will try to lookup the name in the config file under the
+  group *[projects]*, the entry in this group must point to the actual project
+  file.
+
+  e.g.::
+
+    hob --project myproject.conf config
+
+  or with a list of projects::
+
+    [projects]
+    myproject = ../myproject/myproject.conf
+    other = ../myproject2/hob.conf
+
+  then refer to the project by name only::
+
+    hob --project myproject config
+
+* Added option *--target/-t* to override the current target.
+* Added short version for config_file option (*-c*).
+* Added support for reading in option values from the config file. Options are
+  placed in as key values in the config but without the - or --, global options
+  are placed in a *[global]* section and command options in
+  *[command.<command-name>]*::
+
+    [global]
+    verbose = true
+
+    [command.proto]
+    syntax = scope
+    services = Scope, WindowManager
+
+    [command.js]
+    test-framework = true
+
+  Boolean options can be written with *true*, *false*, *on*, *off*, *0*, *1*,
+  *yes* or *no*::
+
+    verbose = true
+    pdb = off
+
+  Lists are defined as a comma separated string, leading and trailing
+  whitespace for each element are stripped.
+  e.g.::
+
+    services = Scope, WindowManager
+
+* Added support for reading config files from *hob_private.conf* in addition to
+  *hob.conf*. This can for instance be used to put personal config entries
+  separately from the main config file, e.g. to avoid committing personal
+  changes.
+
+* Extension paths can now point to a directory. The directory will be added to
+  the Python import path and the module will be imported.
+  e.g.::
+
+    myproject.extension = path/to/myextension
+
+hob module
+~~~~~~~~~~
+
+* pep8 fixes
+* hob: added a *__version_num__* entry that contains version numbers as a tuple.
+* hob.proto: Introduced an *Element* class which is sub-classed by all protocol
+  buffer classes, provides a common way of building a tree structure
+  representing a proto file. The changes should be backwards compatible with
+  0.1.
+* hob.ui: *UserInterface* now exposes version string (*ui.version*) and version
+  numbers (*ui.version_num*).
+* hob.utils: Ensure a unique path for template cache in case multiple version of
+  hob is used (each with different path).
+* hob.cmd: Added support for specifying the metavar for an option, it is placed
+  as the third item in the longname tuple/list of the option.
+* Improved tests.
+
+proto
+~~~~~
+
+* Default values are now checked for correct type.
+* Changed how referenced messages are found to match the behaviour of *protoc*
+  (Official Protocol Buffer). It now matches child, current and parents/global
+  to find the top-most name of a path, once it matches it uses that element
+  to search the rest of the path.
+* Fixed detection of overlapping extension ranges, they are not allowed.
+* Fixed parsing of path items (identifers with dot in between) to only be
+  allowed in certain places, it was currently allowed anywhere an identifer
+  was allowed.
+* Added detection of multiple fields with same number.
+* Added *syntax="<syntax-name>"* to generated proto files.
+* Generated output will now be compatible with Google Protocol Buffer
+  (*syntax="proto2"*). In addition the messages will include
+  *scope_descriptor.proto*.
+* Fixed incorrect usage of *syntax=<syntax-name>* entries in proto files which
+  are supposed to be written as a string (double-quotes). The old and incorrect
+  syntax is still supported in the parser.
+
+command: rst-doc
+~~~~~~~~~~~~~~~~
+
+* Filename of written documentation has changed. Version number is now included
+  in the filename and the file is placed in a sub-directory named after the
+  service, e.g::
+  
+    Scope/Scope_1_1.rst
+
+  In addition an index is written which links to all versions of a service,
+  the index has the name of service and is placed at the root.
+
+* Services are now treated as published unless marked as drafts. To mark a service
+  as a working draft add the 'draft' option with a value of true, e.g.::
+  
+    option draft = true;
+
+* New option *--syntax* to change the syntax of generated output, can either
+  generate pure Google Protocol Buffer (*proto2*) or the special Opera Scope
+  syntax (*scope*).
+  Service definitions are now only written when *syntax=scope* since it refers
+  to the Opera Scope protocol and not the one used in Google Protocol Buffer.
+  Default is to write using the scope syntax as this command is used for
+  documentation.
+
+command: proto
+~~~~~~~~~~~~~~
+
+* Added descriptor file for scope options (*templates/proto/scope_descriptor.proto*).
+* New option *--syntax* to change the syntax of generated output, can either
+  generate pure Google Protocol Buffer (*proto2*) or the special Opera Scope
+  syntax (*scope*).
+  Service definitions are now only written when *syntax=scope* since it refers
+  to the Opera Scope protocol and not the one used in Google Protocol Buffer.
+* Output files are written with .proto as suffix instead of .txt.
+* Added support for specifying *all* in *--type* option to export all types.
+
+command: js
+~~~~~~~~~~~
+
+* Files are now only written to if they contain different content.
+* Message maps are now generated dynamically by requesting information from
+  the remote host.
+* Added type to message maps, contains the number from *hob.proto.Proto*.
+  Used this to displays booleans more correctly.
+* Added support for enums in message-maps, message definitions and
+  pretty-printing, if an enum value cannot be found it fallbacks to displaying
+  the number.
+* Added option *--test-framework* as an alias to *--js-test-framework*.
+* Fixed version matching in *build_application.js*, now it will match the
+  version as long as the major version is the same, minor version may differ
+  and it will pick the most recent one.
+* Added display of message options in js test framework.
+* Various fixes in the js framework.
+
+command: dk-maps
+~~~~~~~~~~~~~~~~
+
+* Command has been removed as it is no longer of any use.
+
+0.1 - 2010-02-12
+----------------
+
+* Initial public release.
