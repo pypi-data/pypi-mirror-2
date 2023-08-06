@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="ascii"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>cocos.tiles</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+  <script type="text/javascript" src="epydoc.js"></script>
+</head>
+
+<body>
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar">
+  <tr valign="middle">
+  <!-- Project homepage -->
+      <!--<th class="navbar" 
+            ><a class="navbar" target="_top" href="http://www.cocos2d.org/">cocos2d API reference</a></th>-->
+
+  <!-- Tree link -->
+      <th><a
+        href="module-tree.html">Trees</a></th>
+
+  <!-- Index link -->
+      <th><a
+        href="identifier-index.html">Indices</a></th>
+
+  <!-- Breadcrumbs -->
+      <th class="navbar-breadcrumbs">
+        <span class="breadcrumbs">
+          <a href="cocos-module.html">cocos</a>&nbsp;.&nbsp;tiles
+        </span>
+      </th>
+
+      <th class="navbar last">
+        <a href="javascript:toggleFrames()">Toggle&nbsp;frames</a>
+      </th>
+  </tr>
+</table>
+<!-- ==================== MODULE DESCRIPTION ==================== -->
+<h1 class="epydoc">Module cocos.tiles</h1>
+<p>Tile maps are made of three components:</p>
+<dl class="rst-docutils">
+<dt>images</dt>
+<dd>Images are from individual files for from image atlases in a single file.</dd>
+<dt>tiles</dt>
+<dd>Tiles may be stand-alone or part of a TileSet.</dd>
+<dt>maps</dt>
+<dd>MapLayers are made of either rectangular or hexagonal Cells which
+reference the tiles used to draw the cell.</dd>
+</dl>
+<p>The intent is that you may have a tile set defined in one XML file
+which is shared amongst many map files (or indeed within a single
+XML file). Images may be shared amongst multiple tiles with the tiles
+adding different meta-data in each case.</p>
+<p>These may be constructed manually or loaded from XML resource files which
+are used to store the specification of tile sets and tile maps. A given
+resource XML file may define multiple tile sets and maps and may even
+reference other external XML resource files. This would allow a single
+tile set to be used by multiple tile maps.</p>
+<div class="rst-section" id="rst-maps">
+<h1 class="heading">Maps</h1>
+<p>The RectMapLayer class extends the regular Cocos layer to handle a
+regular grid of tile images, or Cells. The map layer may be manipulated
+like any other Cocos layer. It also provides methods for interrogating
+the map contents to find cells (eg. under the mouse) or neighboring
+cells (up, down, left, right.)</p>
+<p>Maps may be defined in Python code, but it is a little easier to do so
+in XML. To support map editing the maps support round-tripping to XML.</p>
+</div>
+<div class="rst-section" id="rst-the-xml-file-specification">
+<h1 class="heading">The XML File Specification</h1>
+<p>Assuming the following XML file called &quot;example.xml&quot;:</p>
+<pre class="py-doctest">
+&lt;?xml version=<span class="py-string">&quot;1.0&quot;</span>?&gt;
+&lt;resource&gt;
+  &lt;requires file=<span class="py-string">&quot;ground-tiles.xml&quot;</span> namespace=<span class="py-string">&quot;ground&quot;</span> /&gt;
+
+  &lt;rectmap id=<span class="py-string">&quot;level1&quot;</span>&gt;
+   &lt;column&gt;
+    &lt;cell tile=<span class="py-string">&quot;ground:grass&quot;</span> /&gt;
+    &lt;cell tile=<span class="py-string">&quot;ground:house&quot;</span>&gt;
+      &lt;property type=<span class="py-string">&quot;bool&quot;</span> name=<span class="py-string">&quot;secretobjective&quot;</span> value=<span class="py-string">&quot;True&quot;</span> /&gt;
+    &lt;/cell&gt;
+   &lt;/column&gt;
+  &lt;/map&gt;
+&lt;/resource&gt;</pre>
+<p>You may load that resource and examine it:</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>r = load(<span class="py-string">'example.xml'</span>)
+<span class="py-prompt">&gt;&gt;&gt; </span>map = r[<span class="py-string">'level1'</span>]</pre>
+<p>and then, assuming that level1 is a map:</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>scene = cocos.scene.Scene(map)</pre>
+<p>and then either manually select the tiles to display:</p>
+<blockquote>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>map.set_view(0, 0, window_width, window_height)</pre>
+</blockquote>
+<p>or if you wish for the level to scroll, you use the ScrollingManager:</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span><span class="py-keyword">from</span> cocos <span class="py-keyword">import</span> layers
+<span class="py-prompt">&gt;&gt;&gt; </span>manager = layers.ScrollingManager()
+<span class="py-prompt">&gt;&gt;&gt; </span>manager.add(map)</pre>
+<p>and later set the focus with:</p>
+<pre class="py-doctest">
+<span class="py-prompt">&gt;&gt;&gt; </span>manager.set_focus(focus_x, focus_y)</pre>
+<p>See the section on <a class="rst-reference internal" href="#rst-controlling-map-scrolling">controlling map scrolling</a> below for more detail.</p>
+</div>
+<div class="rst-section" id="rst-xml-file-contents">
+<h1 class="heading">XML file contents</h1>
+<p>XML resource files must contain a document-level tag &lt;resource&gt;:</p>
+<pre class="py-doctest">
+&lt;?xml version=<span class="py-string">&quot;1.0&quot;</span>?&gt;
+&lt;resource&gt;
+<span class="py-more"> ...</span>
+&lt;/resource&gt;</pre>
+<p>You may draw in other resource files by using the &lt;requires&gt; tag:</p>
+<pre class="py-doctest">
+&lt;requires file=<span class="py-string">&quot;road-tiles.xml&quot;</span> /&gt;</pre>
+<p>This will load &quot;road-tiles.xml&quot; into the resource's namespace.
+If you wish to avoid id clashes you may supply a namespace:</p>
+<pre class="py-doctest">
+&lt;requires file=<span class="py-string">&quot;road-tiles.xml&quot;</span> namespace=<span class="py-string">&quot;road&quot;</span> /&gt;</pre>
+<p>If a namespace is given then the element ids from the &quot;road-tiles.xml&quot;
+will be prefixed by the namespace and a period, e.g. &quot;road:bitumen&quot;.</p>
+<p>Other tags within &lt;resource&gt; are:</p>
+<pre class="py-doctest">
+&lt;image file=<span class="py-string">&quot;&quot;</span> id=<span class="py-string">&quot;&quot;</span>&gt;</pre>
+<p>Loads file with pyglet.image.load and gives it the id which is used
+by tiles to reference the image.</p>
+<pre class="py-doctest">
+&lt;imageatlas file=<span class="py-string">&quot;&quot;</span> [id=<span class="py-string">&quot;&quot;</span> size=<span class="py-string">&quot;x,y&quot;</span>]&gt;</pre>
+<p>Sets up an image atlas for child &lt;image&gt; tags to use. Child tags are of
+the form:</p>
+<pre class="py-doctest">
+&lt;image offset=<span class="py-string">&quot;&quot;</span> id=<span class="py-string">&quot;&quot;</span> [size=<span class="py-string">&quot;&quot;</span>]&gt;</pre>
+<p>If the &lt;imageatlas&gt; tag does not provide a size attribute then all
+child &lt;image&gt; tags must provide one. Image atlas ids are optional as
+they are currently not reference directly.</p>
+<pre class="py-doctest">
+&lt;tileset id=<span class="py-string">&quot;&quot;</span>&gt;</pre>
+<p>Sets up a TileSet object. Child tags are of the form:</p>
+<pre class="py-doctest">
+&lt;tile id=<span class="py-string">&quot;&quot;</span>&gt;
+  [&lt;image ...&gt;]
+&lt;/tile&gt;</pre>
+<p>The &lt;image&gt; tag is optional; these tiles may have only properties (or be
+completely empty). The id is used by maps to reference the tile.</p>
+<pre class="py-doctest">
+&lt;rectmap id=<span class="py-string">&quot;&quot;</span> tile_size=<span class="py-string">&quot;&quot;</span> [origin=<span class="py-string">&quot;&quot;</span>]&gt;</pre>
+<p>Sets up a RectMap object. Child tags are of the form:</p>
+<pre class="py-doctest">
+&lt;column&gt;
+ &lt;cell tile=<span class="py-string">&quot;&quot;</span> /&gt;
+&lt;/column&gt;</pre>
+<div class="rst-section" id="rst-map-cell-and-tile-properties">
+<h2 class="heading">Map, Cell and Tile Properties</h2>
+<p>Most tags may additionally have properties specified as:</p>
+<pre class="py-doctest">
+&lt;property [type=<span class="py-string">&quot;&quot;</span>] name=<span class="py-string">&quot;&quot;</span> value=<span class="py-string">&quot;&quot;</span> /&gt;</pre>
+<p>Where type is one of &quot;unicode&quot;, &quot;int&quot;, &quot;float&quot; or &quot;bool&quot;. The property will
+be a unicode string by default if no type is specified.</p>
+<p>Properties are accessed on the map, cell or tile using common dict operations
+with some extensions. Accessing a property on a <strong>cell</strong> will fall back to look
+on the <strong>tile</strong> if it's not found on the cell.</p>
+<p>If a cell has a property <tt class="rst-docutils literal"><span class="pre">player-spawn</span></tt> (boolean) and the tile that the cell
+uses has a property <tt class="rst-docutils literal"><span class="pre">move-cost=1</span></tt> (int) then the following are true:</p>
+<pre class="py-doctest">
+<span class="py-string">'player-spawn'</span> <span class="py-keyword">in</span> cell == True
+cell.get(<span class="py-string">'player-spawn'</span>) == True
+cell[<span class="py-string">'player-spawn'</span>] == True
+
+<span class="py-string">'player-spawn'</span> <span class="py-keyword">in</span> tile == False
+tile.get(<span class="py-string">'player-spawn'</span>) == None
+tile[<span class="py-string">'player-spawn'</span>] --&gt; raises KeyError
+
+cell[<span class="py-string">'move-cost'</span>] == 1</pre>
+<p>You may additionally set properties on cells and tiles:</p>
+<pre class="py-doctest">
+cell[<span class="py-string">'player-postion'</span>] = True
+cell[<span class="py-string">'burnt-out'</span>] = True</pre>
+<p>and when the map is exported to XML these properties will also be exported.</p>
+</div>
+</div>
+<div class="rst-section" id="rst-controlling-map-scrolling">
+<h1 class="heading">Controlling Map Scrolling</h1>
+<p>You have three options for map scrolling:</p>
+<ol class="rst-arabic simple">
+<li>never automatically scroll the map,</li>
+<li>automatically scroll the map but stop at the map edges, and</li>
+<li>scroll the map an allow the edge of the map to be displayed.</li>
+</ol>
+<p>The first is possibly the easiest since you don't need to use a
+ScrollingManager layer. You simple call map.set_view(x, y, w, h) on your
+map layer giving the bottom-left corner coordinates and the dimensions
+to display. This could be as simple as:</p>
+<pre class="py-doctest">
+map.set_view(0, 0, map.px_width, map.px_height)</pre>
+<p>If you wish to have the map scroll around in response to player
+movement the ScrollingManager from the cocos.scrolling module
+may be used.</p>
+</div>
+
+<!-- ==================== CLASSES ==================== -->
+<a name="section-Classes"></a>
+        <h2>Classes</h2>
+<table class="summary">
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.ScrollableLayer-class.html" class="summary-name">ScrollableLayer</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.ScrollingManager-class.html" class="summary-name">ScrollingManager</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.ResourceError-class.html" class="summary-name">ResourceError</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.TilesPropertyWithoutName-class.html" class="summary-name">TilesPropertyWithoutName</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.TilesPropertyWithoutValue-class.html" class="summary-name">TilesPropertyWithoutValue</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.Resource-class.html" class="summary-name">Resource</a>
+<div class="summary-description">Load some tile mapping resources from an XML file.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.Tile-class.html" class="summary-name">Tile</a>
+<div class="summary-description">Tiles hold an image and some optional properties.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.TileSet-class.html" class="summary-name">TileSet</a>
+<div class="summary-description">Contains a set of Tile objects referenced by some id.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.MapLayer-class.html" class="summary-name">MapLayer</a>
+<div class="summary-description">Base class for Maps.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.RegularTesselationMap-class.html" class="summary-name">RegularTesselationMap</a>
+<div class="summary-description">A regularly tesselated map that allows access to its cells by index
+(i, j).</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.RectMap-class.html" class="summary-name">RectMap</a>
+<div class="summary-description">Rectangular map.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.RectMapLayer-class.html" class="summary-name">RectMapLayer</a>
+<div class="summary-description">A renderable, scrollable rect map.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.RectMapCollider-class.html" class="summary-name">RectMapCollider</a>
+<div class="summary-description">This class implements collisions between a moving rect object and a
+tilemap.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.Cell-class.html" class="summary-name">Cell</a>
+<div class="summary-description">Base class for cells from rect and hex maps.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.RectCell-class.html" class="summary-name">RectCell</a>
+<div class="summary-description">A rectangular cell from a MapLayer.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.HexMap-class.html" class="summary-name">HexMap</a>
+<div class="summary-description">MapLayer with flat-top, regular hexagonal cells.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.HexMapLayer-class.html" class="summary-name">HexMapLayer</a>
+<div class="summary-description">A renderable, scrollable hex map.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cocos.tiles.HexCell-class.html" class="summary-name">HexCell</a>
+<div class="summary-description">A flat-top, regular hexagon cell from a HexMap.</div>
+    </td>
+  </tr>
+</table>
+<!-- ==================== FUNCTIONS ==================== -->
+<a name="section-Functions"></a>
+        <h2>Functions</h2>
+<table class="summary">
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a name="load"></a><span class="summary-sig-name">load</span>(<span class="summary-sig-arg">filename</span>)</span>
+<div class="summary-description">Load resource(s) defined in the indicated XML file.</div>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a href="cocos.tiles-module.html#image_factory" class="summary-sig-name">image_factory</a>(<span class="summary-sig-arg">resource</span>,
+        <span class="summary-sig-arg">tag</span>)</span>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a href="cocos.tiles-module.html#imageatlas_factory" class="summary-sig-name">imageatlas_factory</a>(<span class="summary-sig-arg">resource</span>,
+        <span class="summary-sig-arg">tag</span>)</span>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a href="cocos.tiles-module.html#tileset_factory" class="summary-sig-name">tileset_factory</a>(<span class="summary-sig-arg">resource</span>,
+        <span class="summary-sig-arg">tag</span>)</span>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a href="cocos.tiles-module.html#rectmap_factory" class="summary-sig-name">rectmap_factory</a>(<span class="summary-sig-arg">resource</span>,
+        <span class="summary-sig-arg">tag</span>)</span>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a href="cocos.tiles-module.html#hexmap_factory" class="summary-sig-name">hexmap_factory</a>(<span class="summary-sig-arg">resource</span>,
+        <span class="summary-sig-arg">tag</span>)</span>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <span class="summary-sig"><a name="hex_width"></a><span class="summary-sig-name">hex_width</span>(<span class="summary-sig-arg">height</span>)</span>
+<div class="summary-description">Determine a regular hexagon's width given its height.</div>
+    </td>
+  </tr>
+</table>
+<!-- ==================== VARIABLES ==================== -->
+<a name="section-Variables"></a>
+        <h2>Variables</h2>
+<table class="summary">
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="'cocos'"><code class="variable-quote">'</code><code class="variable-string">cocos</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+</table>
+<!-- ==================== FUNCTION DETAILS ==================== -->
+<a name="section-FunctionDetails"></a>
+        <h2>Function Details</h2>
+<table class="details">
+</table>
+<a name="image_factory"></a>
+<div class=" detail">
+  <h3>image_factory</h3>
+  <div class="detail-signature">
+    <span class="sig"><span class="sig-name">image_factory</span>(<span class="sig-arg">resource</span>,
+        <span class="sig-arg">tag</span>)</span>
+    </div>
+  <div class="detail-description">
+  
+  <dl class="fields">
+    <dt>Decorators:</dt>
+    <dd><ul class="nomargin-top">
+        <li><code>@Resource.register_factory('image')</code></li>
+    </ul></dd>
+  </dl>
+  </div>
+</div>
+<a name="imageatlas_factory"></a>
+<div class=" detail">
+  <h3>imageatlas_factory</h3>
+  <div class="detail-signature">
+    <span class="sig"><span class="sig-name">imageatlas_factory</span>(<span class="sig-arg">resource</span>,
+        <span class="sig-arg">tag</span>)</span>
+    </div>
+  <div class="detail-description">
+  
+  <dl class="fields">
+    <dt>Decorators:</dt>
+    <dd><ul class="nomargin-top">
+        <li><code>@Resource.register_factory('imageatlas')</code></li>
+    </ul></dd>
+  </dl>
+  </div>
+</div>
+<a name="tileset_factory"></a>
+<div class=" detail">
+  <h3>tileset_factory</h3>
+  <div class="detail-signature">
+    <span class="sig"><span class="sig-name">tileset_factory</span>(<span class="sig-arg">resource</span>,
+        <span class="sig-arg">tag</span>)</span>
+    </div>
+  <div class="detail-description">
+  
+  <dl class="fields">
+    <dt>Decorators:</dt>
+    <dd><ul class="nomargin-top">
+        <li><code>@Resource.register_factory('tileset')</code></li>
+    </ul></dd>
+  </dl>
+  </div>
+</div>
+<a name="rectmap_factory"></a>
+<div class=" detail">
+  <h3>rectmap_factory</h3>
+  <div class="detail-signature">
+    <span class="sig"><span class="sig-name">rectmap_factory</span>(<span class="sig-arg">resource</span>,
+        <span class="sig-arg">tag</span>)</span>
+    </div>
+  <div class="detail-description">
+  
+  <dl class="fields">
+    <dt>Decorators:</dt>
+    <dd><ul class="nomargin-top">
+        <li><code>@Resource.register_factory('rectmap')</code></li>
+    </ul></dd>
+  </dl>
+  </div>
+</div>
+<a name="hexmap_factory"></a>
+<div class=" detail">
+  <h3>hexmap_factory</h3>
+  <div class="detail-signature">
+    <span class="sig"><span class="sig-name">hexmap_factory</span>(<span class="sig-arg">resource</span>,
+        <span class="sig-arg">tag</span>)</span>
+    </div>
+  <div class="detail-description">
+  
+  <dl class="fields">
+    <dt>Decorators:</dt>
+    <dd><ul class="nomargin-top">
+        <li><code>@Resource.register_factory('hexmap')</code></li>
+    </ul></dd>
+  </dl>
+  </div>
+</div>
+<br />
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar">
+  <tr valign="middle">
+  <!-- Project homepage -->
+      <!--<th class="navbar" 
+            ><a class="navbar" target="_top" href="http://www.cocos2d.org/">cocos2d API reference</a></th>-->
+
+  <!-- Tree link -->
+      <th><a
+        href="module-tree.html">Trees</a></th>
+
+  <!-- Index link -->
+      <th><a
+        href="identifier-index.html">Indices</a></th>
+
+  <!-- Breadcrumbs -->
+      <th class="navbar-breadcrumbs">
+        <span class="breadcrumbs">
+          <a href="cocos-module.html">cocos</a>&nbsp;.&nbsp;tiles
+        </span>
+      </th>
+
+      <th class="navbar last">
+        <a href="javascript:toggleFrames()">Toggle&nbsp;frames</a>
+      </th>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%%">
+  <tr>
+    <td align="left" class="footer">
+    Generated by Epydoc 3.0beta1 on Wed Sep 08 23:50:17 2010
+    </td>
+    <td align="right" class="footer">
+      <a href="http://epydoc.sourceforge.net">http://epydoc.sourceforge.net</a>
+    </td>
+  </tr>
+</table>
+
+<script type="text/javascript">
+  <!--
+  // Private objects are initially displayed (because if
+  // javascript is turned off then we want them to be
+  // visible); but by default, we want to hide them.  So hide
+  // them unless we have a cookie that says to show them.
+  checkCookie()
+  // -->
+</script>
+  
+</body>
+</html>
