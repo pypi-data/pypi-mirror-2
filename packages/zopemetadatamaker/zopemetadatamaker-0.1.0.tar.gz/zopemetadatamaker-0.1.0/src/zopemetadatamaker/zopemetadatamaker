@@ -1,0 +1,96 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+
+import os
+import os.path
+import fnmatch
+import sys, optparse
+
+version = "0.1.0"
+description = "Bulk creation of .metadata files for Zope skins resources"
+
+METADATA_DEFAULT = """[default]
+title=%(filename)s
+cache=HTTPCache"""
+
+def matchPatterns(paths, patterns, recursive=False):
+    """Check if the file/directory at the given path match at least one
+    of the patterns.
+    @paths: a path to a directory, or a list of paths
+    @patterns: a pattern or a list of possible patterns to be checked
+    @return: a list of files that match
+    """
+    found = []
+    if not hasattr(paths,'__iter__'):
+        paths=[paths]
+    if not hasattr(patterns,'__iter__'):
+        patterns=[patterns]
+
+    for path in paths:
+        dirpath = os.path.abspath(path)
+        if os.path.isdir(dirpath):
+            files = os.listdir(dirpath)
+            for f in files:
+                filepath = os.path.join(dirpath, f) 
+                if os.path.isfile(filepath):
+                    for p in patterns:
+                        if fnmatch.fnmatch(f, p):
+                            found.append(filepath)
+                elif recursive:
+                    found.extend(matchPatterns(filepath, patterns, recursive))
+    return found
+
+
+if __name__ == '__main__':
+
+    usage = "usage: %prog [options] pattern [patterns]"
+    p = optparse.OptionParser(usage=usage, version="%prog " + version, description=description,
+                              prog="zopemetadatamaker")
+
+    p.remove_option("--help")
+    p.add_option('--help', '-h', action="store_true", default=False, help='show this help message and exit')
+    p.add_option('--content', '-c', dest="content", metavar="METADATA", default=METADATA_DEFAULT,
+                 help="choose a metadata text different from default; use quoting for multiline input")
+    p.add_option('--default', '-d', action="store_true", default=False, help='print default metadata (if --content is not provided), then exit')
+    p.add_option("--path", '-p', dest="paths", default=[os.getcwd()], metavar="PATHS", action="append",
+                 help="directories path where to look for metadata. You can use this multiple times. Default is the current working directory")
+    p.add_option('--dry-run', dest="dry_run", action="store_true", default=False, help='dry run, simply print what I would like to do')    
+    p.add_option('--force', '-f', action="store_true", default=False, help='force .metadata creation; if another one exists it will be replaced')    
+    p.add_option('--recursive', '-r', action="store_true", default=False, help='search and create recursively inside subdirs')
+
+    args = sys.argv[1:]
+    options, arguments = p.parse_args(args)
+
+    if options.help:
+        p.print_help()
+        sys.exit(0)
+
+    if options.default:
+        print METADATA_DEFAULT
+        sys.exit(0)
+
+    if not args:
+        print "Pattern not provided"
+        p.print_help()
+        sys.exit(1)
+
+    match = matchPatterns(options.paths, arguments, options.recursive)
+
+    created = 0
+    for file in match:
+        mname = file + '.metadata'
+        if os.path.exists(mname):
+            if options.force:
+                print "Replacing %s" % mname
+            else:
+                print "%s exits; skipping" % mname
+                continue
+        if options.dry_run:
+            print "I like to create %s" % mname
+        else:
+            f = open(mname, 'w')
+            f.write(options.content % {'filename': os.path.basename(file)})
+            f.close()
+            created+=1
+
+    print "%s .metadata created" % (created or 'no')
