@@ -1,0 +1,144 @@
+slapos.recipe.build
+===================
+
+Important notice
+----------------
+
+This is totally experimental recipe for fully flexible software "build".
+
+Examples
+--------
+
+Recipe to build the software.
+
+Example buildout::
+
+  [buildout]
+  parts =
+    file
+
+  [zlib]
+  # Use standard configure, make, make install way
+  recipe = slapos.cookbook:build
+  url = http://prdownloads.sourceforge.net/libpng/zlib-1.2.5.tar.gz?download
+  md5sum = c735eab2d659a96e5a594c9e8541ad63
+  slapos_promisee =
+    directory:include
+    file:include/zconf.h
+    file:include/zlib.h
+    directory:lib
+    statlib:lib/libz.a
+    dynlib:lib/libz.so linked:libc.so.6 rpath:
+    dynlib:lib/libz.so.1 linked:libc.so.6 rpath:
+    dynlib:lib/libz.so.1.2.5 linked:libc.so.6
+    directory:lib/pkgconfig
+    file:lib/pkgconfig/zlib.pc
+    directory:share
+    directory:share/man
+    directory:share/man/man3
+    file:share/man/man3/zlib.3
+
+  [file]
+  recipe = slapos.cookbook:buildcmmi
+  url = ftp://ftp.astron.com/pub/file/file-5.04.tar.gz
+  md5sum = accade81ff1cc774904b47c72c8aeea0
+  environment =
+    CPPFLAGS=-I${zlib:location}/include
+    LDFLAGS=-L${zlib:location}/lib -Wl,-rpath -Wl,${zlib:location}/lib
+  slapos_promisee =
+    directory:bin
+    dynlib:bin/file linked:libz.so.1,libc.so.6,libmagic.so.1 rpath:${zlib:location}/lib,!/lib
+    directory:include
+    file:include/magic.h
+    directory:lib
+    statlib:lib/libmagic.a
+    statlib:lib/libmagic.la
+    dynlib:lib/libmagic.so linked:libz.so.1,libc.so.6 rpath:${zlib:location}/lib
+    dynlib:lib/libmagic.so.1 linked:libz.so.1,libc.so.6 rpath:${zlib:location}/lib
+    dynlib:lib/libmagic.so.1.0.0 linked:libz.so.1,libc.so.6 rpath:${zlib:location}/lib
+    directory:share
+    directory:share/man
+    directory:share/man/man1
+    file:share/man/man1/file.1
+    directory:share/man/man3
+    file:share/man/man3/libmagic.3
+    directory:share/man/man4
+    file:share/man/man4/magic.4
+    directory:share/man/man5
+    directory:share/misc
+    file:share/misc/magic.mgc
+
+  [somethingelse]
+  # default way with using script
+  recipe = slapos.cookbook:build
+  url_0 = http://host/path/file.tar.gz
+  md5sum = 9631070eac74f92a812d4785a84d1b4e
+  script =
+    import os
+    os.chdir(%(work_directory)s)
+    unpack(%(url_0), strip_path=True)
+    execute('make')
+    execute('make install DEST=%(location)s')
+  slapos_promisee =
+    ...
+    
+  [multiarchitecture]
+  recipe = slapos.recipe.build
+  slapos_promisee =
+    ...
+  x86 = http://host/path/x86.zip
+  x86-64 =  http://host/path/x64.zip
+  script =
+    if not self.options.get('url'): self.options['url'], self.options['md5sum'] = self.options[guessPlatform()].split(' ')
+    extract_dir = self.extract(self.download(self.options['url'], self.options.get('md5sum')))
+    workdir = guessworkdir(extract_dir)
+    self.copyTree(workdir, "%(location)s")
+
+TODO:
+
+ * add linking suport, buildout definition:
+
+slapos_link = <relative/path> [optional-path
+
+can be used as::
+
+  [file]
+  slapos_link =
+    bin/file
+    bin/file ${buildout:bin-directory}/bin/anotherfile
+
+Which will link ${file:location}/bin/file to ${buildout:bin-directory}/bin/file
+and ${file:location}/bin/file to ${buildout:bin-directory}/bin/anotherfile
+
+Pure download
+-------------
+
+::
+
+  [buildout]
+  parts =
+    download
+
+  [download]
+  recipe = slapos.recipe.build:download
+  url = https://some.url/file
+
+Such profile will download https://some.url/file and put it in
+buildout:parts-directory/download/download
+
+filename parameter can be used to change destination named filename.
+
+destination parameter allows to put explicit destination.
+
+md5sum parameter allows pass md5sum.
+
+mode (octal, so for rw-r--r-- use 0644) allows to set mode
+
+Exposes target attribute which is path to downloaded file.
+
+Notes
+-----
+
+This recipe suffers from buildout download utility issue, which will do not
+try to redownload resource with wrong md5sum.
+
