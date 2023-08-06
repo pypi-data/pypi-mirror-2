@@ -1,0 +1,207 @@
+======================
+p01.recipe.setup:paste
+======================
+
+This Zope 3 recipes offers a Paste Deploy setup for Zope3 projects. It requires
+to define a Paste Deploy *.ini file in the buildout.cfg. The big difference 
+between this recipe and p01.recipe.paster is that this recipes offers a non
+ZODB setup. This means the recipe doesn't check for a zodb part in the config
+section.
+
+
+Options
+-------
+
+The 'paste' recipe accepts the following options:
+
+eggs
+  The names of one or more eggs, with their dependencies that should
+  be included in the Python path of the generated scripts.
+
+ini
+  The paste deploy ``paste.ini`` file content.
+
+conf
+  The zope paste.conf file defining the error log and product configuration 
+  section.
+
+zcml
+  The zope paste.zcml file used by the zope application.
+
+environment (optional)
+  The environement if needed by your application code.
+
+
+Test
+----
+
+Lets define a (bogus) eggs that we can use in our application:
+
+  >>> mkdir('demo')
+  >>> write('demo', 'setup.py',
+  ... '''
+  ... from setuptools import setup
+  ... setup(name = 'demo')
+  ... ''')
+
+Now check if the setup was correct:
+
+  >>> ls('bin')
+  -  buildout
+
+We'll create a ``buildout.cfg`` file that defines our paste serve configuration:
+
+  >>> write('buildout.cfg',
+  ... '''
+  ... [buildout]
+  ... develop = demo
+  ... parts = myapp
+  ...
+  ... [env]
+  ... PREFER_Z3C_PT = True
+  ...
+  ... [myapp]
+  ... eggs = demo
+  ... recipe = p01.recipe.setup:paste
+  ... environment = env
+  ... ini =
+  ...   [app:main]
+  ...   use = egg:demo
+  ...
+  ...   [server:main]
+  ...   use = egg:Paste#http
+  ...   host = 127.0.0.1
+  ...   port = 8080
+  ...
+  ... conf =
+  ...
+  ...   <eventlog>
+  ...     <logfile>
+  ...       formatter zope.exceptions.log.Formatter
+  ...       path ${buildout:directory}/parts/myapp/error.log
+  ...     </logfile>
+  ...     <logfile>
+  ...       formatter zope.exceptions.log.Formatter
+  ...       path STDOUT
+  ...     </logfile>
+  ...   </eventlog>
+  ...
+  ...  devmode on
+  ...
+  ... zcml =
+  ...   <!-- inlcude other zcml files like principals.zcml or securitypolicy.zcml
+  ...        and your app configuration -->
+  ...   <include package="demo" file="app.zcml" />
+  ...
+  ... ''' % globals())
+
+Now, Let's run the buildout and see what we get:
+
+  >>> print system(join('bin', 'buildout')),
+  Develop: '/sample-buildout/demo'
+  Installing myapp.
+  Generated script '/sample-buildout/bin/myapp'.
+
+The bin folder contains the scripts for serve our new created paste deploy
+server:
+
+  >>> ls('bin')
+  -  buildout
+  -  myapp
+
+Check the content of our new generated myapp script. As you can see, the
+generated script uses the ``paste.script.command.run`` for starting our server:
+
+  >>> cat('bin', 'myapp')
+  #!"C:\Python24\python.exe"
+  <BLANKLINE>
+  import sys
+  sys.path[0:0] = [
+      '/sample-buildout/demo',
+      ]
+  <BLANKLINE>
+  <BLANKLINE>
+  import os
+  sys.argv[0] = os.path.abspath(sys.argv[0])
+  os.environ['PREFER_Z3C_PT'] = 'True'
+  <BLANKLINE>
+  <BLANKLINE>
+  import paste.script.command
+  <BLANKLINE>
+  if __name__ == '__main__':
+      paste.script.command.run([
+    'serve', '/sample-buildout/parts/myapp/paste.ini',
+    ]+sys.argv[1:])
+
+Check the content of our new generated paste.ini file:
+
+  >>> cat('parts', 'myapp', 'paste.ini')
+  <BLANKLINE>
+  [app:main]
+  use = egg:demo
+  [server:main]
+  use = egg:Paste#http
+  host = 127.0.0.1
+  port = 8080
+
+Check the content of our new generated paste.zcml file:
+
+  >>> cat('parts', 'myapp', 'paste.zcml')
+  <configure
+      xmlns="http://namespaces.zope.org/zope">
+  <BLANKLINE>
+  <!-- inlcude other zcml files like principals.zcml or securitypolicy.zcml
+  and your app configuration -->
+  <include package="demo" file="app.zcml" />
+  <BLANKLINE>
+  </configure>
+
+Check the content of our new generated paste.conf file:
+
+  >>> cat('parts', 'myapp', 'paste.conf')
+  devmode on
+  site-definition /sample-buildout/parts/myapp/paste.zcml
+  <BLANKLINE>
+  <eventlog>
+    <logfile>
+      formatter zope.exceptions.log.Formatter
+      path /sample-buildout/parts/myapp/error.log
+    </logfile>
+    <logfile>
+      formatter zope.exceptions.log.Formatter
+      path STDOUT
+    </logfile>
+  </eventlog>
+
+
+Entry point
+-----------
+
+As you probably know, there is some magic going on during startup. The section
+``app:main`` in the paste.ini file above must be defined as entry_point in your
+projects setup.py file. Without them, the ``app:main`` isn't available. You can
+define such a app:main entry point by using an ``application_factory``
+like shown here:
+
+  def application_factory(global_conf, conf='conf'):
+      zope_conf = os.path.join(global_conf['here'], conf)
+      return m01.publisher.wsgi.getWSGIApplication(zope_conf)
+
+The setup in setup.py looks like:
+
+  setup(
+      name = 'something',
+      version = '0.5.0dev',
+      ...
+      include_package_data = True,
+      package_dir = {'':'src'},
+      namespace_packages = [],
+      install_requires = [
+          'some.package',
+          ],
+      entry_points = """
+          [paste.app_factory]
+          main = p01.recipe.setup.wsgi:application_factory
+          """,
+  )
+
