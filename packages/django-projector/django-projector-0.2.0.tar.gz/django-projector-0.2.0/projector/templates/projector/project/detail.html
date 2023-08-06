@@ -1,0 +1,224 @@
+{% extends "base_1col.html" %}
+
+{% load markup %}
+{% load i18n %}
+{% load guardian_tags %}
+{% load gravatar_tags %}
+{% load richtemplates_tags %}
+{% load native %}
+
+{% block extra-head %}{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{{ MEDIA_URL }}projector/css/browser.css" />
+<link rel="stylesheet" type="text/css" href="{{ MEDIA_URL }}projector/css/projector.css" />
+<script type="text/javascript">
+    $(document).ready(function(){
+        $('#id_project_repository_url').click(function(){
+            this.select();
+        });
+        {% get_obj_perms request.user for project as "project_perms" %}
+        {% if "change_project" in project_perms %}        
+        $('#admin-link').button({
+            icons: { primary: "ui-icon-wrench" }
+        })
+        $('#fork-link').button({
+            icons: { primary: "ui-icon-shuffle" }
+        })
+        {% endif %}
+    });
+</script>
+{% endblock %}
+
+{% block menu-top %}
+    {{ block.super }}
+    {% include "projector/menu.html" %}
+{% endblock %}
+
+
+{% block col-single-title %}{{ project.name }}{% endblock %}
+
+{% block col-single %}
+{% get_obj_perms request.user for project as "project_perms" %}
+<div class="richtemplates-panel">
+    <h5>{{ project.name }}</h5>
+    <div class="richtemplates-panel-content">
+        <h1><a href="{{ project.get_absolute_url }}">{{ project.name }}</a>{% if project.is_fork %} {% richicon "arrow_switch.png" %}{% endif %}</h1>
+        {% if project.is_fork %}
+            <div class="message message-info">
+                <p>
+                    {% blocktrans %}
+                    This is a fork. Original project can be found
+                    {% endblocktrans %}
+                    <a href="{% if project.fork_url %}{{ project.fork_url }}{% else %}{{ project.get_root.get_absolute_url }}{% endif %}">here</a>
+                </p>
+            </div>
+        {% endif %}
+
+        <div id="project-links">
+        {% block project-links %}
+        <ul class="nav-inline">
+            <li class="richbuttonset"><a class="button-link" href="{{ project.get_absolute_url }}">{% trans "Project detail" %}</a></li>
+            {% if project.get_repo_url %}
+            <li class="richbuttonset"><a class="button-link" href="{{ project.get_browse_repo_url }}">{% trans "Sources" %}</a></li>
+            {% endif %}
+            <li class="richbuttonset">
+                <a class="button-link" href="{{ project.get_task_list_url }}">{% trans "Tasks" %}</a>
+                <a class="button-link" href="{{ project.get_milestones_url }}">{% trans "Milestones" %}</a>
+                <a class="button-link" href="{{ project.get_components_url }}">{% trans "Components" %}</a>
+                <a class="button-link" href="{{ project.get_workflow_url }}">{% trans "Workflow" %}</a>
+            </li>
+            <li class="richbuttonset">
+                <a class="button-link" href="{{ project.get_members_url }}">{% trans "Members" %}</a>
+                <a class="button-link" href="{{ project.get_teams_url }}">{% trans "Teams" %}</a>
+            </li>
+
+            {# Right side #}
+            {% if project.author != request.user %}
+            <li class="richbuttonset" style="float: right">
+                {% if user_fork %}
+                <a id="fork-link" class="button-link" href="{{ user_fork.get_absolute_url }}">{% trans "Your fork" %}</a>
+                {% else %}
+                <a id="fork-link" class="button-link" href="{{ project.get_fork_url }}">{% trans "Fork" %}</a>
+                {% endif %}
+            </li>
+            {% endif %}
+
+        </ul>
+
+        {% if "change_project" in project_perms %}
+        <ul class="nav-inline">
+            <li class="richbuttonset">
+                <a id="admin-link" class="button-link" href="{{ project.get_edit_url }}">{% trans "Admin" %}</a>
+            </li>
+        </ul>
+        {% endif %}
+
+        {% if project.repository.pk %}
+        {% with project.get_clone_cmd|put_username_into_url:user as clone_url %}
+        <ul class="messages">
+            <li class="message message-info">{% trans "Clone repository" %}:
+            <input id="id_project_repository_url" value="{{ clone_url }}"
+                size="{{ clone_url|length|add:'15' }}"
+                onblur="this.value='{{ clone_url }}';"/></li>
+            {% if "://example.com" in clone_url or "@example.com" in clone_url %}
+            <li class="message message-warning">
+                {% trans "Repository URL seems to be broken. Maybe you have forgotten to " %}
+                <a href="{% url admin:sites_site_change 1 %}">{% trans "set site" %}</a> {% trans "at admin panel?" %}
+            </li>
+            {% endif %}
+        </ul>
+        {% endwith %}
+        {% endif %}
+
+        {% endblock project-links %}
+        </div>
+    
+    </div>
+</div>
+    {% block col-single-extra %}
+<div class="richtemplates-panel">    
+    <h5>{% trans "Project detail" %}</h5>
+    <div class="richtemplates-panel-content">
+        <div class="richblock">
+            <table class="richblock-properties">
+                <tbody>
+                    <tr>
+                        <th>{% trans "Project" %}</th>
+                        <td>{{ project.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Author" %}</th>
+                        <td>
+                            <img src="{% gravatar_for_user project.author %}"
+                                 width="16"
+                                 height="16"/>
+                            <a href="{% url projector_users_profile_detail project.author.username %}">{{ project.author }}</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Visibility" %}</th>
+                        <td>
+                            {% if project.is_public %}
+                            {% richicon "lock_open.png" %} <span>{% trans "Public" %}</span>
+                            {% else %}
+                            {% richicon "lock.png" %} <span>{% trans "Private" %}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Homepage" %}</th>
+                        <td>
+                            {% if project.home_page_url %}
+                            <a href="{{ project.home_page_url }}">{{ project.home_page_url }}</a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>SCM</th>
+                        <td>{% if project.repository.alias %}{{ project.repository.alias }}{% else %}-{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <h2>{% trans "Description" %}:</h2>
+        <div class="block-rst">
+            {{ project.description|restructuredtext }}
+        </div>
+
+        <h2><a href="{{ project.get_milestones_url }}">{% trans "Roadmap" %}</a>:</h2>
+        {% for milestone in project.milestone_set.all %}
+        <h3><a href="{{ milestone.get_absolute_url }}">{{ milestone.name }}</a> ({% trans "deadline set to" %} {{ milestone.deadline }})</h3>
+        {% include "projector/project/milestones/progress_table.html" %}
+        {% empty %}
+            <ul class="messages">
+                <li class="message message-info">{% trans "No milestones defined yet" %}</li>
+            </ul>
+        {% endfor %}
+
+        <style type="text/css">
+        .action-item {
+            border-bottom: 2px solid gray;
+        }
+        .action-verb {
+            text-shadow: #aaa -0px -1px 0px;
+        }
+        </style>
+        <h2>{% trans "Timeline" %}:</h2>
+        <ul id="actions-list" class="nav-vertical">
+            {% for action in project.actions.all %}
+            <li class="action-item">
+                <img src="{% gravatar_for_user project.author %}"
+                     width="32"
+                     height="32"/>
+                <a href="{% url projector_users_profile_detail action.author %}">{{ action.author }}</a>
+                
+                <span class="action-verb">{% trans action.verb %}</span>
+
+                {% if action.action_object %}
+                    {% if action.action_object.get_absolute_url %}
+                    <a href="{{ action.action_object.get_absolute_url }}">{{ action.action_object }}</a>
+                    {% else %}
+                    {{ action.action_object }}
+                    {% endif %}
+                    {% trans "on" %}
+                {% endif %}
+                <a href="{{ action.project.get_absolute_url }}">{{ action.project }}</a>
+                {{ action.created_at|timesince }} {% trans "ago" %}
+            </li>
+            {% empty %}
+            <li>
+                <ul class="messages">
+                    <li class="message message-info">{% trans "No timeline entries defined yet" %}</li>
+                </ul>
+            </li>
+            {% endfor %}
+
+        </ul>
+        
+    </div>
+</div>
+    {% endblock col-single-extra %}
+
+{% endblock col-single %}
+

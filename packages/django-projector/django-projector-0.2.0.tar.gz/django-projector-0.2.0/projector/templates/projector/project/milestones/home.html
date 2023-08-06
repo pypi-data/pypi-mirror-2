@@ -1,0 +1,72 @@
+{% extends "projector/project/detail.html" %}
+
+{% load i18n %}
+{% load guardian_tags %}
+{% load richtemplates_tags %}
+
+{% block col-single-extra %}
+
+<div class="richtemplates-panel">
+    <h5>{% trans "Project's milestones" %}</h5>
+    <div class="richtemplates-panel-content">
+    {% block milestones-menu %}
+    {% get_obj_perms request.user for project as "project_perms" %}
+
+    <ul class="nav-inline">
+        <li class="richbuttonset">
+            <a class="button-link" href="{{ project.get_milestones_url }}">{% trans "Milestones" %}</a>
+            {% if "change_project" in project_perms %}
+            <a class="button-link" href="{{ project.get_milestone_gantt_url }}">{% trans "Gantt" %}</a>
+            <a class="button-link" href="{{ project.get_milestone_add_url }}">{% trans "Add milestone" %}</a>
+            {% endif %}
+        </li>
+        <li>
+            {% if "change_project" in project_perms and milestone %}
+            <a class="button-link richbutton-wrench" href="{{ milestone.get_edit_url }}">{% trans "Edit" %}</a>
+            {% endif %}
+        </li>            
+    </ul>
+    {% endblock %}
+
+    {% load pagination_tags %}
+    {% load sorting_tags %}
+
+    {% autosort milestone_list %}
+    {% autopaginate milestone_list %}
+
+    <div id="milestone-sorting" class="togglable">
+        <p>{% trans "Sort by" %}</p>
+        <ul class="nav-horizontal">
+            <li>{% anchor name _("Name") %}</li>
+            <li>{% anchor created_at _("Created at") %}</li>
+            <li>{% anchor task__count _("Task count") %}</li>
+        </ul>
+    </div>
+
+    {% for milestone in milestone_list %}
+        <div id="milestone:{{ milestone }}" class="richblock">
+            <h2><a href="{{ milestone.get_absolute_url }}">{{ milestone }}</a></h2>
+            <table class="richblock-properties">
+                <tbody>
+                    <tr>
+                        <th>{% trans "Created at" %}</th>
+                        <td>{{ milestone.created_at }}</td>
+                    </tr>
+                    <tr>
+                        <th>{% trans "Tasks" %}</th>
+                        <td><a class="show-tipsy centered"
+                               href="{{ project.get_task_list_url }}?milestone={{ milestone.id }}"
+                               title="{% trans "Show all related tasks" %}">{{ milestone.task__count }}</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            {% include "projector/project/milestones/progress_table.html" %}
+        </div>
+    {% endfor %}
+
+</div>
+</div>
+
+{% endblock %}
+
