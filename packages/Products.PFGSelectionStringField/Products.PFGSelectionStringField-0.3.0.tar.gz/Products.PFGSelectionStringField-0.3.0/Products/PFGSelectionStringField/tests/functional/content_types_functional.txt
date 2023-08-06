@@ -1,0 +1,132 @@
+Initial imports and defines.
+----
+    >>> from Products.CMFCore.utils import getToolByName
+    >>> portal_url =  portal.absolute_url()
+
+Setting up.
+----
+    >>> from Products.Five.testbrowser import Browser
+    >>> browser = Browser()
+
+For debugging.
+----
+    >>> browser.handleErrors = True
+    >>> portal.error_log._ignored_exceptions = ()
+
+#Turn off portlets.
+#----
+#    >>> from zope.component import getUtility, getMultiAdapter
+#    >>> from plone.portlets.interfaces import IPortletManager
+#    >>> from plone.portlets.interfaces import IPortletAssignmentMapping
+
+#    >>> left_column = getUtility(IPortletManager, name=u"plone.leftcolumn")
+#    >>> left_assignable = getMultiAdapter((portal, left_column), IPortletAssignmentMapping)
+#    >>> for name in left_assignable.keys():
+#    ...     del left_assignable[name]
+
+#    >>> right_column = getUtility(IPortletManager, name=u"plone.rightcolumn")
+#    >>> right_assignable = getMultiAdapter((portal, right_column), IPortletAssignmentMapping)
+#    >>> for name in right_assignable.keys():
+#    ...     del right_assignable[name]
+
+Log in as the portal owner.
+----
+    >>> browser.open(portal_url)
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> browser.open(portal_url + '/login_form?came_from=' + portal_url)
+    >>> browser.getControl(name='__ac_name').value = portal_owner
+    >>> browser.getControl(name='__ac_password').value = default_password
+    >>> browser.getControl(name='submit').click()
+
+Verify that we can create FormFolder under portal but not PFGSelectionStringField.
+----
+    >>> browser.open(portal_url)
+    >>> url = '%s/createObject?type_name=FormFolder' % portal_url
+    >>> browser.open(url)
+    >>> 'Add' in browser.contents
+    True
+    >>> browser.getControl(name="form.button.cancel").click()
+
+#    >>> url = '%s/createObject?type_name=PFGSelectionStringField' % portal_url
+#    >>> browser.open(url)
+#    Traceback (most recent call last):
+#    ...
+#    HTTPError: HTTP Error 500: Internal Server Error
+
+#    >>> browser.getControl(name="form.button.cancel").click()
+
+#    >>> browser.getLink(id='formfolder').url.endswith("createObject?type_name=FormFolder")
+#    True
+#    >>> browser.getLink(id='pfgverkkomaksut').url.endswith("createObject?type_name=PFGSelectionStringField")
+#    Traceback (most recent call last):
+#    ...
+#    LinkNotFoundError
+
+Add FormFolder under portal.
+----
+
+#    >>> browser.open(portal_url)
+#    >>> browser.getLink(id='formfolder').click()
+
+    >>> url = '%s/createObject?type_name=FormFolder' % portal_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='title').value = "Form Folder"
+    >>> browser.getControl('Save').click()
+    >>> browser.getLink('Publish').click()
+    >>> 'form-folder' in portal.objectIds()
+    True
+    >>> form = portal['form-folder']
+    >>> form_url = form.absolute_url()
+    >>> form.getId()
+    'form-folder'
+    >>> form.Title()
+    'Form Folder'
+
+Add PFGSelectionStringField.
+----
+    >>> url = '%s/createObject?type_name=PFGSelectionStringField' % form_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='title').value = "Selection String Field"
+    >>> browser.getControl(name="fgVocabulary:lines").value = 'aaa\nbbb|BBB\nccc|CCC|Description of C'
+    >>> browser.getControl('Save').click()
+    >>> 'value="aaa"' in browser.contents
+    True
+    >>> 'value="bbb"' in browser.contents
+    True
+    >>> 'BBB' in browser.contents
+    True
+    >>> 'value="ccc"' in browser.contents
+    True
+    >>> 'CCC' in browser.contents
+    True
+    >>> 'Description of C' in browser.contents
+    True
+    >>> 'name="selection-string-field_ccc"' in browser.contents
+    True
+    >>> field = form['selection-string-field']
+    >>> field_url = field.absolute_url()
+
+Log out and submit
+----
+    >>> browser.getLink('Log out').click()
+    >>> browser.open(field_url)
+
+Submit without selecting anything.
+----
+    >>> browser.getControl(name="form_submit").click()
+    >>> 'No Input' in browser.contents
+    True
+
+Submit with selection.
+----
+    >>> browser.open(field_url)
+    >>> browser.getControl(name="selection-string-field").value = ['aaa']
+    >>> open('/tmp/testbrowser.html', 'w').write(browser.contents)
+    >>> browser.getControl(name="form_submit").click()
+    >>> 'AAA' in browser.contents
+    True
+    >>> browser.open(field_url)
+    >>> browser.getControl(name="selection-string-field").value = ['bbb']
+    >>> browser.getControl(name="selection-string-field_ccc").value = 'Some Description'
+    >>> browser.getControl(name="form_submit").click()
+
