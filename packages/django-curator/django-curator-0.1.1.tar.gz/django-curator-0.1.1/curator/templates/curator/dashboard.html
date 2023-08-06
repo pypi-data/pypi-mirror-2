@@ -1,0 +1,74 @@
+{% extends 'curator/base.html' %}
+{% load widget_tag %}
+
+{% block head %}
+    <link rel="stylesheet" href="{% url curator-media 'css/global.css' %}"> 
+    <script>
+        jQuery(document).ready(function($) {
+            $("#sortable").sortable();
+            $('.sortable-object').each(function(){
+                $(this).resizable({
+                    stop: function(event, ui) {
+                        var widget_id = $(this).data("id"); 
+                        $(this).find(".chart_div").height(ui.size.height - 30);
+                        $(this).find(".chart_div").width(ui.size.width - 30);
+                        
+                        redraw_chart(widget_id);
+                        
+                        $.ajax({
+                            type: "POST",
+                            url: "{% url widget_size %}",
+                            data: {"id": widget_id, "height": ui.size.height, "width": ui.size.width},
+                            success: function() { console.log("success-size"); }
+                        });
+                    }
+                });
+            });
+            
+            $("#sortable").bind("sortupdate", function() {
+                var id_order = new Array();
+                $(".sortable-object").each(function() {
+                    var widget_id = $(this).data("id");
+                    id_order.push(widget_id);
+                });
+                $.ajax({
+                    type: "POST",
+                    url: "{% url widget_order dashboard_name=dashboard.name %}",
+                    data: "ids=" + id_order,
+                    success: function() { console.log("success-order"); }
+                });
+            });
+        });
+    </script>
+    <script>
+    {% for widget in widgets %}
+        {% widget_tag_head widget %} 
+    {% endfor %}
+    </script>
+{% endblock %}
+{% block body %}
+    <div id="container">
+        <header>
+            <div id="header">
+                <h1>
+                    {% if site_name %}
+                        {{ site_name }}'s Curator
+                    {% else %}
+                        Curator
+                    {% endif %}
+                    <a href="/admin/logout/">Logout</a>
+                </h1>
+            </div>
+        </header>
+        <div class="demo">
+            <ul id="sortable">
+                {% for widget in widgets %}
+                <li class="ui-state-default sortable-object" data-id="{{ widget.id }}" style="height: {{ widget.height }}; width: {{ widget.width }};">{% widget_tag_body widget %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <footer>
+            <div id="footer"></div>
+        </footer>
+    </div>
+{% endblock %}
