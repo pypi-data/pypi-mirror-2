@@ -1,0 +1,238 @@
+Initial imports and defines.
+----
+    >>> from Products.CMFCore.utils import getToolByName
+    >>> portal_url =  portal.absolute_url()
+    >>> import StringIO
+    >>> dummy_image = StringIO.StringIO('Dummy Image')
+    >>> dummy_file = StringIO.StringIO('Dummy File')
+
+Setting up.
+----
+    >>> from Products.Five.testbrowser import Browser
+    >>> browser = Browser()
+
+For debugging.
+----
+    >>> browser.handleErrors = True
+    >>> portal.error_log._ignored_exceptions = ()
+
+#Turn off portlets.
+#----
+#    >>> from zope.component import getUtility, getMultiAdapter
+#    >>> from plone.portlets.interfaces import IPortletManager
+#    >>> from plone.portlets.interfaces import IPortletAssignmentMapping
+
+#    >>> left_column = getUtility(IPortletManager, name=u"plone.leftcolumn")
+#    >>> left_assignable = getMultiAdapter((portal, left_column), IPortletAssignmentMapping)
+#    >>> for name in left_assignable.keys():
+#    ...     del left_assignable[name]
+
+#    >>> right_column = getUtility(IPortletManager, name=u"plone.rightcolumn")
+#    >>> right_assignable = getMultiAdapter((portal, right_column), IPortletAssignmentMapping)
+#    >>> for name in right_assignable.keys():
+#    ...     del right_assignable[name]
+
+Log in as the portal owner.
+----
+    >>> browser.open(portal_url)
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> browser.open(portal_url + '/login_form?came_from=' + portal_url)
+    >>> browser.getControl(name='__ac_name').value = portal_owner
+    >>> browser.getControl(name='__ac_password').value = default_password
+    >>> browser.getControl(name='submit').click()
+
+Verify that we can create FormFolder under portal but not PFGVerkkomaksut.
+----
+    >>> browser.open(portal_url)
+    >>> url = '%s/createObject?type_name=FormFolder' % portal_url
+    >>> browser.open(url)
+    >>> 'Add' in browser.contents
+    True
+    >>> browser.getControl(name="form.button.cancel").click()
+
+#    >>> url = '%s/createObject?type_name=PFGVerkkomaksut' % portal_url
+#    >>> browser.open(url)
+#    Traceback (most recent call last):
+#    ...
+#    HTTPError: HTTP Error 500: Internal Server Error
+
+#    >>> browser.getControl(name="form.button.cancel").click()
+
+#    >>> browser.getLink(id='formfolder').url.endswith("createObject?type_name=FormFolder")
+#    True
+#    >>> browser.getLink(id='pfgverkkomaksut').url.endswith("createObject?type_name=PFGVerkkomaksut")
+#    Traceback (most recent call last):
+#    ...
+#    LinkNotFoundError
+
+Add FormFolder under portal.
+----
+
+#    >>> browser.open(portal_url)
+#    >>> browser.getLink(id='formfolder').click()
+
+    >>> url = '%s/createObject?type_name=FormFolder' % portal_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='title').value = "Form Folder"
+    >>> browser.getControl('Save').click()
+    >>> 'form-folder' in portal.objectIds()
+    True
+    >>> form = portal['form-folder']
+    >>> form_url = form.absolute_url()
+    >>> form.getId()
+    'form-folder'
+    >>> form.Title()
+    'Form Folder'
+
+Verify that we can add PFGVerkkomaksut under form.
+----
+
+#    >>> browser.getLink(id='pfgverkkomaksut').url.endswith("createObject?type_name=PFGVerkkomaksut")
+#    True
+
+    >>> url = '%s/createObject?type_name=PFGVerkkomaksut' % form_url
+    >>> browser.open(url)
+    >>> 'Verkkomaksut' in browser.contents
+    True
+    >>> browser.getControl(name="form.button.cancel").click()
+
+Add fixed point field and selection field and check their behavior in Verkkomaksut adapter.
+
+#    >>> browser.getLink(id='formfixedpointfield').click()
+
+    >>> url = '%s/createObject?type_name=FormFixedPointField' % form_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='title').value = "Fixed Point Price"
+    >>> try:
+    ...     browser.getControl(name="required:boolean").value = True
+    ... except LookupError:
+    ...     browser.getControl(name="required").value = '1'
+
+    >>> browser.getControl('Save').click()
+    >>> string_price = form['fixed-point-price']
+    >>> string_uid = string_price.UID()
+    >>> string_url = string_price.absolute_url()
+
+    >>> browser.open(form_url)
+
+#    >>> browser.getLink(id='formselectionfield').click()
+
+    >>> url = '%s/createObject?type_name=FormSelectionField' % form_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='title').value = "Selection Price"
+    >>> try:
+    ...     browser.getControl(name="required:boolean").value = True
+    ... except LookupError:
+    ...     browser.getControl(name="required").value = '1'
+    >>> browser.getControl(name="fgVocabulary:lines").value = '1.0|One'
+    >>> browser.getControl('Save').click()
+    >>> selection_price = form['selection-price']
+    >>> selection_uid = selection_price.UID()
+    >>> selection_url = selection_price.absolute_url()
+
+Add PFGVerkkomaksut.
+----
+    >>> browser.open(form_url)
+
+#    >>> browser.getLink(id='pfgverkkomaksut').click()
+
+    >>> url = '%s/createObject?type_name=PFGVerkkomaksut' % form_url
+    >>> browser.open(url)
+    >>> try:
+    ...     browser.getControl(name='title').value = "Verkkomaksut Adapter"
+    ...     browser.getControl(name="price_field").value = [string_uid]
+    ...     browser.getControl(name="thanksPrologue").value = '<p>Thanks!!</p>'
+    ...     browser.getControl(name="cancel_message").value = 'Tämä tilaus peruttu.'
+    ...     browser.getControl('Save').click()
+    ... except LookupError:
+    ...     browser.getControl(name='title').value = "Verkkomaksut Adapter"
+    ...     browser.getControl('Next').click()
+    ...     browser.getLink('verkkomaksut').click()
+    ...     browser.getControl(name="price_field").value = [string_uid]
+    ...     browser.getControl(name="thanksPrologue").value = '<p>Thanks!!</p>'
+    ...     browser.getControl(name="cancel_message").value = 'Tämä tilaus peruttu.'
+    ...     browser.getControl('Save').click()
+
+    >>> 'Verkkomaksut Adapter' in browser.contents
+    True
+    >>> adapter = form['verkkomaksut-adapter']
+    >>> adapter_url = adapter.absolute_url()
+
+Check notify
+----
+    >>> url = "%s/@@verkkomaksut-notify" % adapter_url
+    >>> browser.open(url)
+
+Check verkkomaksut-canceled page.
+----
+    >>> url = '%s/@@verkkomaksut-canceled' % adapter_url
+    >>> browser.open(url)
+    >>> 'Tämä tilaus peruttu.' in browser.contents
+    True
+
+Check if Prices shows properly in Verkkomaksut adapter.
+----
+    >>> browser.open(string_url)
+    >>> browser.getLink('Edit').click()
+    >>> try:
+    ...     browser.getControl(name="required:boolean").value = False
+    ... except LookupError:
+    ...     browser.getControl(name="required").value = '0'
+    >>> browser.getControl('Save').click()
+    >>> browser.open(adapter_url)
+    >>> browser.getLink('Edit').click()
+    >>> try:
+    ...     browser.getLink('verkkomaksut').click()
+    ... except:
+    ...     pass
+    >>> string_uid not in browser.contents
+    True
+    >>> selection_uid in browser.contents
+    True
+    >>> browser.open(selection_url)
+    >>> browser.getLink('Edit').click()
+    >>> browser.getControl(name="fgVocabulary:lines").value = 'one|One'
+    >>> browser.getControl('Save').click()
+    >>> browser.open(adapter_url)
+    >>> browser.getLink('Edit').click()
+    >>> try:
+    ...     browser.getLink('verkkomaksut').click()
+    ... except:
+    ...     pass
+    >>> string_uid not in browser.contents
+    True
+    >>> selection_uid not in browser.contents
+    True
+
+Check if images and files are not shown in msg_attachments field.
+----
+    >>> try:
+    ...     browser.getLink('message').click()
+    ... except:
+    ...     pass
+    >>> 'name="msg_attachments:list"' not in browser.contents
+    True
+
+Add Image and File content type to adapter.
+----
+    >>> url = '%s/createObject?type_name=Image' % adapter_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='image_file').mech_control.add_file(dummy_image, filename='dummy.gif')
+    >>> browser.getControl('Save').click()
+    >>> dimage = adapter['dummy.gif']
+    >>> dimage_uid = dimage.UID()
+    >>> url = '%s/createObject?type_name=File' % adapter_url
+    >>> browser.open(url)
+    >>> browser.getControl(name='file_file').mech_control.add_file(dummy_file, filename='dummy.pdf')
+    >>> browser.getControl('Save').click()
+    >>> dfile = adapter['dummy.pdf']
+    >>> dfile_uid = dfile.UID()
+    >>> browser.open(adapter_url)
+    >>> browser.getLink('Edit').click()
+    >>> try:
+    ...     browser.getLink('message').click()
+    ... except:
+    ...     pass
+    >>> browser.getControl(name="msg_attachments:list").value = [dimage_uid]
+    >>> browser.getControl('Save').click()
+    >>> browser.getLink('Edit').click()
