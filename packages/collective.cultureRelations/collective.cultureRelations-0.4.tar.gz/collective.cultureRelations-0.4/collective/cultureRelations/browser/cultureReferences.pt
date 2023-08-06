@@ -1,0 +1,166 @@
+<tal:references define="type here/portal_type"
+		condition="python:view.isValidType(type)">
+
+<div tal:condition="python:context.restrictedTraverse('@@plone_context_state').is_view_template()" tal:omit-tag="">
+<div class="expanded_relatedItems" tal:define="types view/getStrategicTypesByContext" tal:condition="python:len(context.getRelatedItems()) > 0 or len(context.getBRefs()) > 0">
+		<span tal:define="items python:view.getAllRelatedItemsOfTypes(types)" tal:omit-tag="">
+		<div class="related-block" tal:condition="python:len(items) > 0" tal:omit-tag="">
+			<tal:typefilter condition="python:type != 'Image'">				
+				<span tal:repeat="item items" tal:omit-tag="">
+					<div class="" tal:define="item_type item/portal_type;
+								  wtool context/portal_workflow;
+                                       				  item_type_class python: 'contenttype-' + view.normalizeString(item_type);
+								  item_wf_state        item/review_state|python: wtool.getInfoFor(item, 'review_state', '');"
+						      tal:attributes="class python:'tileItem visualIEFloatFix vevent' + item_type_class + ' ' + (repeat['item'].even() and 'tileEven' or 'tileOdd')">
+                    				<div class="tileHeadline">
+							<a href="#"
+                        	   				class="summary url" tal:attributes="href item/getURL|item/absolute_url;
+												    class python:(context.portal_membership.isAnonymousUser() and 'summary url') or 'summary url state-' + item_wf_state;"
+                           					tal:content="item/title" tal:condition="python:item.portal_type != 'Person' and item.portal_type != 'File'">
+                            						Item Title
+                        				</a>
+							<a href="#"
+                           					class="summary url" tal:attributes="href item/getURL|item/absolute_url"
+                           					tal:content="item/Title" tal:condition="python:item.portal_type == 'Person'">
+                            						Item Title
+                        				</a>
+							
+							<a href="#"
+                           					class="summary url" tal:attributes="href python:(item.absolute_url())+'/view'"
+                           					tal:content="item/Title" tal:condition="python:item.portal_type == 'File'">
+                            						Item Title
+                        				</a>
+                    				</div>
+
+						<tal:video define="isVideo python:view.isVideo(item)" condition="isVideo">
+                        				<div class="tileVideo" tal:define="audio_only python:view.audio_only(item); 
+											hasLeadImage python:view.hasContentLeadImage(item)">
+                        						<a class="autoFlowPlayer minimal" href="" tal:attributes="href item/getURL | item/absolute_url;
+                                                                          	onclick python:hasLeadImage and 'v2_video.configure(this, true)' or ''" tal:condition="python:not audio_only">
+                                						<img src="" class="splash"  alt=""  tal:condition="hasLeadImage"
+											tal:attributes="src python:item.absolute_url() + '/leadImage'"/>
+                                						<img tal:replace="structure here/play-button.png" src="" alt="play video" 
+											tal:condition="hasLeadImage" />
+                        						</a>
+                        						<a class="autoFlowPlayer audio" href="" tal:attributes="href item/absolute_url" tal:condition="audio_only">
+                        						</a>
+                        						<p class="tileBody" tal:condition="audio_only">
+                                						<span tal:omit-tag="" tal:condition="not:item/Description">
+                                    							&nbsp;
+                                						</span>
+                                						<span class="description" tal:content="python:view.trimDescription(item.Description(), 250)">
+                                    							description
+                                						</span>
+                        						</p>
+                                                                </div>      
+                                                                <div class="addthis_toolbox addthis_default_style"
+                                                                            tal:attributes="addthis:url python:item.absolute_url() + '/view';
+                                                                                addthis:title item/Title | item/title | item/id;
+                                                                                addthis:description python:view.trimDescription(item.Description(), 250);">
+                                                                            <a class="addthis_button_facebook">
+                                                                                  <img class="shareButton facebookShare" src="++resource++plonetheme.laboral.images/facebook.png" />
+                                                                                  <img class="shareButtonHover facebookShare" src="++resource++plonetheme.laboral.images/facebook_hover.png" />
+                                                                            </a>
+                                                                            <a class="addthis_button_twitter">
+                                                                                  <img class="shareButton twitterShare" src="++resource++plonetheme.laboral.images/twitter.png" />
+                                                                                  <img class="shareButtonHover twitterShare" src="++resource++plonetheme.laboral.images/twitter_hover.png" />
+                                                                            </a>
+                                                                            <a class="addthis_button_stumbleupon">
+                                                                                  <img class="shareButton stumbleuponShare" src="++resource++plonetheme.laboral.images/stumbleupon.png" />
+                                                                                  <img class="shareButtonHover stumbleuponShare" src="++resource++plonetheme.laboral.images/stumbleupon_hover.png" />
+                                                                            </a>
+                                                                            <a class="addthis_button_more">
+                                                                                  <img class="shareButton shareShare" src="++resource++plonetheme.laboral.images/share.png" />
+                                                                                  <img class="shareButtonHover shareShare" src="++resource++plonetheme.laboral.images/share_hover.png" />
+                                                                            </a>
+                                                                            <a class="addthis_counter addthis_pill_style"></a>
+                                                                </div>
+                        				
+						</tal:video>
+
+						<tal:excludedetails condition="python:item_type != 'Topic' and item_type != 'Folder' and not view.isVideo(item)">
+						<a href="#" tal:attributes="href item/getURL|item/absolute_url">
+                                	                 <img src="" alt="" tal:condition="exists:item/image_thumb"
+                                	                        tal:replace="structure python: path('nocall:item/tag')(scale='thumb', css_class='tileImage')" />
+                                	                 <img src="" alt=""
+                                	                        tal:replace="structure python:view.tag(item, css_class='tileImage')" /><br />
+                                	        </a>
+						
+						<tal:event condition="python: item_type == 'Event'">
+                                                    <span tal:condition="python: item_type == 'Event'">
+                                                            <div class="EventDateInfo" tal:condition="python: item.end() >= view.currenttime()">
+                                                                    <div class="futureEventDateFrom">
+                                                                            <div class="eventDayInfo" tal:content="python:item.start().day()">02</div>
+                                                                            <div class="eventMonthInfo" tal:content="python:item.start().strftime('%b').capitalize()">Jun</div>
+                                                                            <div class="eventYearInfo" tal:content="python:item.start().strftime('%Y').capitalize()">2010</div>
+                                                                    </div>
+                                                                    <span tal:condition="python:item.start().strftime('%d - %m - %Y') != item.end().strftime('%d - %m - %Y')" tal:omit-tag="" >
+                                                                    <div class="futureEventDateUntil">
+                                                                            <div class="eventDayInfo" tal:content="python:item.end().day()">02</div>
+                                                                            <div class="eventMonthInfo" tal:content="python:item.end().strftime('%b').capitalize()">Jun</div>
+                                                                            <div class="eventYearInfo" tal:content="python:item.end().strftime('%Y').capitalize()">2010</div>
+                                                                    </div>
+                                                                    <div class="visualClearLeft"><!-- --></div>
+                                                                    </span>
+                                                            </div>
+                                                            <div class="EventDateInfo" tal:condition="python: item.end() < view.currenttime()">
+                                                                    <div class="pastEventDateFrom">
+                                                                            <div class="eventDayInfo" tal:content="python:item.start().day()">02</div>
+                                                                            <div class="eventMonthInfo" tal:content="python:item.start().strftime('%b').capitalize()">Jun</div>
+                                                                            <div class="eventYearInfo" tal:content="python:item.start().strftime('%Y').capitalize()">2010</div>
+                                                                    </div>
+                                                                    <span tal:condition="python:item.start().strftime('%d - %m - %Y') != item.end().strftime('%d - %m - %Y')" tal:omit-tag="">
+                                                                    <div class="pastEventDateUntil">
+                                                                            <div class="eventDayInfo" tal:content="python:item.end().day()">02</div>
+                                                                            <div class="eventMonthInfo" tal:content="python:item.end().strftime('%b').capitalize()">Jun</div>
+                                                                            <div class="eventYearInfo" tal:content="python:item.end().strftime('%Y').capitalize()">2010</div>
+                                                                    </div>
+                                                                    <div class="visualClearLeft"><!-- --></div>
+                                                                    </span>
+                                                            </div>
+                                                     </span>
+                    				</tal:event>
+		                	        <p class="tileBody">
+                       		 			<span tal:omit-tag="" tal:condition="not:item/Description">
+                        				    &nbsp;
+                        				</span>
+                        				<span class="description" tal:content="python:view.trimDescription(item.Description(), 200)"
+                                                        tal:condition="python:item.portal_type != 'Event'">
+                                                            description
+                                                        </span>
+                                                        <span class="description" tal:content="python:view.trimDescription(item.Description(), 90)"
+                                                        tal:condition="python:item.portal_type == 'Event'">
+                                                            description
+                                                        </span>
+                    				</p>
+                                                <div class="addthis_toolbox addthis_default_style"
+                                                    tal:attributes="addthis:url python:(item.portal_type == 'File' or item.portal_type == 'Image') and item.absolute_url() + '/view' or item.absolute_url();
+                                                                            addthis:title item/Title | item/title | item/id;
+                                                                            addthis:description python:view.trimDescription(item.Description(), 250);">
+                                                                      <a class="addthis_button_facebook">
+                                                                            <img class="shareButton facebookShare" src="++resource++plonetheme.laboral.images/facebook.png" />
+                                                                            <img class="shareButtonHover facebookShare" src="++resource++plonetheme.laboral.images/facebook_hover.png" />
+                                                                      </a>
+                                                                      <a class="addthis_button_twitter">
+                                                                            <img class="shareButton twitterShare" src="++resource++plonetheme.laboral.images/twitter.png" />
+                                                                            <img class="shareButtonHover twitterShare" src="++resource++plonetheme.laboral.images/twitter_hover.png" />
+                                                                      </a>
+                                                                      <a class="addthis_button_stumbleupon">
+                                                                            <img class="shareButton stumbleuponShare" src="++resource++plonetheme.laboral.images/stumbleupon.png" />
+                                                                            <img class="shareButtonHover stumbleuponShare" src="++resource++plonetheme.laboral.images/stumbleupon_hover.png" />
+                                                                      </a>
+                                                                      <a class="addthis_button_more">
+                                                                            <img class="shareButton shareShare" src="++resource++plonetheme.laboral.images/share.png" />
+                                                                            <img class="shareButtonHover shareShare" src="++resource++plonetheme.laboral.images/share_hover.png" />
+                                                                      </a>
+                                                                      <a class="addthis_counter addthis_pill_style"></a>
+                                                </div>
+						</tal:excludedetails>
+					</div>		
+				</span>
+			</tal:typefilter>
+		</div>
+		</span>
+	</div>
+</div>
+</tal:references>
