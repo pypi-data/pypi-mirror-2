@@ -1,0 +1,78 @@
+====================================================================================
+GCEISING: the Monte Carlo simulator of Generalized Canonical Ensemble of Ising Model
+====================================================================================
+
+Gceising is a Monte Carlo simulation toolkit of the Generalized Canonical Ensemble of 2D Ising Model.
+
+The programming of this project involves tasks in three aspects: Time consuming jobs, Numerical calculation and Data virtualization.
+To improve the performance of time consuming job, we code it in C++ and then bind it via swig as a python module, which can be used by other modules.
+Python has many advanced data structures, from which it is so free to do scientific jobs such as numerical calculation.
+Though Matplotlib python package, we also can easily deal with data virtualization. If we use pyQT, UI design is amazing.
+
+Gceisng bases on C++, swig, Numpy, Matplotlib, and PyQt4.
+
+Install
+-------
+
+This package depends on Numpy, Matplotlib, and PyQt4 (swig are optional if you need modify the \*.i files).
+Once you have fulfilled these dependencies you can install the package with the usual command::
+
+    $ python setup.py install
+
+if you INSTALL ON WINDOWS, you can use mingw32 or MS VC++ as C++ compiler.
+For installation of PyQt4 on Windows, PyQt4 binary package (build-in with qt and sip) is strongly recommended instead of source packages.
+PyQt4 download link 
+http://www.riverbankcomputing.co.uk/software/pyqt/download.
+
+Usage
+-----
+
+There are various ways to use ``gceising``. The simplest is add inline code as argument to the Python interpreter::
+
+    $ python -c "from gceising import qIsing;qIsing.main()"
+
+This will create a GUI window which you can operate. Or execute ``python qIsing.py`` after ``_Ising.so`` or ``_Ising.pyd`` is built.
+
+It is also possible to manually call ``qIsing.py`` inside
+Python code::
+
+    >>> from gceising import qIsing
+    >>> qIsing.main()
+
+*Note*: 
+	``Ising.py`` in ``gceising`` package can be freely extended as need like ``qIsing.py``.
+
+Development
+-----------
+ 
+Get a local copy of the ``gceising`` mercurial repository with this command::
+	
+	hg clone https://gce-ising.googlecode.com/hg/ gce-ising 
+
+
+Bugs
+----
+
+The source code has been successfully tested on Linux and Windows with Python2.5 and Python2.6 respectively.
+Bugs on Mac OS are unknown.
+
+Misc
+----
+
+Author: Alwin Tsui <alwintsui@gmail.com> (`Blog <http://alwin-tsui.appspot.com>`_);
+
+Theory advisor: Xin Zhou <xinzhou71@gmail.com> at Asia Pacific Center for Theoretical Physics (`APCTP <http://www.apctp.org>`_).
+
+
+Feedback
+--------------------------------
+
+Comments, suggestions and patches are welcome and appreciated.  They can
+be sent to alwintsui@gmail.com or via
+http://code.google.com/p/gce-ising.
+
+License
+-------
+
+GPLv3+ License, (C) 2011 Alwin Tsui.
+
