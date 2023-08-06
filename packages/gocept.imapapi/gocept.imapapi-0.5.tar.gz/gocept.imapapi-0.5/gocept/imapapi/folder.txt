@@ -1,0 +1,459 @@
+============
+IMAP folders
+============
+
+Accessing IMAP folders
+======================
+
+IMAP accounts provide access to the folder structure by exposing a list of
+top-level folders:
+
+>>> from gocept.imapapi.account import Account
+>>> from pprint import pprint
+>>> account = Account('localhost', 10143, 'test', 'bsdf')
+>>> pprint(dict(account.folders))
+{u'Bar': <gocept.imapapi.folder.Folder object u'Bar' at 0x2612732>,
+ u'F\xf6': <gocept.imapapi.folder.Folder object u'F\xf6' at 0x2612732>,
+ u'INBOX': <gocept.imapapi.folder.Folder object u'INBOX' at 0x2134232>}
+
+A folder knows about its name, path, separator, and depth in the hierarchy:
+
+>>> INBOX = account.folders[u'INBOX']
+>>> INBOX
+<gocept.imapapi.folder.Folder object u'INBOX' at 0x12bde90>
+>>> INBOX.name
+u'INBOX'
+>>> INBOX.path
+u'INBOX'
+>>> INBOX.separator
+'/'
+>>> INBOX.depth
+1
+
+Folders also provide access to their direct sub-folders:
+
+>>> INBOX.folders
+{u'Baz': <gocept.imapapi.folder.Folder object u'INBOX/Baz' at 0x2318293>}
+
+Here's a folder that's a bit deeper in the hierarchy:
+
+>>> baz = INBOX.folders[u'Baz']
+>>> baz.name
+u'Baz'
+>>> baz.path
+u'INBOX/Baz'
+>>> baz.separator
+'/'
+>>> baz.depth
+2
+
+Folders can be compared for equality to see whether they're the same folders:
+
+>>> account.folders[u'INBOX'] == account.folders[u'INBOX']
+True
+>>> account.folders[u'Bar'] == account.folders[u'INBOX']
+False
+
+Being the same folder also requires to be connected in the same connection:
+
+>>> account_ = Account('localhost', 10143, 'test', 'bsdf')
+>>> account_.folders[u'INBOX'] == account.folders[u'INBOX']
+False
+
+
+Creating folders
+================
+
+Folders may be created as top-level folders of an account or within existing
+folders. Let's create three nested folders starting at the top level:
+
+>>> from gocept.imapapi.folder import Folder
+>>> account.folders[u'Top level'] = Folder()
+>>> pprint(dict(account.folders))
+{u'Bar': <gocept.imapapi.folder.Folder object u'Bar' at 0x2142346>,
+ u'F\xf6': <gocept.imapapi.folder.Folder object u'F\xf6' at 0x2612732>,
+ u'INBOX': <gocept.imapapi.folder.Folder object u'INBOX' at 0x2762352>,
+ u'Top level': <gocept.imapapi.folder.Folder object u'Top level' at 0x2123423>}
+>>> top_level = account.folders[u'Top level']
+>>> top_level.name
+u'Top level'
+>>> top_level.path
+u'Top level'
+
+>>> top_level.folders[u'Subfolder'] = subfolder = Folder()
+>>> top_level.folders
+{u'Subfolder': <gocept.imapapi.folder.Folder object
+                u'Top level/Subfolder' at 0x2132423>}
+>>> subfolder.name
+u'Subfolder'
+>>> subfolder.path
+u'Top level/Subfolder'
+
+>>> subfolder.folders[u'Subsubfolder'] = subsubfolder = Folder()
+>>> subfolder.folders
+{u'Subsubfolder': <gocept.imapapi.folder.Folder object
+                   u'Top level/Subfolder/Subsubfolder' at 0x2132423>}
+>>> subsubfolder.name
+u'Subsubfolder'
+>>> subsubfolder.path
+u'Top level/Subfolder/Subsubfolder'
+
+If a folder with the name of the new folder already exists in path, a
+`KeyError` is raised:
+
+>>> top_level.folders[u'Subfolder'] = Folder()
+Traceback (most recent call last):
+KeyError: "Could not create folder 'Top level/Subfolder': Mailbox exists."
+
+
+Accessing messages
+==================
+
+Messages can be retrieved from a folder using its `messages` attribute
+which provides a dictionary-like API:
+
+>>> INBOX.messages
+<8 messages of <gocept.imapapi.folder.Folder object u'INBOX' at 0xb78b3cac>>
+>>> INBOX.message_count
+8
+>>> INBOX.unread_message_count
+8
+>>> INBOX.messages.values()[0].flags.add(r'\Seen')
+>>> INBOX.unread_message_count
+7
+
+>>> pprint(dict(INBOX.messages))
+{'...-...': <gocept.imapapi.message.Message object u'INBOX/...-...' at 0x2162537>,
+ ...
+ '...-...': <gocept.imapapi.message.Message object u'INBOX/...-...' at 0x2138986>}
+
+Individual messages have a name attribute which can be used to uniquely
+identify a message within a folder. We can use it to retrieve an individual
+message:
+
+>>> mail1 = INBOX.messages.values()[0]
+>>> mail1.headers['X-IMAPAPI-Test']
+u'1'
+>>> INBOX.messages[mail1.name].headers['X-IMAPAPI-Test']
+u'1'
+
+In addition to the dictionary access, messages can be filtered and
+sorted. The result is an list-like object supporting index access and
+slicing:
+
+>>> messages = INBOX.messages.filtered(sort_by='SUBJECT')
+>>> [m.headers['Subject'] for m in messages]
+[u'" DELETE * FROM mailbox',
+ u'11 - AppleMail, Complex HTML with many images',
+ u'34 - Claws, encoded attachment filename',
+ u'Mail 1',
+ u'Mail 2',
+ u'Mail 3',
+ u'Fw: Original message',
+ u'Text \xfc']
+
+The sort direction can be reversed by specifying `sort_dir=='desc'`:
+
+>>> messages = INBOX.messages.filtered(
+...     sort_by='SUBJECT', sort_dir='desc')
+>>> [m.headers['Subject'] for m in messages]
+[u'Text \xfc',
+ u'Fw: Original message',
+ u'Mail 3',
+ u'Mail 2',
+ u'Mail 1',
+ u'34 - Claws, encoded attachment filename',
+ u'11 - AppleMail, Complex HTML with many images',
+ u'" DELETE * FROM mailbox']
+
+The message list returned from the filtering is lazy and supports
+slicing and item access:
+
+>>> len(messages)
+8
+>>> [m.headers['Subject'] for m in messages[3:5]]
+[u'Mail 2', u'Mail 1']
+
+>>> messages[3].headers['Subject']
+u'Mail 2'
+
+Other possible sort keys include:
+
+'From' address:
+
+>>> messages = INBOX.messages.filtered(sort_by='FROM')
+>>> [m.headers['From'] for m in messages]
+[u'',
+ u'Zaphod <admin@example.com>',
+ u'Christian Zagrodnick <cz@gocept.com>',
+ u'test@localhost',
+ u'test@localhost',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'umlaut@localhost']
+
+'From' real name, falling back to the address if no real name is given:
+
+>>> messages = INBOX.messages.filtered(sort_by='FROM_NAME')
+>>> [m.headers['From'] for m in messages]
+[u'',
+ u'Christian Zagrodnick <cz@gocept.com>',
+ u'test@localhost',
+ u'test@localhost',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'umlaut@localhost',
+ u'Zaphod <admin@example.com>']
+
+Calling the ``filtered`` method without a sort key returns the messages sorted
+by date:
+
+>>> messages = INBOX.messages.filtered()
+>>> [m.headers['From'] for m in messages]
+[u'test@localhost',
+ u'',
+ u'Zaphod <admin@example.com>',
+ u'Christian Zagrodnick <cz@gocept.com>',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'Thomas Lotze <tl@gocept.com>',
+ u'umlaut@localhost',
+ u'test@localhost']
+
+Filtering
+=========
+
+>>> import gocept.imapapi.interfaces
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value='Mail 1')
+>>> [m.headers['Subject'] for m in messages]
+[u'Mail 1']
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value='1')
+>>> [m.headers['Subject'] for m in messages]
+[u'Mail 1', u'11 - AppleMail, Complex HTML with many images']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SENDER,
+...     filter_value='Zaphod')
+>>> [m.headers['From'] for m in messages]
+[u'Zaphod <admin@example.com>']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT_OR_SENDER,
+...     filter_value='Zaphod')
+>>> [m.headers['From'] for m in messages]
+[u'Zaphod <admin@example.com>']
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT_OR_SENDER,
+...     filter_value='Mail 1')
+>>> [m.headers['Subject'] for m in messages]
+[u'Mail 1']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_TO_OR_CC,
+...     filter_value='Thomas')
+>>> [m.headers['To'] for m in messages]
+[u'Thomas Lotze <tl@gocept.com>', u'Thomas Lotze <tl@gocept.com>']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value=u'\xfc')
+>>> [m.headers['Subject'] for m in messages]
+[u'Text \xfc']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value=u'" DELETE * FROM mailbox')
+>>> [m.headers['Subject'] for m in messages]
+[u'" DELETE * FROM mailbox']
+
+An empty filter_value retrieves all messages:
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_TO_OR_CC,
+...     filter_value='')
+>>> len(messages)
+8
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_TO_OR_CC,
+...     filter_value=None)
+>>> len(messages)
+8
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SEEN,
+...     filter_value=True)
+>>> len(messages)
+8
+>>> messages[0].flags.remove(r'\Seen')
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SEEN,
+...     filter_value=True)
+>>> len(messages)
+7
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SEEN,
+...     filter_value=False)
+>>> len(messages)
+1
+
+
+Filtering and sorting combined
+==============================
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value='1', sort_by='SUBJECT')
+>>> [m.headers['Subject'] for m in messages]
+[u'11 - AppleMail, Complex HTML with many images', u'Mail 1']
+
+>>> messages = INBOX.messages.filtered(
+...     filter_by=gocept.imapapi.interfaces.FILTER_SUBJECT,
+...     filter_value='1', sort_by='FROM_NAME')
+>>> [m.headers['Subject'] for m in messages]
+[u'11 - AppleMail, Complex HTML with many images', u'Mail 1']
+
+
+
+Appending messages to folders
+=============================
+
+To store a new message in a folder, you `append` it:
+
+>>> before = len(INBOX.messages)
+>>> INBOX.messages.add('Foo')
+>>> len(INBOX.messages) - before
+1
+>>> message = INBOX.messages.values()[-1]
+>>> message.raw
+'Foo'
+
+
+Deleting messages from folders
+==============================
+
+To delete a message from a folder, you delete it using the `del` operator:
+
+>>> before = len(INBOX.messages)
+>>> del INBOX.messages[INBOX.messages.keys()[-1]]
+>>> len(INBOX.messages) - before
+-1
+>>> message = INBOX.messages.values()[-4]
+>>> print message.raw[:10000]
+Date: Tue, 11 Aug 2009 16:29:50 +0200
+From: Thomas Lotze <tl@gocept.com>
+To: joe@example.com
+Subject: 34 - Claws, encoded attachment filename
+Message-ID: <20090811162950.606d0776@krusty.ws.whq.gocept.com>
+...
+
+
+Renaming folders
+================
+
+Renaming the `INBOX` is not supported:
+
+>>> INBOX.name = 'Foobar'
+Traceback (most recent call last):
+KeyError: "Renaming INBOX isn't supported."
+
+Any other folder can be renamed, e.g. a folder which is located next to the
+`INBOX`:
+
+>>> bar = account.folders[u'Bar']
+>>> bar.name = 'Foobar'
+>>> pprint(dict(account.folders))
+{u'Foobar': <gocept.imapapi.folder.Folder object u'Foobar' at 0x1392b90>,
+...
+
+or inside the `INBOX`:
+
+>>> baz.name = 'Foobaz'
+>>> pprint(dict(baz.folders))
+{u'Boo': <gocept.imapapi.folder.Folder object u'INBOX/Foobaz/Boo' at 0x1392a30>}
+
+Renaming back is also supported:
+
+>>> baz.name = 'Baz'
+
+
+Moving folders
+==============
+
+We can move a folder to another place in the folder hierarchy. Folders can be
+moved to and from parent folders, to and from accounts as direct parents,
+within a single account and even between different accounts. Let's set up a
+second account and demonstrate this by moving a folder around a few times:
+
+>>> account2 = Account('localhost', 10143, 'test2', 'csdf')
+>>> pprint(dict(account2.folders))
+{u'INBOX': <gocept.imapapi.folder.Folder object u'INBOX' at 0xb7715a8c>}
+
+>>> account.folders[u'Foobar'].move(account.folders[u'INBOX'])
+>>> pprint(account.folders.keys())
+[u'F\xf6', u'INBOX', u'Top level']
+>>> pprint(dict(account.folders[u'INBOX'].folders))
+{u'Baz': <gocept.imapapi.folder.Folder object u'INBOX/Baz' at 0xb770eb6c>,
+ u'Foobar': <gocept.imapapi.folder.Folder object u'INBOX/Foobar' at 0xb770e52c>}
+
+>>> account.folders[u'INBOX'].folders[u'Foobar'].move(account)
+>>> pprint(account.folders[u'INBOX'].folders.keys())
+[u'Baz']
+>>> pprint(dict(account.folders))
+{u'Foobar': <gocept.imapapi.folder.Folder object u'Foobar' at 0xb770e60c>,
+ u'F\xf6': ..., u'INBOX': ..., u'Top level': ...}
+
+>>> account.folders[u'Foobar'].move(account2)
+>>> pprint(account.folders.keys())
+[u'F\xf6', u'INBOX', u'Top level']
+>>> pprint(dict(account2.folders))
+{u'Foobar': <gocept.imapapi.folder.Folder object u'Foobar' at 0xb770ec2c>,
+ u'INBOX': ...}
+
+Trying to move a folder to a parent that already contains another folder with
+the same name results in a KeyError:
+
+>>> account.folders[u'Foobar'] = Folder()
+>>> account.folders[u'Foobar'].move(account2)
+Traceback (most recent call last):
+KeyError: "Could not create folder 'Foobar': Mailbox exists."
+
+Moving folders implies moving all their content along. This works both when
+moving within one account and between different accounts as well:
+
+>>> account2.folders[u'Foobar'].folders[u'Quux'] = Folder()
+>>> account2.folders[u'Foobar'].move(account.folders[u'INBOX'])
+>>> pprint(dict(account.folders[u'INBOX'].folders[u'Foobar'].folders))
+{u'Quux': <gocept.imapapi.folder.Folder object u'INBOX/Foobar/Quux' at 0xb76279ac>}
+
+>>> del account.folders[u'Foobar']
+>>> account.folders[u'INBOX'].folders[u'Foobar'].move(account)
+>>> pprint(dict(account.folders[u'Foobar'].folders))
+{u'Quux': <gocept.imapapi.folder.Folder object u'Foobar/Quux' at 0xb774a18c>}
+
+
+Deleting folders
+================
+
+When deleting a folder, all subfolders and their messages are deleted.
+
+>>> pprint(dict(baz.folders))
+{u'Boo': <gocept.imapapi.folder.Folder object u'INBOX/Baz/Boo' at 0x1392a30>}
+
+Delete the folder `baz` with its subfolder `boo`:
+
+>>> del INBOX.folders['Baz']
+>>> pprint(dict(INBOX.folders))
+{}
+
+Deleting a non-existent folder or the INBOX itself raises a `KeyError`:
+
+>>> del INBOX.folders['Foo']
+Traceback (most recent call last):
+KeyError: u'Foo'
+
+>>> del account.folders['INBOX']
+Traceback (most recent call last):
+KeyError: u'INBOX'
