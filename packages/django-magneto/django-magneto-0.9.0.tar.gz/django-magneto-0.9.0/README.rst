@@ -1,0 +1,171 @@
+Overview
+========
+
+Magneto is a content and template management application built for the
+`Django`_ framework.
+
+A ``Template`` represents a web page on your site. Within the template
+can be used any built-in `Template Tags`_, as well as custom installed ones.
+Beyond HTML pages, a ``Template`` can also represent content types such as
+CSS, Javascript, JSON, and XML. When using template inheritance, templates
+can be marked for use strictly by the template loader and not for display
+as a web page.
+
+Key Features
+------------
+
+- Because templates and web pages are synonymous you can use template tags
+  and filters in your pages.
+- Manage content types like html, css, javascript, xml, json, and text.
+- Database queries can be minimized with the use of a cached template loader
+  that caches pre-rendered templates.
+- Use CodeMirror in the admin for template editing.
+- Know who changed what and when with built-in support for `Reversion`_.
+  Easily go back to older versions of the content.
+- Group related templates with ``Template Groups``. Useful when you have a
+  large number of templates.
+- `HTML5 Boilerplate`_ fixtures included to get started quickly.
+- Support for `South`_ migrations.
+
+Admin Pages
+-----------
+
+.. image:: http://imgur.com/OcKX3.png
+.. image:: http://imgur.com/OltdC.png
+.. image:: http://imgur.com/7fYnB.png
+
+
+Sandbox Installation
+====================
+
+An example application is provided to make this application easy to download
+and demo in a sandboxed environment. Use the following commands to run it::
+
+    $ hg clone http://bitbucket.org/prestontimmons/django-magneto
+    $ cd django-magneto
+    $ python bootstrap.py
+    $ bin/buildout
+    $ cp -r magneto/media/ example/media/magneto
+    $ bin/django syncdb
+    $ bin/django migrate
+    $ bin/django loaddata html5boilerplate.json
+    $ bin/django runserver 0.0.0.0:8000
+
+Visit http://localhost:8000/admin/ and update your domain in ``Site``
+settings to match the server your running on. Now you can view and edit
+the templates that were loaded in.
+
+
+Site Installation
+=================
+
+Configure your ``settings.py``
+------------------------------
+
+#) Make sure ``django.contrib.sites`` and ``django.contrib.admin`` are
+   installed. Add ``magneto`` and ``reversion`` to ``INSTALLED_APPS``.
+   Optionally add ``south`` for migration support.
+
+    Example::
+
+        INSTALLED_APPS = (
+            'django.contrib.admin',
+            'django.contrib.admindocs',
+            'django.contrib.auth',
+            'django.contrib.contenttypes',
+            'django.contrib.sessions',
+            'django.contrib.sites',
+
+              ...
+
+            'magneto',
+            'reversion',
+
+              ...
+
+            'south', # optional for migrations
+        )
+
+#) Add ``magneto.loader.CachedTemplateLoader`` to ``TEMPLATE_LOADERS``.
+
+    Example::
+
+        TEMPLATE_LOADERS = (
+            'magneto.loader.CachedTemplateLoader',
+
+              ...
+
+            'django.template.loaders.filesystem.load_template_source',
+            'django.template.loaders.app_directories.load_template_source',
+        )
+
+#) Copy media files to where they can be found by the admin pages.
+   * See the notes on the MAGNETO_MEDIA_DIRECTORY setting below for more
+   information.
+
+#) Add a url entry in your site urls.py.
+
+    Example::
+
+        urlpatterns = patterns('',
+            (r'^admin/', include(admin.site.urls)),
+            (r'^accounts/login/$', 'django.contrib.auth.views.login'),
+
+              ...
+
+            # Mount it at a specific url
+            (r'^pages/', include('magneto.urls')),
+
+            # Or mount it at your root url
+            (r'^', include('magneto.urls')),
+        )
+
+#) Run ``python manage.py syncdb``.
+
+#) Run ``python manage.py runserver 0.0.0.0:8000`` to start the
+   Django devserver.
+
+
+Configurable Settings
+=====================
+
+``MAGNETO_MEDIA_DIRECTORY``
+
+    The url of the root folder where the magneto media files are.
+    This defaults to a folder called ``magneto`` in the directory specified
+    by the ``MEDIA_URL`` setting.
+
+
+Notes
+=====
+
+Built for Python 2.6, Django 1.2 according to `PEP8`_ and the
+`Django Style Guide`_. If you're using previous versions of Python or
+Django your mileage may vary. Let me know if anything doesn't work.
+
+Standing on the shoulders of giants
+-----------------------------------
+This application is like a combined version of Django `DB Templates`_ and
+the built-in `Flatpages` application. Thanks to `Jannis Leidel`_ for
+open-sourcing the `DB Templates` app and for everyone who contributed to
+Django.
+
+------------------
+
+Thanks be to God who called me out of darkness into his marvelous light
+through the grace he bestowed on me through `Jesus Christ`_ in the
+`Gospel`_.
+
+
+.. _`DB Templates`: http://pypi.python.org/pypi/django-dbtemplates/
+.. _`Django`: http://djangoproject.com/
+.. _`Django Style Guide`: http://docs.djangoproject.com/en/dev/internals/contributing/
+.. _`Flatpages`: http://docs.djangoproject.com/en/dev/ref/contrib/flatpages/
+.. _`Gospel`: http://fm.thevillagechurch.net/resource_files/audio/20070224BA01S_MattChandler_Gospel.mp3
+.. _`HTML5 Boilerplate`: http://html5boilerplate.com/
+.. _`Jannis Leidel`: http://github.com/jezdez
+.. _`Jesus Christ`: http://www.youtube.com/watch?v=xMxRWd9sgGI
+.. _`PEP8`: http://www.python.org/dev/peps/pep-0008/
+.. _`Reversion`: http://pypi.python.org/pypi/django-reversion
+.. _`South`: http://south.aeracode.org/
+.. _`Template Tags`: http://docs.djangoproject.com/en/dev/ref/templates/builtins/
