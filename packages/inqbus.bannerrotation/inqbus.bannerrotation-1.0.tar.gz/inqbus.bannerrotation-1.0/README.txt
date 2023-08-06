@@ -1,0 +1,50 @@
+Introduction
+============
+
+inqbus.bannerrotation simple, ajax based bannerrotation viewlet for
+plone. It uses the jQuery Cycle Plugin and its original implementation
+can be found here: http://jquery.malsup.com/cycle/
+
+
+
+Installing
+==========
+
+Installing without buildout
+---------------------------
+
+Install this package in either your system path packages or in the
+lib/python directory of your Zope instance. You can do this using
+either easy_install or via the setup.py script.
+
+Installing with buildout
+------------------------
+
+If you are using `buildout_`, just add it to your eggs and your zcml
+in the instance part:
+
+    [instance]
+    eggs = inqbus.bannerrotation
+    ...
+    zcml = inqbus.bannerrotation
+
+inqbus.bannerrotation use a z3c.form view for the configlet. To make
+sure you get the right versions, you might want to add the following
+into your buildout.cfg to:
+
+    [buildout]
+    ...
+    extentds =
+        ...
+        http://good-py.appspot.com/release/plone.app.z3cform/0.5.0
+
+After that, just run ''bin/buildout'' in your instance rootfolder to
+get the package and all of it dependencies.
+
+.. _buildout: http://pypi.python.org/pypi/zc.buildout
+
+Configuration
+=============
+
+Copyright and Credits
+=====================
