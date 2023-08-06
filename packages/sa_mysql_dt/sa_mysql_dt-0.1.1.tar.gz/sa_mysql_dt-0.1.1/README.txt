@@ -1,0 +1,19 @@
+sa_mysql_dt
+***********
+
+MySQL, unlike for instance, PostgreSQL, doesn't support datetime
+columns with a sub-second granularity. This means that it is not
+possible to distinguish between two datetimes that were generated in
+the same second.
+
+This can however be very useful. This package defines a new field type
+for SQLAlchemy that should be a drop-in replacement for the standard
+SQLAlchemy DateTime. It stores its information in a Numeric column to
+enable sub-second granularity. 
+
+It's probably also not properly timezone aware.
+
+To use it in a SQLAlchemy table definition as a column type, import it
+instead of SQLAlchemy's version::
+
+  >>> from sa_mysql_dt import DateTime
