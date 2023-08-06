@@ -1,0 +1,127 @@
+Metadata-Version: 1.0
+Name: sslsnoop
+Version: 0.1
+Summary: Dumps the live traffic of an ssl-encrypted stream.
+Home-page: http://packages.python.org/sslsnoop/
+Author: Loic Jaquemet
+Author-email: loic.jaquemet+python@gmail.com
+License: GPL
+Download-URL: http://github.com/trolldbois/sslsnoop/tree/master
+Description: HOWTO:
+        ------
+        works if scapy doesn't drop packets. using pcap instead of SOCK_RAW  helps a lot now.
+        works better on interactive traffic with slow traffic.
+        Dumps one file by fd in outputs/
+        Attaching a process is quickier with --addr 0xb788aa98 as provided by abouchet.py
+            INFO:abouchet:found instance <class 'ctypes_openssh.session_state'> @ 0xb788aa98
+        
+          $ sudo python finder.py    # try ssh, sshd and ssh-agent...
+          $ sudo python openssh.py `pgrep ssh`
+          $ sudo python openssh.py `pgrep ssh` --server # for sshd
+          $ sudo python openssl.py `pgrep ssh-agent` # dump RSA and DSA keys
+        
+        and go and check outputs/ :
+        
+        
+        not so FAQ :
+        ============
+        
+        What does it do, really ?:
+        --------------------------
+        It dumps live AES keys from an openssh in aes128-ctr , and decrypts the traffic on the fly.
+        Working on adding all ciphers quickly. (aes_ctr is ok for all length, aes_cbc only half-duplex. )
+        
+        It can also dump DSA and RSA keys from ssh-agent or sshd ( or others ).
+        
+        How do it knows that the structures is valid ? :
+        ------------------------------------------------
+        You add some constraints ( expectedValues ) on the fields. Pointers are also a good start.
+        
+        Yeah, but you have to be root, so what's the use ? :
+        ----------------------------------------------------
+        Monitoring ssh traffic on honeypots ?
+        Monitoring encrypted traffic on honeypots ?
+        Monitoring encrypted traffic on ... somewhere your are root ?
+        
+         
+        Where does the idea comes from ? :
+        -----------------------------------
+        use http://www.hsc.fr/ressources/breves/passe-partout.html.fr  to get keys
+        use http://pauldotcom.com/2010/10/tsharkwireshark-ssl-decryption.html  
+         or http://www.rtfm.com/ssldump/ to read streams
+        use scapy, because it's fun ? but we need IP reassembly . 
+        pynids could be more useful...
+        dsniff is now in python ?
+        flowgrep
+        use python.
+        
+        
+        What are the dependencies ? :
+        ----------------------------
+        python-haystack (same author)
+        python-ptrace
+        scapy
+        python-pcap / python-xxxpcap ( recommended for perf issues )
+        paramiko (for ssh decryption) [ TODO, extract & kill dep. we only need Message and Packetizer ]
+        python-psutil 
+        
+        Conclusion :
+        ------------
+        poc done.
+        Next, `pgrep firefox`. 
+        
+        
+        Biblio
+        -------
+        
+        Bringing volatility to Linux
+        http://dfsforensics.blogspot.com/2011/03/bringing-linux-support-to-volatility.html
+        
+        Extracting truecrypt keys from memory
+        http://jessekornblum.com/tools/volatility/cryptoscan.py
+        
+        python-ptrace ( hey, haypo again)
+        https://bitbucket.org/haypo/python-ptrace/wiki/Home
+        https://bitbucket.org/haypo/python-ptrace/wiki/Documentation
+        
+        from ptrace.debugger.memory_mapping import readProcessMappings
+        
+        openssl.py is passe-partout.py - OK - 04/03/2011
+        
+        OpenSSH, testing ciphers
+        ========================
+             Ciphers
+                     Specifies the ciphers allowed for protocol version 2 in order of preference.  Multiple ciphers must be comma-separated.  The supported ciphers
+                     are “3des-cbc”, “aes128-cbc”, “aes192-cbc”, “aes256-cbc”, “aes128-ctr”, “aes192-ctr”, “aes256-ctr”, “arcfour128”, “arcfour256”, “arcfour”,
+                     “blowfish-cbc”, and “cast128-cbc”.  The default is:
+        
+                        aes128-ctr,aes192-ctr,aes256-ctr,arcfour256,arcfour128,
+                        aes128-cbc,3des-cbc,blowfish-cbc,cast128-cbc,aes192-cbc,
+                        aes256-cbc,arcfour
+        
+        force one :
+        
+        ssh -c aes192-ctr log@host
+        
+        
+        
+        firefox & NSS
+        =============
+        INFO:abouchet:found instance <class 'ctypes_nss_generated.CERTCertificateStr'> @ 0xbfe12c20   => sur la stack
+        
+        INFO:abouchet:Looking at 0x85f00000-0x86000000 (rw-p)
+        INFO:abouchet:processed 6465536 bytes
+        ptrace.debugger.process_error.ProcessError: readBytes(0x84d28ae4, 392) error: [Errno 5] Input/output error
+        ## weird ....
+        
+        4894720
+        
+Keywords: memory,analysis,forensics,struct,ptrace,openssh,openssl,decrypt
+Platform: UNKNOWN
+Classifier: Topic :: System :: Networking
+Classifier: Topic :: Security
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Programming Language :: Python
+Classifier: Development Status :: 5 - Production/Stable
