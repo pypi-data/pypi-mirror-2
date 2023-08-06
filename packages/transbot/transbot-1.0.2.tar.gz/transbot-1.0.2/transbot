@@ -1,0 +1,496 @@
+#!/usr/bin/env python
+#    Transbot is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Transbot is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Transbot.  If not, see <http://www.gnu.org/licenses/>.
+#
+# 	 Original Developer: John McLean
+#	 Current Developers: Taylor Rose 	tjr1351@rit.edu
+#						 Mark Thill 	mrt8449@rit.edu
+#	 Bug fixes by:		 Graham Weldon	graham@grahamweldon.com
+
+import logging
+
+import irclib, urllib2, re, sys, os
+
+import simplejson
+
+from optparse import OptionParser
+
+import ConfigParser
+
+
+
+irclib.DEBUG = False # Set this to true if you hate life.
+
+#connection info and default values
+network = 'irc.freenode.net'
+port = 6667
+channel_languages = {}
+base_dir = os.path.join( os.environ['HOME'], '.Transbot-config')
+if not os.path.exists(base_dir):
+	os.mkdir(base_dir)
+log_path = os.path.join( base_dir, 'transbot.log')
+conf_path = os.path.join( base_dir, 'transbot.ini')
+
+
+#configure logging
+logging.basicConfig(filename= log_path, 
+                    format="%(asctime)s: %(levelname)s: %(message)s",
+                    level=logging.DEBUG)
+
+# supported_languages
+# 'de' , 'zh' , 'en' , 'es' , 'fr' , 'ru' , 'pt' , 'ga' , 'hi' , 'he' , 'it' , 
+# 'ko' , 'la' , 'ro' , 'sr' , 'sl' , 'sv' , 'tr' , 'ar' , 'ja' 
+
+# FORMAT OF TRANSBOT.CONF
+#
+# network: <network-name>
+# channels: #<channel-name> <two char language identifier>, etc...
+# port: <port #>
+#
+def handle_command(channel, command, args=""):
+		
+	if command == "help":
+		
+		help(channel)
+	
+	elif command == "about":
+		
+		about(channel)
+		
+	elif command == "list_chan":
+		
+		list_channels(channel)
+		
+	elif command == "add_chan":
+		
+		add_chan(channel, args)
+		
+	elif command == "rem_chan":
+		
+		rem_chan(channel)
+		
+	elif command == "change_lang":
+		
+		change_lang(channel, args)
+		
+	elif command == "save":
+		save_list = ""
+		
+		for key in channel_languages.keys():
+			
+			save_list = save_list + key[1:] + ":" + channel_languages[key] + ","
+
+		save_list = save_list[0:len(save_list)-1]
+		print save_list
+		server.privmsg(channel, "Saved channels to config file: " + save_list)
+		save_channels(save_list)
+		
+def rem_chan(source_chan):
+	
+	server.privmsg(source_chan, "Transbot removed from channel")
+	remove_channels(source_chan[1:])
+	server.part(source_chan)
+	
+
+def add_chan(source_chan, chan_pair):
+	new_channel = (chan_pair.split(':'))[0]
+	lang = (chan_pair.split(':'))[1]
+	
+	if len(lang) == 2:
+		channel_languages[new_channel] = lang
+		server.join(new_channel)
+		server.privmsg(source_chan, "Added channel: " + new_channel + " Language: " + lang)
+		
+	else:
+		#Make this more verbose later
+		server.privmsg(source_chan, "Incorrect input")
+
+def help(channel):
+	
+	server.privmsg(channel, "Usage: 'transbot [command] [args]")
+	server.privmsg(channel, "'help': list commands")
+	server.privmsg(channel, "'about': about Transbot")
+	server.privmsg(channel, "'list_chan': list the channels that Transbot is connected to")
+	server.privmsg(channel, "'add_chan <channel_name>:<language code>': connects Transbot to selected channel with selected source language")
+	server.privmsg(channel, "'rem_chan <channel_name>': disconnect Transbot from selected channel")
+	server.privmsg(channel, "'change_lang <language code>': Change the translation language of the current channel")
+	server.privmsg(channel, "'save': save the current channels to config file")
+	server.privmsg(channel, "for a list of supported languages please check our wiki https://fedorahosted.org/transbot/#SupportedLanguages")
+
+def about(channel):
+	
+	server.privmsg(channel, "Transbot is an interchannel IRC translation bot. Messages sent on one channel will be translated and sent to every channel Transbot is in. For more information please visit http://fedorahosted.org/transbot")
+
+def list_channels(channel):
+	
+	server.privmsg(channel, "Current channels:")
+	
+	for chan in channel_languages.keys():
+		
+		server.privmsg(channel, chan + ":" + channel_languages[chan])
+
+def change_lang(channel, lang):
+	
+	if len(lang) == 2 and channel in channel_languages.keys():
+		channel_languages[channel] = lang
+		server.privmsg(channel, "Channel language changed to " + lang)
+	
+	else:
+		# Should be more verbose later
+		server.privmsg(channel, "Incorrect input")
+
+def create_default_config():
+	#logging.debug('Error with .ini creating default .ini')
+	config = ConfigParser.RawConfigParser()
+	config.add_section('Connection_Info')
+	config.set('Connection_Info','network','irc.freenode.net')
+	config.set('Connection_Info','port','6667')
+	config.add_section('Channels')
+	f = open(conf_path,'wb')
+	config.write(f)
+	f.close()
+
+
+def save_channels(save_list):
+	toAdd = save_list.split(',')
+	config = ConfigParser.SafeConfigParser()
+	try:
+		config.read(conf_path)
+						
+	except Exception,msg:
+		create_default_config()
+		save_channels(save_list)
+		
+	else:
+		print toAdd
+		for channel in toAdd:
+			pair = channel.split(':')
+			config.set('Channels',pair[0],pair[1])
+			
+		print(config.items('Channels'))
+		f = open(conf_path,'w')
+		config.write(f)
+		f.close()
+		
+def remove_channels(remove_list):
+	config = ConfigParser.RawConfigParser()
+	try:
+		config.read(conf_path)
+		config.items('Channels')
+	except Exception:
+		create_default_config()
+		remove_channels(remove_list)
+	else:
+		toRemove = remove_list.split(',')
+		for channel in toRemove:
+			config.remove_option('Channels',channel)
+
+		f = open(conf_path,'wb')
+		config.write(f)
+		f.close()			
+							
+nick = 'transbot0'
+name = 'transbot Test'
+api = 'http://ajax.googleapis.com/ajax/services/language/translate?v=1.0&q='
+
+#Handles the actual translation of the message
+def translator(source_lang, target_lang, message, name, channel):
+    url =  api + urllib2.quote(message) + '&langpair=' + source_lang + '%7C' + target_lang
+    urlRetVal = urllib2.urlopen(url)
+    json_obj = simplejson.load(urlRetVal)
+    logging.debug(json_obj)
+    
+    #encode in utf-8
+    line = json_obj['responseData'] ['translatedText']
+    line = line.replace('\"', '')
+    line = line.encode ("utf-8")
+    
+    # Handles unescaped characters
+    line = line.replace("&amp;", "&")
+    line = line.replace("&gt;", ">")
+    line = line.replace("&lt;", "<")
+    line = line.replace("&quot;", "\"")
+    line = line.replace("&#39;", "'")
+    
+    logging.info(line) 
+    return line
+    
+    
+def handleEndWelcome ( connection, event ):
+	logging.debug(" Welcome messages recieved. Joining channels...")
+	for channel in channel_languages.keys():
+		server.join ( channel )
+
+
+#Generic echo handler (space added, then with no space), used to ouput initial info from server
+def handleEcho ( connection, event ):
+	logging.debug(" ".join(event.arguments()))
+def handleNoSpace ( connection, event ):
+	logging.debug(" ".join(event.arguments()))
+
+
+#handle private notices
+def handlePrivNotice ( connection, event ):
+	if event.source():
+		logging.debug(":: " + event.source() + " ->" + event.arguments() [0])
+	else:
+		logging.dedug(event.arguments()[0])
+
+
+#auto-joins to invited channels
+def handleInvite ( connection, event ):
+	channel_languages [ str ( event.arguments() [ 0 ]  ).lower() ] = '.en'
+	connection.join ( event.arguments() [ 0 ] ) 
+
+
+#handles private messages
+def handlePrivMessage (  connection, event ):
+	name = event.source().split ( '!' ) [ 0 ]
+	helpmessage =  [ 'transbot 0.1', "This program connects to user" +
+    " specified channels on irc.freenode.net and translates between" +
+    " languages on those channels. Users must specify the language on the" +
+    " channel before transbot will translate anything. Specification comes" +
+    " in the form of messaging the channel with a message of the form" +
+    " '.<language abbreviation>'. For example, english is '.en', spanish is" +
+    " '.es'. ", 'Languages supported are: ar - Arabic, de - German, en -' +
+    ' English, es - Spanish, fr - French, ga - Irish, hi - Hindi, he -' +
+    ' Hebrew, it - Italian, ja - Japanese, ko - Korean, la - Latin, pt -' +
+    ' Portugese, ro - Romanian, ru - Russian, sl - Slovenian, sr - Serbian,' +
+    ' sv - Swedish, tr - Turkish, zh - Chinese' ]
+	for line in range ( len ( helpmessage ) ):	
+		server.privmsg ( name , helpmessage [ line ] )
+
+
+#handles public messages
+def handlePubMessage ( connection, event ):
+    seeker = re.compile ( '^\.[a-zA-Z]{2}$' )
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    message = event.arguments() [ 0 ]
+    logging.info(message)
+    name = event.source().split( '!' ) [ 0 ] 
+    if name.strip ( '0123456789' ) == 'transbot':
+        return
+        
+    if message.startswith("transbot"):
+		message = message.split(" ", 2);
+		
+		if len(message) == 2:
+			
+			handle_command(event.target(), message[1])
+			
+		elif len(message) == 3:
+			
+			handle_command(event.target(), message[1], message[2])
+    else:
+		    
+		# this seems to be a command to set the language of a channel    
+		if bool ( seeker.search ( message ) ):
+			message = message.strip ( '.' )
+			channel_languages [ str ( event.target() ).lower()  ] = message; return
+		for channel in channel_languages.keys():
+			if channel_languages [ channel ] == source_lang:
+				pass
+			else:
+				target_lang = channel_languages [ channel ]
+				line = translator(source_lang, target_lang, message, name, channel)
+				server.privmsg(channel, name +  "> " + line)
+
+
+#handles topic changes
+def handleTopic ( connection, event ):
+    name = event.source().split ( "!" ) [ 0 ]
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    message = event.arguments() [ 0 ]
+    logging.info(message)    
+    for channel in channel_languages.keys():
+        if channel_languages[channel] == source_lang:
+            pass
+        else:
+            target_lang = channel_languages[channel]
+            translation = translator(source_lang, target_lang, "has set mode:" + message, name, channel)
+            server.privmsg ( channel, name + " " + translation )
+
+
+#handles mode changes
+def handleMode ( connection, event ):
+    name = event.source().split ( "!" ) [ 0 ]
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    message = event.arguments() [ 0 ] 
+    logging.info(message)
+    for channel in channel_languages.keys():
+        if channel_languages [ channel ] == source_lang:
+            pass
+        else:
+            target_lang = channel_languages [ channel ]
+            translation = translator(source_lang, target_lang, "has set mode:" + message, name, channel)
+            if len ( event.arguments() ) < 2:
+                server.privmsg ( channel, name + " " + translation)
+            else:
+                name2 = event.arguments() [ 1 ]
+                server.privmsg ( channel, name + " " + translation.split( "has set " ) [ 0 ] + name2 + "'s" + translation.split( "has set" ) [ 1 ] )
+
+
+#handles Parts
+def handlePart ( connection, event ):
+    name = event.source().split ( "!" ) [ 0 ]
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    for channel in channel_languages.keys():
+        if channel_languages[channel] == source_lang:
+            pass
+        else:
+            target_lang = channel_languages[channel]
+            translation = translator(source_lang, target_lang, "has quit", name, channel)
+            logging.info(translation)
+            server.privmsg ( channel, name + " " + translation + " " + str ( event.target() ).lower()  )
+
+
+#handles quits
+def handleQuit ( connection, event ):
+    name = event.source().split ( "!" ) [ 0 ]
+    for channel in channel_languages.keys():
+        target_lang = channel_languages [ channel ]
+        translation = translator("", target_lang, "has disconnected", name, channel)
+        logging.info(translation)
+        server.privmsg ( channel, name + " " + translation )
+
+	
+#handles kicks
+def handleKick ( connection, event ):
+    name = event.source().split ( "!" ) [ 0 ]
+    name2 = event.arguments() [ 0 ]
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    for channel in channel_languages.keys():
+        if channel_languages[channel] == source_lang:
+            pass
+        else:
+            target_lang = channel_languages[channel]
+            translation = translator(source_lang, target_lang, "has been kicked by", name, channel)
+            server.privmsg ( channel, name2 + " " + translation + " " + name)
+
+
+#handle channel joins
+def handleJoin ( connection, event ):
+    #the source needs to be split into just the name
+    #it comes in the format nickname!user@host
+    name = event.source().split ( "!" ) [ 0 ] 
+    if name.strip ( '0123456789' ) == "transbot":
+        return
+    source_lang = channel_languages [ str ( event.target() ).lower()  ] 
+    for channel in channel_languages.keys():
+        if channel_languages [ channel ] == source_lang:
+            pass
+        else:
+            target_lang = channel_languages [ channel ]
+            translation = translator(source_lang, target_lang, "has joined:", name, channel)
+            logging.info(translation)
+            server.privmsg ( channel, name + ' ' + translation + ' ' + str ( event.target() ).lower()  )
+
+#handler for a pre-registed nick
+def handleNoNick (connection, event):
+    global nick, server
+    instance = int ( nick.strip ( 'transbot' ) )
+    instance += 1
+    nick2 = 'transbot' + str ( instance )
+    server = server_object ( network, nick2, name, port, ircname = name )
+    return server
+#create an irc object
+irc = irclib.IRC()
+
+# Register handlers
+irc.add_global_handler ( 'part' , handlePart ) #handles parts
+irc.add_global_handler ( 'quit' , handleQuit ) #handles quits
+irc.add_global_handler ( 'kick' , handleKick ) #handles kicks
+irc.add_global_handler ( 'mode' , handleMode ) #handles mode changes
+irc.add_global_handler ( 'topic' , handleTopic ) #handles topic changes
+irc.add_global_handler ( 'privmsg', handlePrivMessage ) #private messages
+irc.add_global_handler ( 'pubmsg', handlePubMessage ) #public channel messages
+irc.add_global_handler ( 'invite', handleInvite ) #invite
+irc.add_global_handler ( 'privnotice', handlePrivNotice ) #Private notice
+irc.add_global_handler ( 'welcome', handleEcho ) # Welcome message
+irc.add_global_handler ( 'yourhost', handleEcho ) # Host message
+irc.add_global_handler ( 'created', handleEcho ) # Server creation message
+irc.add_global_handler ( 'myinfo', handleEcho ) # "My info" message
+irc.add_global_handler ( 'featurelist', handleEcho ) # Server feature list
+irc.add_global_handler ( 'luserclient', handleEcho ) # User count
+irc.add_global_handler ( 'luserop', handleEcho ) # Operator count
+irc.add_global_handler ( 'luserchannels', handleEcho ) # Channel count
+irc.add_global_handler ( 'luserme', handleEcho ) # Server client count
+irc.add_global_handler ( 'n_local', handleEcho ) # Server client count/maximum
+irc.add_global_handler ( 'n_global', handleEcho ) # Network client count/maximum
+irc.add_global_handler ( 'luserconns', handleEcho ) # Record client count
+irc.add_global_handler ( 'luserunknown', handleEcho ) # Unknown connections
+irc.add_global_handler ( 'motdstart', handleEcho ) # Message of the day ( start )
+irc.add_global_handler ( 'motd', handleNoSpace ) # Message of the day
+irc.add_global_handler ( 'endofmotd', handleEndWelcome ) # Message of the day ( end )
+irc.add_global_handler ( 'nomotd', handleEndWelcome ) # Missing Message of the day
+irc.add_global_handler ( 'join', handleJoin ) # Channel join
+irc.add_global_handler ( 'namreply', handleNoSpace ) # Channel name list
+irc.add_global_handler ( 'endofnames', handleNoSpace ) # Channel name list ( end )
+irc.add_global_handler ( 'nicknameinuse', handleNoNick ) #handles pre-registered nick
+
+#create a server object, connect and join the channel
+def server_object ( network, nick, name, port, ircname ):
+	server = irc.server()
+	server.connect ( network, port, nick, ircname )
+	return server
+
+#handles command args
+#handles help, save, remove
+parser = OptionParser()
+parser.add_option("-s","--save",help="Saves a list of channels as default."+  
+		"Uses form -s channel1:es,channel2:es...",dest="save")
+parser.add_option("-r","--remove",help="Removes a list of channels as"+
+		"default. Uses form -r channel1:es,channel2:es...",dest="remove")
+
+(options,args)=parser.parse_args()
+	
+if options.save is not None:
+	save_channels(options.save)
+if options.remove is not None:
+	remove_channels(options.remove)
+	
+for arg in args:
+	arg = arg.split(':')
+	channel_languages ['#'+arg[0].lower()] = arg[1]
+
+config = ConfigParser.RawConfigParser()
+try:
+	config.read(conf_path)
+except:
+	create_default_config()
+	config = ConfigParser.RawConfigParser()
+	config.read(conf_path)
+try:
+	network = config.get('Connection_Info','network')
+	port = config.getint('Connection_Info','port')
+	channel_list = config.items('Channels')
+except:
+	create_default_config()
+	config = ConfigParser.RawConfigParser()
+	config.read(conf_path)
+	network = config.get('Connection_Info','network')
+	port = config.getint('Connection_Info','port')
+	channel_list = config.items('Channels')
+
+for channel in channel_list:
+	channel_languages [ '#'+channel[ 0 ] ] = channel[ 1 ]
+	#handles command args
+
+for arg in args:
+	arg = arg.split(':')
+	channel_languages ['#'+arg[0].lower()] = arg[1]
+
+server = server_object ( network, nick, name, port, ircname = name )
+
+	#jumps into infinite loop
+irc.process_forever()
