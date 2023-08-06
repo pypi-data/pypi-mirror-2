@@ -1,0 +1,104 @@
+.. _purpose and overview:
+
+Purpose and Overview
+====================
+
+`CKAN`_ is a metadata registry for datasets. These datasets can be
+organised into groups for curation purposes. Often these goups have
+criteria that must be met in order for datasets to be included. This
+tool is intended to help automate checking the metadata to see if a
+particular dataset should be included.
+
+The design of this tool is to take a set of rules, expressed in 
+`Notation 3`_ and to compare the dataset description against these
+rules. The output is an `RDF`_ graph containing statements generated
+by the rules. Inclusion in a group depends on contents of this graph. 
+
+An example may make this clearer. Suppose we consider the `LOD
+Cloud`_. Inclusion in the cloud means inclusion in the `lodcloud
+group`_ on CKAN. Amongst the criteria for inclusion are that a dataset
+must contain dereferenceable resources. So we make a simple ruleset::
+
+    @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    @prefix void: <http://rdfs.org/ns/void#>.
+    @prefix curate: <http://eris.okfn.org/ww/2010/12/curate#>.
+
+    { ?dataset void:exampleResource ?example } =>
+    { ?example curate:httpReq "HEAD" }.
+
+This says that if something, the ``?dataset`` has an example resource,
+``?example`` then we evaluate the special predicate ``curate:httpReq``
+(of which more later). This and other simple rulesets can be found
+in the `examples`_ directory in the source distribution.
+
+The result of using the tool to evaluate the `record for
+DBpedia`_ produces a graph that contains a transcript of the HTTP
+session, including headers and status codes and suchlike.
+
+The command line used to do this was:
+
+.. code-block:: sh
+
+    curate -v \
+        -r https://bitbucket.org/okfn/curate/raw/tip/examples/dereference.n3 \
+        dbpedia
+
+A more advanced example can do things other than simply infer
+triples. We can actually have consequent actions using the
+builtins. One thing that is important to remember is that we cannot
+use builtins in the head (consequent) rules and the head must have 
+at least one inferred triple or action.
+
+Continuing with an example, suppose the criteria for membership in a
+group, such as the `curation testing group` is simply to have a
+dereferenceable example resource. So we may make a ruleset that looks
+like this::
+
+    @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    @prefix void: <http://rdfs.org/ns/void#>.
+    @prefix http: <http://www.w3.org/2006/http#>.
+    @prefix curate: <http://eris.okfn.org/ww/2010/12/curate#>.
+
+    { ?dataset void:exampleResource ?example } =>
+    { ?example curate:httpReq "HEAD" }.
+
+    { ?dataset void:exampleResource ?example .
+      ?req a http:Request . 
+      ?req http:requestURI ?uri .
+      ?req http:resp ?resp .
+      ?resp http:statusCodeNumber "200" } =>
+    { ?dataset curate:addGroup <http://ckan.net/group/curation_testing> }.
+
+This example contains two rules that will chain together. The first
+rule is identical to the previous example. The second rule looks at
+the result of the request and checks that the status code was "200".
+In this case it calls the ``curate:addGroup`` action to add the
+dataset to the specified group.  This action calls
+:class:`curate.actions.addGroup` which will queue a call to the `CKAN
+API`_ that adds the given dataset to the group in question.
+
+The command line for executing this one, because it does an
+authenticated write operation on the `CKAN`_ catalogue, needs an
+extra parameter to specify the API key to use, and needs to be told
+explicitly to save the metadata back via the API.
+
+.. code-block:: sh
+
+    curate -v -s \
+        -k API_KEY \
+        -r https://bitbucket.org/okfn/curate/raw/tip/examples/groups.n3 \
+        dbpedia
+
+For more complete documentation on the options and behaviours, see the
+documentation for the command line tool in this manual.
+
+.. _ckan: http://ckan.oet/
+.. _Notation 3: http://www.w3.org/DesignIssues/Notation3
+.. _RDF: http://en.wikipedia.org/wiki/Resource_Description_Framework
+.. _LOD Cloud: http://richard.cyganiak.de/2007/10/lod/
+.. _lodcloud group: http://ckan.net/group/lodcloud
+.. _examples: https://bitbucket.org/okfn/curate/src/tip/examples/
+.. _record for DBpedia: http://ckan.net/package/dbpedia
+.. _RIF Actions: http://www.w3.org/TR/rif-prd/#Actions
+.. _curation testing group: http://ckan.net/group/curation_testing
+.. _CKAN API: http://packages.python.org/ckan/api.html
