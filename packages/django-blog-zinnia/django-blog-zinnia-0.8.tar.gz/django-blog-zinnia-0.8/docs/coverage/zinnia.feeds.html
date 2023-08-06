@@ -1,0 +1,405 @@
+<html>
+<head>
+<title>zinnia.feeds</title>
+</head>
+<body>
+zinnia.feeds
+<style>
+.coverage pre {float: left; margin: 0px 1em; border: none;
+               padding: 0px; }
+.num pre { margin: 0px }
+.nocov, .nocov pre {background-color: #faa}
+.cov, .cov pre {background-color: #cfc}
+div.coverage div { clear: both; height: 1.1em}
+</style>
+<div class="stats">
+Covered: 255 lines<br/>
+Missed: 24 lines<br/>
+Skipped 101 lines<br/>
+Percent: 91 %<br/>
+
+</div>
+<div class="coverage">
+<div class="cov"><span class="num"><pre>  1</pre></span><pre>&quot;&quot;&quot;Feeds for Zinnia&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>  2</pre></span><pre>from sgmllib import SGMLParser</pre></div>
+<div class="skip"><span class="num"><pre>  3</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>  4</pre></span><pre>from django.contrib.auth.models import User</pre></div>
+<div class="cov"><span class="num"><pre>  5</pre></span><pre>from django.contrib.sites.models import Site</pre></div>
+<div class="cov"><span class="num"><pre>  6</pre></span><pre>from django.core.urlresolvers import reverse</pre></div>
+<div class="cov"><span class="num"><pre>  7</pre></span><pre>from django.core.urlresolvers import NoReverseMatch</pre></div>
+<div class="cov"><span class="num"><pre>  8</pre></span><pre>from django.utils.feedgenerator import Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>  9</pre></span><pre>from django.utils.translation import ugettext as _</pre></div>
+<div class="cov"><span class="num"><pre> 10</pre></span><pre>from django.contrib.syndication.views import Feed</pre></div>
+<div class="cov"><span class="num"><pre> 11</pre></span><pre>from django.shortcuts import get_object_or_404</pre></div>
+<div class="skip"><span class="num"><pre> 12</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 13</pre></span><pre>from tagging.models import Tag</pre></div>
+<div class="cov"><span class="num"><pre> 14</pre></span><pre>from tagging.models import TaggedItem</pre></div>
+<div class="skip"><span class="num"><pre> 15</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 16</pre></span><pre>from zinnia.models import Entry</pre></div>
+<div class="cov"><span class="num"><pre> 17</pre></span><pre>from zinnia.settings import COPYRIGHT</pre></div>
+<div class="cov"><span class="num"><pre> 18</pre></span><pre>from zinnia.settings import PROTOCOL</pre></div>
+<div class="cov"><span class="num"><pre> 19</pre></span><pre>from zinnia.settings import FEEDS_MAX_ITEMS</pre></div>
+<div class="cov"><span class="num"><pre> 20</pre></span><pre>from zinnia.managers import entries_published</pre></div>
+<div class="cov"><span class="num"><pre> 21</pre></span><pre>from zinnia.views.categories import get_category_or_404</pre></div>
+<div class="skip"><span class="num"><pre> 22</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre> 23</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 24</pre></span><pre>class ImgParser(SGMLParser):</pre></div>
+<div class="cov"><span class="num"><pre> 25</pre></span><pre>    &quot;&quot;&quot;Parser for getting IMG markups&quot;&quot;&quot;</pre></div>
+<div class="skip"><span class="num"><pre> 26</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 27</pre></span><pre>    def __init__(self):</pre></div>
+<div class="cov"><span class="num"><pre> 28</pre></span><pre>        SGMLParser.__init__(self)</pre></div>
+<div class="cov"><span class="num"><pre> 29</pre></span><pre>        self.img_locations = []</pre></div>
+<div class="skip"><span class="num"><pre> 30</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 31</pre></span><pre>    def start_img(self, attr):</pre></div>
+<div class="cov"><span class="num"><pre> 32</pre></span><pre>        &quot;&quot;&quot;Save each image's location&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 33</pre></span><pre>        attr = dict(attr)</pre></div>
+<div class="cov"><span class="num"><pre> 34</pre></span><pre>        if attr.get('src', ''):</pre></div>
+<div class="cov"><span class="num"><pre> 35</pre></span><pre>            self.img_locations.append(attr['src'])</pre></div>
+<div class="skip"><span class="num"><pre> 36</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre> 37</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 38</pre></span><pre>class EntryFeed(Feed):</pre></div>
+<div class="cov"><span class="num"><pre> 39</pre></span><pre>    &quot;&quot;&quot;Base Entry Feed&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 40</pre></span><pre>    title_template = 'feeds/entry_title.html'</pre></div>
+<div class="cov"><span class="num"><pre> 41</pre></span><pre>    description_template = 'feeds/entry_description.html'</pre></div>
+<div class="cov"><span class="num"><pre> 42</pre></span><pre>    feed_copyright = COPYRIGHT</pre></div>
+<div class="skip"><span class="num"><pre> 43</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 44</pre></span><pre>    def __init__(self):</pre></div>
+<div class="cov"><span class="num"><pre> 45</pre></span><pre>        self.site = Site.objects.get_current()</pre></div>
+<div class="skip"><span class="num"><pre> 46</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 47</pre></span><pre>    def item_pubdate(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 48</pre></span><pre>        &quot;&quot;&quot;Publication date of an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 49</pre></span><pre>        return item.creation_date</pre></div>
+<div class="skip"><span class="num"><pre> 50</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 51</pre></span><pre>    def item_categories(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 52</pre></span><pre>        &quot;&quot;&quot;Entry's categories&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 53</pre></span><pre>        return [category.title for category in item.categories.all()]</pre></div>
+<div class="skip"><span class="num"><pre> 54</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 55</pre></span><pre>    def item_author_name(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 56</pre></span><pre>        &quot;&quot;&quot;Returns the first author of an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 57</pre></span><pre>        return item.authors.all()[0].username</pre></div>
+<div class="skip"><span class="num"><pre> 58</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 59</pre></span><pre>    def item_author_email(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 60</pre></span><pre>        &quot;&quot;&quot;Returns the first author's email&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 61</pre></span><pre>        return item.authors.all()[0].email</pre></div>
+<div class="skip"><span class="num"><pre> 62</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 63</pre></span><pre>    def item_author_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 64</pre></span><pre>        &quot;&quot;&quot;Returns the author's URL&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 65</pre></span><pre>        url = '%s://%s' % (PROTOCOL, self.site.domain)</pre></div>
+<div class="cov"><span class="num"><pre> 66</pre></span><pre>        try:</pre></div>
+<div class="cov"><span class="num"><pre> 67</pre></span><pre>            author_url = reverse('zinnia_author_detail',</pre></div>
+<div class="cov"><span class="num"><pre> 68</pre></span><pre>                                 args=[item.authors.all()[0].username])</pre></div>
+<div class="cov"><span class="num"><pre> 69</pre></span><pre>            return url + author_url</pre></div>
+<div class="nocov"><span class="num"><pre> 70</pre></span><pre>        except NoReverseMatch:</pre></div>
+<div class="nocov"><span class="num"><pre> 71</pre></span><pre>            return url</pre></div>
+<div class="skip"><span class="num"><pre> 72</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 73</pre></span><pre>    def item_enclosure_url(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 74</pre></span><pre>        &quot;&quot;&quot;Returns an image for enclosure&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 75</pre></span><pre>        if item.image:</pre></div>
+<div class="nocov"><span class="num"><pre> 76</pre></span><pre>            return item.image.url</pre></div>
+<div class="cov"><span class="num"><pre> 77</pre></span><pre>        parser = ImgParser()</pre></div>
+<div class="cov"><span class="num"><pre> 78</pre></span><pre>        try:</pre></div>
+<div class="cov"><span class="num"><pre> 79</pre></span><pre>            parser.feed(item.content)</pre></div>
+<div class="nocov"><span class="num"><pre> 80</pre></span><pre>        except UnicodeEncodeError:</pre></div>
+<div class="nocov"><span class="num"><pre> 81</pre></span><pre>            return</pre></div>
+<div class="cov"><span class="num"><pre> 82</pre></span><pre>        if len(parser.img_locations):</pre></div>
+<div class="cov"><span class="num"><pre> 83</pre></span><pre>            if self.site.domain in parser.img_locations[0]:</pre></div>
+<div class="nocov"><span class="num"><pre> 84</pre></span><pre>                return parser.img_locations[0]</pre></div>
+<div class="cov"><span class="num"><pre> 85</pre></span><pre>            else:</pre></div>
+<div class="cov"><span class="num"><pre> 86</pre></span><pre>                return '%s://%s%s' % (PROTOCOL,</pre></div>
+<div class="cov"><span class="num"><pre> 87</pre></span><pre>                                      self.site.domain,</pre></div>
+<div class="cov"><span class="num"><pre> 88</pre></span><pre>                                      parser.img_locations[0])</pre></div>
+<div class="nocov"><span class="num"><pre> 89</pre></span><pre>        return None</pre></div>
+<div class="skip"><span class="num"><pre> 90</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 91</pre></span><pre>    def item_enclosure_length(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 92</pre></span><pre>        &quot;&quot;&quot;Hardcoded enclosure length&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 93</pre></span><pre>        return '100000'</pre></div>
+<div class="skip"><span class="num"><pre> 94</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre> 95</pre></span><pre>    def item_enclosure_mime_type(self, item):</pre></div>
+<div class="cov"><span class="num"><pre> 96</pre></span><pre>        &quot;&quot;&quot;Hardcoded enclosure mimetype&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre> 97</pre></span><pre>        return 'image/jpeg'</pre></div>
+<div class="skip"><span class="num"><pre> 98</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre> 99</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>100</pre></span><pre>class LatestEntries(EntryFeed):</pre></div>
+<div class="cov"><span class="num"><pre>101</pre></span><pre>    &quot;&quot;&quot;Feed for the latest entries&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>102</pre></span><pre>    title = _('Latest entries')</pre></div>
+<div class="skip"><span class="num"><pre>103</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>104</pre></span><pre>    def link(self):</pre></div>
+<div class="cov"><span class="num"><pre>105</pre></span><pre>        &quot;&quot;&quot;URL of latest entries&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>106</pre></span><pre>        return reverse('zinnia_entry_archive_index')</pre></div>
+<div class="skip"><span class="num"><pre>107</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>108</pre></span><pre>    def items(self):</pre></div>
+<div class="cov"><span class="num"><pre>109</pre></span><pre>        &quot;&quot;&quot;Items are published entries&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>110</pre></span><pre>        return Entry.published.all()[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>111</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>112</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>113</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>114</pre></span><pre>        return _('The latest entries for the site %s') % self.site.domain</pre></div>
+<div class="skip"><span class="num"><pre>115</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>116</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>117</pre></span><pre>class CategoryEntries(EntryFeed):</pre></div>
+<div class="cov"><span class="num"><pre>118</pre></span><pre>    &quot;&quot;&quot;Feed filtered by a category&quot;&quot;&quot;</pre></div>
+<div class="skip"><span class="num"><pre>119</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>120</pre></span><pre>    def get_object(self, request, path):</pre></div>
+<div class="cov"><span class="num"><pre>121</pre></span><pre>        &quot;&quot;&quot;Retrieve the category by his path&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>122</pre></span><pre>        return get_category_or_404(path)</pre></div>
+<div class="skip"><span class="num"><pre>123</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>124</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>125</pre></span><pre>        &quot;&quot;&quot;Items are the published entries of the category&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>126</pre></span><pre>        return obj.entries_published_set()[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>127</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>128</pre></span><pre>    def link(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>129</pre></span><pre>        &quot;&quot;&quot;URL of the category&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>130</pre></span><pre>        return obj.get_absolute_url()</pre></div>
+<div class="skip"><span class="num"><pre>131</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>132</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>133</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>134</pre></span><pre>        return _('Entries for the category %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>135</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>136</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>137</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>138</pre></span><pre>        return _('The latest entries for the category %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>139</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>140</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>141</pre></span><pre>class AuthorEntries(EntryFeed):</pre></div>
+<div class="cov"><span class="num"><pre>142</pre></span><pre>    &quot;&quot;&quot;Feed filtered by an author&quot;&quot;&quot;</pre></div>
+<div class="skip"><span class="num"><pre>143</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>144</pre></span><pre>    def get_object(self, request, username):</pre></div>
+<div class="cov"><span class="num"><pre>145</pre></span><pre>        &quot;&quot;&quot;Retrieve the author by his username&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>146</pre></span><pre>        return get_object_or_404(User, username=username)</pre></div>
+<div class="skip"><span class="num"><pre>147</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>148</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>149</pre></span><pre>        &quot;&quot;&quot;Items are the published entries of the author&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>150</pre></span><pre>        return entries_published(obj.entry_set)[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>151</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>152</pre></span><pre>    def link(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>153</pre></span><pre>        &quot;&quot;&quot;URL of the author&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>154</pre></span><pre>        return reverse('zinnia_author_detail', args=[obj.username])</pre></div>
+<div class="skip"><span class="num"><pre>155</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>156</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>157</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>158</pre></span><pre>        return _('Entries for author %s') % obj.username</pre></div>
+<div class="skip"><span class="num"><pre>159</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>160</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>161</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>162</pre></span><pre>        return _('The latest entries by %s') % obj.username</pre></div>
+<div class="skip"><span class="num"><pre>163</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>164</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>165</pre></span><pre>class TagEntries(EntryFeed):</pre></div>
+<div class="cov"><span class="num"><pre>166</pre></span><pre>    &quot;&quot;&quot;Feed filtered by a tag&quot;&quot;&quot;</pre></div>
+<div class="skip"><span class="num"><pre>167</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>168</pre></span><pre>    def get_object(self, request, slug):</pre></div>
+<div class="cov"><span class="num"><pre>169</pre></span><pre>        &quot;&quot;&quot;Retrieve the tag by his name&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>170</pre></span><pre>        return get_object_or_404(Tag, name=slug)</pre></div>
+<div class="skip"><span class="num"><pre>171</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>172</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>173</pre></span><pre>        &quot;&quot;&quot;Items are the published entries of the tag&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>174</pre></span><pre>        return TaggedItem.objects.get_by_model(</pre></div>
+<div class="cov"><span class="num"><pre>175</pre></span><pre>            Entry.published.all(), obj)[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>176</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>177</pre></span><pre>    def link(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>178</pre></span><pre>        &quot;&quot;&quot;URL of the tag&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>179</pre></span><pre>        return reverse('zinnia_tag_detail', args=[obj.name])</pre></div>
+<div class="skip"><span class="num"><pre>180</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>181</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>182</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>183</pre></span><pre>        return _('Entries for the tag %s') % obj.name</pre></div>
+<div class="skip"><span class="num"><pre>184</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>185</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>186</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>187</pre></span><pre>        return _('The latest entries for the tag %s') % obj.name</pre></div>
+<div class="skip"><span class="num"><pre>188</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>189</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>190</pre></span><pre>class SearchEntries(EntryFeed):</pre></div>
+<div class="cov"><span class="num"><pre>191</pre></span><pre>    &quot;&quot;&quot;Feed filtered by a search pattern&quot;&quot;&quot;</pre></div>
+<div class="skip"><span class="num"><pre>192</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>193</pre></span><pre>    def get_object(self, request, slug):</pre></div>
+<div class="cov"><span class="num"><pre>194</pre></span><pre>        &quot;&quot;&quot;The slug is the pattern to search&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>195</pre></span><pre>        return slug</pre></div>
+<div class="skip"><span class="num"><pre>196</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>197</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>198</pre></span><pre>        &quot;&quot;&quot;Items are the published entries founds&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>199</pre></span><pre>        return Entry.published.search(obj)[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>200</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>201</pre></span><pre>    def link(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>202</pre></span><pre>        &quot;&quot;&quot;URL of the search request&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>203</pre></span><pre>        return '%s?pattern=%s' % (reverse('zinnia_entry_search'), obj)</pre></div>
+<div class="skip"><span class="num"><pre>204</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>205</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>206</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>207</pre></span><pre>        return _('Results of the search for %s') % obj</pre></div>
+<div class="skip"><span class="num"><pre>208</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>209</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>210</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>211</pre></span><pre>        return _('The entries containing the pattern %s') % obj</pre></div>
+<div class="skip"><span class="num"><pre>212</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>213</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>214</pre></span><pre>class EntryDiscussions(Feed):</pre></div>
+<div class="cov"><span class="num"><pre>215</pre></span><pre>    &quot;&quot;&quot;Feed for discussions in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>216</pre></span><pre>    title_template = 'feeds/discussion_title.html'</pre></div>
+<div class="cov"><span class="num"><pre>217</pre></span><pre>    description_template = 'feeds/discussion_description.html'</pre></div>
+<div class="cov"><span class="num"><pre>218</pre></span><pre>    feed_copyright = COPYRIGHT</pre></div>
+<div class="skip"><span class="num"><pre>219</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>220</pre></span><pre>    def get_object(self, request, slug):</pre></div>
+<div class="cov"><span class="num"><pre>221</pre></span><pre>        &quot;&quot;&quot;Retrieve the discussions by entry's slug&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>222</pre></span><pre>        return get_object_or_404(Entry, slug=slug)</pre></div>
+<div class="skip"><span class="num"><pre>223</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>224</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>225</pre></span><pre>        &quot;&quot;&quot;Items are the discussions on the entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>226</pre></span><pre>        return obj.discussions[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>227</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>228</pre></span><pre>    def item_pubdate(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>229</pre></span><pre>        &quot;&quot;&quot;Publication date of a discussion&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>230</pre></span><pre>        return item.submit_date</pre></div>
+<div class="skip"><span class="num"><pre>231</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>232</pre></span><pre>    def item_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>233</pre></span><pre>        &quot;&quot;&quot;URL of the discussion&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>234</pre></span><pre>        return item.get_absolute_url()</pre></div>
+<div class="skip"><span class="num"><pre>235</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>236</pre></span><pre>    def link(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>237</pre></span><pre>        &quot;&quot;&quot;URL of the entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>238</pre></span><pre>        return obj.get_absolute_url()</pre></div>
+<div class="skip"><span class="num"><pre>239</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>240</pre></span><pre>    def item_author_name(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>241</pre></span><pre>        &quot;&quot;&quot;Author of the discussion&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>242</pre></span><pre>        return item.userinfo['name']</pre></div>
+<div class="skip"><span class="num"><pre>243</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>244</pre></span><pre>    def item_author_email(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>245</pre></span><pre>        &quot;&quot;&quot;Author's email of the discussion&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>246</pre></span><pre>        return item.userinfo['email']</pre></div>
+<div class="skip"><span class="num"><pre>247</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>248</pre></span><pre>    def item_author_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>249</pre></span><pre>        &quot;&quot;&quot;Author's URL of the discussion&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>250</pre></span><pre>        return item.userinfo['url']</pre></div>
+<div class="skip"><span class="num"><pre>251</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>252</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>253</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>254</pre></span><pre>        return _('Discussions on %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>255</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>256</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>257</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>258</pre></span><pre>        return _('The latest discussions for the entry %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>259</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>260</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>261</pre></span><pre>class EntryComments(EntryDiscussions):</pre></div>
+<div class="cov"><span class="num"><pre>262</pre></span><pre>    &quot;&quot;&quot;Feed for comments in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>263</pre></span><pre>    title_template = 'feeds/comment_title.html'</pre></div>
+<div class="cov"><span class="num"><pre>264</pre></span><pre>    description_template = 'feeds/comment_description.html'</pre></div>
+<div class="skip"><span class="num"><pre>265</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>266</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>267</pre></span><pre>        &quot;&quot;&quot;Items are the comments on the entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>268</pre></span><pre>        return obj.comments[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>269</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>270</pre></span><pre>    def item_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>271</pre></span><pre>        &quot;&quot;&quot;URL of the comment&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>272</pre></span><pre>        return item.get_absolute_url('#comment_%(id)s')</pre></div>
+<div class="skip"><span class="num"><pre>273</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>274</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>275</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>276</pre></span><pre>        return _('Comments on %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>277</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>278</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>279</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>280</pre></span><pre>        return _('The latest comments for the entry %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>281</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>282</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>283</pre></span><pre>class EntryPingbacks(EntryDiscussions):</pre></div>
+<div class="cov"><span class="num"><pre>284</pre></span><pre>    &quot;&quot;&quot;Feed for pingbacks in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>285</pre></span><pre>    title_template = 'feeds/pingback_title.html'</pre></div>
+<div class="cov"><span class="num"><pre>286</pre></span><pre>    description_template = 'feeds/pingback_description.html'</pre></div>
+<div class="skip"><span class="num"><pre>287</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>288</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>289</pre></span><pre>        &quot;&quot;&quot;Items are the pingbacks on the entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>290</pre></span><pre>        return obj.pingbacks[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>291</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>292</pre></span><pre>    def item_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>293</pre></span><pre>        &quot;&quot;&quot;URL of the pingback&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>294</pre></span><pre>        return item.get_absolute_url('#pingback_%(id)s')</pre></div>
+<div class="skip"><span class="num"><pre>295</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>296</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>297</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>298</pre></span><pre>        return _('Pingbacks on %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>299</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>300</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>301</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>302</pre></span><pre>        return _('The latest pingbacks for the entry %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>303</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>304</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>305</pre></span><pre>class EntryTrackbacks(EntryDiscussions):</pre></div>
+<div class="cov"><span class="num"><pre>306</pre></span><pre>    &quot;&quot;&quot;Feed for trackbacks in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>307</pre></span><pre>    title_template = 'feeds/trackback_title.html'</pre></div>
+<div class="cov"><span class="num"><pre>308</pre></span><pre>    description_template = 'feeds/trackback_description.html'</pre></div>
+<div class="skip"><span class="num"><pre>309</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>310</pre></span><pre>    def items(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>311</pre></span><pre>        &quot;&quot;&quot;Items are the trackbacks on the entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>312</pre></span><pre>        return obj.trackbacks[:FEEDS_MAX_ITEMS]</pre></div>
+<div class="skip"><span class="num"><pre>313</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>314</pre></span><pre>    def item_link(self, item):</pre></div>
+<div class="cov"><span class="num"><pre>315</pre></span><pre>        &quot;&quot;&quot;URL of the trackback&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>316</pre></span><pre>        return item.get_absolute_url('#trackback_%(id)s')</pre></div>
+<div class="skip"><span class="num"><pre>317</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>318</pre></span><pre>    def title(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>319</pre></span><pre>        &quot;&quot;&quot;Title of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>320</pre></span><pre>        return _('Trackbacks on %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>321</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>322</pre></span><pre>    def description(self, obj):</pre></div>
+<div class="cov"><span class="num"><pre>323</pre></span><pre>        &quot;&quot;&quot;Description of the feed&quot;&quot;&quot;</pre></div>
+<div class="nocov"><span class="num"><pre>324</pre></span><pre>        return _('The latest trackbacks for the entry %s') % obj.title</pre></div>
+<div class="skip"><span class="num"><pre>325</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>326</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>327</pre></span><pre># Atom versions of the feeds</pre></div>
+<div class="cov"><span class="num"><pre>328</pre></span><pre>class AtomLatestEntries(LatestEntries):</pre></div>
+<div class="cov"><span class="num"><pre>329</pre></span><pre>    &quot;&quot;&quot;Atom feed for the latest entries&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>330</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>331</pre></span><pre>    subtitle = LatestEntries.description</pre></div>
+<div class="skip"><span class="num"><pre>332</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>333</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>334</pre></span><pre>class AtomCategoryEntries(CategoryEntries):</pre></div>
+<div class="cov"><span class="num"><pre>335</pre></span><pre>    &quot;&quot;&quot;Atom feed filtered by a category&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>336</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>337</pre></span><pre>    subtitle = CategoryEntries.description</pre></div>
+<div class="skip"><span class="num"><pre>338</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>339</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>340</pre></span><pre>class AtomAuthorEntries(AuthorEntries):</pre></div>
+<div class="cov"><span class="num"><pre>341</pre></span><pre>    &quot;&quot;&quot;Atom feed filtered by an author&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>342</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>343</pre></span><pre>    subtitle = AuthorEntries.description</pre></div>
+<div class="skip"><span class="num"><pre>344</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>345</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>346</pre></span><pre>class AtomTagEntries(TagEntries):</pre></div>
+<div class="cov"><span class="num"><pre>347</pre></span><pre>    &quot;&quot;&quot;Atom feed filtered by a tag&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>348</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>349</pre></span><pre>    subtitle = TagEntries.description</pre></div>
+<div class="skip"><span class="num"><pre>350</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>351</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>352</pre></span><pre>class AtomSearchEntries(SearchEntries):</pre></div>
+<div class="cov"><span class="num"><pre>353</pre></span><pre>    &quot;&quot;&quot;Atom feed filtered by a search pattern&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>354</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>355</pre></span><pre>    subtitle = SearchEntries.description</pre></div>
+<div class="skip"><span class="num"><pre>356</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>357</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>358</pre></span><pre>class AtomEntryDiscussions(EntryDiscussions):</pre></div>
+<div class="cov"><span class="num"><pre>359</pre></span><pre>    &quot;&quot;&quot;Atom feed for discussions in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>360</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>361</pre></span><pre>    subtitle = EntryDiscussions.description</pre></div>
+<div class="skip"><span class="num"><pre>362</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>363</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>364</pre></span><pre>class AtomEntryComments(EntryComments):</pre></div>
+<div class="cov"><span class="num"><pre>365</pre></span><pre>    &quot;&quot;&quot;Atom feed for comments in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>366</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>367</pre></span><pre>    subtitle = EntryComments.description</pre></div>
+<div class="skip"><span class="num"><pre>368</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>369</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>370</pre></span><pre>class AtomEntryPingbacks(EntryPingbacks):</pre></div>
+<div class="cov"><span class="num"><pre>371</pre></span><pre>    &quot;&quot;&quot;Atom feed for pingbacks in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>372</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>373</pre></span><pre>    subtitle = EntryPingbacks.description</pre></div>
+<div class="skip"><span class="num"><pre>374</pre></span><pre></pre></div>
+<div class="skip"><span class="num"><pre>375</pre></span><pre></pre></div>
+<div class="cov"><span class="num"><pre>376</pre></span><pre>class AtomEntryTrackbacks(EntryTrackbacks):</pre></div>
+<div class="cov"><span class="num"><pre>377</pre></span><pre>    &quot;&quot;&quot;Atom feed for trackbacks in an entry&quot;&quot;&quot;</pre></div>
+<div class="cov"><span class="num"><pre>378</pre></span><pre>    feed_type = Atom1Feed</pre></div>
+<div class="cov"><span class="num"><pre>379</pre></span><pre>    subtitle = EntryTrackbacks.description</pre></div>
+<div class="skip"><span class="num"><pre>380</pre></span><pre></pre></div>
+</div>
+</body>
+</html>
