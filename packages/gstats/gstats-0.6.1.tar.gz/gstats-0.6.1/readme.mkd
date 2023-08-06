@@ -1,0 +1,104 @@
+# Stats gathering thing for gunicorn 
+
+*... or, really, anything that supports custom pre_request and post_request hooks*
+
+This is a simple app able to gather stats from gunicorn (or similar) and return
+them as a JSON object; you get:
+
+* `gstats-collectd` -- stats collecting daemon
+* `gstatsctl` -- provides a few handy commands to talk to the daemon and can serve 
+  as an example for your own code 
+* munin plug-ins to graph requests/second and average request, usable out of the
+  box or as a basis for your own code
+* a simple WSGI app that returns stats 
+
+## Intended audience
+... is mostly developers with (more than) one foot in systems administration 
+looking to graph application parameters; if pretty graphs are your thing, you may
+find this useful
+
+## Packages
+* [Ubuntu PPA](https://launchpad.net/~iacobs/+archive/ppa) (Lucid / 10.04 LTS; if
+  needed, I'll add builds for Maverick and / or Natty as well)
+
+if anyone finds this useful enough to build packages for their distro of choice,
+contact me and I'll add the links here
+
+## Requirements
+* you should be able to speak Python (for the hooks)
+* pyzmq ([PPA for Ubuntu](https://launchpad.net/~iacobs/+archive/zeromq))
+* [optional] python-setproctitle for nice process names 
+  ([PPA for ubuntu](https://launchpad.net/~iacobs/+archive/ppa))
+
+## Usage
+The scripts:
+
+    gstats-collectd -h
+    Usage: gstats-collectd [options]
+
+    Options:
+      -h, --help            show this help message and exit
+      -s ADDR, --stats-address=ADDR
+                            set collector address to ADDR [tcp://127.0.0.2:2345]
+      -c ADDR, --comm-address=ADDR
+                            set communication address to ADDR
+                            [tcp://127.0.0.1:2345]
+      -l LENGTH, --buffer-length=LENGTH
+                            compute average load times over the last LENGTH
+                            seconds [600]
+
+    for the format of ZeroMQ addresses, please refer to zmq_connect(3) (online at
+    http://api.zeromq.org/zmq_connect.html)
+
+and
+
+    gstatsctl -h
+    Usage: gstatsctl [OPTIONS] <quit|reset|rtimes|stats>
+
+    Options:
+      -h, --help            show this help message and exit
+      -c ADDR, --comm-address=ADDR
+                            set communication address to ADDR
+                            [tcp://127.0.0.1:2345]
+
+    for the format of ZeroMQ addresses, please refer to zmq_connect(3) (online at
+    http://api.zeromq.org/zmq_connect.html)
+
+The simplest collecting code looks like this (examples/gunicorn.conf.py):
+
+    from gstats import start_request, end_request
+
+    _collector_addr = 'tcp://127.0.0.2:2345'
+
+    def pre_request(req, worker):
+        start_request(req, collect=True, collector=_collector_addr, prefix='my_app')
+
+    def post_request(req, worker):
+        end_request(req, collector=_collector_addr, prefix='my_app')
+
+The included munin plug-ins are standard wildcard plug-ins; link `plugin_name_` to
+`/etc/munin/plugins/plugin_name_my-label` and reload munin-node; if you want to use 
+another address than the default, add an entry like this in 
+`/etc/munin/plugin-conf.d/munin-node`:
+
+    [gunicorn*]
+    user <my_user>
+    env.status_addr <zmq addr>
+
+The included WSGI application can be started with
+
+    gunicorn gstats.wsgi:app -b localhost:8002
+
+if you need to configure things, set the `GSTATS_COMM_ADDR` and / or
+`GSTATS_ALLOWED_IPS` environment variables before starting the web server; the 
+results should be available at `http://localhost:8002/_status`
+
+## One last thing
+Due to the way zeromq works, writes will block if collector is down, which means
+your application will hang; this may not be a problem if you use only post_request
+and maybe eventlet workers, because the user has already received the response;
+however, if a pre_request hangs the request won't even be processed.
+
+Also, this thing doesn't have tests because I have no idea what I could/should test.
+I will hopefully have sphinx documentation soon, though, so at least I hope to be a 
+good citizen in this respect :)
