@@ -1,0 +1,108 @@
+#!/usr/bin/python
+'''`cat` for avro files'''
+
+from avro.io import DatumReader
+from avro.datafile import DataFileReader
+
+import json
+import csv
+from sys import stdout
+from itertools import ifilter
+from functools import partial
+
+def print_json(row):
+    print(json.dumps(row))
+
+def print_json_pretty(row):
+    print(json.dumps(row, indent=4))
+
+_write_row = csv.writer(stdout).writerow
+def print_csv(row):
+    # We sort the keys to the fields will be in the same place
+    _write_row([row[key] for key in sorted(row)])
+
+def select_printer(format):
+    return {
+        "json" : print_json,
+        "json-pretty" : print_json_pretty,
+        "csv" : print_csv
+    }[format]
+
+def record_match(expr, record):
+    return eval(expr, None, {"r" : record})
+
+def print_avro(avro, args):
+    if args.header and (args.format != "csv"):
+        raise ValueError("--header applies only to CSV format")
+
+    # Apply filter first
+    if args.filter:
+        avro = ifilter(partial(record_match, args.filter), avro)
+
+    for i in xrange(args.skip):
+        try:
+            next(avro)
+        except StopIteration:
+            return
+
+    printer = select_printer(args.format)
+    for i, record in enumerate(avro):
+        if i == 0 and args.header:
+            _write_row(sorted(record.keys()))
+        if i >= args.count:
+            break
+        printer(record)
+
+def print_schema(avro):
+    schema = avro.meta["avro.schema"]
+    # Pretty print
+    print json.dumps(json.loads(schema), indent=4)
+
+def main(argv=None):
+    import sys
+    from argparse import ArgumentParser
+
+    argv = argv or sys.argv
+
+    parser = ArgumentParser(description="`cat` for Avro files", prog="avrocat")
+    parser.add_argument("filename", help="avro file", nargs="?")
+    parser.add_argument("-n", "--count", default=float("Infinity"),
+                    help="number of records to print", type=int)
+    parser.add_argument("-s", "--skip", help="number of records to skip", type=int,
+                   default=0)
+    parser.add_argument("-f", "--format", help="record format", default="json",
+                  choices=["json", "csv", "json-pretty"])
+    parser.add_argument("--header", help="print CSV header", default=False,
+                   action="store_true")
+    parser.add_argument("--filter", help="filter records (e.g. r['age']>1)",
+                    default=None)
+    parser.add_argument("--schema", help="print schema", action="store_true",
+                       default=False)
+    parser.add_argument("--version", help="print version", default=False,
+                        action="store_true")
+
+    args = parser.parse_args(argv[1:])
+
+    if args.version:
+        print("0.1.2")
+        return
+
+    if not args.filename:
+        raise SystemExit("error: missing filename")
+
+    try:
+        fo = open(args.filename, "rb")
+    except (OSError, IOError) as e:
+        raise SystemExit("error: can't open %s - %s" % (args.filename, e))
+
+    avro = DataFileReader(fo, DatumReader())
+
+    if args.schema:
+        print_schema(avro)
+        return
+
+    print_avro(avro, args)
+
+if __name__ == "__main__":
+    main()
+
