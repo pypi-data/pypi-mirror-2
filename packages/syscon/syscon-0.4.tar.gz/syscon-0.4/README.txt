@@ -1,0 +1,92 @@
+======
+syscon
+======
+syscon is a python package providing remote control tools for other computers
+in the network. At the moment, syscon is still a beta version, since I hope
+to be able to add some new functions.
+
+Syntax
+======
+
+Client
+------
+
+On the client, you just have to start the client.py
+
+If you want to have a "silent" remote control, you should rename the client.py to client.pyw
+
+controlling Computer
+--------------------
+
+On the controlling computer, usage is as follows::
+
+    import syscon.control
+    
+    con = syscon.control.Connection("XYZ")
+    # This defines con as a connection with the Computer in the network which
+    # has the name XYZ over port 51000. If you want to use another port, use
+    # the second parameter, e.g. for port 9999:
+    # con = syscon.control.Connection("XYZ", 9999)
+    # In case you do this, you must start the client.pyw
+    # on the remote machine with the port number as parameter
+    
+    # Now send orders with con.send (next section)
+    # Usage of con.send: con.send(command[, second_param[, third_param]])
+    
+    con.close()
+    # This immediately stops the connection and closes the client.py or client.pyw
+    # on the other computer. You could also use con.send("stopcontrol")
+	
+Screenshots
+-----------
+
+Also, there is a function to make screenshots of the monitor of the remote computer.
+The Python Imaging Library (PIL) is needed to be installed on the client computer.
+syscon uses version 1.1.7 of this package. It is available to download `here <http://www.pythonware.com/products/pil/>`_.
+You have to start the pyscreen.py on the controlling computer.
+You will be asked which port you want to use (56000 is recommended) and where to save
+the screenshots.
+
+If you use port 56000, you just need to call the *screenshot* function of the 
+connection object to make a screenshot. Otherwise, you need to use the following code::
+
+    ...
+    # con is the connection object
+    con.send("screenshot", "54321")
+
+where the second parameter (note it's a string) specifies the port number.
+
+
+Orders to remote computer
+=========================
+
+There are the following orders in this version:
+
+1. **execpy**:		This command needs a second parameter. The code from the second parameter is executed with "exec" on the remote machine.
+
+2. **executefile**:	Starts the program specified in the second parameter.
+
+3. **download**:	Downloads the file from the url in the third parameter to the local path (on the remote computer) in the second parameter.
+
+4. **shutdown**:	Sends a shutdown signal to the remote computer (note: works only with Windows NT to Windows 7)
+
+5. **logoff**:		Sends a logoff signal to the remote computer (note: works also only with Windows NT to Windows 7)
+
+6. **stopcontrol**:	Stops the remote control immediately. Same as con.close()
+
+7. **screenshot**:	Makes a screenshot of the remote machine monitor. Usage: see above.
+
+8. **returnvalue**:     Returns the return value of the expression in the second parameter
+
+.. WARNING::
+   THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+If you have found any bugs or have an idea to improve this tool, write an e-mail. This is a beta version, so please report any bugs you found. I will try to work out a solution.
+
+Changelog
+=========
+0.4   - The connection (except from the screenshot function, where the data volume would be to big) is now encrypted with AES
+
+0.3.1 - Bugfixes (Working on linux systems, Usage without PIL)
+
+0.3.0 - Initial release
