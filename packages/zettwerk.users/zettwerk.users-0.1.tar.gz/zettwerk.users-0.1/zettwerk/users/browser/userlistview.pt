@@ -1,0 +1,102 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="zettwerk.users">
+
+<body>
+  <metal:main metal:fill-slot="main">
+    <h1 class="documentFirstHeading" i18n:translate="label_user_overview">
+      User overview
+    </h1>
+
+
+    <div class="documentDescription" i18n:translate="label_userlist_description">
+      Here you are able to see all registered users. The status shows if the user has been already logged in.
+      You can reset the password of selected users here.
+    </div>
+
+    <div id="userlist_group_filter">
+      <form method="post" tal:attributes="action string:${here/absolute_url}/@@userlist_view">
+        <div id="userlist_group_id">
+          <select name="group_id">
+            <option value="" i18n:translate="">Show all Users</option>
+          <tal:block tal:repeat="item view/portal_groups/listGroups">
+            <option tal:attributes="value item/getId;selected python:['', 'selected'][request.get('group_id', '') == item.getId()]" tal:content="item/getId" />
+          </tal:block>
+          </select>
+        </div>
+        <div id="userlist_group_filter_submit">
+          <input type="submit" name="group_filter" value="Search" i18n:attributes="value" />
+        </div>
+        <div class="visualClear"><!-- --></div>
+      </form>
+    </div>
+
+    <tal:block tal:define="batch view/getUsers;
+      group_id request/group_id|string:;
+      show_all request/show_all|string:;
+      select request/select|string:">
+      <div metal:use-macro="here/batch_macros/macros/navigation" />
+      <form method="post" tal:attributes="action string:${here/absolute_url}/@@userlist_view">
+      <input type="hidden" name="select" tal:attributes="value select" />
+      <input type="hidden" name="group_id" tal:attributes="value group_id" />
+      <input type="hidden" name="show_all" tal:attributes="value show_all" />
+        <table class="listing" id="userlist-table" summary="Userlist" i18n:attributes="summary">
+          <thead>
+            <tr>
+              <th colspan="5" class="nosort">
+                <a tal:condition="python:view.show_select_all_items and view.show_select_orphan_items"
+                  tal:attributes="href string:${here/absolute_url}/@@userlist_view?select=all&group_id=${group_id}&show_all=${show_all}"
+                  i18n:translate="tableheading_select_all_users">Select all <tal:block tal:replace="batch/sequence_length" i18n:name="count"/> users.</a>
+                <a tal:condition="python:view.show_select_orphan_items and view.show_select_all_items and batch.orphans > 0"
+                  tal:attributes="href string:${here/absolute_url}/@@userlist_view?select=orphan&group_id=${group_id}&show_all=${show_all}"
+                  i18n:translate="tableheading_select_all_orphans">Select all <tal:block tal:replace="batch/orphans" i18n:name="count"/> users, not yet logged in.</a>
+                <a tal:condition="python:not view.show_select_all_items or not view.show_select_orphan_items"
+                  tal:attributes="href string:${here/absolute_url}/@@userlist_view?group_id=${group_id}&show_all=${show_all}"
+                  i18n:domain="plone" i18n:translate="tableheading_clear_selection"
+                  id="userlist-clearselection">Clear selection</a>
+              </th>
+            </tr>
+            <tr>
+              <th class="sort column userlist-title" id="userlist-title-column" i18n:domain="plone" i18n:translate="label_username">Username</th>
+              <th class="sort column userlist-fullname" id="userlist-fullname-column" i18n:domain="plone" i18n:translate="label_fullname">Full Name</th>
+              <th class="sort column userlist-email" id="userlist-email-column" i18n:domain="plone" i18n:translate="label_email">E-Mail-Address</th>
+              <th class="sort column userlist-state" id="userlist-state-column" i18n:domain="plone" i18n:translate="last_login">Last log-in</th>
+              <th class="nosort column userlist-reset" id="userlist-reset-column" i18n:domain="plone" i18n:translate="listingheader_reset_password">Reset Password</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tal:block tal:repeat="item batch">
+              <tr tal:attributes="id string:userlist-item-${repeat/item/index};
+                class python:['even', 'odd'][repeat.get('item').even()]">
+                <td class="userlist-title">
+                  <a tal:attributes="href item/url" tal:content="item/username" />
+                </td>
+                <td class="userlist-fullname" tal:content="item/fullname"></td>
+                <td class="userlist-email" tal:content="item/email"></td>
+                <td class="userlist-state" tal:content="python:['', here.toLocalizedTime(item['last_login_time'],long_format=1)][item['initial_login']]"></td>
+                <td class="userlist-reset">
+                  <input type="checkbox" name="users:list" tal:attributes="value item/username;checked item/checked;class python:['userlist_orphan', 'userlist_logged_in'][item['initial_login']]" />
+                </td>
+              </tr>
+            </tal:block>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5" tal:condition="python:batch.sequence_length > batch.size or show_all">
+                <a tal:condition="not:show_all" tal:attributes="href string:${here/absolute_url}/@@userlist_view?show_all=true&group_id=${group_id}&select=${select}" i18n:translate="label_show_all" i18n:domain="plone">Show all items</a>
+                <a tal:condition="show_all" tal:attributes="href string:${here/absolute_url}/@@userlist_view?group_id=${group_id}&select=${select}" i18n:translate="label_show_batched" i18n:domain="plone">Show batched</a>
+              </th>
+            </tr>
+          </tfoot>
+        </table>
+        <div id="password_reset_button">
+          <input type="submit" name="reset_passwords" value="Reset Passwords" i18n:attributes="value" />
+        </div>
+        <div class="visualClear"><!-- --></div>
+      </form>
+      <div metal:use-macro="here/batch_macros/macros/navigation" />
+    </tal:block>
+  </metal:main>
+</body>
+</html>
