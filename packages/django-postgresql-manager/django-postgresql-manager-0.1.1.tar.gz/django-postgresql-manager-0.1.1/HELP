@@ -1,0 +1,117 @@
+django-postgresql-manager Help
+========================================================================
+This file contains detailed information on how to configure and use
+``django-postgresql-manager``.
+
+
+PostgreSQL Administrator Role
+=============================
+This application requires that you create a PostgreSQL (refered to as *Pg*
+hereafter) role which will be used for the role and database management.
+
+While in the Pg shell as a superuser, create the *administrator* role::
+
+    CREATE ROLE administrator WITH LOGIN CREATEDB CREATEROLE PASSWORD '1234';
+
+
+
+Configuration
+=============
+This section outlines the configuration options that need to be set in your
+Django project's ``settings.py`` file.
+
+Add an extra database connection, named ``PostgreSQL_manager_conn``,
+which will be used to connect to the PostgreSQL cluster using the
+``administrator`` role::
+
+    DATABASES = {
+        ...
+        # Database connection settings for PostgreSQL_manager
+        'PostgreSQL_manager_conn': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': 'postgres',
+            'USER': 'administrator',
+            'PASSWORD': '1234',
+            'HOST': 'localhost',
+            'PORT': '5432',
+            'OPTIONS': {
+                'autocommit': True,
+            },
+        },
+        ...
+    }
+
+**Important Note**: It should be noted that the ``PostgreSQL_manager_conn``
+database connection is only used to perform role and database management
+on the PostgreSQL Cluster. No extra databases or tables will be created.
+The ``PostgreSQL_manager`` application specific tables will be created in
+the Django project's default database, which may exist in any database
+backend.
+
+Add the ``PostgreSQL_manager`` app in the ``INSTALLED_APPS`` setting::
+
+    INSTALLED_APPS = (
+        ...
+        'PostgreSQL_manager',
+        ...
+    )
+
+Optional Configuration Settings
+-------------------------------
+``PostgreSQL_manager`` supports the following configuration settings:
+
+**PGMANAGER_FORBIDDEN_USER_NAMES**
+    A list of role names that should not be used. By default, the following role
+    names are forbidden: postgres, postgresql, pg, admin, administrator, root,
+    sys, system.
+**PGMANAGER_FORBIDDEN_DATABASE_NAMES**
+    A list of database names that should not be used. By default, the following
+    names are forbidden: postgres, template0, template1.
+
+
+Synchronize the Django Project database
+---------------------------------------
+Finally synchronize your project database::
+
+    python manage.py syncdb
+
+
+Running the example project
+===========================
+``django-postgresql-manager`` ships with an example Django project which can be
+used to demonstrate the application. The example project, which is located in
+the ``contrib`` directory, has the following requirements:
+
+- Django (``pip install Django``)
+- Python bindings for SQLite 3 (``pip install pysqlite``)
+- Python bindings for PostgreSQL (``pip install psycopg2``)
+
+Once these are installed in your system, create the ``administrator`` role
+in your PostgreSQL Cluster as desacribed above::
+
+    CREATE ROLE administrator WITH LOGIN CREATEDB CREATEROLE PASSWORD '1234';
+
+Then change to the ``contrib/example-project`` directory and load the example
+project's settings file in a text editor:
+
+    vi settings.py
+
+And make sure the ``PostgreSQL_manager_conn`` database connection settings
+are correct, otherwise the Django project won't be able to connect to the
+PostgreSQL Cluster.
+
+Next synchronize the Django project database (``test.db``)::
+
+    python manage.py syncdb
+
+Make sure you create a root account when prompted.
+
+Finally run Django's internal web server::
+
+    python manage.py runserver 127.0.0.1:8000
+
+Use any web browser to connect to the admin interface::
+
+    http://127.0.0.1:8000/admin/
+
+Enjoy.
