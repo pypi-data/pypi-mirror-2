@@ -1,0 +1,164 @@
+
+# DEFUALT SETTINGS
+PROJECT_NAME=`basename $VIRTUAL_ENV`
+USE_DEFAULTS="N"
+CREATE_FABFILE="y"
+DJANGO_SRC_URL=""
+DJANGO_BASE_SITE_URL=""
+CONFIG_PATH="$PROJECT_NAME.config"
+SERVER_ADDR="127.0.0.1"
+SERVER_PORT="8000"
+POST_PIP_CMD=""
+RUN_SYNCDB="N"
+
+# If the DJANGO_ENV_CONFIG_PATH environment variable is set then source it's
+# path, else if the defualt django_env_config file exits source the file. The
+# loaded settings file overrides any of the default settings.
+if [[ -n "$DJANGO_ENV_CONFIG_PATH" ]]; then
+    source $DJANGO_ENV_CONFIG_PATH
+elif [[ -f ~/.django_env_config ]]; then
+    source ~/.django_env_config
+fi
+
+# Check to see if the user wants to install a Django environment
+echo -n "Is this a Django-enviroment your creating (y/n)? [Default: y] "
+read -e IS_DJANGO_ENV
+
+if [ -z "$IS_DJANGO_ENV" ]; then
+    IS_DJANGO_ENV="y"
+fi
+if [ $IS_DJANGO_ENV == "n" ]; then
+    exit 0
+fi
+
+if [ "$USE_DEFAULTS" != "Y" ]; then
+    echo -n "Enter the python path to the config directory (i.e. Where your settings.py, manage.py and urls.py will go). Use a period (.) if you want the config files in your current project root. [Default: $CONFIG_PATH] "
+    read -e CONFIG_PATH_INPUT
+fi
+if [ -n "$CONFIG_PATH_INPUT" ]; then
+    CONFIG_PATH=$CONFIG_PATH_INPUT
+fi
+
+if [ "$USE_DEFAULTS" != "Y" ]; then
+    echo -n "Development server address? [Default: $SERVER_ADDR] "
+    read -e SERVER_ADDR_INPUT
+fi
+
+if [ "$USE_DEFAULTS" != "Y" ]; then
+    echo -n "Development server address? [Default: $SERVER_PORT] "
+    read -e SERVER_PORT_INPUT
+fi
+
+if [ "$USE_DEFAULTS" != "Y" ]; then
+    echo -n "Create a blank Fabric fabfile in your project (y/n)? [Default: y] "
+    read -e CREATE_FABFILE_INPUT
+fi
+if [ -n "$CREATE_FABFILE_INPUT" ]; then
+    CREATE_FABFILE=$CREATE_FABFILE_INPUT
+fi
+
+# install Django
+if [ -n "$DJANGO_SRC_URL" ]; then
+    pip install $DJANGO_SRC_URL
+else
+    pip install django
+fi
+
+# Setup the Django project
+DJANGO_ENV_PROJECT_DIR=`pwd`
+if [ -n "$DJANGO_BASE_SITE_URL" ]; then
+    SHELLPATH=`echo $CONFIG_PATH | perl -wpe "s/\./\//g"`
+    FABFILE_LOCATION="$SHELLPATH/fabfile.py"
+    SETTINGS_PATH="$SHELLPATH/settings.py"
+    ROOT_URLCONF="$CONFIG_PATH.urls"
+    SETTINGS_MODULE="$CONFIG_PATH.settings"
+    $WORKON_HOME/django_env/utils/vcs.py $DJANGO_BASE_SITE_URL `pwd`/temp
+    mv $DJANGO_ENV_PROJECT_DIR/temp/* $DJANGO_ENV_PROJECT_DIR
+    rm -rf "$DJANGO_ENV_PROJECT_DIR/temp/"
+    SETTINGS_MODULE="$CONFIG_PATH.settings"
+    ROOT_URLCONF="$CONFIG_PATH.urls"
+else
+    django-admin.py startproject temp
+    if [ "$CONFIG_PATH" == "." ]; then
+        FABFILE_LOCATION="$DJANGO_ENV_PROJECT_DIR/fabfile.py"
+        SETTINGS_PATH="$DJANGO_ENV_PROJECT_DIR/settings.py"
+        ROOT_URLCONF="urls"
+        SETTINGS_MODULE="settings"
+        mv $DJANGO_ENV_PROJECT_DIR/temp/* $DJANGO_ENV_PROJECT_DIR
+        rm -rf "$DJANGO_ENV_PROJECT_DIR/temp/"
+    else
+        SHELLPATH=`echo $CONFIG_PATH | perl -wpe "s/\./\//g"`
+        FABFILE_LOCATION="$SHELLPATH/fabfile.py"
+        SETTINGS_PATH="$SHELLPATH/settings.py"
+        ROOT_URLCONF="$CONFIG_PATH.urls"
+        SETTINGS_MODULE="$CONFIG_PATH.settings"
+        mkdir -p $SHELLPATH
+        cp $DJANGO_ENV_PROJECT_DIR/temp/* $SHELLPATH/
+        find . -type d -exec touch {}/__init__.py \;
+        rm $DJANGO_ENV_PROJECT_DIR/__init__.py
+        rm -rf $DJANGO_ENV_PROJECT_DIR/temp
+    fi
+fi
+
+
+
+
+# Setup the django_env_settings.py
+LOCAL_SETTINGS=`cat $WORKON_HOME/django_env/config/django_env_settings_template.txt`
+LOCAL_SETTINGS_TARGET=$VIRTUAL_ENV/bin/django_env_settings.py
+echo "$LOCAL_SETTINGS" > $LOCAL_SETTINGS_TARGET
+
+perl -i -wpe "s|{{ PROJECT_DIR }}|$DJANGO_ENV_PROJECT_DIR|g" $LOCAL_SETTINGS_TARGET
+perl -i -wpe "s/{{ SETTINGS_MODULE }}/$SETTINGS_MODULE/g" $LOCAL_SETTINGS_TARGET
+if [ -n "$SERVER_ADDR_INPUT" ]; then
+    perl -i -wpe "s/127\.0\.0\.1/$SERVER_ADDR_INPUT/g" $LOCAL_SETTINGS_TARGET
+    perl -i -wpe "s/# DJANGO_ENV_SERVER_ADDR/DJANGO_ENV_SERVER_ADDR  /g" $LOCAL_SETTINGS_TARGET
+fi
+if [ -n "$SERVER_PORT_INPUT" ]; then
+    perl -i -wpe "s/8000/$SERVER_PORT_INPUT/g" $LOCAL_SETTINGS_TARGET
+    perl -i -wpe "s/# DJANGO_ENV_SERVER_PORT/DJANGO_ENV_SERVER_PORT  /g" $LOCAL_SETTINGS_TARGET
+fi
+perl -i -wpe "s|{{ FABFILE }}|$FABFILE_LOCATION|g" $LOCAL_SETTINGS_TARGET
+if [ "$CREATE_FABFILE" == "Y" ]; then
+    FABFILE=`cat $WORKON_HOME/django_env/config/empty_fabfile.txt`
+    echo "$FABFILE" > $FABFILE_LOCATION
+fi
+
+
+# symlink all bin files
+ln -s $WORKON_HOME/django_env/bin/runserver $VIRTUAL_ENV/bin/runserver
+ln -s $WORKON_HOME/django_env/utils/get_django_env_settings.py $VIRTUAL_ENV/bin/get_django_env_settings.py
+
+
+# add the postactivate and postdeactivate hooks
+echo '
+
+source $WORKON_HOME/django_env/bin/postactivate
+
+' >> "$VIRTUAL_ENV/bin/postactivate"
+echo '
+
+source $WORKON_HOME/django_env/bin/postdeactivate
+
+' >> "$VIRTUAL_ENV/bin/postdeactivate"
+
+# fix the ROOT_URLCONF setting
+perl -i -wpe "s/temp\.urls/$ROOT_URLCONF/g" $SETTINGS_PATH
+
+# add all paths to the PYTHONPATH
+add2virtualenv $DJANGO_ENV_PROJECT_DIR
+
+# Install any requirements using PIP
+if [ -n "$POST_PIP_CMD" ]; then
+    pip $POST_PIP_CMD
+fi
+
+# Run SYNCDB
+if [ "$RUN_SYNCDB" == "Y" ]; then
+    export DJANGO_SETTINGS_MODULE="$CONFIG_PATH.settings"
+    django-admin.py syncdb
+fi
+
+# source the Django-environment postactivate script
+source "$WORKON_HOME/django_env/bin/postactivate"
+
