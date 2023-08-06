@@ -1,0 +1,128 @@
+Overview
+--------
+
+``django-simple-events`` lets you bind your models to events. This events have the
+following configuration options:
+
+- beginning
+- time
+- frecuency: single time, daily, weekly, montly, yearly
+- interval: times between frecuencies
+- repetitions
+- end
+
+The event occurrences are stored in the DB when an event gets saved. If you don't 
+specify a maximum repetitions number or the end datetime, the event occurrences are 
+updated periodically with the ``update_occurrences`` command.
+
+Instalation
+-----------
+
+Add ``events`` to your ``INSTALLED_APPS``::
+
+    INSTALLED_APPS = (
+        ...
+        'events',
+        ...
+        )
+
+Set ``EVENTS_MAX_FUTURE_OCCURRENCES`` to indicate the maximum of future occurrences to
+recolect in the DB if an event is endless ::
+
+    EVENTS_MAX_FUTURE_OCCURRENCES = 50
+
+You can also set ``EVENTS_MAX_PAST_OCCURRENCES``
+
+Usage
+-----
+
+In the following examples we are going to relate ``Study`` objects to events.
+
+Models
+~~~~~~
+
+If you want to access from ``Study`` the events, it's recommendable to add a 
+generic relation ::
+
+    from django.db import models
+    from django.contrib.contenttypes import generic
+    from events.models import Event
+
+    class Study(models.Model):
+        ...
+        events = generic.GenericRelation(Event)
+        ...
+
+
+API
+~~~
+
+Get the events related to a ``Study``::
+
+    study = Study.objects.get(pk=1)
+    study.events.all()
+
+Add an event to a ``Study``::
+    
+    from events.models import Event
+    from datetime import date, time
+
+    study = Study.objects.get(pk=1)
+    event = Event(date.today(), time.now())
+
+    event.related_object = study
+    event.save()
+
+    study.events.get(pk=event.pk)
+
+Play with the occurrences of an event::
+    
+    from events.models import Event
+
+    event = Event.objects.get(pk=1)
+    
+    #get all the occurrences as an iter of datetimes
+    event.get_occurrences()
+
+    #get all of past occurrences as a list of datetimes
+    event.get_past_occurrences()
+
+    #get the last 20 past occurrences as a list of datetimes
+    event.get_past_occurrences(20)
+
+    #get the next 20 future occurrences as a list of datetimes
+    event.get_future_occurrences(20)
+
+    #update the Occurrence objects of an event
+    event.update_occurrences(event.get_occurrences)
+
+    #get the Occurrence objects of an event
+    event.occurrence_set.all()
+
+    #get all the Study objects that have occurrences in the future
+    from datetime import datetime
+    Study.objects.filter(events__occurrence__datetime__gt=datetime.now())
+
+Admin
+~~~~~
+
+If, when you are editing a ``Study`` in admin, you want to also edit the
+related events, you are easilly done::
+
+    from django.contrib import admin
+
+    from events.admin import EventInline
+
+    class StudyAdmin(admin.ModelAdmin):
+        ...
+        inlines = EventInline,
+        ...
+    admin.site.register(Study, StudyAdmin)
+
+Forms
+~~~~~
+
+You can also use the event form::
+
+    from events.forms import EventForm
+
