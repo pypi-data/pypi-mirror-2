@@ -1,0 +1,179 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# rewrite of dshbak using python-hostlist
+
+__version__ = "1.10"
+
+# Copyright (C) 2010 Mattias Slabanja <slabanja@chalmers.se>
+#               
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+import sys
+import optparse
+import re
+
+from hostlist import collect_hostlist, expand_hostlist, __version__ as library_version
+from difflib import unified_diff
+
+def scan():
+    """Scan stdin, store lines by host, and return it all in a
+    dictionary indexed by host.
+
+    Input lines are expected to be on the format
+    "<hostname>:<rest of line>". Lines not matching that format
+    are added to the dictionary using None as key.
+
+    The linesplit-re is designed to match the original dshbak behavior. 
+    """
+
+    linesplitter = re.compile(r'^ *([A-Za-z0-9.-]+) *: ?(.*)$')
+    text_dict = {}
+
+    for line in sys.stdin:
+        match = linesplitter.match(line)
+        if match:
+            host, hostline = match.groups()
+        else:
+            # The linesplitter regexp did NOT match.
+            # This line will be added to text_dict[None]
+            host = None
+            hostline = line.rstrip('\n')
+
+        if host in text_dict:
+            # The groups in the linesplitter regexp does not include the trailing '\n'
+            text_dict[host] += "\n" + hostline
+        else:
+            text_dict[host] = hostline
+
+    return text_dict
+
+def collect(text_dict):
+    """Collect hosts having identical output.
+
+    Return a list of (host set, text) tuples."""
+
+    reverse_dict = {}
+    for host, text in text_dict.iteritems():
+        if text in reverse_dict:
+            reverse_dict[text].add(host)
+        else:
+            reverse_dict[text] = set((host,))
+
+    return [(host_set, text) for text, host_set in reverse_dict.iteritems()]
+
+def output(host_set_or_str, text, count_hosts = False):
+    """Prepend the output with a hostname framed with horizontal lines."""
+    hline = '-' * 16
+    if isinstance(host_set_or_str, str):
+        header = host_set_or_str # for the benefit of the garbage header
+    else:
+        header = collect_hostlist(host_set_or_str)
+        if count_hosts:
+            header = "%d: %s" % (len(host_set_or_str),  header)
+    print hline
+    print header
+    print hline
+    print text
+
+# MAIN
+
+op = optparse.OptionParser(usage="usage: %prog [OPTION]...",
+                           add_help_option = False)
+
+op.add_option("-c", "--collect", action="store_true",
+              help="Collect identical output.")
+
+op.add_option("-n", "--count", action="store_true",
+              help="Show the number of hosts in the header.")
+
+op.add_option("-d", "--unified-diff", action="store_true",
+              help="Print the most frequent output in its full form, "
+              "and all other outputs as unified diffs "
+              "relative the most frequent output. This option implies --collect.")
+
+op.add_option("-g", "--with-garbage", action="store_true",
+              help="Also collect and print input not conforming to the "
+              ' "host : output"-format. '
+              "Garbage output will be presented separated from host output.")
+
+op.add_option("-h", "--help", action="help", help="Show help")
+op.add_option("--version",
+              action="store_true",
+              help="Show version")
+
+(opts, args) = op.parse_args()
+
+if opts.version:
+    print "Version %s (library version %s)" % (__version__, library_version)
+    sys.exit()
+
+try:
+    text_dict = scan()
+
+    if opts.with_garbage and None in text_dict:
+        # The user wants to see garbage-output, and it is non-empty.
+        # Print it before the host output regardless of diff/normal mode.
+        output('NON-FORMATTED OUTPUT', text_dict[None])
+    # Remove garbage lines from text_dict
+    text_dict.pop(None,None)
+
+    if opts.unified_diff:
+        # "Unified diff mode", print the most abundant output, O, in full, and all
+        # other outputs as a unified diff relative O.
+
+        hosts_text_list = collect(text_dict)
+
+        # Sort in descending order of the number of hosts
+        hosts_text_list.sort(key = lambda x: -len(x[0]))
+
+        if len(hosts_text_list) == 0:
+            sys.exit()
+
+        # The most abundant output
+        ref_host_set, ref_text = hosts_text_list.pop(0)
+        ref_hostlist = collect_hostlist(ref_host_set)
+
+        # Split into lines for use with difflib.
+        ref_lines = ref_text.split('\n')
+
+        output(ref_host_set, ref_text, opts.count)
+
+        for host_set, text in hosts_text_list:
+            output(host_set,
+                   '\n'.join(unified_diff(ref_lines,
+                                          text.split('\n'),
+                                          fromfile=ref_hostlist,
+                                          tofile=collect_hostlist(host_set),
+                                          lineterm='')),
+                   opts.count)
+
+    else:
+        # "Normal" mode, just print the output
+
+        if opts.collect:
+            hosts_text_list = collect(text_dict)
+        else:
+            hosts_text_list = [(set((n,)), l) for n,l in text_dict.iteritems()]
+
+        # Sort in descending order of the number of hosts
+        hosts_text_list.sort(key = lambda x: -len(x[0]))
+
+        for host_set, text in hosts_text_list:
+            output(host_set, text, opts.count)
+
+except KeyboardInterrupt:
+    sys.exit()
