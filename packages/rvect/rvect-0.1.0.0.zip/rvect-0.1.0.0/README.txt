@@ -1,0 +1,140 @@
++++++++++++++++++++++++++++++++++++++++++
+rvect.py
++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~
+R Vectors in Python
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``rvect.py`` is a Python module that defines a class (Rvect) implementing a data type 
+that simulates the vector data type used in the R_ language for statistical computing.
+
+.. _R: http://www.r-project.org/
+
+Mathematical operations on vectors (Rvect objects) are similar in syntax but 
+different in function than operations on Python lists. In general, operations on 
+vectors are applied to each element of the vector, rather than to the vector as a 
+whole. Whereas multiplying a Python list by a positive integer extends the length 
+of the list, multiplying a vector by a positive integer increases the magnitude 
+of each element of the vector but does not change the length of the vector.
+
+The ``rvect`` module does not interact in any way with R_--other Python modules 
+(e.g., RPy_) provide that functionality. The ``rvect`` module only provides another 
+Python data type, similar to vectors in R, that are useful for some types of 
+calculations.
+
+.. _RPy: http://rpy.sourceforge.net/
+
+=======================================
+Examples
+=======================================
+
+To illustrate the usage of Rvect objects, the following examples contrast operations
+on Python lists and on Rvect objects.
+
+1. Multiplying by a scalar ::
+
+     >>> [1, 2, 3] * 2
+     [1, 2, 3, 1, 2, 3] 
+     >>> Rvect([1, 2, 3]) * 2
+     [2, 4, 6]
+
+2. Adding a scalar ::
+
+     >>> [1, 2, 3] + 2
+     TypeError 
+     >>> Rvect([1, 2, 3]) + 2
+     [3, 4, 5]
+
+3. Multiplying two lists or vectors ::
+
+     >>> [1, 2, 3] * [4, 5, 6]
+     TypeError 
+     >>> Rvect([1, 2, 3]) * Rvect([4, 5, 6])
+     [4, 10, 18]
+
+4. Adding two lists or vectors ::
+
+     >>> [1, 2, 3] + [4, 5, 6] 
+     [1, 2, 3, 4, 5, 6] 
+     >>> Rvect([1, 2, 3]) + Rvect([4, 5, 6])
+     [5, 7, 9]
+
+5. Binary logical operations on two lists or vectors ::
+
+     >>> [True, True, False, False] and [True, False, True, False]
+     [True, False, True, False] 
+     >>> list_and( [True, True, False, False], [True, False, True, False] ) 
+     [True, False, False, False] 
+     >>> Rvect([True, True, False, False]).logical_and( Rvect([True, False, True, False]) )
+     [True, False, False, False]
+
+=======================================
+Notes
+=======================================
+
+1. This module contains several functions that implement basic listwise operations
+   (e.g., and, or, sum, product) on lists or tuples, in addition to the class (Rvect)
+   that defines overloaded operators for these and other functions.
+
+2. Whereas elements of an R vector must all be of the same type, the Rvect class has
+   no such constraint--Rvect elements may be of any type, as with a Python list. The
+   class does contain methods to coerce all elements to several specific types, however.
+
+3. Because Python does not allow a class to define its own __not__ method, the command ::
+
+      not Rvect()
+
+   does not work as might be expected (that is, not as in R). Instead, there is a method named ::
+
+      .logical_not()
+
+   of an Rvect object that must be called instead.
+
+4. Because Python implements the logical binary infix operations 'and', 'or', and 'xor'
+   by calling __nonzero__ or __len__ on each object and then executing the Boolean logic
+   itself, logical binary combination of Rvect objects cannot be done using the 'and',
+   'or', and 'xor' infix operators. Instead, the following functions are defined ::
+
+      .logical_and(Rvect1, Rvect2, ...)
+      .logical_or(Rvect1, Rvect2, ...)
+      .logical_xor(...)
+
+5. The special methods __and__, __or__, and __xor__, which correspond to the binary
+   infix operators '&', '|', and '^',are for binary, not logical, comparisons. In R,
+   however, these infix operators peform logical comparisons. Therefore, the special
+   methods have been implemented so that they convert their arguments to booleans, and
+   therefore correspond to logical operators, and so operate similarly to the equivalent
+   R operators. Thus, for Rvects a and b, the following two expressions are equivalent ::
+
+      a.logical_and(b) a & b
+
+   Both return a vector of booleans. As per the previous note, these are *not* equivalent to ::
+
+      a and b
+
+   which returns a single boolean value.
+
+6. The ``'list_...()'`` functions in this module allow operation on multiple lists, whereas
+   the binary infix mathematical operators implemented for Rvect instances only allow
+   operation on two objects. For example, multiple lists can be summed in parallel with ::
+
+      list_sum(list1, list2, list3,...)
+
+   However, the arguments to the ``'list_...()'`` functions must all be lists of the same
+   length, whereas the arguments to the Rvect methods may be other Rvect objects, lists,
+   or scalars.
+
+=======================================
+Copyright and License
+=======================================
+
+Copyright (c) 2007, 2009, R.Dreas Nielsen
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later 
+version. This program is distributed in the hope that it will be useful, but 
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for 
+more details. The GNU General Public License is available at 
+http://www.gnu.org/licenses/.
