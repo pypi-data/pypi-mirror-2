@@ -1,0 +1,8 @@
+<HTML>
+<HEAD>
+<TITLE>Sqlkit</TITLE>
+<META HTTP-EQUIV="REFRESH" CONTENT="0; URL=sqlkit/tour.html">
+</HEAD>
+<BODY>
+</BODY>
+</HTML>

@@ -1,0 +1,100 @@
+ ===========
+l'obiettivo
+===========
+
+  1. Quando si apre una tabella deve aprirsi con già le colonne dimensionate
+     correttamente per il testo che deve mostrare -anche se è al momento
+     vuota-, prendendo le informazioni dal database via il campo
+     fields[field_name]['length'] 
+
+  2. La dimensione della tabella deve essere sufficiente per mostrare tutte
+     le colonne ma non superiore alla dimensione dello schermo.
+
+  2b. per le colonne condimensione > di (circa) 60 caratteri, la colonna
+     deve non superare i 60 caratteri.
+
+  3. Deve essere possibile ridimensionare le colonne *ai dati presenti* in un
+     *dato momento*. Questa è una operazioen differente dalla
+     precedente. Quetsa funzione potrebbe ad esempio essere invocata da una
+     icona Zoom-to-fit
+
+  4. per quanto possibile le funzioni deve  essere esportabile alle table
+     non SqlTable, ovvero quelle che non hanno un database sotto e quindi
+     che non hanno coscienza a priori della larghezza del campo (questo può
+     essere vero solo per il punto 3.)
+
+columns
+=======
+
+Usando la proprietà 'expand' solo per le colonne corrispondenti a VarChar
+con length > x (es. 20 o 30), ed il resize = True  per tutti si ottiene già
+una maggiore usabilità. La versione nel repo (dev) implementa questo.
+
+Resta un fastidioso problema di interazione quando si voglia ridimensionare.
+
+
+cell-renderer
+=============
+
+Proviamo usando dei cell renderers che passino dele informazioni sulla
+larghezza da utilizzare via le funzioni on_get_size.
+
+
+date
+----
+L'esempio da cui sono partito è il cell renderer delle date, ho provato a
+truccare la larghezza così::
+
+        width  = width * XSCALE + (xpad * 2)
+        height = height + (ypad * 2)
+
+ed effettivamente se XSCALE cambia anche  la larghezza della colonna
+cambia (nella fattispece la colonna ha expand = False).
+
+.. note::
+
+  se si cambia interattivamente XSCALE (es. con ipython) la largezza della
+  colonna non cambia subito ma quando uso::
+
+     t.treeview.column_autosize()
+
+  se però ridimensiono a mano, non le nuove dimensioni vengono mantenute
+  (cosa che ci va bene)
+
+varchar
+-------
+
+procedi a fare un CellRenderer per i varchar che erediti da CellRendererText
+e sovrascriva solo on_get_size, calcolandosi la larghezza da passare. Il
+cell Renderer deve avere un campo aggiuntivo length:
+
+  class CellRendererVarchar(gtk.CellRendererText):
+
+      def __init__(self, length, *args, **kwargs)
+           self.length = length
+      	   return gtk.CellRendererText.__gobject_init__(self, *args, **kwargs)
+
+      def on_get_size(...)
+
+Se questa cosa dimensiona correttamente la colonna (e non vedo perché non
+dovrebbe), il gioco è fatto: il resto è qualche algoritmo per decidere che
+larghezza massima da dare alla finestra (ma già hai fatto qualcosa) e veder
+come farsi passare le informazioni dall cell renderer per dimenzionare il tutto.
+
+===============
+Dubbi
+===============
+
+metodi virtuali
+===============
+
+io credo che si possa usare on_get_size invece che do_get_size, cosa che è
+permessa a GenericCellRenderer, ma non sono sicuro. Quello che non capisco è
+quando si usa il metodo virtuale do_ e quando si usa l'altro.
+
+
+esempi
+========
+
+io ho un esempio di finestra che sballa i calcoli ma è in un database
+differente. Nei prossimi giorni provo a metterlo sul db movies.
