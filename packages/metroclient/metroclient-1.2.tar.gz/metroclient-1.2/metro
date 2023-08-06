@@ -1,0 +1,327 @@
+#!/usr/bin/python
+#
+#   Metro Application Manager
+#       (c) Lumentica, 2011
+#           support@lumentica.com
+#       
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+import sys
+from optparse import OptionParser
+from cmd import Cmd
+import time
+import tempfile
+import json
+import inspect
+from functools import wraps
+from metroclient import MetroClient, MetroClientError
+from metroclient.interactive import interactive_shell
+import paramiko
+#import Crypto
+from paramiko import SSHClient, AutoAddPolicy, RSAKey, PKey, AuthenticationException
+
+def deploy(client=None, package_file=None):
+    deploy_task_id = client.deploy(package_file)
+    if deploy_task_id:
+        print('Deploying...')
+        status = client.get_task_status(deploy_task_id)
+        if type(status) != type({}):
+            print(status)
+        else:
+            progress = ''
+            while status != 'success' and status != 'failure' and status != 'revoked':
+                data = client.get_task_status(deploy_task_id)
+                status = data['task_status']
+                if data['deploy_status'] != progress:
+                    progress = data['deploy_status']
+                    print(' :: {0}...'.format(progress))
+
+def run_shell(metro_client=None, app_name=None, keyfile=None):
+    if not metro_client:
+        raise MetroClientError('You must specify a Metro client object')
+    try:
+        # get the app name
+        if not app_name:
+            app_name = raw_input('Application name: ').strip()
+        # request a new session and get connection info
+        conn_info = metro_client.start_shell(app_name)
+        host = conn_info['host']
+        port = conn_info['port']
+        # start it off...
+        #Crypto.Random.atfork()
+        ssh = SSHClient()
+        ssh.load_system_host_keys()
+        ssh.set_missing_host_key_policy(AutoAddPolicy())
+        try:
+            if keyfile:
+                if not os.path.exists(keyfile):
+                    raise MetroClientError('Keyfile does not exist')
+                pk = RSAKey.from_private_key_file(keyfile)
+                ssh.connect(host, username=app_name, port=port, pkey=pk)
+            else:
+                ssh.connect(host, username=app_name, port=port)
+        except AuthenticationException:
+            print('Authentication failed.  Make sure to upload your SSH public keys to Metro before using.')
+            sys.exit(1)
+        #Crypto.Random.atfork()
+        t = ssh.get_transport()
+        c = t.open_session()
+        c.get_pty()
+        c.invoke_shell()
+        # start interactive
+        interactive_shell(c)
+        c.close()
+        t.close()
+        sys.exit(0)
+    except Exception, d:
+        import traceback
+        traceback.print_exc()
+        print('Error: {0}'.format(d))
+        sys.exit(1)
+
+def main(opts=None, args=None):
+    try:
+        # show version and exit
+        print('\nMetro Application Manager {0}'.format(metroclient.VERSION))
+        print('  Copyright (c) Lumentica,  http://www.lumentica.com\n')
+        if opts.show_version:
+            sys.exit(0)
+        username = None
+        api_key = None
+        metro_host = None
+        # load command line username/api_key
+        if opts.username:
+            username = opts.username
+        else:
+            username = None
+        if opts.api_key:
+            api_key = opts.api_key
+        else:
+            api_key = None
+        # check env vars for username and api_key; only load if no command line options are present
+        if os.environ.has_key('METRO_USERNAME') and not username:
+            username = os.environ['METRO_USERNAME']
+        if os.environ.has_key('METRO_API_KEY') and not api_key:
+            api_key = os.environ['METRO_API_KEY']
+        # get custom metro url
+        if opts.metro_host:
+            url = opts.metro_host.replace('http://', '').replace('https://', '')
+        else:
+            url = 'metro.apphosted.com'
+        if username:
+            if api_key:
+                if url:
+                    client = MetroClient(username=username, api_key=api_key, metro_host=url)
+                else:
+                    client = MetroClient(username=username, api_key=api_key)
+            else:
+                if url:
+                    client = MetroClient(username=username, metro_host=url)
+                else:
+                    client = MetroClient(username=username)
+        else:
+            if url:
+                client = MetroClient(metro_host=url)
+            else:
+                client = MetroClient()
+        # start the shell if requested
+        if opts.run_shell:
+            # query metro to start and get the shell session
+            if opts.keyfile:
+                keyfile = opts.keyfile
+            else:
+                keyfile = None
+            if opts.app_name:
+                app_name = opts.app_name
+            else:
+                app_name = None
+            run_shell(metro_client=client, app_name=app_name, keyfile=keyfile)
+
+        # check for updates
+        client.check_for_update()
+        app_dir = None
+        # check options
+        if opts.source_directory:
+            if not os.path.exists(opts.source_directory):
+                print('Application source directory not found...')
+                sys.exit(1)
+            else:
+                app_dir = opts.source_directory
+        if not app_dir:
+            app_dir = raw_input('Application directory (i.e. path to project): ')
+        if app_dir != './' and app_dir != '.':
+            app_pkg = os.path.basename(app_dir) + '.mpkg'
+            app_dir = os.path.join(os.getcwd() + os.sep + os.path.basename(app_dir))
+        else:
+            app_pkg = os.path.basename(os.getcwd()) + '.mpkg'
+            app_dir = os.path.abspath(os.getcwd())
+        package_file = os.path.join(tempfile.gettempdir(), app_pkg)
+        # check for existing config
+        if os.path.exists(os.path.join(app_dir, 'metro.config')):
+            # check existing config version
+            f = open(os.path.join(app_dir, 'metro.config'), 'r')
+            cfg = f.read()
+            f.close()
+            conf_ver = None
+            app_name = None
+            app_version = None
+            app_modules = None
+            app_fixtures = None
+            app_load_data = None
+            app_ssl = None
+            force_ssl = None
+            deploy_type = 'normal'
+            wsgi_module = ''
+            paste_config = ''
+            for l in cfg.split('\n'):
+                if l.find('config_version') > -1:
+                    conf_ver = float(l.split('::')[-1])
+                if l.find('name') > -1:
+                    app_name = l.split('::')[-1].strip()
+                if l.find('version') > -1:
+                    app_version = l.split('::')[-1].strip()
+                if l.find('modules') > -1:
+                    app_modules = l.split('::')[-1].strip()
+                if l.find('wsgi_module') > -1:
+                    wsgi_module = l.split('::')[-1].strip()
+                if l.find('paste_config') > -1:
+                    paste_config = l.split('::')[-1].strip()
+                if l.find('fixtures') > -1:
+                    app_fixtures = l.split('::')[-1].strip()
+                if l.find('load_data') > -1:
+                    app_load_data = l.split('::')[-1].strip()
+                if l.find('use_ssl') > -1:
+                    app_ssl = l.split('::')[-1].strip()
+                if l.find('force_ssl') > -1:
+                    force_ssl = l.split('::')[-1].strip()
+                if l.find('deploy_type') > -1:
+                    deploy_type = l.split('::')[-1].strip()
+            # use existing config if desired
+            if conf_ver == float(client.__version__):
+                if opts.use_config or raw_input('Do you want to use the existing config? (y/n): ').strip().lower() == 'y':
+                    print('Using existing config...\n')
+                    print('Application: {0}\nVersion: {1}\nModules: {2}\nWSGI module: {3}\nPaste config: {4}\nFixtures: {5}\nLoad data: {6}\nSSL: {7}\nForce SSL: {8}\n'.format(app_name, app_version, app_modules, wsgi_module, paste_config, app_fixtures, app_load_data, app_ssl, force_ssl))
+                    if opts.build or raw_input('Build? (y/n): ').strip().lower() == 'y':
+                        client.create_package(package_file, app_dir)
+                        print('Build complete.')
+                        # check for upload to metro
+                        if opts.push or raw_input('Upload to AppHosted? (y/n): ').strip().lower() == 'y':
+                            deploy(client, package_file)
+                    if opts.keep_build:
+                        print('\nPackage available in {0}\n'.format(archive_file))
+                    else:
+                        if os.path.exists(package_file):
+                            os.remove(package_file)
+                    sys.exit(0)
+        app_name = raw_input('Application name: ')
+        app_version = raw_input('Application version: ')
+        app_description = raw_input('Application description: ')
+        app_modules = raw_input('Application modules (extra; comma-separated): ')
+        # add trailing comma if needed
+        if app_modules.strip() != '':
+            if app_modules.strip()[-1] != ',':
+                app_modules += ','
+        wsgi_module = raw_input('WSGI module (optional): ').strip()
+        paste_config = raw_input('Paste config (optional): ').strip()
+        app_fixtures = raw_input('Fixtures (optional; comma-separated): ').strip()
+        # add trailing comma if needed
+        if app_fixtures.strip() != '':
+            if app_fixtures.strip()[-1] != ',':
+                app_fixtures += ','
+        app_load_data = raw_input('Sync database and load fixtures? (y/n): ')
+        app_ssl = raw_input('Use SSL? (y/n): ')
+        force_ssl = raw_input('Force SSL: (y/n): ')
+        #quick_deploy = raw_input('Quick deploy? (y/n): ')
+        quick_deploy = 'n' # default to 'normal' deploy
+        # write config
+        f = open('%s/metro.config' % (app_dir), 'w')
+        f.write('config_version:: %s\n' % (metroclient.VERSION))
+        f.write('name:: %s\n' % (app_name))
+        f.write('version:: %s\n' % (app_version))
+        f.write('description:: %s\n' % (app_description))
+        f.write('modules:: %s\n' % (app_modules))
+        f.write('wsgi_module:: %s\n' % (wsgi_module))
+        f.write('paste_config:: %s\n' % (paste_config))
+        f.write('fixtures:: %s\n' % (app_fixtures))
+        # load data
+        if app_load_data.strip().lower() == 'y':
+            f.write('load_data:: true\n')
+        else:
+            f.write('load_data:: false\n')
+        # ssl
+        if app_ssl.strip().lower() == 'y':
+            f.write('use_ssl:: true\n')
+        else:
+            f.write('use_ssl:: false\n')
+        # force ssl
+        if force_ssl.strip().lower() == 'y':
+            f.write('force_ssl:: true\n')
+        else:
+            f.write('force_ssl:: false\n')
+        # quick deploy
+        if quick_deploy.strip().lower() == 'y':
+            f.write('deploy_type:: quick\n')
+        else:
+            f.write('deploy_type:: normal\n')
+        f.close()
+    
+        client.create_package(package_file, app_dir)
+        print('Build complete.')
+        # check for upload to metro
+        if raw_input('Upload to AppHosted? (y/n): ').strip().lower() == 'y':
+            deploy(client, package_file)
+        # cleanup
+        if opts.keep_build:
+            print('\nPackage available in {0}\n'.format(archive_file))
+        else:
+            if os.path.exists(package_file):
+                os.remove(package_file)
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print('\nBuild cancelled...')
+        sys.exit(1)
+    except Exception, d:
+        import traceback
+        traceback.print_exc()
+        msg = str(d).replace('\"', '').replace('\'', '')
+        print('\nError: {0}\n'.format(msg))
+        sys.exit(1)
+
+if __name__=='__main__':
+    # try to import global metroclient -- if fail, add local dir to path to check for manual download
+    try:
+        import metroclient
+    except ImportError:
+        print('Unable to import metroclient; please install the Metro client via pip or by downloading the package.')
+        sys.exit(1)
+    op = OptionParser()
+    op.add_option('-u', '--user', dest="username", help="AppHosted username")
+    op.add_option('-k', '--api-key', dest="api_key", help="AppHosted API key")
+    op.add_option('-d', '--source-directory', dest="source_directory", help="Project source directory")
+    op.add_option('-b', '--build', dest="build", action="store_true", default=False, help="Build Metro package")
+    op.add_option('--keep-build', dest="keep_build", action="store_true", default=False, help="Keep the built Metro package")
+    op.add_option('-p', '--push', dest="push", action="store_true", default=False,  help="Push (deploy) to AppHosted")
+    op.add_option('-q', '--quick', dest="quick_deploy", action="store_true", default=False,  help="Use quick deploy (experts only)")
+    op.add_option('-e', '--use-existing-config', dest="use_config", action="store_true", default=False, help="Use existing Metro configuration file if exists")
+    op.add_option('--metro-host', dest="metro_host", help="Specify an alternate Metro server")
+    op.add_option('-v', '--version', dest="show_version", action="store_true", default=False, help="Show version")
+    op.add_option('-s', '--shell', dest="run_shell", action="store_true", default=False, help="Start the Metro shell")
+    op.add_option('--app', dest="app_name", help="Specify application to use with Metro shell")
+    op.add_option('--private-key', dest="keyfile", help="Specify alternate key to use with Metro shell")
+
+    opts, args = op.parse_args()
+    main(opts=opts, args=args)
+
