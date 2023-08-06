@@ -1,0 +1,106 @@
+odls.client -- A client for the OpenDataLinkingSystem (ODLS_)
+*************************************************************
+
+The ODLS_ client scans local filesystems, looks for changes, and reports
+them to an ODLS_ server. The states of files/directories scanned are
+stored in a local SQLite database.
+
+The `odls.client` package mainly provides a script ``indexer`` that
+will be available in some ``bin/`` directory after install (the
+concrete location will depend on the type of install).
+
+The ``indexer`` script is configured by commandline options (try
+``indexer --help``) and configuration files. All this is explained in
+more detail in the package documentation (see below).
+
+This Python implementation of the ODLS_ client is the successor of the
+C++ implementation used in the years before.
+
+While `odls.client` itself is pure Python, some extensions (notably
+the SQLite support) require C extensions.
+
+.. warning:: This package is in a really early state!!! Some options
+             do simply not work yet and Windows support is yet
+             completely untested.
+
+
+Documentation
+=============
+
+The full package documentation can be found at:
+
+http://packages.python.org/odls.client
+
+
+Prerequisites
+=============
+
+`odls.client` is currently tested on Linux only.
+
+* you need Python >= 2.4
+
+* you need `pysqlite` whih in turn might require the SQLite libraries
+  and header files.
+
+* for full install (including tests etc.) you also need the Python
+  header files and a working C-compiler like `gcc`.
+
+
+Installing the Library
+======================
+
+Use `easy_install` to install the library.
+
+Or download the sources and in the root dir of the extracted package
+do::
+
+  $ python setup.py install
+
+You might need superuser permissions to do that.
+
+
+Installing for Development
+==========================
+
+After downloading and extracting the sources, in the root dir of the
+downloaded file tree do::
+
+  $ python bootstrap/bootstrap.py
+
+which will configure the package for your system. Then, run::
+
+  $ ./bin/buildout
+
+which will generate all scripts needed for development in the local
+``bin/`` directory.
+
+Running Tests
+-------------
+
+Afterwards you can run the tests by doing::
+
+  $ ./bin/test
+
+Creating Docs
+-------------
+
+`odls.client` comes with some documentation in the ``docs/``
+folder. It can be turned into `Sphinx` based HTML by running::
+
+  $ ./bin/make-docs
+
+The docs then can be found in ``docs/build/html``.
+
+Creating Coverage Reports
+-------------------------
+
+We try to keep `odls.client` at a 100%-test-covered level. You can
+do the coverage report by issuing on the command line::
+
+  $ ./bin/coverage-detect
+  $ ./bin/coveragereport
+
+This will create HTML docs of the test coverage of each module. You
+can find the generated HTML pages in the ``coveragereport`` subdir.
+
+.. _ODLS: http://www.odls.net/

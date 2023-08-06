@@ -1,0 +1,104 @@
+ODLS client configuration
+*************************
+
+ODLS client is configured via well-known .ini-style configuration
+files.
+
+     >>> from odls.client.configuration import ODLSConfiguration
+     >>> myconf = ODLSConfiguration([])
+
+
+ODLSConfigParser
+================
+
+The ODLSConfigParser is an ordinary ConfigParser, that additionally
+looks for configuration files in certain locations.
+
+The ODLSConfigParser parses config files like an ordinary
+ConfigParser:
+
+     >>> open('myindexer.ini', 'wb').write("""
+     ... [SERVER]
+     ... a=1
+     ... [LOG]
+     ... LOGLEVEL = DEBUG
+     ... """)
+
+     >>> open('myindexer2.ini', 'wb').write("""
+     ... [LOG]
+     ... LOGLEVEL = BIZARRE_VALUE
+     ...
+     ... FOO=BAR
+     ... """)
+
+We parse this config file:
+
+     >>> from odls.client.configuration import ODLSConfigParser
+     >>> myparser = ODLSConfigParser()
+     >>> myparser.read(['myindexer.ini', 'myindexer2.ini'])
+     [..., 'myindexer.ini', 'myindexer2.ini']
+
+     >>> myparser.get('LOG', 'LOGLEVEL')
+     'BIZARRE_VALUE'
+
+The parsed values include some, we did not include in the config file:
+
+     >>> myparser.get('LOG', 'DO_SYSLOG')
+     'no'
+
+Even other sections are included:
+
+     >>> myparser.sections()
+     ['CLIENT', 'LOG', 'ODLS_VARS', 'SERVER']
+
+That's because by default we first parse a local default.ini (which is
+part of the package) which gives us the really needed default values.
+
+The ODLSConfigParser provides special methods for parsing certain
+entry types.
+
+We can parse loglevels:
+
+     >>> myparser.getloglevel('LOG', 'loglevel')
+     Traceback (most recent call last):
+     ...
+     ValueError: Illegal loglevel in config file: bizarre_value
+
+Aferwards, we look for a site-wide config (``/etc/indexer.ini``) and a
+user specific config (``~/indexer.ini``, ``~/.indexer.ini``). Config
+files are parsed in this order, overriding any formerly set values.
+
+ODLSOptionParser
+================
+
+The ODLSOptionParser is a regular optparse.OptionParser with
+prepopulated data, including help, usage, options and the like.
+
+     >>> from odls.client.configuration import ODLSOptionParser
+     >>> myoptparser = ODLSOptionParser()
+     >>> #myoptparser.print_help()
+
+We can see the current version:
+
+     >>> myoptparser.print_version()
+     0.1dev
+
+     >>> myoptparser.version
+     '0.1dev'
+
+     >>> #myoptparser.parse_args([])
+
+ODLSConfiguration
+=================
+
+A configuration is a collection of options set after parsing
+configuration file(s) and cmdline args.
+
+     >>> from odls.client.configuration import ODLSConfiguration
+     >>> myconf = ODLSConfiguration([])
+
+Clean up:
+
+     >>> import os
+     >>> os.unlink('myindexer.ini')
+     >>> os.unlink('myindexer2.ini')
