@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+"""
+csvcut is originally the work of eminent hackers Joe Germuska and Aaron Bycoffe.
+
+This code is forked from:
+https://gist.github.com/561347/9846ebf8d0a69b06681da9255ffe3d3f59ec2c97
+
+Used and modified with permission.
+"""
+
+import sys
+
+from csvkit import * 
+from csvkit.unicode import UnicodeCSVReader, UnicodeCSVWriter 
+
+def main(args):
+    """
+    Command line-utility that filters and truncates CSV files. Like unix "cut" command, but for tabular data.
+    """
+    rows = UnicodeCSVReader(args.file, **extract_csv_reader_kwargs(args))
+    column_names = rows.next()
+
+    if args.names_only:
+        for i, c in enumerate(column_names):
+            sys.stdout.write('%3i: %s\n' % (i + 1, c))
+
+        sys.exit()
+
+    column_ids = parse_column_identifiers(args.columns, column_names)
+    output = UnicodeCSVWriter(sys.stdout)
+
+    if not args.skip_header:
+        if args.line_numbers:
+            column_names.insert(0, 'line_number')
+
+        output.writerow(column_names[c] for c in column_ids)
+
+    for row in rows:
+        out_row = [row[c] if c < len(row) else None for c in column_ids] 
+        
+        if args.line_numbers:
+            out_row.insert(0, i) 
+
+        output.writerow(out_row)
+                
+if __name__ == "__main__":
+    """
+    Process command line arguments.
+    """
+    parser = init_common_parser(description='Filter and truncate CSV files. Like unix "cut" command, but for tabular data.')
+    parser.add_argument('-n', '--names', dest='names_only', action='store_true',
+                        help='Display column names and indices from the input CSV and exit.')
+    parser.add_argument('-c', '--columns', dest='columns',
+                        help='A comma separated list of column indices or names to be extracted. Defaults to all columns.')
+    parser.add_argument('-s', '--skipheader', dest='skip_header', action='store_true',
+                        help='Do not display the csv header in the output. Useful when piping to grep or uniq.')
+    parser.add_argument('-l', '--linenumbers', dest='line_numbers', action='store_true',
+                        help='Insert a column of line numbers at the front of the output. Useful when piping to grep or as a simple primary key.')
+
+    main(parser.parse_args())
