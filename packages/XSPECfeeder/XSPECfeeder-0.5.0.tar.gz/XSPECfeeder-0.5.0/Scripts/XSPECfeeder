@@ -1,0 +1,257 @@
+""" XSPECfeeder
+
+
+Version : 1.0.0
+Author  : Jure Japelj, Stefano Covino
+Date    : 25/08/2011
+E-mail  : jure.japelj@fmf.uni-lj.si, stefano.covino@brera.inaf.it
+URL:    : http://www.merate.mi.astro.it/utenti/covino
+
+Usage   : XSPECfeeder [-d arg1] -f arg2 [-h] -i arg3 [-l] [-k arg4] -o arg5 -t arg6 -u arg7 [-v]
+            
+
+History : (25/08/2011) First version.
+"""
+
+
+
+from optparse import OptionParser
+import os.path
+import XSF
+from XSF.Files.TableRead import TableRead
+from XSF.Files.TableWrite import TableWrite
+from XSF.System.Pipe import Pipe
+from XSF.System.Which import Which
+from XSF.Units.dataCheck import dataCheck
+from XSF.Units.ERGA2JY import ERGA2JY
+from XSF.Units.ERGH2JY import ERGH2JY
+from XSF.Units.FL2XSPEC import FL2XSPEC
+from XSF.Units.FLHE2XSPEC import FLHE2XSPEC
+from XSF.Units.FLMAG2XSPEC import FLMAG2XSPEC
+from XSF.Units.NM2ANG import NM2ANG
+from XSF.Units.TEV2GEV import TEV2GEV
+
+
+parser = OptionParser(usage="usage: %prog [-d arg1] -f arg2 [-h] -i arg3 [-l] [-k arg4] -o arg5 -t arg6 -u arg7 [-v]")
+parser.add_option("-d", "--debugfile", action="store", nargs=1, type="string", dest="debfile", help="XSPEC compliant input file")
+parser.add_option("-f", "--inputfluxunit", action="store", nargs=1, type="string", dest="inputfluxunit", help="Input data flux units")
+parser.add_option("-i", "--inputfile", action="store", nargs=1, type="string", dest="inputfile", help="File with data to be converted")
+parser.add_option("-k", "--kindoffile", action="store", nargs=1, type="string", dest="kindoffile", default='ASCII', help="Format of input file")
+parser.add_option("-l", "--longexpl", action="store_true", help="Longer explanation about the script usage")
+parser.add_option("-o", "--outfile", action="store", nargs=1, type="string", dest="outfile", help="Output result file")
+parser.add_option("-t", "--inputtype", action="store", nargs=1, type="string", dest="inputtype", help="Input data type")
+parser.add_option("-u", "--inputunit", action="store", nargs=1, type="string", dest="inputunit", help="Input data units")
+parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="Verbose output")
+(options, args) = parser.parse_args()
+
+
+if options.longexpl:
+    #
+    print
+    print "Input data type can be (option -t):"
+    print "\tOptical spectra (OPT)"
+    print "\tVery High Energy data (VHE)"
+    print "\tOptical magnitudes (MAG)"
+    print
+    print "Input flux units (option -f):"
+    print "\tJansky (JY)"
+    print "\terg / cm^2 s A (ERGA)"
+    print "\terg / cm^2 s Hz (ERGH)"
+    print "\tTeV / cm^2 s (TEV)"
+    print
+    print "Input units (option -u):"
+    print "\tAngstrom (ANG)"
+    print "\tNanometer (NM)"
+    print "\tHertz (HZ)"
+    print "\tGeV (GEV)"
+    print "\tTeV (TEV)"
+    print 
+    print "Input data are expected to follow this format:"
+    print "\tOptical spectra:"
+    print "\t\tWavelength flux_density flux_density_error"
+    print "\tVHE data:"
+    print "\t\tE_min E_max flux flux_error"
+    print "\tMAG data:"
+    print "\t\twavelength fwhm flux_density flux_density_error"
+    print
+    print "Input file format can be (option -k):"
+    print "\tASCII"
+    print "\tFITS"
+    print
+    print "Warnings:"
+    print "\tYou can import as many data files as you like."
+    print "\tHowever it is essential to take care that for each"
+    print "\tdata file the wavelength/energy bins"
+    print "\tmust all be consecutive following the rule:"
+    print "\t\tE1 E2 (with E1 < E2)"
+    print "\t\tE2 E3 (with E2 < E3)"
+    print "\t\tetc."
+    print "\tNo gaps or repetitions are possible."
+    print "\tIn case of gaps, import different portions of"
+    print "\tthe dataset by different files."
+    print "\tIn addition, for magnitudes, only one filter per file"
+    print "\tcan be imported."
+    print 
+    #
+elif options.inputfile and options.outfile and options.inputtype and options.inputunit and options.inputfluxunit and options.kindoffile:
+    # Input parameters check
+    #
+    if Which(XSF.FLX2XSP) == None:
+        parser.error("XSPEC package %s not found." % XSF.FLX2XSP)
+    #
+    if not os.path.exists(options.inputfile):
+        parser.error("Input file %s not found." % options.inputfile)
+    else:
+        if options.verbose:
+            print "Input file\t\t: %s" % options.inputfile
+    #
+    if options.inputfluxunit.upper() not in XSF.XSFIFU:
+        parser.error("Input flux unit %s not recognized." % options.inputfluxunit)
+    else:
+        if options.verbose:
+            print "Input flux units\t: %s" % options.inputfluxunit.upper()
+    #
+    if options.inputtype.upper() not in XSF.XSFIDT:
+        parser.error("Input data type %s not recognized." % options.inputtype)
+    else:
+        if options.verbose:
+            print "Input data type\t\t: %s" % options.inputtype.upper()
+    #
+    if options.inputunit.upper() not in XSF.XSFIU:
+        parser.error("Input data unit %s not recognized." % options.inputunit)
+    else:
+        if options.verbose:
+            print "Input data units\t: %s" % options.inputunit.upper()
+    #
+    if options.kindoffile.upper() not in XSF.XSFTT:
+        parser.error("Input file format %s not recognized." % options.kindofile)
+    else:
+        if options.verbose:
+            print "Input file format\t: %s" % options.kindoffile.upper()
+    #
+    if options.verbose:
+        print "Output file\t\t: %s" % options.outfile
+    #
+    if options.verbose and options.debfile:
+        print "Debug output file\t: %s" % options.debfile
+    #
+    # read input data
+    #
+    tdt = TableRead(options.inputfile,options.kindoffile.upper())
+    #
+    if tdt == None:
+        parser.error("Problem in reading data.")
+    #
+    # Check on column number
+    if options.inputtype.upper() == 'OPT':
+        if len(tdt.columns) != 3:
+            parser.error("Input spectrum is expected to have 3 columns.")
+        if options.inputunit.upper() not in XSF.XSFIUOPT:
+            parser.error("Input data unit not allowed for this data type.")
+        if options.inputfluxunit.upper() not in XSF.XSFIFUOPT:
+            parser.error("Input flux data not allowed for this data type.")            
+    elif options.inputtype.upper() == 'VHE':
+        if len(tdt.columns) != 4:
+            parser.error("Input spectrum is expected to have 4 columns.")
+        if options.inputunit.upper() not in XSF.XSFIUVHE:
+            parser.error("Input data unit not allowed for this data type.")
+        if options.inputfluxunit.upper() not in XSF.XSFIFUVHE:
+            parser.error("Input flux data not allowed for this data type.")    
+    elif options.inputtype.upper() == 'MAG':
+        if len(tdt.columns) != 4:
+            parser.error("Input data should show 4 columns.")
+        if options.inputunit.upper() not in XSF.XSFIUOPT:
+            parser.error("Input data unit not allowed for this data type.")
+        if options.inputfluxunit.upper() not in XSF.XSFIFUOPT:
+            parser.error("Input flux data not allowed for this data type.")   
+    # input data consistency check
+    reschk = dataCheck (tdt, options.inputtype.upper())
+    if reschk != '':
+        parser.error(reschk) 
+    #
+    if options.inputtype.upper() == 'OPT':
+        # create columns
+        xdata = tdt.col1
+        ydata = tdt.col2
+        eydata = tdt.col3
+        # convert nm to Ang
+        if options.inputunit.upper() == 'NM':
+            xdata = NM2ANG(xdata)
+        elif  options.inputunit.upper() == 'HZ':
+            xdata = HZ2ANG(xdata)
+        # convert erg / s cm2 Hz to Jy
+        if options.inputfluxunit.upper() == 'ERGH':
+            ydata, eydata = ERGH2JY(ydata,eydata)
+        elif options.inputfluxunit.upper() == 'ERGA':
+            ydata, eydata = ERGA2JY(xdata,ydata,eydata)
+        # Now all units are correct
+        # Convert from Jy to ph / cm2 s
+        emin, emax, phfl, ephfl = FL2XSPEC(xdata,ydata,eydata)
+        #
+    elif options.inputtype.upper() == 'VHE':
+        # create columns
+        xmin = tdt.col1
+        xmax = tdt.col2        
+        ydata = tdt.col3
+        eydata = tdt.col4
+        # convert TeV to GeV
+        if options.inputunit.upper() == 'TEV':
+            xmin, xmax = TEV2GEV (xmin, xmax)
+        #
+        # Now all units are correct
+        # Convert from TeV/cm2s to ph / cm2 s
+        emin, emax, phfl, ephfl = FLHE2XSPEC(xmin,xmax,ydata,eydata)
+        #
+    if options.inputtype.upper() == 'MAG':
+        # create columns
+        xdata = tdt.col1
+        fdata = tdt.col2
+        ydata = tdt.col3
+        eydata = tdt.col4
+        # convert nm to Ang
+        if options.inputunit.upper() == 'NM':
+            xdata = NM2ANG(xdata)
+            fdata = NM2ANG(fdata)
+        elif  options.inputunit.upper() == 'HZ':
+            xdata = HZ2ANG(xdata)
+            fdata = HZ2ANG(xdata)
+        # convert erg / s cm2 Hz to Jy
+        if options.inputfluxunit.upper() == 'ERGH':
+            ydata, eydata = ERGH2JY(ydata,eydata)
+        elif options.inputfluxunit.upper() == 'ERGA':
+            ydata, eydata = ERGA2JY(xdata,ydata,eydata)
+        # Now all units are correct
+        # Convert from Jy to ph / cm2 s
+        emin, emax, phfl, ephfl = FLMAG2XSPEC(xdata,fdata,ydata,eydata)
+        #
+    #
+    # Create input file for next step
+    if options.debfile:
+        parfname = options.debfile
+    else:
+        parfname = XSF.xscfname
+    #
+    if TableWrite(parfname,emin,emax,phfl,ephfl) == None:
+        parser.error("Problems in writing file: %s." % parfname)
+    #
+    # generate external command
+    cmd = XSF.FLX2XSP + " %s %s.pha %s.rsp" % (parfname, options.outfile, options.outfile)
+    #print cmd
+    res = Pipe(cmd)
+    if res == None:
+        parser.error("Problems in executing %s." % XSF.FLX2XSP)
+    else:
+        if options.verbose:
+            print res
+    #
+    if not options.debfile:
+        try:
+            os.remove(parfname)
+        except IOError:
+            pass
+    #
+else:
+    parser.print_help()
+    #
+    
+    
