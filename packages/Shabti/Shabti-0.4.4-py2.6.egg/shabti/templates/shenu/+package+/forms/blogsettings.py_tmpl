@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+
+import formencode
+from tw.forms.validators import *
+from formencode.schema import Schema
+
+from tw.api import WidgetsList, CSSLink, JSLink, CSSSource, JSSource
+from tw.core.js import js_function
+
+from {{package}}.forms.validators.unique import Unique
+from {{package}}.forms.validators.related_fetcher import RelatedFetcher
+from {{package}} import model
+import tw.forms as twf, formencode as fe
+
+
+__all__ = ["BlogSettingsForm"]
+
+# Standard settings for cmxforms
+css = CSSLink(link="/css/cmxform.css", media="screen", title="cmxform")
+functions = JSLink(link="/js/cmxform.js")
+focus_element = js_function('focus_element')
+alert = js_function('alert')
+
+# For validating fields buried in FieldSets
+class StripSubDict(Schema): 
+    def _to_python(self, value, state): 
+        return super(StripSubDict, self)._to_python(
+                value, state).get('mysubdict', {})
+    
+
+
+# Strip spurious variables.
+class FilteringSchema(Schema):
+    filter_extra_fields = True
+    allow_extra_fields = True
+
+
+# def get_roles():
+#     return [('', 'None selected')] + model.Session.query(model.Role).order_by(model.Role.title).all()
+# def get_users():
+#     return [('', 'None selected')] + model.Session.query(
+#                         model.User).order_by(model.User.display_name).all()
+
+def get_users():
+    return model.Session.query(model.User).order_by(model.User.display_name).all()
+
+
+
+class BlogSettingsForm(twf.ListForm):
+    class fields(WidgetsList):
+        # The _method hidden field is required
+        # in oder to trigger the correct REST route.
+        # Make all the data editable.
+        rest_method = twf.HiddenField(
+            default = "PUT",
+            name = "_method")
+        
+        name = twf.TextField(
+            validator = UnicodeString(not_empty=True),
+            help_text = "Enter the name of the blog",
+            label_text = "Name",
+            maxlength = 255,
+            size = 50
+            )
+        owner = twf.SingleSelectField(
+            help_text = "Select a Adminsitrator from the list.",
+            label_text = "Owner",
+            validator = RelatedFetcher(model.User),
+            options = get_users,
+            )
+        theme = twf.SingleSelectField(
+            label_text = "Theme",
+            help_text = "Select a theme from the list.",
+            validator = OneOf(['Default', 'Green' ]),
+            options = ['Default', 'Green', ]
+            )
+        
+        
+    # allow adding js calls dynamically for a request
+    include_dynamic_js_calls = True
+    
+    css = [css]
+    # Add cmxform styling to the form
+    css_classes = ['cmxform']
+    javascript = [functions]
+    # Note usage of the chained test "CheckAgreed" validator, of which
+    # Alberto observes: "What might be tripping you is that the chained 
+    # validator approach only raises the Invalid when there are no other 
+    # errors in the form."
+    validator = Schema(
+        chained_validators = [],
+        )
+    
+    
+    def update_params(self, d):
+        super(BlogSettingsForm, self).update_params(d)
+        # Focus and select the 'name' field on the form
+        # The adapter we just wrote lets us pass formfields as parameters and
+        # the right thing will be done.
+        if not d.error:
+            self.add_call(focus_element(d.c.name))
+        else:
+            self.add_call(
+                alert('The form contains invalid data\n%s'% unicode(d.error))
+                )
+    
+
+

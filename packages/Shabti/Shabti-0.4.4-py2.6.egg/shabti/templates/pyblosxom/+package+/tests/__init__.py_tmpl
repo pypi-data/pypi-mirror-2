@@ -1,0 +1,98 @@
+"""Pylons application test package
+
+This package assumes the Pylons environment is already loaded, such as
+when this script is imported from the `nosetests --with-pylons=test.ini`
+command.
+
+This module initializes the application via ``websetup`` (`paster
+setup-app`) and provides the base testing objects.
+"""
+from unittest import TestCase
+import os
+import sys
+
+import pylons
+from pylons.i18n.translation import _get_translator
+from paste.deploy import loadapp
+from pylons import url
+from paste.script.appinstall import SetupCommand
+from routes.util import URLGenerator
+from webtest import TestApp
+import pylons.test
+import datetime
+import hashlib
+
+from {{package}}.config.environment import load_environment
+
+__all__ = ['environ', 'url', 'TestController', 'TestModel']
+
+
+# Invoke websetup with the current config file
+# SetupCommand('setup-app').run([pylons.test.pylonsapp.config['__file__']])
+
+# additional imports ...
+from paste.deploy import appconfig
+
+here_dir = os.path.dirname(__file__)
+conf_dir = os.path.dirname(os.path.dirname(here_dir))
+
+test_file = os.path.join(conf_dir, 'test.ini')
+conf = appconfig('config:' + test_file)
+config = load_environment(conf.global_conf, conf.local_conf)
+environ = {}
+
+filecontent = '''\
+Initial post
+#author Graham Higgins
+
+
+Facturusne operae pretium sim si a primordio urbis res populi Romani perscripserim nec satis scio nec, si sciam, dicere ausim, quippe qui cum ueterem tum uolgatam esse rem uideam, dum noui semper scriptores aut in rebus certius aliquid allaturos se aut scribendi arte rudem uetustatem superaturos credunt. Vtcumque erit, iuuabit tamen rerum gestarum memoriae principis terrarum populi pro uirili parte et ipsum consuluisse; et si in tanta scriptorum turba mea fama in obscuro sit, nobilitate ac magnitudine eorum me qui nomini officient meo consoler.
+
+**Note:** `Restructured Text <http://docutils.sourceforge.net/docs/user/rst/quickref.html>`_ and Pygments highlighting. Other parsers available (MoinMoin, Markdown, etc.)
+
+.. sourcecode:: python
+
+    def fib(n):    # write Fibonacci series up to n
+        """Print a Fibonacci series up to n."""
+        a, b = 0, 1
+        while b < n:
+            print b,
+            a, b = b, a+b
+'''
+
+
+class TestModel(TestCase):
+    ici = os.path.split(os.path.split(here_dir)[0])[0]
+    e = ici+'/data/blog/entries'
+    g = ici+'/data/blog/entries/general'
+    ip = ici+'/data/blog/entries/general/initialpost.txt'
+    
+    def setUp(self):
+        if not os.path.exists(self.e): os.mkdir(self.e)
+        if not os.path.exists(self.g): os.mkdir(self.g)
+        if not os.path.exists(self.ip): open(self.ip,'w').write(filecontent)
+    
+    
+    def tearDown(self):
+        if os.path.exists(self.g) and len(os.listdir(self.g))>0: 
+            [os.unlink(self.g+'/'+x) for x in os.listdir(self.g)]
+        if os.path.exists(self.g): os.rmdir(self.g)
+        if os.path.exists(self.e): os.rmdir(self.e)
+    
+    
+class TestController(TestModel):
+
+    def __init__(self, *args, **kwargs):
+        wsgiapp = loadapp('config:test.ini', relative_to=conf_dir)
+        config = wsgiapp.config
+        pylons.app_globals._push_object(config['pylons.app_globals'])
+        pylons.config._push_object(config)
+        
+        # Initialize a translator for tests that utilize i18n
+        translator = _get_translator(pylons.config.get('lang'))
+        pylons.translator._push_object(translator)
+        
+        url._push_object(URLGenerator(config['routes.map'], environ))
+        self.app = TestApp(wsgiapp)
+        TestCase.__init__(self, *args, **kwargs)
+

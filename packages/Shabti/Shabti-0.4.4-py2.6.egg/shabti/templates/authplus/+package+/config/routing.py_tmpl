@@ -1,0 +1,116 @@
+"""Routes configuration
+
+The more specific and detailed routes should be defined first so they
+may take precedent over the more generic routes. For more information
+refer to the routes manual at http://routes.groovie.org/docs/
+"""
+# from routes import Mapper
+
+import routes
+
+class Mapper(routes.Mapper):
+    # http://positiveincline.com/?p=550
+    # Pretty string representation - returns a string formatted like this:
+    #
+    #    Route name   Methods Path
+    #                         /error/{action}
+    #                         /error/{action}/{id}
+    #    home         GET     /
+    #    things       GET     /things
+    #    create_thing POST    /things
+    #    new_thing    GET     /things/new
+    #    thing                  GET     /thing/{id}
+    #
+    #    etc
+    #
+    # Enter 'print mapper' in the paster shell to use it, or (TBD) run it via a
+    # configured paster command.
+    #
+    def __str__(self):
+        def format_methods(r):
+            if r.conditions:
+                method = r.conditions.get('method', '')
+                return method if type(method) is str else ', '.join(method)
+            else:
+                return ''
+
+        table = [('Route name', 'Methods', 'Path')] + [
+            (
+                r.name or '',
+                format_methods(r),
+                r.routepath or''
+            )
+            for r in self.matchlist]
+
+        widths = [
+            max(len(row[col]) for row in table)
+            for col in range(len(table[0]))]
+
+        return '\n'.join(
+            ' '.join(
+                    row[col].ljust(widths[col])
+                    for col in range(len(widths))
+                ).rstrip()
+            for row in table)
+
+def make_map(config):
+    """Create, configure and return the routes Mapper"""
+    map = Mapper(directory=config['pylons.paths']['controllers'],
+                 always_scan=config['debug'])
+    map.minimization = False
+
+    # The ErrorController route (handles 404/500 error pages); it should
+    # likely stay at the top, ensuring it can always be resolved
+    map.connect('/error/{action}', controller='error')
+    map.connect('/error/{action}/{id}', controller='error')
+
+    # CUSTOM ROUTES HERE
+    # Home url's
+    map.connect('home', '/', controller='home', action='index')
+    map.connect('/robots.txt', controller='home', action='robots')
+    
+    # Accounts
+    map.connect('account_login', '/accounts/login', 
+                controller='accounts', action='login')
+    map.connect('account_register', '/accounts/register', 
+                controller='accounts', action='register')
+    map.connect('account_logout', '/accounts/logout', 
+                controller='accounts', action='logout')
+    map.connect('verify_email', '/accounts/verify_email/{token}', 
+                controller='accounts', action='verify_email')
+    map.connect('forgot_password', '/accounts/forgot_password', 
+                controller='accounts', action='forgot_password')
+    map.connect('reset_password', '/accounts/reset_password/{token}', 
+                controller='accounts', action='change_password')
+    
+    # OpenID URL's
+    map.connect('openid_associate', '/accounts/openid/associate', 
+                controller='accounts', action='openid_associate')
+    map.connect('openid_register', '/accounts/openid/register', 
+                controller='accounts', action='openid_register')
+    map.connect('openid_login', '/accounts/openid/login', 
+                controller='consumer', action='login')
+    map.connect('openid_process', '/accounts/openid/process', 
+                controller='consumer', action='process')
+    map.connect('openid_create', '/accounts/openid/create', 
+                controller='consumer', action='create')
+    
+    # FA model admin
+    # Map the /admin url to FA's AdminController
+    # Map static files
+    map.connect('fa_static', '/jquery/{path_info:.*}', 
+                controller='jquery')
+    # Index page
+    map.connect('admin', '/admin', 
+                controller='admin', action='models')
+    map.connect('formatted_admin', '/admin.json', 
+                controller='admin', action='models', format='json')
+    # Models
+    map.resource('model', 'models', path_prefix='/admin/{model_name}', 
+                controller='admin')
+    
+    # Catchalls
+    map.connect('/{controller}/{action}')
+    map.connect('/{controller}/{action}/{id}')
+
+    return map

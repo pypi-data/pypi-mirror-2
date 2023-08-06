@@ -1,0 +1,30 @@
+"""The application's Globals object"""
+
+from beaker.cache import CacheManager
+from beaker.util import parse_cache_config_options
+
+from datetime import datetime
+import hashlib
+import os
+
+from openid.server import server
+from openid.store import filestore
+
+class Globals(object):
+    """Globals acts as a container for objects available throughout the
+    life of the application
+
+    """
+    def __init__(self, config):
+        """One instance of Globals is created during application
+        initialization and is available during requests via the
+        'app_globals' variable
+
+        """
+        self.cache = CacheManager(**parse_cache_config_options(config))
+        oid_store = os.path.sep.join([config['pylons.cache_dir'], 'openid'])
+        self.openid_store = filestore.FileOpenIDStore(oid_store)
+        self.openid_server = server.Server(
+                    self.openid_store, config['openid.base_url'])
+        
+        self.etag_id = hashlib.md5(str(datetime.now().timetuple()[3])).hexdigest()
