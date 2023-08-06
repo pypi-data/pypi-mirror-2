@@ -1,0 +1,90 @@
+diff --git a/jsbridge/jsbridge/extension/resource/modules/jsbridgefilelogger.js b/jsbridge/jsbridge/extension/resource/modules/jsbridgefilelogger.js
+index 9dbbf07..d34f6de 100644
+--- a/jsbridge/jsbridge/extension/resource/modules/jsbridgefilelogger.js
++++ b/jsbridge/jsbridge/extension/resource/modules/jsbridgefilelogger.js
+@@ -1,4 +1,7 @@
+-var EXPORTED_SYMBOLS = ["gJsbridgeFileLogger"];
++var EXPORTED_SYMBOLS = ["JsbridgeFileLogger"];
++
++var Cc = Components.classes;
++var Ci = Components.interfaces;
+ 
+ var gJsbridgeFileLogger = null;
+ 
+diff --git a/mozmill/mozmill/extension/resource/modules/frame.js b/mozmill/mozmill/extension/resource/modules/frame.js
+index 602c576..bb0af34 100644
+--- a/mozmill/mozmill/extension/resource/modules/frame.js
++++ b/mozmill/mozmill/extension/resource/modules/frame.js
+@@ -148,7 +148,7 @@ var loadFile = function(path, collector) {
+     events.fireEvent('endTest', obj);
+     Components.utils.reportError(e);
+   }
+-  
++
+   module.__file__ = path;
+   module.__uri__ = uri;
+   return module;
+diff --git a/mozmill/mozmill/extension/resource/modules/init.js b/mozmill/mozmill/extension/resource/modules/init.js
+index be2ad6b..be52109 100644
+--- a/mozmill/mozmill/extension/resource/modules/init.js
++++ b/mozmill/mozmill/extension/resource/modules/init.js
+@@ -37,6 +37,44 @@
+  * 
+  * ***** END LICENSE BLOCK ***** */
+ 
++var frame = {};   Components.utils.import('resource://mozmill/modules/frame.js', frame);
++
++/**
++* Console listener which listens for error messages in the console and forwards
++* them to the Mozmill reporting system for output.
++*/
++function ConsoleListener() {
++ this.register();
++}
++ConsoleListener.prototype = {
++ observe: function(aMessage) {
++   var msg = aMessage.message;
++   var re = /^\[.*Error:.*(chrome|resource):\/\/.*/i;
++   if (msg.match(re)) {
++     frame.events.fail(aMessage);
++   }
++ },
++ QueryInterface: function (iid) {
++	if (!iid.equals(Components.interfaces.nsIConsoleListener) && !iid.equals(Components.interfaces.nsISupports)) {
++		throw Components.results.NS_ERROR_NO_INTERFACE;
++   }
++   return this;
++ },
++ register: function() {
++   var aConsoleService = Components.classes["@mozilla.org/consoleservice;1"]
++                              .getService(Components.interfaces.nsIConsoleService);
++   aConsoleService.registerListener(this);
++ },
++ unregister: function() {
++   var aConsoleService = Components.classes["@mozilla.org/consoleservice;1"]
++                              .getService(Components.interfaces.nsIConsoleService);
++   aConsoleService.unregisterListener(this);
++ }
++}
++
++// start listening
++var consoleListener = new ConsoleListener();
++
+ var EXPORTED_SYMBOLS = ["mozmill"];
+   
+ const Cc = Components.classes;
+diff --git a/mutt/mutt/tests/js/test_reportErrorConsole.js b/mutt/mutt/tests/js/test_reportErrorConsole.js
+index 44e8a8b..131d434 100644
+--- a/mutt/mutt/tests/js/test_reportErrorConsole.js
++++ b/mutt/mutt/tests/js/test_reportErrorConsole.js
+@@ -6,5 +6,9 @@ var testErrorConsole = function() {
+   controller.open("http://www.mozilla.org");
+   controller.waitForPageLoad();
+ 
+-  var syntaxError =
++  // syntax error
++  var syntaxError = ;
++  
++  // execution error
++  test();
+ }

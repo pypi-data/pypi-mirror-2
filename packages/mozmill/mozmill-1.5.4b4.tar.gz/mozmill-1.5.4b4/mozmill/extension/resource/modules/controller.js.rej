@@ -1,0 +1,82 @@
+***************
+*** 301,317 ****
+    }
+  };
+  
+- var MozMillController = function (window) {
+    this.window = window;
+  
+    this.mozmillModule = {};
+    Components.utils.import('resource://mozmill/modules/mozmill.js', this.mozmillModule);
+  
+    utils.waitFor(function() {
+-     return window != null &&
+-            ("mozmillDocumentLoaded" in window) &&
+-            window.mozmillDocumentLoaded;
+-   }, "controller(): Window could not be initialized.");
+  
+    if ( controllerAdditions[window.document.documentElement.getAttribute('windowtype')] != undefined ) {
+      this.prototype = new utils.Copy(this.prototype);
+--- 301,316 ----
+    }
+  };
+  
++ 
++ function MozMillController(window) {
+    this.window = window;
+  
+    this.mozmillModule = {};
+    Components.utils.import('resource://mozmill/modules/mozmill.js', this.mozmillModule);
+  
+    utils.waitFor(function() {
++     return window != null && this.isLoaded();
++   }, "controller(): Window could not be initialized.", undefined, undefined, this);
+  
+    if ( controllerAdditions[window.document.documentElement.getAttribute('windowtype')] != undefined ) {
+      this.prototype = new utils.Copy(this.prototype);
+***************
+*** 634,641 ****
+    return true;
+  }
+  
+- MozMillController.prototype.isLoaded = function() {
+-   return this.window.mozmillDocumentLoaded;
+  };
+  
+  MozMillController.prototype.waitFor = function(callback, message, timeout,
+--- 633,647 ----
+    return true;
+  }
+  
++ /**
++  * Checks if the specified window has been loaded
++  *
++  * @param {DOMWindow} [window=this.window] Window object to check for loaded state
++  */
++ MozMillController.prototype.isLoaded = function (window) {
++   var win = window || this.window;
++ 
++   return ("mozmillDocumentLoaded" in win) && win.mozmillDocumentLoaded;
+  };
+  
+  MozMillController.prototype.waitFor = function(callback, message, timeout,
+***************
+*** 1289,1296 ****
+  
+      // Wait until the content in the tab has been loaded
+      this.waitFor(function() {
+-       return ("mozmillDocumentLoaded" in owner && owner.mozmillDocumentLoaded);
+-     }, "controller.waitForPageLoad(): Timeout waiting for page loaded.", timeout, aInterval);
+  
+      frame.events.pass({'function':'controller.waitForPageLoad()'});
+    }
+--- 1295,1303 ----
+  
+      // Wait until the content in the tab has been loaded
+      this.waitFor(function() {
++       return this.isLoaded(owner);
++     }, "controller.waitForPageLoad(): Timeout waiting for page loaded.",
++        timeout, aInterval, this);
+  
+      frame.events.pass({'function':'controller.waitForPageLoad()'});
+    }
