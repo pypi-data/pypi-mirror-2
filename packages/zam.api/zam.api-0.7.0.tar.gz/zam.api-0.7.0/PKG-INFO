@@ -1,0 +1,487 @@
+Metadata-Version: 1.0
+Name: zam.api
+Version: 0.7.0
+Summary: API for ZAM (Zope Application Management
+Home-page: http://pypi.python.org/pypi/zam.api
+Author: Stephan Richter, Roger Ineichen and the Zope Community
+Author-email: zope-dev@zope.org
+License: ZPL 2.1
+Description: This package provides an API for ZAM (Zope Application Management).
+        
+        
+        .. contents::
+        
+        =======
+        CHANGES
+        =======
+        
+        
+        0.7.0 (2011-01-13)
+        ------------------
+        
+        - Updated test set up and tests to run with ZTK 1.0 and current z3c.form
+          version.
+        
+        - Removed dependency on ``zope.app.twisted``, ``zc.configuration`` and most
+          of the ``zope.app.*`` packages.
+        
+        - Using Python's ``doctest`` module instead of depreacted
+          ``zope.testing.doctestunit``.
+        
+        - Fixed package metadata, added doctests top `long_description`.
+        
+        0.6.1 (2009-07-06)
+        ------------------
+        
+        - Removed deprecation warnings.
+        
+        0.6.0 (2009-07-06)
+        ------------------
+        
+        - Updating tests and dependencies to work with latest versions of packages.
+        
+        0.5.3 (2008-06-07)
+        ------------------
+        
+        - A test dependency (zope.app.session) was missing
+          (still checking with KGS 3.4)
+        
+        0.5.2 (2008-04-11)
+        ------------------
+        
+        - Simplify ftesting setup, removed duplicated configuration. Make it better
+          reusable. Now we can include app.zcml and mixin ftesting.zcml at the same
+          time in plugin tests.
+        
+        0.5.1 (2008-04-13)
+        ------------------
+        
+        - Added new plugin layer for zamplugin.contents plugin
+        
+        0.5.0 (2008-04-11)
+        ------------------
+        
+        - Now plugin provides it's own management form. By default the PluginManagement
+          page can be used which is a mixin of IContentProvider and IForm. This makes
+          it possible to write intelligent plugin management views which can do more
+          then just install and uninstall.
+        
+        - Initial Release
+        
+        
+        =======
+        zam.api
+        =======
+        
+        This package contains the Zope Application Management api. We support a test
+        skin for this package which allows us to test the plugin management page.
+        There is also a ZAMTest site available whcih this test will use. This test site
+        can also be used in any other zam.* or zamplugin.* package.
+        
+        Login as manager first:
+        
+          >>> from zope.testbrowser.testing import Browser
+          >>> manager = Browser()
+          >>> manager.addHeader('Authorization', 'Basic mgr:mgrpw')
+        
+        Check if we can access the page.html view which is registred in the
+        ftesting.zcml file with our skin:
+        
+          >>> manager = Browser()
+          >>> manager.handleErrors = False
+          >>> manager.addHeader('Authorization', 'Basic mgr:mgrpw')
+          >>> skinURL = 'http://localhost/++skin++ZAMTest/index.html'
+          >>> manager.open(skinURL)
+          >>> manager.url
+          'http://localhost/++skin++ZAMTest/index.html'
+        
+        Now let's create a test site called ``first`` and add them to the root:
+        
+          >>> import zam.api.testing
+          >>> root = getRootFolder()
+          >>> firstSite = zam.api.testing.ZAMTestSite(u'first')
+          >>> root['first'] = firstSite
+        
+        And create another one called ``second``:
+        
+          >>> secondSite = zam.api.testing.ZAMTestSite(u'second')
+          >>> root['second'] = secondSite
+        
+        Go the the new zam test site:
+        
+          >>> firstSiteURL = 'http://localhost/++skin++ZAMTest/first'
+          >>> manager.open(firstSiteURL + '/index.html')
+          >>> manager.url
+          'http://localhost/++skin++ZAMTest/first/index.html'
+        
+        and to the ``second`` site:
+        
+          >>> secondSiteURL = 'http://localhost/++skin++ZAMTest/second'
+          >>> manager.open(secondSiteURL + '/index.html')
+          >>> manager.url
+          'http://localhost/++skin++ZAMTest/second/index.html'
+        
+        and go to the ``plugins.html`` page:
+        
+          >>> manager.open(firstSiteURL + '/plugins.html')
+        
+        Now we see the plugins.html page:
+        
+          >>> print manager.contents
+          <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+          <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+                lang="en">
+          <head>
+          <title>ZAM</title><meta http-equiv="cache-control" content="no-cache" />
+          <meta http-equiv="pragma" content="no-cache" />
+          </head>
+          <body>
+          <form action="./plugins.html" method="post" enctype="multipart/form-data" class="plugin-form">
+            <h1>ZAM Plugin Management</h1>
+            <fieldset id="pluginManagement">
+              <strong class="notInstalledPlugin">ZAM test plugin</strong>
+              <div class="description">ZAM test plugin.</div>
+            <div class="viewspace">
+              <div>
+              </div>
+            </div>
+            <div>
+              <div class="buttons">
+                <input id="zam-api-testing-buttons-install"
+                       name="zam.api.testing.buttons.install"
+                       class="submit-widget button-field" value="Install"
+                       type="submit" />
+              </div>
+            </div>
+            </fieldset>
+          </form>
+          </body>
+          </html>
+        
+        Before we install the plugin, we try to access the page which only is available
+        if the zam test plugin is installed:
+        
+          >>> manager.open(firstSiteURL + '/test.html')
+          Traceback (most recent call last):
+          ...
+          NotFound: Object: <ZAMTestSite u'first'>, name: u'test.html'
+        
+        The ``second`` site does also not provide such a test page:
+        
+          >>> manager.open(secondSiteURL + '/test.html')
+          Traceback (most recent call last):
+          ...
+          NotFound: Object: <ZAMTestSite u'second'>, name: u'test.html'
+        
+        As you can see there is no such ``test.html`` page. Let's install our zam test
+        plugin:
+        
+          >>> manager.open(firstSiteURL + '/plugins.html')
+          >>> manager.getControl(name='zam.api.testing.buttons.install').click()
+        
+        Now we can see that the plugin is installed:
+        
+          >>> print manager.contents
+          <!DOCTYPE...
+          <h1>ZAM Plugin Management</h1>
+          <fieldset id="pluginManagement">
+            <strong class="installedPlugin">ZAM test plugin</strong>
+            <div class="description">ZAM test plugin.</div>
+          <div class="viewspace">
+          ...
+          <div>
+            <div class="buttons">
+              <input id="zam-api-testing-buttons-uninstall"
+                     name="zam.api.testing.buttons.uninstall"
+                     class="submit-widget button-field" value="Uninstall"
+                     type="submit" />
+            </div>
+          </div>
+          ...
+        
+        Now make test coverage happy and test different things. The zam plugin test
+        page is available at the ``first`` site
+        
+          >>> manager.open(firstSiteURL + '/test.html')
+          >>> manager.url
+          'http://localhost/++skin++ZAMTest/first/test.html'
+        
+        But not at the ``second`` site:
+        
+          >>> manager.open(secondSiteURL + '/test.html')
+          Traceback (most recent call last):
+          ...
+          NotFound: Object: <ZAMTestSite u'second'>, name: u'test.html'
+        
+        Let's unsinstall the plugin:
+        
+          >>> manager.open(firstSiteURL + '/plugins.html')
+          >>> manager.getControl(name='zam.api.testing.buttons.uninstall').click()
+        
+        And check if the site is not available anymore:
+        
+          >>> manager.open(firstSiteURL + '/test.html')
+          Traceback (most recent call last):
+          ...
+          NotFound: Object: <ZAMTestSite u'first'>, name: u'test.html'
+        
+        
+        ====================
+        ZAM Plugin Framework
+        ====================
+        
+        The plugin framework allows us to write "3rd party" software that depends on
+        the base system's API, but the base system does not in any way depend on the
+        new software. This allows us to keep the base system compact, and separate
+        optional features into clearly separated packages.
+        
+        There are two different type of plugins offered. Simple plugin do what they
+        needs to do during the install and uninstall process. Base registry
+        supported plugins will install a custom component registry.
+        
+        The fundamental concept of the package is that a plugin can be installed for a
+        particular site. At any time, you can ask the plugin, whether it has been
+        installed for a particular site. The third API method allows you to uninstall
+        the plugin from a site.
+        
+        So let's implement a trivial plugin that stores an attribute:
+        
+          >>> from zam.api import plugin
+        
+          >>> class SamplePlugin(plugin.Plugin):
+          ...     title = u'Sample'
+          ...     description = u'Sample Attribute Plugin'
+          ...
+          ...     def isInstalled(self, site):
+          ...         """See interfaces.IPlugin"""
+          ...         return hasattr(site, 'sample')
+          ...
+          ...     def install(self, site):
+          ...         """See interfaces.IPlugin"""
+          ...         if not self.isInstalled(site):
+          ...             setattr(site, 'sample', 1)
+          ...
+          ...     def uninstall(self, site):
+          ...         """See interfaces.IPlugin"""
+          ...         if self.isInstalled(site):
+          ...             delattr(site, 'sample')
+        
+        The title and description of the plugin serve as pieces of information for the
+        user, and are commonly used in the UI.
+        
+        So let's use the sample plugin:
+        
+          >>> from zam.api import testing
+          >>> site = testing.ZAMTestSite(u'ZAM Test Site')
+          >>> sm = site.getSiteManager()
+        
+          >>> sample = SamplePlugin()
+        
+        At the beginning the plugin is not installed, so let's take care of that.
+        
+          >>> sample.isInstalled(site)
+          False
+        
+          >>> sample.install(site)
+          >>> site.sample
+          1
+        
+          >>> sample.isInstalled(site)
+          True
+        
+        However, once the plugin is installed, it cannot be installed again:
+        
+          >>> site.sample = 2
+        
+          >>> sample.install(site)
+          >>> site.sample
+          2
+        
+        This is a requirement of the API. Now you can also uninstall the plugin:
+        
+          >>> sample.uninstall(site)
+          >>> sample.isInstalled(site)
+          False
+          >>> site.sample
+          Traceback (most recent call last):
+          ...
+          AttributeError: 'ZAMTestSite' object has no attribute 'sample'
+        
+        You cannot uninstall the plugin again:
+        
+          >>> sample.uninstall(site)
+        
+        
+        Base Registry Plugins
+        ---------------------
+        
+        An important base implementation is a plugin that installs a new base registry
+        to the to the site.
+        
+        We also need a base registry for the plugin:
+        
+          >>> import zope.component
+          >>> from z3c.baseregistry import baseregistry
+        
+          >>> sampleRegistry = baseregistry.BaseComponents(
+          ...     zope.component.globalSiteManager, 'sampleRegistry')
+        
+        Now we can create the plugin, either through instantiation or sub-classing:
+        
+          >>> class SampleRegistryPlugin(plugin.BaseRegistryPlugin):
+          ...     title = u'Sample Registry'
+          ...     description = u'Sample Registry Plugin'
+          ...     registry = sampleRegistry
+        
+          >>> regPlugin = SampleRegistryPlugin()
+        
+        We use the same API methods as before. Initially the plugin is not installed:
+        
+          >>> sampleRegistry in sm.__bases__
+          False
+          >>> regPlugin.isInstalled(site)
+          False
+        
+        Now we install the plugin:
+        
+          >>> regPlugin.install(site)
+        
+          >>> sampleRegistry in sm.__bases__
+          True
+          >>> regPlugin.isInstalled(site)
+          True
+        
+        As before, installing the plugin again does nothing:
+        
+          >>> len(sm.__bases__)
+          2
+        
+          >>> regPlugin.install(site)
+        
+          >>> len(sm.__bases__)
+          2
+        
+        And uninstalling the plugin is equally simple:
+        
+          >>> regPlugin.uninstall(site)
+        
+          >>> sampleRegistry in sm.__bases__
+          False
+          >>> regPlugin.isInstalled(site)
+          False
+          >>> len(sm.__bases__)
+          1
+        
+        Uninstalling a second time does nothing:
+        
+          >>> regPlugin.uninstall(site)
+        
+          >>> sampleRegistry in sm.__bases__
+          False
+          >>> len(sm.__bases__)
+          1
+        
+        
+        Layers
+        ------
+        
+        We offer a fine grained layer concept which allows you to use the ZAM skin
+        out of the box, or lets you define your own skins, offering what you need.
+        Each ZAM plugin should configure it's component for the IZAMBrowserLayer and
+        not for the IZAMCoreLayer. This allows others to use the IZAMCoreLayer without
+        any plugin configuration. See the different layer descriptions below for more
+        information about the ZAM layer concept.
+        
+        
+        Big note
+        ~~~~~~~~
+        
+        This is only important if you'd like to define your own skin which uses
+        selective zam plugins.
+        
+        The layer concept has some limitations when it comes to adapter lookups. It's
+        not possible to define a custom layer and make an existing layer act like it
+        whould inherit this layer. ``Implements`` and ``provide`` concept only work on
+        classes but not on interfaces. Let's be more precise: they work but don't affect the
+        request. Which means the request doesn't know about such applied layers. This
+        means there is no[*] way to apply a later defined layer to an existing layer.
+        This is the reason why we offer all plugin layers in the zam.api.layer package.
+        But what does this mean if you'd like to define custom plugins and their layers?
+        You have to define your own skin and inherit your new layers in this skin.
+        You can skip the named skin configuration and configure your custom skin.
+        
+        [*] Ok, there is a way to apply layers to an existing layer or at least it will
+        be effectively the same thing. There are two ways: you can add a SkinChangedEvent which
+        will do an alsoProvide and inject your layer, or you can use a 'before traversal
+        event' subscriber which does the same. I decided not to use these patterns here
+        as defaults, because such subscribers will affect every skin and will cost
+        processing time on every request. The option we have with defining an explicit
+        configuration for a custom skin is to small to pay that price.
+        
+        
+        IZAMCoreLayer
+        ~~~~~~~~~~~~~
+        
+        The core layer provides the ZAM core management views but no plugins and
+        skin configuration. This allows us to write skins with a selective choice
+        of plugins. Of course each plugin must be configured again for your
+        custom skin. Out of the box, there is no way to offer a working set without
+        configuring a plugin twice using two different layers.
+        
+        
+        IZAMPluginLayer
+        ~~~~~~~~~~~~~~~
+        
+        The zam plugin layer should not be used in plugins. You need to define a
+        plugin layer for your plugin in zam.api.layer and use this newly defined layer.
+        This layer then becomes a part of the IZAMPluginLayer. This makes it
+        possible to use the IZAMPluginLayer and get all it's configuration.
+        
+        But what happens if you don't develop in the zamplugin.* namespace? Then you
+        only have the option to configure your plugins for an additional layer and use
+        another skin which uses the IZAMPluginLayer and your custom layer. Using the
+        IAZMPluginLayer for your configuration and sharing such packages ends in
+        bad configuration and others needs to exclude your configuration if it
+        is not needed in every skin they provide and is based on IZAMPluginLayer.
+        Of course you can do this in your own private projects, but please do not
+        use it for public shared packages. Help us provide a clean IZAMPluginLayer!
+        
+        Any improvement which offers us a better layer usage concept is very welcome if
+        it doesn't need to configure additional subscribers.
+        
+        
+        IZAMBrowserLayer
+        ~~~~~~~~~~~~~~~~
+        
+        This is the "all in one" layer which can be used for build skins which knows
+        about all plugin configurations. All plugins should use this layer.
+        
+        
+        IZAMSkinLayer
+        ~~~~~~~~~~~~~
+        
+        The IZAMSkinLayer offers the UI part for ZAM but is not registered as skin.
+        You can use this layer as base if you'd like to develop a custom skin. This
+        layer contains the nested div menu implementation.
+        
+        
+        IZAMBrowserSkin
+        ~~~~~~~~~~~~~~~
+        
+        The IZAMBrowserSkin uses the IZAMSkinLayer and IZAMBrowserLayer and offers the
+        UI part for ZAM as named skin. This means the IZAMBrowserSkin is accessible
+        as ++skin++ZAM.
+        
+        
+        
+Keywords: zope3 z3c zam api
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope3
