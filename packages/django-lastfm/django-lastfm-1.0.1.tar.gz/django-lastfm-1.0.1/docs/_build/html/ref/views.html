@@ -1,0 +1,171 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Views &mdash; django-lastfm v1.0 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="django-lastfm v1.0 documentation" href="../index.html" />
+    <link rel="up" title="API-Reference" href="index.html" />
+    <link rel="prev" title="Template Tags" href="templatetags.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="templatetags.html" title="Template Tags"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">django-lastfm v1.0 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">API-Reference</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-lastfm.views">
+<span id="views"></span><span id="ref-views"></span><h1>Views<a class="headerlink" href="#module-lastfm.views" title="Permalink to this headline">¶</a></h1>
+<p>The AJAX code generate by the template tag (see
+<a class="reference internal" href="templatetags.html#module-lastfm.templatetags.lastfm_widget" title="lastfm.templatetags.lastfm_widget"><tt class="xref py py-mod docutils literal"><span class="pre">lastfm.templatetags.lastfm_widget</span></tt></a>) doesn’t contact Last.fm directly,
+but uses a Django view as proxy. The advantage of this is, that you can
+exactly control what data your site gets. Another advantage is, that visitors
+can’t see your Last.fm username by inspecting the HTML source of your site.</p>
+<p>In addition to the view itself this module also defines some helper classes
+that are responsible for handling the different types of charts (e.g. top
+tracks or top artists).</p>
+<dl class="function">
+<dt id="lastfm.views.lastfm_data">
+<tt class="descclassname">lastfm.views.</tt><tt class="descname">lastfm_data</tt><big>(</big><em>request</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#lastfm.views.lastfm_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>This view retrievs the data from Last.fm and returns a JSON encoded list.
+The template tag’s AJAX code will retrieve this list and generate the
+chart from it.</p>
+<dl class="docutils">
+<dt>Each list entry is a dict with three elements:</dt>
+<dd><ul class="first last simple">
+<li><tt class="docutils literal"><span class="pre">title</span></tt>: Contains the song title or artist name and can be displayed
+as alternative text or link title.</li>
+<li><tt class="docutils literal"><span class="pre">url</span></tt>: A url pointing to the track or artist on Last.fm.</li>
+<li><tt class="docutils literal"><span class="pre">img_url</span></tt>: A url pointing to the track’s cover or artist image.</li>
+</ul>
+</dd>
+</dl>
+<p>For each chart type there is a class that handles its data. They are
+necessary to unify Last.fm’s different key names to those three explained
+above. Currently, there is no abstract base class which they must inherit
+from, but each class is expected to implement the following attributes and
+methods:</p>
+<p><tt class="docutils literal"><span class="pre">params</span></tt>: A dict that contains all parameters required by the <a class="reference external" href="http://www.lastfm.de/api">Last.fm
+API call</a></p>
+<p><tt class="docutils literal"><span class="pre">get_data(data)</span></tt>: Last.fm’s JSON data is quite nested. This method
+should extract the list with the actual items from the raw data.</p>
+<p><tt class="docutils literal"><span class="pre">get_item_title(item)</span></tt>: Return an item’s text for the <tt class="docutils literal"><span class="pre">title</span></tt>
+attribute in the data dict.</p>
+<p><tt class="docutils literal"><span class="pre">get_default_image()</span></tt>: Return a url to a default image that will be used
+if a track or artist has no image on its own.</p>
+<p><tt class="docutils literal"><span class="pre">get_img_url(img_size,</span> <span class="pre">item)</span></tt>: This method needs to be implemented only
+if an item has no <tt class="docutils literal"><span class="pre">image</span></tt> key (which is the case for e.g. the weekly top
+artist). It gets the desired image size (small, medium, large, …) and the
+item. It might do another API call and extract a custom image URL for that
+item.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="lastfm.views.RecentTracks">
+<em class="property">class </em><tt class="descclassname">lastfm.views.</tt><tt class="descname">RecentTracks</tt><a class="headerlink" href="#lastfm.views.RecentTracks" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class handles the API call <tt class="docutils literal"><span class="pre">user.getRecentTracks</span></tt>.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="lastfm.views.WeeklyTopArtists">
+<em class="property">class </em><tt class="descclassname">lastfm.views.</tt><tt class="descname">WeeklyTopArtists</tt><a class="headerlink" href="#lastfm.views.WeeklyTopArtists" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class handles the API call <tt class="docutils literal"><span class="pre">user.getWeeklyArtistChart</span></tt>.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="lastfm.views.TopArtists">
+<em class="property">class </em><tt class="descclassname">lastfm.views.</tt><tt class="descname">TopArtists</tt><a class="headerlink" href="#lastfm.views.TopArtists" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class handles the API call <tt class="docutils literal"><span class="pre">user.getTopArtists</span></tt>. The period must be
+defined in the site’s settings module.</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="templatetags.html"
+                        title="previous chapter">Template Tags</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/ref/views.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="templatetags.html" title="Template Tags"
+             >previous</a> |</li>
+        <li><a href="../index.html">django-lastfm v1.0 documentation</a> &raquo;</li>
+          <li><a href="index.html" >API-Reference</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2009, Stefan Scherfke.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
