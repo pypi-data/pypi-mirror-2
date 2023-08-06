@@ -1,0 +1,704 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.core.models.user &mdash; Stalker v0.1.0.20110110 documentation</title>
+    <link rel="stylesheet" href="../../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '0.1.0.20110110',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.0.20110110 documentation" href="../../../../index.html" />
+    <link rel="up" title="Module code" href="../../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../../index.html">Stalker v0.1.0.20110110 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.core.models.user</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+
+
+
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">entity</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span>
+<div class="viewcode-block" id="User"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User">[docs]</a><span class="k">class</span> <span class="nc">User</span><span class="p">(</span><span class="n">entity</span><span class="o">.</span><span class="n">Entity</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;The user class is designed to hold data about a User in the system. It</span>
+<span class="sd">    is derived from the entity.AuditEntity class</span>
+<span class="sd">    </span>
+<span class="sd">    it adds these parameters to the AuditEntity class</span>
+<span class="sd">    </span>
+<span class="sd">    :param email: holds the e-mail of the user, should be in [part1]@[part2]</span>
+<span class="sd">      format</span>
+<span class="sd">    </span>
+<span class="sd">    :param last_login: it is a datetime.datetime object holds the last login</span>
+<span class="sd">      date of the user (not implemented yet)</span>
+<span class="sd">    </span>
+<span class="sd">    :param login_name: it is the login name of the user, it should be all lower</span>
+<span class="sd">      case. Giving a string or unicode that has uppercase letters, it will be</span>
+<span class="sd">      converted to lower case. It can not be an empty string or None</span>
+<span class="sd">    </span>
+<span class="sd">    :param first_name: it is the first name of the user, must be a string or</span>
+<span class="sd">      unicode, middle name also can be added here, so it accepts white-spaces</span>
+<span class="sd">      in the variable, but it will truncate the white spaces at the beginin and</span>
+<span class="sd">      at the end of the variable and it can not be empty or None</span>
+<span class="sd">    </span>
+<span class="sd">    :param last_name: it is the last name of the user, must be a string or</span>
+<span class="sd">      unicode, again it can not contain any white spaces at the beggining and</span>
+<span class="sd">      at the end of the variable and it can be an empty string or None</span>
+<span class="sd">    </span>
+<span class="sd">    :param department: it is the department of the current user. It should be</span>
+<span class="sd">      a Department object. One user can only be listed in one department. A</span>
+<span class="sd">      user is allowed to have no department to make it easy to create a new</span>
+<span class="sd">      user and create the department and assign the user it later.</span>
+<span class="sd">    </span>
+<span class="sd">    :param password: it is the password of the user, can contain any character</span>
+<span class="sd">      and it should be scrambled by using the key from the system preferences</span>
+<span class="sd">    </span>
+<span class="sd">    :param permission_groups: it is a list of permission groups that this user</span>
+<span class="sd">      is belong to</span>
+<span class="sd">    </span>
+<span class="sd">    :param tasks: it is a list of Task objects which holds the tasks that this</span>
+<span class="sd">      user has been assigned to</span>
+<span class="sd">    </span>
+<span class="sd">    :param projects: it is a list of Project objects which holds the projects</span>
+<span class="sd">      that this user is a part of</span>
+<span class="sd">    </span>
+<span class="sd">    :param projects_lead: it is a list of Project objects that this user</span>
+<span class="sd">      is the leader of, it is for back refefrencing purposes</span>
+<span class="sd">    </span>
+<span class="sd">    :param sequences_lead: it is a list of Sequence objects that this</span>
+<span class="sd">      user is the leader of, it is for back referencing purposes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.__init__"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">department</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">email</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span>
+                 <span class="n">first_name</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span>
+                 <span class="n">last_name</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span>
+                 <span class="n">login_name</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span>
+                 <span class="n">password</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span>
+                 <span class="n">permission_groups</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">projects</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">projects_lead</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">sequences_lead</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">tasks</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="o">**</span><span class="n">kwargs</span>
+                 <span class="p">):</span>
+        
+        <span class="c"># use</span>
+        
+        <span class="nb">super</span><span class="p">(</span><span class="n">User</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_department</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_department</span><span class="p">(</span><span class="n">department</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_email</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_email</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_first_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_first_name</span><span class="p">(</span><span class="n">first_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_last_name</span><span class="p">(</span><span class="n">last_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_login_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_login_name</span><span class="p">(</span><span class="n">login_name</span><span class="p">)</span>
+        
+        <span class="c"># to be able to mangle the password do it like this</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_password</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="n">password</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_permission_groups</span> <span class="o">=</span> \
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_permission_groups</span><span class="p">(</span><span class="n">permission_groups</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_projects</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_projects</span><span class="p">(</span><span class="n">projects</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_projects_lead</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_projects_lead</span><span class="p">(</span><span class="n">projects_lead</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_lead</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_sequences_lead</span><span class="p">(</span><span class="n">sequences_lead</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_tasks</span><span class="p">(</span><span class="n">tasks</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span></div>
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return the representation of the current User</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="s">&quot;&lt;user.User (</span><span class="si">%s</span><span class="s"> </span><span class="si">%s</span><span class="s"> (&#39;</span><span class="si">%s</span><span class="s">&#39;))&gt;&quot;</span> <span class="o">%</span> \
+               <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">first_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">login_name</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_department</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">department_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given department value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c">## check if department_in is None</span>
+        <span class="c">#if department_in is None:</span>
+            <span class="c">#raise(ValueError(&#39;department could not be None&#39;))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">department</span>
+        
+        <span class="c"># check if it is intance of Department object</span>
+        <span class="k">if</span> <span class="n">department</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">department_in</span><span class="p">,</span> <span class="n">department</span><span class="o">.</span><span class="n">Department</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;department should be instance of </span><span class="se">\</span>
+<span class="s">                stalker.core.models.department.Department&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">department_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_email</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given email value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># check if email_in is an instance of string or unicode</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">email_in</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">)):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;email should be an instance of string or </span><span class="se">\</span>
+<span class="s">            unicode&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_email_format</span><span class="p">(</span><span class="n">email_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_email_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;formats the email</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># split the mail from @ sign</span>
+        <span class="n">splits</span> <span class="o">=</span> <span class="n">email_in</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;@&#39;</span><span class="p">)</span>
+        <span class="n">len_splits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span>
+        
+        <span class="c"># there should be one and only one @ sign</span>
+        <span class="k">if</span> <span class="n">len_splits</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;check the email formatting, there are more than </span><span class="se">\</span>
+<span class="s">            one @ sign&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="n">len_splits</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;check the email formatting, there are no @ </span><span class="se">\</span>
+<span class="s">            sign&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="n">splits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;&#39;</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;check the email formatting, the name part is </span><span class="se">\</span>
+<span class="s">            missing&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="n">splits</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;&#39;</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;check the email formatting, the domain part is </span><span class="se">\</span>
+<span class="s">            missing&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">email_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_first_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">first_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given first_name attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">first_name_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;first_name cannot be none&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">first_name_in</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">)):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;first_name should be instance of string or </span><span class="se">\</span>
+<span class="s">            unicode&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="n">first_name_in</span> <span class="o">==</span> <span class="s">&#39;&#39;</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;first_name can not be an empty string&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_first_name_formatting</span><span class="p">(</span><span class="n">first_name_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_first_name_formatting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">first_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given first_name formatting</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="n">first_name_in</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_last_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">last_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given last_name attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c">#if last_name_in is None:</span>
+            <span class="c">#raise(ValueError(&#39;last_name cannot be none&#39;))</span>
+        <span class="k">if</span> <span class="n">last_name_in</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">last_name_in</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">)):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;last_name should be instance of string or </span><span class="se">\</span>
+<span class="s">                unicode&#39;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">last_name_in</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+        
+        <span class="c">#if last_name_in == &#39;&#39;:</span>
+            <span class="c">#raise(ValueError(&#39;last_name can not be an empty string&#39;))</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_last_name_formatting</span><span class="p">(</span><span class="n">last_name_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_last_name_formatting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">last_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given last_name formatting</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="n">last_name_in</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_login_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">login_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given login_name value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">login_name_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;login name could not be None&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">login_name_in</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">)):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;login_name should be instance of string or </span><span class="se">\</span>
+<span class="s">            unicode&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="n">login_name_in</span> <span class="o">==</span> <span class="s">&#39;&#39;</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;login name could not be empty string&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_login_name_formatting</span><span class="p">(</span><span class="n">login_name_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_login_name_formatting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">login_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given login_name formatting</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">login_name_in</span><span class="p">,</span> <span class="nb">str</span><span class="p">))</span>
+        <span class="n">login_name_in</span> <span class="o">=</span> <span class="n">login_name_in</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">login_name_in</span> <span class="o">=</span> <span class="n">login_name_in</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39; &#39;</span><span class="p">,</span><span class="s">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">login_name_in</span> <span class="o">=</span> <span class="n">login_name_in</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">login_name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span> <span class="s">&#39;[^</span><span class="se">\\</span><span class="s">(a-zA-Z1-9)]+&#39;</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">login_name_in</span><span class="p">)</span>
+        <span class="n">login_name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span> <span class="s">&#39;^[0-9]+&#39;</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">login_name_in</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">login_name_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given password</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">password_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;password cannot be None&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">password_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_permission_groups</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">permission_groups_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;check the given permission_group</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">permission_groups_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;permission_groups attribute can not be None&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">permission_groups_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;permission_groups should be a list of group </span><span class="se">\</span>
+<span class="s">            objects&#39;</span><span class="p">))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">group</span>
+        
+        <span class="k">for</span> <span class="n">permission_group</span> <span class="ow">in</span> <span class="n">permission_groups_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">permission_group</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">Group</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;any group in permission_groups should be </span><span class="se">\</span>
+<span class="s">                an instance of stalker.core.models.group.Group&#39;</span><span class="p">))</span>
+        
+        <span class="c">#if len(permission_groups_in) == 0:</span>
+            <span class="c">#raise(ValueError(&#39;users should be assigned at least to one \</span>
+            <span class="c">#permission_group&#39;))</span>
+        
+        <span class="k">return</span> <span class="n">permission_groups_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_projects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">projects_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given projects attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># projects can not be None</span>
+        <span class="k">if</span> <span class="n">projects_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;projects can not be None&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">projects_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;projects should be a list of </span><span class="se">\</span>
+<span class="s">            stalker.core.models.project.Project objects&#39;</span><span class="p">))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">project</span>
+        
+        <span class="k">for</span> <span class="n">a_project</span> <span class="ow">in</span> <span class="n">projects_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a_project</span><span class="p">,</span> <span class="n">project</span><span class="o">.</span><span class="n">Project</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;any element in projects should be an </span><span class="se">\</span>
+<span class="s">                instance of stalker.core.models.project.Project&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">projects_in</span>
+        
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_projects_lead</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">projects_lead_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given projects_lead attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">projects_lead_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;projects_lead attribute could not be None, try </span><span class="se">\</span>
+<span class="s">            setting it to an empty list&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">projects_lead_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;projects_lead should be a list of </span><span class="se">\</span>
+<span class="s">            stalker.core.models.project.Project objects&#39;</span><span class="p">))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">project</span>
+        
+        <span class="k">for</span> <span class="n">a_project</span> <span class="ow">in</span> <span class="n">projects_lead_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a_project</span><span class="p">,</span> <span class="n">project</span><span class="o">.</span><span class="n">Project</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;any element in projects_lead should be an </span><span class="se">\</span>
+<span class="s">                instance of stalker.core.models.project.Project class&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">projects_lead_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_sequences_lead</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences_lead_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given sequences_lead attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">sequences_lead_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;sequences_lead attribute could not be None, try </span><span class="se">\</span>
+<span class="s">            setting it to an empty list&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sequences_lead_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;sequences_lead should be a list of </span><span class="se">\</span>
+<span class="s">            stalker.core.models.sequence.Sequence objects&#39;</span><span class="p">))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">sequence</span>
+        
+        <span class="k">for</span> <span class="n">a_sequence</span> <span class="ow">in</span> <span class="n">sequences_lead_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a_sequence</span><span class="p">,</span> <span class="n">sequence</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;any element in sequences_lead should be an </span><span class="se">\</span>
+<span class="s">                instance of stalker.core.models.sequence.Sequence class&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">sequences_lead_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_check_tasks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tasks_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;checks the given taks attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">tasks_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;tasks attribute could not be None, try setting </span><span class="se">\</span>
+<span class="s">            it to an empty list&#39;</span><span class="p">))</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tasks_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;tasks should be a list of </span><span class="se">\</span>
+<span class="s">            stalker.core.models.task.Task objects&#39;</span><span class="p">))</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">task</span>
+        
+        <span class="k">for</span> <span class="n">a_task</span> <span class="ow">in</span> <span class="n">tasks_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a_task</span><span class="p">,</span> <span class="n">task</span><span class="o">.</span><span class="n">Task</span><span class="p">):</span>
+                <span class="k">raise</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;any element in tasks should be an instance </span><span class="se">\</span>
+<span class="s">                of stalker.core.models.task.Task class&#39;</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">tasks_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.department"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.department">[docs]</a>    <span class="k">def</span> <span class="nf">department</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_department</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">department_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_department</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_department</span><span class="p">(</span><span class="n">department_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set department</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">department</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">department</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.email"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.email">[docs]</a>    <span class="k">def</span> <span class="nf">email</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_email</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">email_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_email</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_email</span><span class="p">(</span><span class="n">email_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set email values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">email</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">email</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.first_name"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.first_name">[docs]</a>    <span class="k">def</span> <span class="nf">first_name</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_first_name</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">first_name_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_first_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_first_name</span><span class="p">(</span><span class="n">first_name_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set first_name</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">first_name</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">first_name</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.last_name"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.last_name">[docs]</a>    <span class="k">def</span> <span class="nf">last_name</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_name</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">last_name_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_last_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_last_name</span><span class="p">(</span><span class="n">last_name_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set last_name</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">last_name</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">last_name</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.login_name"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.login_name">[docs]</a>    <span class="k">def</span> <span class="nf">login_name</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_login_name</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">login_name_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_login_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_login_name</span><span class="p">(</span><span class="n">login_name_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set login_name</span>
+<span class="s">        values&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">login_name</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">login_name</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.password"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.password">[docs]</a>    <span class="k">def</span> <span class="nf">password</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">base64</span><span class="o">.</span><span class="n">decodestring</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_password</span><span class="p">)</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_password</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">encodestring</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_check_password</span><span class="p">(</span><span class="n">password_in</span><span class="p">)</span>
+            <span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the password of the user, it is scrambled before</span>
+<span class="s">        stored in the _password attribute&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">password</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">password</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.permission_groups"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.permission_groups">[docs]</a>    <span class="k">def</span> <span class="nf">permission_groups</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_permission_groups</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">permission_groups_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_permission_groups</span> <span class="o">=</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">_check_permission_groups</span><span class="p">(</span><span class="n">permission_groups_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set</span>
+<span class="s">        permission_groups values&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">permission_groups</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">permission_groups</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.projects"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.projects">[docs]</a>    <span class="k">def</span> <span class="nf">projects</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_projects</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">projects_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_projects</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_projects</span><span class="p">(</span><span class="n">projects_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set projects</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">projects</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">projects</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.projects_lead"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.projects_lead">[docs]</a>    <span class="k">def</span> <span class="nf">projects_lead</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_projects_lead</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">projects_lead_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_projects_lead</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_projects_lead</span><span class="p">(</span><span class="n">projects_lead_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set projects_lead</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">projects_lead</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">projects_lead</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.sequences_lead"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.sequences_lead">[docs]</a>    <span class="k">def</span> <span class="nf">sequences_lead</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequences_lead</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences_lead_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sequences_lead</span> <span class="o">=</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">_check_sequences_lead</span><span class="p">(</span><span class="n">sequences_lead_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set sequences_lead</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">sequences_lead</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">sequences_lead</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="User.tasks"><a class="viewcode-back" href="../../../../generated/stalker.core.models.user.User.html#stalker.core.models.user.User.tasks">[docs]</a>    <span class="k">def</span> <span class="nf">tasks</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tasks_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_tasks</span><span class="p">(</span><span class="n">tasks_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;This is the property that helps to get and set tasks</span>
+<span class="s">        values</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">tasks</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">tasks</span><span class="p">())</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../../index.html">Stalker v0.1.0.20110110 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.6.
+    </div>
+  </body>
+</html>
