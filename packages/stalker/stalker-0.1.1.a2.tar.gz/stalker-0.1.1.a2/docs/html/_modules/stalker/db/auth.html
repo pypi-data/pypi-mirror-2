@@ -1,0 +1,243 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.db.auth &mdash; Stalker v0.1.1.a2 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1.1.a2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.1.a2 documentation" href="../../../index.html" />
+    <link rel="up" title="stalker.db" href="../db.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">Stalker v0.1.1.a2 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../db.html" accesskey="U">stalker.db</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.db.auth</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;This is the authentication system of Stalker. Uses Beaker for the session</span>
+<span class="sd">management.</span>
+
+<span class="sd">This helper module is written to help users to persist their login information</span>
+<span class="sd">in their system. The aim of this function is not security. So one can quickly</span>
+<span class="sd">by-pass this system and get himself/herself logged in or query information from</span>
+<span class="sd">the database without login.</span>
+
+<span class="sd">The user information is going to be used in the database to store who created,</span>
+<span class="sd">updated, read or delete the data.</span>
+
+<span class="sd">To login for the first time use::</span>
+<span class="sd">    </span>
+<span class="sd">    from stalker.db import auth</span>
+<span class="sd">    userObj = auth.authenticate(&#39;username&#39;, &#39;password&#39;)</span>
+
+<span class="sd">the basic usage of the system is as follows::</span>
+<span class="sd">    </span>
+<span class="sd">    from stalker import db</span>
+<span class="sd">    from stalker.db import auth</span>
+<span class="sd">    from stalker.models import user</span>
+<span class="sd">    </span>
+<span class="sd">    if &#39;user_id&#39; in auth.SESSION:</span>
+<span class="sd">        userObj = db.meta.session.query(user.User).\</span>
+<span class="sd">            filter_by(id=auth.SESSION[&#39;user_id&#39;]).first()</span>
+<span class="sd">    else:</span>
+<span class="sd">        # ask the username and password of the user</span>
+<span class="sd">        # then authenticate the given user</span>
+<span class="sd">        username, password = the_interface_for_login()</span>
+<span class="sd">        userObj = auth.authenticate(username, password)</span>
+<span class="sd">    </span>
+<span class="sd">    # login with the given user.User object</span>
+<span class="sd">    # this will create the session </span>
+<span class="sd">    auth.login(userObj)</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">from</span> <span class="nn">beaker</span> <span class="kn">import</span> <span class="n">session</span> <span class="k">as</span> <span class="n">beakerSession</span>
+<span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+
+
+
+<span class="n">SESSION</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">SESSION_KEY</span> <span class="o">=</span> <span class="s">&#39;stalker_key&#39;</span>
+<span class="n">SESSION_VALIDATE_KEY</span> <span class="o">=</span> <span class="s">&#39;stalker_validate_key&#39;</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="create_session"><a class="viewcode-back" href="../../../generated/stalker.db.auth.create_session.html#stalker.db.auth.create_session">[docs]</a><span class="k">def</span> <span class="nf">create_session</span><span class="p">(</span><span class="n">id_</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;creates a session with the given id, generally this is the user.id</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">tempdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">()</span>
+    
+    <span class="n">session_options</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">&#39;id&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">id_</span><span class="p">),</span>
+        <span class="s">&#39;type&#39;</span><span class="p">:</span> <span class="s">&#39;file&#39;</span><span class="p">,</span>
+        <span class="s">&#39;cookie_expires&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+        <span class="s">&#39;data_dir&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">tempdir</span><span class="p">,</span> <span class="s">&#39;stalker_cache&#39;</span><span class="p">,</span> <span class="s">&#39;data&#39;</span><span class="p">]),</span>
+        <span class="s">&#39;lock_dir&#39;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">tempdir</span><span class="p">,</span> <span class="s">&#39;stalker_cache&#39;</span><span class="p">,</span> <span class="s">&#39;lock&#39;</span><span class="p">]),</span>
+        <span class="s">&#39;key&#39;</span><span class="p">:</span> <span class="n">SESSION_KEY</span><span class="p">,</span>
+        <span class="s">&#39;validate_key&#39;</span><span class="p">:</span> <span class="n">SESSION_VALIDATE_KEY</span><span class="p">,</span>
+    <span class="p">}</span>
+    
+    <span class="n">SESSION</span> <span class="o">=</span> <span class="n">beakerSession</span><span class="o">.</span><span class="n">Session</span><span class="p">({},</span> <span class="o">**</span><span class="n">session_options</span><span class="p">)</span>
+    <span class="n">SESSION</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span></div>
+<div class="viewcode-block" id="authenticate"><a class="viewcode-back" href="../../../generated/stalker.db.auth.authenticate.html#stalker.db.auth.authenticate">[docs]</a><span class="k">def</span> <span class="nf">authenticate</span><span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;authenticates the given username and password, returns a</span>
+<span class="sd">    stalker.models.user.User object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c"># check if the database is setup</span>
+    <span class="k">if</span> <span class="n">db</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">session</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">raise</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">LoginError</span><span class="p">(</span><span class="s">&quot;stalker is not connected to any db right now, </span><span class="se">\</span>
+<span class="s">        use stalker.db.setup(), to setup the default db&quot;</span><span class="p">))</span>
+    
+    <span class="c"># try to get the given user</span>
+    <span class="kn">from</span> <span class="nn">stalker.models</span> <span class="kn">import</span> <span class="n">user</span>
+    
+    <span class="n">userObj</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">)</span><span class="o">.</span><span class="n">filter_by</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">user_name</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    
+    <span class="c">#assert(isinstance(userObj, user.User))</span>
+    
+    <span class="n">error_msg</span> <span class="o">=</span> <span class="s">&quot;user name and login don&#39;t match&quot;</span>
+    
+    <span class="k">if</span> <span class="n">userObj</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">raise</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">LoginError</span><span class="p">(</span><span class="n">error_msg</span><span class="p">))</span>
+    
+    <span class="k">if</span> <span class="n">userObj</span><span class="o">.</span><span class="n">password</span> <span class="o">!=</span> <span class="n">password</span><span class="p">:</span>
+        <span class="k">raise</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">LoginError</span><span class="p">(</span><span class="n">error_msg</span><span class="p">))</span>
+    
+    <span class="n">meta</span><span class="o">.</span><span class="n">logged_user</span> <span class="o">=</span> <span class="n">userObj</span>
+    <span class="k">return</span> <span class="n">userObj</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span></div>
+<div class="viewcode-block" id="login"><a class="viewcode-back" href="../../../generated/stalker.db.auth.login.html#stalker.db.auth.login">[docs]</a><span class="k">def</span> <span class="nf">login</span><span class="p">(</span><span class="n">user_obj</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Persist a user id in the session. This way a user doesn&#39;t have to</span>
+<span class="sd">    reauthenticate on every request</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">user</span><span class="o">.</span><span class="n">last_login</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="s">&#39;id&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">SESSION</span><span class="p">:</span>
+        <span class="c"># create the session first</span>
+        <span class="n">create_session</span><span class="p">(</span><span class="n">user_obj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    
+    <span class="c"># check if the session.id is same with the user</span>
+    <span class="k">if</span> <span class="n">SESSION</span><span class="p">[</span><span class="s">&#39;id&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">user_obj</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+        <span class="c"># create a new session with the current users id</span>
+        <span class="n">SESSION</span> <span class="o">=</span> <span class="p">{}</span>
+    
+
+
+
+
+<span class="c">#----------------------------------------------------------------------</span></div>
+<div class="viewcode-block" id="logout"><a class="viewcode-back" href="../../../generated/stalker.db.auth.logout.html#stalker.db.auth.logout">[docs]</a><span class="k">def</span> <span class="nf">logout</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;removes the current session</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">SESSION</span><span class="p">,</span> <span class="n">beakerSession</span><span class="o">.</span><span class="n">Session</span><span class="p">))</span>
+    
+    <span class="n">SESSION</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+    <span class="n">SESSION</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span></div>
+<div class="viewcode-block" id="get_user"><a class="viewcode-back" href="../../../generated/stalker.db.auth.get_user.html#stalker.db.auth.get_user">[docs]</a><span class="k">def</span> <span class="nf">get_user</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;returns the user from stored session</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span> <span class="s">&#39;user_id&#39;</span> <span class="ow">in</span> <span class="n">SESSION</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">db</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">)</span><span class="o">.</span>\
+               <span class="n">filter_by</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">SESSION</span><span class="p">[</span><span class="s">&#39;user_id&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">None</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">Stalker v0.1.1.a2 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../db.html" >stalker.db</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.6.
+    </div>
+  </body>
+</html>

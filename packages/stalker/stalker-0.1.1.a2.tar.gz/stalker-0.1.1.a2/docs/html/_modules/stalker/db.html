@@ -1,0 +1,164 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.db &mdash; Stalker v0.1.1.a2 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.1.a2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.1.a2 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">Stalker v0.1.1.a2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.db</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;This is the database module of Stalker.</span>
+
+<span class="sd">Whenever something is imported from stalker.db, the setup function becomes</span>
+<span class="sd">available to let one to setup the database</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">sessionmaker</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">create_engine</span>
+<span class="kn">from</span> <span class="nn">stalker.conf</span> <span class="kn">import</span> <span class="n">defaults</span>
+<span class="kn">from</span> <span class="nn">stalker.db</span> <span class="kn">import</span> <span class="n">tables</span><span class="p">,</span> <span class="n">meta</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="setup"><a class="viewcode-back" href="../../generated/stalker.db.setup.html#stalker.db.setup">[docs]</a><span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="n">database</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">mappers</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is a utillty function that helps to connect the system to the given</span>
+<span class="sd">    database.</span>
+<span class="sd">    </span>
+<span class="sd">    if the database is None then the it setups using the default database in</span>
+<span class="sd">    the settings file.</span>
+<span class="sd">    </span>
+<span class="sd">    These are the steps:</span>
+<span class="sd">     1. creates the engine, and stores it in stalker.db.meta.engine</span>
+<span class="sd">     2. creates the mappers, adds the given mappers to the</span>
+<span class="sd">        stalker.conf.defaults.MAPPERS list</span>
+<span class="sd">     3. creates the session and binds the engine to it, and stores the session</span>
+<span class="sd">        in stalker.db.meta.session</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span> <span class="n">database</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">database</span> <span class="o">=</span> <span class="n">defaults</span><span class="o">.</span><span class="n">DATABASE</span>
+    
+    <span class="n">meta</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="n">database</span><span class="p">,</span> <span class="n">echo</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    
+    <span class="c"># create the mappers according to the config</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">mappers</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span>
+    
+    <span class="c"># extend the default mappers with the given mappers list</span>
+    <span class="n">defaults</span><span class="o">.</span><span class="n">MAPPERS</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">mappers</span><span class="p">)</span>
+    
+    <span class="n">create_mappers</span><span class="p">(</span><span class="n">defaults</span><span class="o">.</span><span class="n">MAPPERS</span><span class="p">)</span>
+    
+    <span class="c"># create tables</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">create_all</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+    
+    <span class="c"># create the Session class</span>
+    <span class="n">Session</span> <span class="o">=</span> <span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="n">meta</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+    
+    <span class="c"># create and save session object to stalker.db.meta.sessison</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">()</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span></div>
+<span class="k">def</span> <span class="nf">create_mappers</span><span class="p">(</span><span class="n">mapper_list</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;imports the given mapper helper modules, refer to :ref:`mappers` for</span>
+<span class="sd">    more information about how to create your own mapper modules.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c"># </span>
+    <span class="c"># just import the given list of mapper modules, if they are in the correct</span>
+    <span class="c"># format all the mapping should be done already by just import ing the</span>
+    <span class="c"># mapper helper modules</span>
+    <span class="c"># </span>
+    
+    <span class="k">for</span> <span class="n">_mapper</span> <span class="ow">in</span> <span class="n">mapper_list</span><span class="p">:</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&quot;import &quot;</span> <span class="o">+</span> <span class="n">_mapper</span><span class="p">)</span>
+    
+    
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">Stalker v0.1.1.a2 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.6.
+    </div>
+  </body>
+</html>
