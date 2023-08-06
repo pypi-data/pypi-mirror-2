@@ -1,0 +1,35 @@
+Salesforce Query
+===================
+
+This product is the result of ongoing work in the Plone community to increase re-usable tools for integrating Plone and Salesforce CRM. It began as a proof of concept product as to how you can pull Salesforce data into a Plone website. It is now growing in functionality to a much more useful tool that can be the basis for custom integration where one or more objects from Salesforce are brought into Plone. This can be used to make directories in Plone that cache data from Salesforce locally. In general, it requires further development to create desired interfaces. 
+
+Features include: 
+
+  * Ability to add a query into a Plone site like Plone content
+  * Link the query to an object in Salesforce
+  * Cache Salesforce data in Plone
+  * Ability to refresh the cache of data from Plone
+
+Using the Product
+==================
+After you install the product in your Plone site, you will see the "Salesforce Query" as an option in the "Add new item" menu. You can add this anywhere in your website. After that, you configure the options you want for the data from Salesforce (which object, etc). 
+
+Plone-Salesforce Integration Resources
+=======================================
+
+A Google Group, called `Plone Salesforce Integration`_ exists with the sole aim of discussing and developing tools to make Plone integrate well with Salesforce.com. If you have a question, joining this group and posting to the mailing list is the likely best way to get support.
+	.. _Plone Salesforce Integration: http://groups.google.com/group/plonesf
+	
+Credits
+=======
+
+This work was begun by ifPeople (ifpeople.net) and continues as an open source project with significant contributions from Machinalis (machinalis.com). Contributors include: 
+
+  * Franco Pelgrini (developer)
+  * Josh Kidd (product maintenance)
+  * Christopher Johnson (executive sponsor)
+  * Horacio Duran (developer)
+  * Javier Mansilla (developer)
+
+
+
