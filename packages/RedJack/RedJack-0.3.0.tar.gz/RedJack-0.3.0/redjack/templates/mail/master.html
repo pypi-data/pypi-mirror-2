@@ -1,0 +1,155 @@
+<html><head>
+    <style type="text/css">
+      * {
+      font: normal 13px Verdana, Arial, sans-serif;
+      }
+      h2 {
+      font-weight: bold;
+      font-size: 18px;
+      }
+      h3 {
+      font-weight: bold;
+      font-size: 14px;
+      //background: #0f0;
+      padding: 3px 5px;
+      margin: 0px;
+      width: 950px;
+      background: #ccf;
+      border-top: 1px solid #22f;
+      border-left: 1px solid #22f;
+      border-right: 1px solid #22f;
+      border-bottom: 0px;
+      }
+      .section {
+      width: 954px;
+      margin: 0 0 12px 0;
+      padding: 3px;
+      border: 1px solid #22f;
+      }
+      table {
+      border: 0px;
+      width: 954px;
+      border-collapse: collapse;
+      border-spacing: 0px 0px;
+      }
+      th {
+      font-style: italic;
+      font-size: 14px;
+      text-align: left;
+      padding: 2px 2px 2px 3px;
+      border: 2px solid white;
+      background: #ff6;
+      }
+      td {
+      padding: 0 0 0 3px;
+      border: 2px solid white;
+      vertical-align: top;
+      }
+      tr:nth-child(even) {
+      background: #ffc;
+      }
+      tr:nth-child(odd) {
+      background: #ffa;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h2>${subject}</h2>
+
+    <h3>Build info</h3><div class='section'>
+      <table>
+        <tr><td>Date of build: </td><td>${date}</td></tr>
+        <!--<tr><td>Build time: </td><td>???</td></tr>-->
+        <tr><td>Label: </td><td>${label}</td></tr>
+      </table>
+    </div>
+    
+
+<!-- trigger report -->
+    % for obj, t in triggers:
+        <h3>Trigger from ${t['info']}</h3>
+        <div class='section'>
+        <table>
+          <tr><th>Author</th><th>Date</th><th>Comment</th><th>Modified files</th></tr>
+          % for cs in t['changesets']:
+            <tr><td>
+            % if cs['email'] != "":
+             <a href='mailto:${cs["email"]}'>${cs['author']}</a>
+            % else:
+             ${cs['author']}
+            % endif
+            </td><td>${cs['date']}</td><td>${cs['comment']}</td><td>
+            % for f in cs['files']:
+              ${f}<br/>
+            % endfor
+            </td></tr>
+          % endfor
+        </table>
+        </div>
+    % endfor
+
+<!-- process junit -->
+<%
+        from xml.etree.ElementTree import ElementTree
+        import os
+
+        # gather junit files
+        junit_files = []
+        for j in jobs:
+            junit_path = None
+            if 'report' in j.job_info and 'junit' in j.job_info['report']: 
+                junit_path = j.job_info['report']['junit']
+            if junit_path == None or not os.path.exists(junit_path):
+                continue
+            if os.path.isdir(junit_path):
+                for f in os.listdir(junit_path):
+                    if f.endswith("xml"):
+                        junit_files.append(os.path.join(junit_path, f))
+            else:
+                junit_files.append(junit_path)
+%>
+
+<!-- jobs report -->
+
+    <h3>Jobs summary</h3>
+    <div class='section'>
+      % for j in jobs:
+        Job ${j.idx}: <a href='#job${j.idx}'>${j.completion_status}</a> (${j.job_info['batch']})<br/>
+      % endfor
+    </div>
+
+    <h3>JUnit report</h3>
+    <div class='section'>
+      <table>
+        <tr><th>Test Suite</th><th>Failed</th><th>Erred</th><th>Total</th><th>Pass Rate</th></tr>
+      % for jf in junit_files:
+        % for ts in ElementTree().parse(jf).findall(""):
+        <tr>
+          <td>${ts.attrib['name']}</td>
+          <td>${ts.attrib['failures']}</td>
+          <td>${ts.attrib['errors']}</td>
+          <td>${ts.attrib['tests']}</td>
+          <%
+             passrate = (float(ts.attrib['tests']) - float(ts.attrib['failures']) - float(ts.attrib['errors'])) / float(ts.attrib['tests'])*100
+             passrate = "%.1f" % passrate
+          %>
+          <td>${passrate}%</td>
+        </tr>
+        % endfor
+      % endfor
+      </table>
+    </div>
+
+    % for j in jobs:
+      % if j.completion_status != "ok" or ('report' in j.job_info and 'include-log' in j.job_info['report'] and j.job_info['report']['include-log'] == True):
+      <a name='job${j.idx}'></a>
+      <h3>Job ${j.idx}: ${j.job_info['batch']}</h3>
+      <div class='section'>
+        Status: ${j.completion_status}<br/>
+        <pre>${j.execlog}</pre>
+      </div>
+      % endif
+    % endfor
+
+
