@@ -1,0 +1,182 @@
+Metadata-Version: 1.0
+Name: cykooz.thumbs
+Version: 0.3.1
+Summary: WSGI middleware for image resizing
+Home-page: https://bitbucket.org/cykooz/cykooz.thumbs
+Author: Cykooz
+Author-email: saikuz@mail.ru
+License: GPL
+Description: ==========
+        Назначение
+        ==========
+        
+        Пакет **cykooz.thumbs** реализует WSGI-middlware для изменения размера картинок отдаваемых приложением.
+        
+        
+        Конструктор миделвары
+        ---------------------
+        
+        **cykooz.thumbs.middleware.Thumbs(application, cache_dir, sizes, \**kwargs)**
+        
+        Аргументы:
+        
+        *application*
+            приложение оборачиваемое миделварой
+        
+        *cache_dir*
+            путь к папке в которой будет храниться кэш картинок
+        
+        *sizes*
+            словарь с параметрами допустимых размеров картинок
+        
+        Пример значения для аргумента *sizes*::
+        
+            {
+                'small': {'size': (100, 100), 'scale_method': 'crop', 'quality': 80},
+                'preview': {'size': (800, 600)},
+                'png_thumb': {'size': (50, 50), 'scale_method': 'crop', 'quality': 'png'}
+            }
+        
+        где:
+        
+        *size*
+            размер, в который надо вписать картинку. Если один из размеров равен нулю,
+            то этот размер берётся из исходной картинки.
+            
+        *scale_method*
+            режим масштабирования (по умолчанию - *'fit_stretch'*):
+        
+            *'сrop'*
+                обрезание картинки до заданных пропорций и вписывание в указанный размер;
+        
+            *'stretch'*
+                растягивание картинки до заданных размеров;
+        
+            *'squash'*
+                то же самое, что и *'stretch'*, но возвращает оригинальную картинку если оба её размера меньше требуемых;
+        
+            *'fit_stretch'*
+                вписывает картинку в заданные размеры с сохранением оригинальных пропорций;
+        
+            *'fit_squash'*
+                то же самое, что и *'fit_stretch'*, но возвращает оригинальную картинку если оба её размера меньше требуемых.
+        
+        *quality*
+            качество сжатия JPEG, если указанно 'png', то картинка будет сжата в PNG.
+            По умолчанию - 75
+        
+        
+        Пример конфигурации миделвары для Paste
+        ---------------------------------------
+        
+        ::
+        
+            [filter:thumbs]
+            use = egg:cykooz.thumbs
+            cache_dir = %(here)s/images_cache
+            sizes =
+                small = 100x100,crop,q80
+                preview = 800x600
+                png_thumb = 50x50,crop,qpng
+        
+        
+        WSGI приложение
+        ---------------
+        
+        Пакет содержит простейшее приложение обёрнутое миделварой.
+        Это приложение просто возвращает файлы из указанной аргументом *image_dir* папки.
+        
+        
+        Пример конфигурации приложения для Paste
+        ---------------------------------------- 
+        
+        ::
+        
+            [app:main]
+            use = egg:cykooz.thumbs
+            image_dir = %(here)s/images
+            cache_dir = %(here)s/images_cache
+            sizes =
+                small = 100x100,crop,q80
+                preview = 800x600
+                png_thumb = 50x50,crop,qpng
+        
+        
+        Запуск приложения
+        -----------------
+        
+        К проекту прилагается конфигурация Buildout для запуска приложения и
+        пример конфигурации для PasteDeploy.
+        Конфигурация Buildout:
+        
+        - создаёт скрипт ./bin/paster
+        - компилирует WSGI-сервер uWSGI
+        - создаёт скрипт ./bin/wsgi-script для запуска приложения чрез mod_wsgi или через uWSGI
+        
+        Пример команды для запуска приложения под uWSGI::
+        
+            user@user-pc:~/cykooz.thumbs$ ./bin/uwsgi --ini ./etc/thumbs_example.ini
+        
+        
+        Получение отмасштабированных картинок в браузере
+        ------------------------------------------------
+        
+        Получить в браузере отмасштабированную картинку можно например так::
+        
+            http://www.site.ru/images/big_images.jpg?view=small
+            http://www.site.ru/images/big_images.jpg?view=preview
+        
+        Очитка кэша из браузера
+        -----------------------
+        
+        Что бы очистить кэш картинок достаточно загрузить любой адрес,
+        который перехватывается миделварой со специальным аргументом::
+        
+            http://www.site.ru/images/big_images.jpg?view=__clear_cache__
+            или
+            http://www.site.ru/?view=__clear_cache__
+        
+        
+        =======
+        CHANGES
+        =======
+        
+        Version 0.3.1
+        -------------
+        - Исправлено масштабирование методом *'crop'* маленьких картинок до больших размеров. 
+        
+        Version 0.3
+        -----------
+        - Изменён способ передачи параметров в миделвару
+        - Переименованы методы масштабирования::
+        
+            'scale_fit' => 'fit_stretch'
+            'scale_stretch' => 'stretch'
+            
+        - Добавлены новые методы масштабирования *'squash'* и *'fit_squash'*
+        
+        Version 0.2
+        -----------
+        
+        - Добавлен параметр crop
+        - Добавлены параметры scale_fit и scale_stretch
+        - Добавлен параметр для указания качества сжатия JPEG или указывающий на сохранение в PNG
+        - Добавлено простейшее WSGI приложение возвращающее файлы из указанной директории и обёрнутое middleware для обработки изображений.
+        - Buildout теперь устанавливает wsgi-сервер uWSGI и создаёт wsgi-script для запуска приложения
+        - Добавлен пример конфигурации приложения для Paste и uWSGI
+        
+        Version 0.1
+        ------------------
+        
+        - Initial Release
+        
+Keywords: wsgi middleware imaging
+Platform: UNKNOWN
+Classifier: Environment :: Web Environment
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI :: Middleware
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI :: Application
