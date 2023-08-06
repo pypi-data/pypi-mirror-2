@@ -1,0 +1,295 @@
+{% extends "telemeta/base.html" %}
+{% load telemeta_utils %}
+{% load i18n %}
+
+{% block head_title %}{{ block.super }} - {% trans "Item" %} : {{ item.title }}{% endblock %}
+
+{% block stylesheets %}
+{{ block.super }}
+      <link rel="stylesheet" type="text/css" href="{% url telemeta-timeside "skins/lab/style.css" %}" />
+      <link rel="stylesheet" type="text/css" href="{% url telemeta-css "player.css" %}" />
+{% endblock %}
+
+{% block extra_javascript %}
+{% if item %}
+
+      <!--<script src="{% url telemeta-js "wz_jsgraphics.js" %}" type="text/javascript"></script>-->
+<script src="{% url telemeta-timeside "js/soundmanager2-nodebug-jsmin.js" %}" type="text/javascript"></script>
+<script src="{% url telemeta-js "popupdiv.js" %}" type="text/javascript"></script>
+<script src="{% url telemeta-js "playlist.js" %}" type="text/javascript"></script>
+<script type="text/javascript">
+    //soundManager.url = '{% url telemeta-swf "./" %}';
+    soundManager.url = "{% url telemeta-timeside "swf/" %}";
+    soundManager.flashVersion = 9;
+    soundManager.useMovieStar = true; // enable MP4/M4A/AAC
+    soundManager.debugMode = false;
+    soundManager.allowPolling = true;
+
+    var setupPlaylist = function(){
+        {% if user.is_authenticated %}
+        var p = playlistUtils;
+        {% for playlist in playlists %}
+        p.addPlaylist('{{ playlist.playlist.title }}','{{playlist.playlist.public_id}}');
+        {% endfor %}
+
+        {% endif %}
+        {% if item %}
+        var anchor = jQuery('#_add_to_playlist');
+        if(anchor.length){
+            anchor.unbind('click').click(function(){
+                p.showAddResourceToPlaylist(anchor,'item','{{item.id}}',gettrans('item added to the selected playlist'));
+                return false;
+            });
+        }
+        {% endif %}
+    };
+
+    //managing errors (might be improved in future development)
+    function playerError(msg){
+        var elm = jQuery('#loading_span');
+        if(elm.length>0){
+            elm.empty().remove();
+        }
+        jQuery('#rightcol').hide();
+        alert(msg);
+    }
+    //warn on soundmanager error:
+    soundManager.onerror = function() {
+        playerError('SoundManager error. If your browser does not support HTML5, Flash player (version '+soundManager.flashVersion+'+) must be installed.\nIf flash is installed, try to:\n - Reload the page\n - Empty the cache (see browser preferences/options/tools) and reload the page\n - Restart the browser');
+    };
+
+    setTimeout(function(){
+        if(jQuery('#loading_span').length>0){
+            playerError('SoundManager is not responding. Try to:\n - Reload the page\n - Empty the cache (see browser preferences) and reload the page\n - Restart the browser');
+        }
+    },10000);
+
+    //initializing the visualizers to be passed to the player
+    var visualizers = {};
+    {% for v in visualizers %}
+    visualizers["{{v.name}}"] = "{% url telemeta-item-visualize item.public_id,v.id,"WIDTH","HEIGHT" %}";
+    {% endfor %}
+    
+    var scripts = ["{% url telemeta-timeside "js/raphael-min.js" %}", "{% url telemeta-timeside "js/timeside.js" %}","{% url telemeta-timeside "js/playerLoader.js" %}"];
+    //"{% url telemeta-timeside "js/wz_jsgraphics.js" %}",
+    jQuery(window).ready(function(){
+        //if soundmanager is ready, the callback is executed immetiately
+        //onready is executed BEFORE onload, it basically queues several onload events.
+        //It it is executed immetiately if soundmanager has already been loaded
+        soundManager.onready(function() {
+            loadScripts(scripts,
+            function(){
+                {% if user.is_staff or user.is_superuser %}
+                var superuser = true;
+                {% else %}
+                var superuser = false;
+                {% endif %}
+                loadPlayer('{% url telemeta-item-analyze-xml item.public_id %}',"{% url telemeta-item-export item.public_id,"mp3" %}", '{{item.id}}', visualizers, CURRENT_USER_NAME, superuser);
+                setupPlaylist();
+            });
+        });
+    });
+
+
+
+</script>
+{% endif %}
+{% endblock %}
+
+{% if item %}
+
+{% block title %}
+<img src="images/item.png" alt="item" style="vertical-align:middle" /> Item : {{ item }}
+{% endblock %}
+
+{% block title_buttons %}
+<div class="fixedWidthAsPlayer">
+    {% if user.is_authenticated and perms.telemeta.change_mediaitem %}
+    <a href="{% url telemeta-item-edit item.public_id %}" class="component_icon button icon_edit">{% trans "Edit" %}</a>
+    <a href="{% url telemeta-item-copy item.public_id %}" class="component_icon button icon_copy">{% trans "Copy" %}</a>
+    {% endif %}
+    {% if user.is_authenticated %}
+    <a id="_add_to_playlist" href='#' class="component_icon button icon_add_to_playlist">{% trans "Add to playlist" %}</a>
+    {% endif %}
+    <a href="{% url telemeta-item-detail previous %}" class="component_icon button icon_previous">{% trans "Previous" %}</a>
+    <a href="{% url telemeta-item-detail next %}" class="component_icon button icon_next">{% trans "Next" %}</a>
+    <a href="{% url telemeta-item-dublincore item.public_id %}" class="component_icon button icon_dublin_core">Dublin Core</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="{% if item.file %}{% if item.public_access == 'full' or public_access or user.is_staff %}with-rightcol{% endif %}{% endif %}">
+    {% if item.file %}
+    {% if public_access or user.is_staff or user.is_superuser %}
+    <div id="player_maximized" class="ts-skin-lab">
+        <a href="#" class="toggle">Minimize</a>
+        <div class="wazing"></div>
+    </div>
+    <div id="rightcol">
+        <div id="player_minimized" class="ts-skin-lab">
+            <a href="#" class="toggle">Maximize</a>
+            <div class="wazing"></div>
+            <div id="player" class="ts-player">
+            </div>
+        </div>
+
+        <!-- </div> -->
+        <div id="tabs_container">
+            <!-- this div will be hidden when everything is fully loaded-->
+            <span id="loading_span" href="#"><img style="vertical-align:middle" alt="wait" src="/images/wait.gif"/>&nbsp;
+                <span id="loading_span_text">Loading...</span></span>
+            <a id="tab_analysis" style="display:none" class ="tab" href="#">{% trans "Analysis" %}</a><!--
+             do not let space here as it appears in the document!!!!!
+            --><a id="tab_markers" style="display:none" class="tab" href="#">{% trans "Markers" %}</a>
+        </div>
+
+        <div class="markers" id="markers_div_id"></div>
+
+        <div class="analyzer" id="analyzer_div_id">
+            <table width="100%">
+                <tr class="analyzer-title">
+                    <td>{% trans "Property" %}</td>
+                    <td>{% trans "Value" %}</td>
+                    <td>{% trans "Unit" %}</td>
+                </tr>
+            </table>
+        </div>
+        <!--</div>-->
+
+        {% if audio_export_enabled %}
+        <div class="exporter">
+            <p><img src="images/download.png" alt="download" style="vertical-align:middle" /> {% trans "Download:" %}
+                {% for format in export_formats %}
+                <a href="{% url telemeta-item-export item.public_id,format.extension %}">
+                    <img src="images/{{ format.extension }}.png" style="vertical-align:middle" alt="{{ format.extension }}" /></a>
+                {% endfor %}</p>
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% block infos %}
+    <div class="infos">
+        {% block general_info %}
+        <dl class="listing">
+            {% dl_field item "title" placeholder %}
+            {% dl_field item "alt_title" %}
+            {% dl_field item "collector" placeholder %}
+            <dt>{% field_label item "collection" %}</dt>
+            <dd><a href="{% url telemeta-collection-detail item.collection.public_id %}">{{ item.collection }}</a></dd>
+            <dt>{% trans "Recording date" %}</dt>
+
+            <dd>{% if item.recorded_from_date %}{{ item.recorded_from_date }} {{ item.recorded_to_date|prepend:" - "  }}{% endif %}</dd>
+
+        </dl>
+        {% endblock general_info %}
+    </div>
+    <div class="extraInfos">
+        {% block geoethnic_data %}
+        <div>
+            <h4><a href="#">{% trans "Geographic and cultural informations" %}</a></h4>
+            <dl class="listing">
+                <dt>{% trans "Location" %}</dt>
+                <dd>{% if item.location %}{{ item.location.fullnames|join:"<br/>" }}{% endif %}</dd>
+                {% dl_field item "location_comment" %}
+                {% dl_field item "cultural_area" %}
+                {% dl_field item "language" %}
+                {% dl_field item "ethnic_group" placeholder %}
+                <dt>{% trans "Comments" %}</dt>
+                <dd>{{ item.context_comment|html_line_break|safe }}</dd>
+                {% dl_field item "keywords" join with ", " %}
+            </dl>
+        </div>
+        {% endblock geoethnic_data %}
+    </div>
+    {% if user.is_authenticated and perms.telemeta.change_mediaitem %}
+    <a href="{% url telemeta-item-keywords_edit item.public_id %}" class="component_icon button icon_edit">{% trans "Edit" %} {% trans "keywords" %}</a>
+    {% endif %}
+    <div class="extraInfos">
+        {% block musical_data %}
+        <div>
+            <h4><a href="#">{% trans "Musical informations" %}</a></h4>
+            <dl class="listing">
+                {% dl_field item "vernacular_style" %}
+                {% dl_field item "generic_style" %}
+                {% dl_field item "author" %}
+            </dl>
+            {% if item.performances %}
+            <div class="instruments">
+                <table class="instruments">
+                    <thead>
+                        <tr>
+                            <td>{% field_label "MediaItemPerformance" "instruments_num" %}</td>
+                            <td>{% field_label "MediaItemPerformance" "instrument" %}</td>
+                            <td>{% field_label "MediaItemPerformance" "alias" %}</td>
+                            <td>{% field_label "MediaItemPerformance" "musicians" %}</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for performance in item.performances.all %}
+                        <tr>
+                            <td>{{ performance.instruments_num }}</td>
+                            <td>{{ performance.instrument|default:"" }}</td>
+                            <td>{{ performance.alias|default:"" }}</td>
+                            <td>{{ performance.musicians }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+        {% endblock musical_data %}
+    </div>
+    {% if user.is_authenticated and perms.telemeta.change_mediaitem %}
+    <a href="{% url telemeta-item-performances_edit item.public_id %}" class="component_icon button icon_edit">{% trans "Edit"%} {% trans "performance"%}</a>
+    {% endif %}
+    <div class="extraInfos">
+        {% block general_data %}
+        <div>
+            <h4><a href="#">{% trans "General informations" %}</a></h4>
+            <dl class="listing">
+                <dt>{% trans "Remarks" %}</dt>
+                <dd>{{ item.comment|html_line_break|safe }}</dd>
+                {% dl_field item "collector_selection" %}
+            </dl>
+        </div>
+        {% endblock general_data %}
+    </div>
+    <div class="extraInfos">
+        {% block archive_data %}
+        <div>
+            <h4><a href="#">{% trans "Archiving data" %}</a></h4>
+            <dl class="listing">
+                {% dl_field item "code" %}
+                {% dl_field item "old_code" %}
+                {% dl_field item "track" %}
+                {% dl_field item "creator_reference" %}
+                <dt>{% trans "Published references" %}</dt>
+                <dd>{{ item.external_references|html_line_break|safe }}</dd>
+                {% dl_field item "public_access_label" %}
+            </dl>
+        </div>
+        {% endblock archive_data %}
+    </div>
+    <div class="extraInfos">
+        {% block technical_data %}
+        <div>
+            <h4><a href="#">{% trans "Technical data" %}</a></h4>
+            <div>
+                <dl class="listing">
+                    <dt>{% trans "Media type" %}</dt><dd>{% trans "Audio" %}</dd>
+                    {% dl_field item "approx_duration" %}
+                </dl>
+            </div>
+        </div>
+        {% endblock technical_data %}
+    </div>
+    {% endblock infos %}
+</div> <!-- with-rightcol -->
+{% endblock %}
+{% else %}
+<p>No such item</p>
+{% endif %}
