@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import oam
+import urlparse
+import os.path
+
+def parse_options():
+    parser = oam.option_parser("%prog [options] <URL> <files>")
+    parser.add_option("-p", "--processed", dest="archive", action="store_false", default=True, help="If this image is prepared for OAM, set this option.")
+    parser.add_option("-c", "--license", dest="license", type="int", default=1, help="Redistribution license ID")
+    parser.add_option("-l", "--layer", dest="layers", type="int", help="Layer ID")
+    # parser.add_option("-u", "--url", dest="url", help="Image URL", required=True)
+    (opts, args) = parser.parse_args()
+    opts.url = args[0]
+    opts.files = args[1:]
+    if len(opts.files) > 1 and not opts.url.endswith("/"):
+        raise Exception(
+            "URL must end with a / if multiple files are being stored")
+    return opts
+
+def post_description(client, path, opts):
+    image = oam.Image.load(path)
+    image.archive = opts.archive
+    image.license = opts.license
+    path_parts = os.path.split(path)
+    image.layers = opts.layers
+    image.url = urlparse.urljoin(opts.url, path_parts[-1])
+    return client.save_image(image)
+
+def walk_path(client, path, opts):
+    pass
+
+if __name__ == "__main__":
+    opts = parse_options()
+    client = oam.build_client(opts)
+    for filename in opts.files:
+        record = post_description(client, filename, opts)
+        if record: print record
