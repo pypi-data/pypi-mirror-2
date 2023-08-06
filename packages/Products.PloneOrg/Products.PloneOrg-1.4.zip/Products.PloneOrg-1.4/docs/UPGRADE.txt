@@ -1,0 +1,301 @@
+
+Upgrade steps
+=============
+
+3.x -> 4.0
+----------
+
+[X] Turn linkintegrity off (site_properties/enable_link_integrity_checks)
+
+[X] Run the upgrade steps.
+
+[X] Turn linkintegrity back on (site_properties/enable_link_integrity_checks)
+
+[X] Delete unneeded items from custom and portal_view_customizations.
+
+[X] Run (null) upgrade steps for ArchAddOn and PloneFormGen.  Run the Poi upgrade
+    and wait for the long security reindex.
+
+[X] Use in place of the old plone.org.  Re-enable logins.
+
+[ ] Make sure custom member properties (nickname, organization_title, organization_link)
+    are shown on the personalize form
+
+[ ] Check plone.org/team (can't check it now b/c needs LDAP)
+
+[ ] Fix styling of the dropdown personal bar.
+
+[X] Make TinyMCE the default editor, and make sure it works with the XDV theming.
+
+[ ] Turn on overlays.
+
+
+Done!
+
+Issues
+~~~~~~
+
+- Look into BSD support for p.r.haproxy
+
+2.5.4-devel -> 3.2rc1
+---------------------
+
+If you add or edit a step, please include your name in brackets. Roughly in order of priority.
+Some steps are optional. Some can be done out of order. YMMV.
+
+[X] -Make sure you have at least 2 GB your /tmp folder. If not, edit 
+  ZEO/TransactionBuffer.py file and add a folder prefix in the constructor 
+  in order to make that file created in a place where there's room. [tarek]
+
+    XXX Or set TEMP in instance? [aclark] E.g.
+    <environment>
+      DISABLE_PTS 1
+      TEMP ${buildout:directory}/tmp
+    </environment>
+  
+[X] -Remove all logs before you start. [tarek]
+
+[X] -Go to ZMI -> portal_catalog -> Advanced. Click on "Clear and Rebuild".
+  Otherwise, you might get a few errors in some updates. This takes about an 
+  hour. [tarek]
+
+[X] -Disable CMFSquidTool by removing the plone.org url from 
+  plone.org -> portal_squid -> Proxy URLs. [aclark]
+  Don't forget to put them back:
+    http://plone.org:80
+    http://plone.org
+
+[X] -Go to ZMI -> portal_migration [limi]
+    [X] -Scroll down to the 'Force Upgrade' section.
+    [X] -'Force Upgrade' from Plone 2.5.3-rc1
+    [X] -Watch the uncannily quick migration ;)
+
+[X] -Run portal_quickinstaller upgrades. [aclark]
+
+[X] -Go to ZMI -> archetype_tool -> Update Schema [aclark, tarek]
+    [X] -Select all the classes and the checkbox at the bottom to Remove schema
+      attributes *BUT* PloneSoftwareCenter.PSCFile, that must remain unchecked
+    [X] -Watch the uncannily long schema update (This seriously takes ~1 hour ;)
+
+[X] -Delete broken transforms in portal_transforms, including: 
+  web_intelligent_plain_text_to_html Force migrate from 3.0-rc1 to current 
+  version to get them back. [aclark]
+
+[X] -Go to ZMI -> portal_setup -> upgrades. Choose Products.PloneSoftwareCenter, and 
+  run it You need to check the log to control for any missing files. [tarek]
+
+[ ] - check distutils ids for projects that uses links and the migration step could not get the file through that link to check the id [tarek]
+
+[X] -Go to Site Setup and reinstall POI [tarek]
+ 
+[X] -Go to ZMI -> portal_setup -> upgrades. Choose Products.Poi, and run it. [tarek]
+
+[X] -Go to Site Setup -> Add/Remove Products (/prefs_install_products_form) and 
+  install PSC External Storage 0.1.0  and PSC Mirroring 0.1.0. [tarek]
+
+[X] -Go to @@extstorage-config and configure an absolute path for
+  ExternalStorage, e.g. /srv/plone.org/files. Make sure the zope process can 
+  write there. [tarek]
+
+[X] -Go to @@mirroring-config  an absolute path for mirroring files, e.g.
+  /srv/plone.org/mirror. [tarek]
+
+[X] -Go to portal_skins in the ZMI and rename 'custom' to 'custom_old', and create 
+  a new, blank custom folder. The site will now be a bit faster. [limi]
+
+[X] -Go to /Control_Panel/Products/manage_main and delete all the product entries, 
+  so they update when you restart (reinstalling will result in the blank version 
+  bug if you don't do this and the products have different paths. Why these are 
+  persistent is anybody's guess, probably because Zope needs to support ZClasses) 
+  Restart. [limi] 
+
+[X] -Go to Site Setup and reinstall all the add-on products that need it. [limi]
+  (Plone.org site 1.0 needs to be last, to avoid AttributeError default_view.)
+
+[X] -Go to /products and select the plonesoftwarecenter_ploneorg template from the 
+  'Display' menu. [aclark]
+
+[X] -Go to /products/edit and change the storage strategy to External Storage. This will
+  fill the External storage folder. [tarek]
+
+[X] -Make sure the JS and CSS registries emit as few units as possible (ideally just one 
+  each, the front page will probably have two with the current setup). The tabber JS 
+  is included in Plone, so can be removed from the page, I assume. [limi]
+
+[X] -Go to portal_skins and make sure there are no bogus entries. When starting up 
+  locally, I get references to at least the following non-existent entries:
+
+    -irclogs refers to a non-existing path
+    -keyword_manager refers to a non-existing path
+    -plone_tableless refers to a non-existing path
+
+    I also removed "plonepas", "LanguageToolFlags" and "cache_prefs_plone20".
+
+    Also make sure you press the correct "Save" button, there are two. ;)
+
+[X] -Make the front page 4x faster by removing the legacy portlets (really!):
+  Go to /@@manage-portlets in the site root, convert legacy portlets if it 
+  asks, then remove them from the listings. This reduces the front page 
+  rendering time from 24s to 6s on my laptop.
+  Additionally, if you remove everything but the navigation portlet (which is
+  really the only thing we use on plone.org on all levels), it goes down to
+  5s. For extra brownie points, remove the navigation portlet from the root,
+  and only add it to the subfolders. This further reduces the page load time
+  to 4.5s. [limi]
+
+    XXX I think the upgrade does this automatically now.
+
+[X] - Remove old types that are no longer used, all the "CMF something" types
+      and IRCLogs come to mind
+
+[X] -TypesTool throws an AttributeError: IRCLogs, I assume we need to just 
+     delete the IRCLogs entry from portal_types. [limi]
+
+[X] -run migration.py script. This will initiate the package mirror. [tarek]
+
+  XXX You mean mirror.py ?
+
+Issues
+~~~~~~~
+
+[ ] It looks like we have trouble serving up images. See http://dev.plone.org/plone/ticket/8844
+
+    NB Maybe related to the redirection tool?  I can't really tell without being able to log in to plone.org for comparison --davisagli
+
+[X] http://new.plone.org/documentation is missing the left portlets from http://plone.org/documentation. I can't see any way to get the @@manage-portlets to work, so I can't put them back. (with PHC 1.6, this works) [limi]
+
+[X] PloneHelpCenter needs a little love, it should be switched to the 1.6 branch
+
+[X] I should work with Steve to make sure it's ready for the transition to the new theme. Currently, it has quite a few 2.5-isms. [limi]
+
+[ ] On first access of Help Center content, we get:
+
+    2008-12-30T07:43:03 INFO Archetypes ArchetypesTool: Trying to register "PloneHelpCenter.HelpCenterReferenceManual" which has already been registered.  The new type Products.PloneHelpCenter.types.ReferenceManual.HelpCenterReferenceManual is going to override Products.PloneHelpCenter.content.ReferenceManual.HelpCenterReferenceManual
+
+[X] PHC nested in PSC seems to have trouble, example:
+ http://new.plone.org/products/ploneformgen/documentation/reference/referencemanualfolder_view - gets the following traceback: 
+
+  Module Products.PloneHelpCenter.browser.phcfolder, line 141, in getItemsByAudiencesAndSections
+  TypeError: iteration over non-sequence
+
+    XXX I fixed this by reindexing the contents of these PHCs -- davisagli
+
+[X] Topic area pages are giving an error re pickling acquisition-wrapped objects on second view.  This is due to memoizing catalog brains.  SteveM is working on this.
+
+[X] RSS feeds on individual projects in PSC seem to be empty.
+
+    This appears to be because the RSS link includes review_state=published, but PSCReleases use a custom workflow and are usually not in the 'published' state.
+
+[X] http://new.plone.org/products/plone can't find the icon for http://new.plone.org/platform_linux_bsd_unix.gif
+
+[X] No themes for Plone 3.0: http://new.plone.org/products?getCategories=themes&getCompatibility=Plone+3.0&product_search=Update
+    NB Fixed by reindexing PSCRelease type. [davisagli]
+
+[ ] Adding new downloadable file creates pscfile.99817395, instead of RealFilename.tgz. In general, if you could look at PSCFile and make it more like ATFile that might help. [aclark]
+
+[ ] calendaring 0.4's package doesn't exist in the dist.plone.org directory, the file still exists in PSC but isn't navigable due to the rewrite rule [MatthewWilkes]
+
+Other/general issues:
+
+[X] Sharing seems to be broken.  Graham used to have access to http://new.plone.org/support/lists/
+    (he was a local Owner role on that document) I removed his local Owner role and added him via the standard Plone 3 Sharing:
+    He gets insufficient privileges. The full traceback can be seen here: http://paste.plone.org/25629 - excerpt:
+    Module OFS.Traversable, line 195, in unrestrictedTraverse - __traceback_info__: ([], '@@at_base_edit_view')
+    Unauthorized: You are not allowed to access '@@at_base_edit_view' in this context
+
+    NB This was due to the support and lists sections not acquiring the Modify portal content permission,
+so the Editor role which you gave Graham wasn't actually associated with that permission there.
+I fixed by turning acquiring back on for this permission.  --davisagli
+
+[X] We need to do something about sendto_form, MSNbot (among others) is too stupid to not index it, so our pages are spidered twice. Probably customizing the sendto_form to return an HTTP status 404 would be easiest.
+
+[X] These occur during normal operation of the site, but we should look into fixing them. [limi]
+
+    Getting warnings about products that were uninstalled in 2003 or thereabouts — CMFWiki, ZWiki and CMFPhotoAlbum, one example from each:
+    2008-12-30T08:03:31 WARNING OFS.Uninstalled Could not import class 'PhotoAlbum' from module 'Products.CMFPhotoAlbum.PhotoAlbum'
+    2008-12-30T07:02:30 WARNING OFS.Uninstalled Could not import class 'PersistentOutline' from module 'Products.ZWiki.OutlineSupport'
+    2008-12-30T05:37:19 WARNING OFS.Uninstalled Could not import class 'CMFWikiFolder' from module 'Products.CMFWiki.CMFWikiPage'
+    NB these were manually killed off by Newbery while eating ice cream! Finally gone, we uninstalled these products in ~2003 :P
+
+[X] This still happens, although less frequently:
+
+    2008-12-30T08:04:45 ERROR PortalTransforms Cannot register transform html_to_web_intelligent_plain_text (ImportError), using BrokenTransform: Error
+ No module named intelligenttext.transforms.html_to_web_intelligent_plain_text
+
+    NB Maybe there are objects that are not Poi-related that use intelligenttext that need an update?
+    I recreated the html-to-intelligent text transform which was missing, so this may be working now. -- davisagli
+
+    Haven't seen this in a while, so I assume it is fixed, thanks! [limi]
+
+[X] Some releases have invalid dates, like this zforum object:
+
+    Module None, line 4, in toLocalizedTime
+       - <FSPythonScript at /plone.org/toLocalizedTime used for /plone.org/products/zforum/releases/1.1.0.Preview>
+       - Line 4
+    Module Products.CMFPlone.browser.ploneview, line 191, in toLocalizedTime
+    Module Products.CMFPlone.TranslationServiceTool, line 79, in ulocalized_time
+    Module Products.CMFPlone.i18nl10n, line 107, in ulocalized_time
+    Module DateTime.DateTime, line 1491, in strftime
+    ValueError: year=1000 is before 1900; the datetime strftime() methods require year >= 1900
+
+    NB I fixed by handling the ValueError in the view. This exposes a general problem with the effective method of Archetypes' ExtensibleMetadata which is usually masked because the only common pre-1900 effective date is the FLOOR_DATE, and the exception it generates while indexing is swallowed. --davisagli
+
+[ ] Placeful Workflow seems to throw some errors, are we actually using it anywhere on plone.org? Example traceback excerpt:
+
+    2008-12-30T12:46:18 ERROR Zope.SiteErrorLog http://new.plone.org/products/tracking/issues/placeful_workflow_configuration
+       - URL: file:/srv/plone.org/p3/eggs/Products.CMFPlacefulWorkflow-1.4.0-py2.4.egg/Products/CMFPlacefulWorkflow/skins/CMFPlacefulWorkflow/placeful_workflow_configuration.pt
+       - Line 30, Column 4
+       - Expression: <PythonExpr pwtool.getWorkflowPolicyConfig(here)>
+           'user': <SpecialUser 'Anonymous User'>}
+      Module Products.PageTemplates.ZRPythonExpr, line 49, in __call__
+       - __traceback_info__: pwtool.getWorkflowPolicyConfig(here)
+      Module PythonExpr, line 1, in <expression>
+      Module Products.CMFPlacefulWorkflow.PlacefulWorkflowTool, line 212, in getWorkflowPolicyConfig
+    Unauthorized: You need Manage portal permission on /plone.org/products/tracking/issues
+
+-- /plone.org/products/tracking/issues/placeful_workflow_configuration works for me, I think this is just a normal permission check failure -- davisagli
+
+[X] This is probably harmless, but wanted to note it anyway: Whenever I delete an object with comments, I get the log message:
+2008-12-30T12:52:32 ERROR Zope.ZCatalog uncatalogObject unsuccessfully attempted to uncatalog an object with a uid of /plone.org/news/blah/talkback/1195686147. (this happens in all Plone instances)
+
+[X] mail_uninstall.py doesn't work. What is it for? uninstall-feedback.pt? :)
+
+[X] personalize_form.cpt needs to be updated to 3.x format. When saving your profile, currently it fails like this:
+    Module plone.protect.authenticator, line 60, in check
+    Forbidden: Form authenticator is invalid.
+
+[X] portlet_(events|news|training) possibly need to be updated to 3.x format.
+     (not changed, but they seem to work fine, and since we're switching soon,
+      I can't be bothered. ~limi)
+
+[X] Double check that prefs_user_details fix has indeed been forward-ported to 3.x, and remove if so.
+
+[X] uninstall-feedback.pt embed a Google Spreadsheet survey instead, to remove the need for us to send email and letting the content end up in an SF.net mailing list. Sent out to some participants for initial feedback. I'll handle this one. [limi]
+
+[ ] Poi issue responses are no longer archetypes objects, need to run the upgrade steps from migrate-poi.html [MatthewWilkes]
+
+Post-upgrade
+~~~~~~~~~~~~
+
+[ ] REMEMBER TO REMOVE ROBOTS.TXT FROM THE SITE ROOT! Currently, we disallow all bots while it's running on new.plone.org.
+
+[X] We should remove the error filters for a few days, and keep an eye on the error log when it's running on plone.org. We have a lot of broken links and other random stuff that can easily be fixed. Also a good idea wrt. to checking in whether there's any abuse/spidering going on.
+
+[ ] Put back the exception filters again once we have done:
+    NotFound
+    Redirect
+    Unauthorized
+
+[ ] Consider changing the workflow to private/published for Events and News, since spammers have started abusing the Draft state. The same goes for documentation types (there's spamming going on here too)
+
+[ ] Implement buildout changes suggested by Clayton Parker, "Just took a look at the prod buildout and noticed a couple things.
+    http://svn.plone.org/svn/plone/Products.PloneOrg/trunk/production.cfg For the
+    extra instances you 
+    should use collective.recipe.zope2cluster to cut down on possible errors and
+    redundant config: http://pypi.python.org/pypi/collective.recipe.zope2cluster
+    Also, in the 
+    zope2instance part the &lt;environment&gt; in the zope-conf-additional is now
+    an option in the recipe. environment-vars = DISBLE_PTS 1 FOO bar There is also
+    a recipe f
+    or creating mount points:
+    http://pypi.python.org/pypi/collective.recipe.filestorage claytron"
