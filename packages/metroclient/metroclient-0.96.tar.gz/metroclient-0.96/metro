@@ -1,0 +1,191 @@
+#!/usr/bin/env python
+#
+#   Metro Application Manager
+#       (c) Lumentica, 2010
+#           support@lumentica.com
+#       
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+import sys
+from optparse import OptionParser
+import tarfile
+import httplib
+import urllib
+import getpass
+import pycurl
+import time
+import tempfile
+
+def main(opts=None, args=None):
+    try:
+        # show version and exit
+        print('\nMetro Application Manager {0}'.format(metroclient.VERSION))
+        print('  Copyright (c) Lumentica,  http://www.lumentica.com\n')
+        if opts.show_version:
+            sys.exit(0)
+        # check for updates
+        metroclient.check_for_update()
+        app_dir = None
+        # check options
+        if opts.source_directory:
+            if not os.path.exists(opts.source_directory):
+                print('Application source directory not found...')
+                sys.exit(1)
+            else:
+                app_dir = opts.source_directory
+        if not app_dir:
+            app_dir = raw_input('Application directory (i.e. path to django project): ')
+        if app_dir != './' and app_dir != '.':
+            app_pkg = os.path.basename(app_dir) + '.mpkg'
+            app_dir = os.path.join(os.getcwd() + os.sep + os.path.basename(app_dir))
+        else:
+            app_pkg = os.path.basename(os.getcwd()) + '.mpkg'
+            app_dir = os.path.abspath(os.getcwd())
+        # check for existing config
+        if os.path.exists(os.path.join(app_dir, 'metro.config')):
+            # check existing config version
+            f = open(os.path.join(app_dir, 'metro.config'), 'r')
+            cfg = f.read()
+            f.close()
+            conf_ver = None
+            app_name = None
+            app_version = None
+            app_modules = None
+            app_fixtures = None
+            app_load_data = None
+            app_ssl = None
+            force_ssl = None
+            deploy_type = 'normal'
+            wsgi_module = ''
+            for l in cfg.split('\n'):
+                if l.find('config_version') > -1:
+                    conf_ver = float(l.split('::')[-1])
+                if l.find('name') > -1:
+                    app_name = l.split('::')[-1].strip()
+                if l.find('version') > -1:
+                    app_version = l.split('::')[-1].strip()
+                if l.find('modules') > -1:
+                    app_modules = l.split('::')[-1].strip()
+                if l.find('wsgi_module') > -1:
+                    wsgi_module = l.split('::')[-1].strip()
+                if l.find('fixtures') > -1:
+                    app_fixtures = l.split('::')[-1].strip()
+                if l.find('load_data') > -1:
+                    app_load_data = l.split('::')[-1].strip()
+                if l.find('use_ssl') > -1:
+                    app_ssl = l.split('::')[-1].strip()
+                if l.find('force_ssl') > -1:
+                    force_ssl = l.split('::')[-1].strip()
+                if l.find('deploy_type') > -1:
+                    deploy_type = l.split('::')[-1].strip()
+            # use existing config if desired
+            if conf_ver == float(metroclient.VERSION):
+                if opts.use_config or raw_input('Do you want to use the existing config? (y/n): ').strip().lower() == 'y':
+                    print('Using existing config...\n')
+                    print('Application: {0}\nVersion: {1}\nModules: {2}\nWSGI module: {3}\nFixtures: {4}\nLoad data: {5}\nSSL: {6}\nForce SSL: {7}\n'.format(app_name, app_version, app_modules, wsgi_module, app_fixtures, app_load_data, app_ssl, force_ssl))
+                    if opts.build or raw_input('Build? (y/n): ').strip().lower() == 'y':
+                        metroclient.create_archive(app_pkg, app_dir)
+                        print('Build complete.')
+                        # check for upload to metro
+                        if opts.push or raw_input('Upload to AppHosted? (y/n): ').strip().lower() == 'y':
+                            metroclient.upload_to_metro(package_path=os.path.join(tempfile.gettempdir(), app_pkg), username=opts.username)
+                            archive_file = os.path.join(tempfile.gettempdir(), app_pkg)
+                            if os.path.exists(archive_file):
+                                os.remove(archive_file)
+                    sys.exit(0)
+        app_name = raw_input('Application name: ')
+        app_version = raw_input('Application version: ')
+        app_description = raw_input('Application description: ')
+        app_modules = raw_input('Application modules (extra; comma-separated): ')
+        # add trailing comma if needed
+        if app_modules.strip() != '':
+            if app_modules.strip()[-1] != ',':
+                app_modules += ','
+        wsgi_module = raw_input('WSGI module (optional): ')
+        app_fixtures = raw_input('Fixtures (comma-separated): ')
+        # add trailing comma if needed
+        if app_fixtures.strip() != '':
+            if app_fixtures.strip()[-1] != ',':
+                app_fixtures += ','
+        app_load_data = raw_input('Sync database and load fixtures? (y/n): ')
+        app_ssl = raw_input('Use SSL? (y/n): ')
+        force_ssl = raw_input('Force SSL: (y/n): ')
+        #quick_deploy = raw_input('Quick deploy? (y/n): ')
+        quick_deploy = 'n' # default to 'normal' deploy
+        # write config
+        f = open('%s/metro.config' % (app_dir), 'w')
+        f.write('config_version:: %s\n' % (metroclient.VERSION))
+        f.write('name:: %s\n' % (app_name))
+        f.write('version:: %s\n' % (app_version))
+        f.write('description:: %s\n' % (app_description))
+        f.write('modules:: %s\n' % (app_modules))
+        f.write('wsgi_module:: %s\n' % (wsgi_module))
+        f.write('fixtures:: %s\n' % (app_fixtures))
+        # load data
+        if app_load_data.strip().lower() == 'y':
+            f.write('load_data:: true\n')
+        else:
+            f.write('load_data:: false\n')
+        # ssl
+        if app_ssl.strip().lower() == 'y':
+            f.write('use_ssl:: true\n')
+        else:
+            f.write('use_ssl:: false\n')
+        # force ssl
+        if force_ssl.strip().lower() == 'y':
+            f.write('force_ssl:: true\n')
+        else:
+            f.write('force_ssl:: false\n')
+        # quick deploy
+        if quick_deploy.strip().lower() == 'y':
+            f.write('deploy_type:: quick\n')
+        else:
+            f.write('deploy_type:: normal\n')
+        f.close()
+    
+        metroclient.create_archive(app_pkg, app_dir)
+        print('Build complete.')
+        # check for upload to metro
+        if raw_input('Upload to AppHosted? (y/n): ').strip().lower() == 'y':
+            metroclient.upload_to_metro(os.path.join(tempfile.gettempdir(), app_pkg))
+        # cleanup
+        archive_file = os.path.join(tempfile.gettempdir(), app_pkg)
+        if os.path.exists(archive_file):
+            os.remove(archive_file)
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print('\nBuild cancelled...')
+        sys.exit(1)
+
+if __name__=='__main__':
+    # try to import global metroclient -- if fail, add local dir to path to check for manual download
+    try:
+        import metroclient
+    except ImportError:
+        print('Unable to import metroclient; please install the Metro client via pip or by downloading the package.')
+        sys.exit(1)
+    op = OptionParser()
+    op.add_option('-d', '--source-directory', dest="source_directory", help="Project source directory")
+    op.add_option('-b', '--build', dest="build", action="store_true", default=False, help="Build Metro package")
+    op.add_option('-p', '--push', dest="push", action="store_true", default=False,  help="Push (deploy) to AppHosted")
+    op.add_option('-q', '--quick', dest="quick_deploy", action="store_true", default=False,  help="Use quick deploy (experts only)")
+    op.add_option('-u', '--user', dest="username", help="AppHosted username")
+    op.add_option('-e', '--use-existing-config', dest="use_config", action="store_true", default=False, help="Use existing Metro configuration file if exists")
+    op.add_option('-v', '--version', dest="show_version", action="store_true", default=False, help="Show version")
+
+    opts, args = op.parse_args()
+    main(opts=opts, args=args)
+
