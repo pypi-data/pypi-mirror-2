@@ -1,0 +1,469 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Pyramid Tutorial &mdash; ToscaWidgets 2 v2.0b5 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '2.0b5',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ToscaWidgets 2 v2.0b5 documentation" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b5 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="pyramid-tutorial">
+<h1>Pyramid Tutorial<a class="headerlink" href="#pyramid-tutorial" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The files created in this tutorial can be downloaded as a <a class="reference external" href="https://github.com/ralphbean/tw2.core-docs-pyramid/zipball/master">.zip file</a>,
+a <a class="reference external" href="https://github.com/ralphbean/tw2.core-docs-pyramid/tarball/master">.tar file</a>,
+or can be cloned from a <a class="reference external" href="http://github.com/ralphbean/tw2.core-docs-pyramid">github repository</a>.</p>
+</div>
+<div class="section" id="getting-set-up">
+<h2>Getting Set Up<a class="headerlink" href="#getting-set-up" title="Permalink to this headline">¶</a></h2>
+<p>First, we&#8217;ll create a python <tt class="docutils literal"><span class="pre">virtualenv</span></tt> and install <tt class="docutils literal"><span class="pre">pyramid</span></tt> into it:</p>
+<div class="highlight-python"><pre>$ mkvirtualenv --no-site-packages tw2-and-pyramid
+$ pip install pyramid
+$ paster create -t pyramid_alchemy myapp
+$ cd myapp</pre>
+</div>
+<p>Open <tt class="docutils literal"><span class="pre">setup.py</span></tt> and add the following to the <tt class="docutils literal"><span class="pre">requires=[...]</span></tt> entry:</p>
+<div class="highlight-python"><pre>requires=[
+
+    ...
+
+    "tw2.core",
+    "tw2.forms",
+    "tw2.dynforms",
+    "tw2.sqla",
+    "tw2.jqplugins.jqgrid",
+    ],</pre>
+</div>
+<p>Once that&#8217;s done.  Install your dependencies by running:</p>
+<div class="highlight-python"><pre>$ python setup.py develop</pre>
+</div>
+</div>
+<div class="section" id="enabling-toscawidgets2">
+<h2>Enabling ToscaWidgets2<a class="headerlink" href="#enabling-toscawidgets2" title="Permalink to this headline">¶</a></h2>
+<p>Easy!  Just edit <tt class="docutils literal"><span class="pre">development.ini</span></tt> and add <tt class="docutils literal"><span class="pre">tw2.core</span></tt> to the
+pipline so that it looks like:</p>
+<div class="highlight-python"><pre>[pipeline:main]
+pipeline =
+    egg:WebError#evalerror
+    tm
+    tw2.core
+    myapp</pre>
+</div>
+<p>We&#8217;ll add another section where pyramid will take configuration values for the
+tw2.core middleware itself.  Add it just belo the <tt class="docutils literal"><span class="pre">[pipeline:main]</span></tt> section:</p>
+<div class="highlight-python"><pre>[filter:tw2.core]
+use = egg:tw2.core#middleware</pre>
+</div>
+<p>We&#8217;ll add more configuration values later.  For now,
+check that this worked by running the following and visiting
+<a class="reference external" href="http://localhost:6543">http://localhost:6543</a>:</p>
+<div class="highlight-python"><pre>$ paster serve development.ini</pre>
+</div>
+</div>
+<div class="section" id="building-a-form">
+<h2>Building a Form<a class="headerlink" href="#building-a-form" title="Permalink to this headline">¶</a></h2>
+<p>We&#8217;ll create a movie database as in the <a class="reference internal" href="standalone.html"><em>Standalone Tutorial</em></a> example.  We&#8217;ll need
+to create the widget, expose it in a pyramid view, and render it in a template.</p>
+<p>First, create a new file <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt> with the contents:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.core</span>
+<span class="kn">import</span> <span class="nn">tw2.forms</span>
+
+<span class="k">class</span> <span class="nc">MovieForm</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">FormPage</span><span class="p">):</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="s">&#39;Movie&#39;</span>
+    <span class="k">class</span> <span class="nc">child</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">TableForm</span><span class="p">):</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">HiddenField</span><span class="p">()</span>
+        <span class="n">title</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">TextField</span><span class="p">(</span><span class="n">validator</span><span class="o">=</span><span class="n">tw2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Required</span><span class="p">)</span>
+        <span class="n">director</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+        <span class="n">genres</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">CheckBoxList</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;Action&#39;</span><span class="p">,</span> <span class="s">&#39;Comedy&#39;</span><span class="p">,</span> <span class="s">&#39;Romance&#39;</span><span class="p">,</span> <span class="s">&#39;Sci-fi&#39;</span><span class="p">])</span>
+        <span class="k">class</span> <span class="nc">cast</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">GridLayout</span><span class="p">):</span>
+            <span class="n">extra_reps</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="n">character</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+            <span class="n">actor</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Second, modify <tt class="docutils literal"><span class="pre">myapp/views.py</span></tt> and add a new view callable like so:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">def</span> <span class="nf">view_widget</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s">&#39;widget&#39;</span><span class="p">:</span><span class="n">context</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Thirdly, add a new template <tt class="docutils literal"><span class="pre">myapp/templates/widget.pt</span></tt> (which is a <a class="reference external" href="http://pypi.python.org/pypi/Chameleon">chameleon</a> template) with the following
+contents:</p>
+<div class="highlight-python"><pre>&lt;!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"&gt;
+&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" xmlns:tal="http://xml.zope.org/namespaces/tal"&gt;
+&lt;head&gt;
+  &lt;title&gt;The Pyramid Web Application Development Framework&lt;/title&gt;
+  &lt;meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/&gt;
+  &lt;meta name="keywords" content="python web application" /&gt;
+  &lt;meta name="description" content="pyramid web application" /&gt;
+  &lt;link rel="shortcut icon" href="${request.static_url('myapp:static/favicon.ico')}" /&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div id="wrap"&gt;
+    &lt;div tal:content="structure widget.display()"&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div id="footer"&gt;
+    &lt;div class="footer"&gt;&amp;copy; Copyright 2008-2011, Agendaless Consulting.&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+<p>Fourthly, modify the class responsible for producing your resource tree,
+the <tt class="docutils literal"><span class="pre">MyApp</span></tt> class in <tt class="docutils literal"><span class="pre">myapp/models.py</span></tt>.  At the top of the file add:</p>
+<p>And inside the <tt class="docutils literal"><span class="pre">MyApp</span></tt> class, just inside the definition of the
+<tt class="docutils literal"><span class="pre">__getitem__(self,</span> <span class="pre">key)</span></tt> method but before the <tt class="docutils literal"><span class="pre">session=</span> <span class="pre">DBSession()</span></tt> line
+add the following block:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s">&#39;movie&#39;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">myapp.widgets</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">widgets</span><span class="o">.</span><span class="n">MovieForm</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__parent__</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__name__</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">return</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>Having modified the resource tree in <tt class="docutils literal"><span class="pre">myapp/models.py</span></tt>, added a new view
+callable to <tt class="docutils literal"><span class="pre">myapp/views.py</span></tt>, added the new template
+<tt class="docutils literal"><span class="pre">myapp/templates/widget.pt</span></tt>, and having added the widget definition
+itself to <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt>, all that&#8217;s left is to wire it all together.
+Edit your applications configuration in <tt class="docutils literal"><span class="pre">myapp/__init__.py</span></tt> and add the
+view to the application registry with the following call:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">config</span><span class="o">.</span><span class="n">add_view</span><span class="p">(</span><span class="s">&#39;myapp.views.view_widget&#39;</span><span class="p">,</span>
+                <span class="n">context</span><span class="o">=</span><span class="s">&#39;myapp.widgets.MovieForm&#39;</span><span class="p">,</span>
+                <span class="n">renderer</span><span class="o">=</span><span class="s">&quot;templates/widget.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>With those five file edits in place, you should be able to restart the
+application with <tt class="docutils literal"><span class="pre">paster</span> <span class="pre">serve</span> <span class="pre">development.ini</span></tt> (there is a <tt class="docutils literal"><span class="pre">--reload</span></tt>
+option for convenience) and point your browser
+at <a class="reference external" href="http://localhost:6543/movie">http://localhost:6543/movie</a>.</p>
+<p>You should see the form, but it doesn&#8217;t look very appealing.  To try to
+improve this, lets add some CSS.  We&#8217;ll start with something simple;
+create <tt class="docutils literal"><span class="pre">myapp/static/myapp.css</span></tt> with the following:</p>
+<div class="highlight-python"><pre>th {
+    vertical-align: top;
+    text-align: left;
+    font-weight: normal;
+}
+
+ul {
+    list-style-type: none;
+}
+
+.required th {
+    font-weight: bold;
+}</pre>
+</div>
+<p>Notice the use of the &#8220;required&#8221; class. TableForm applies this to rows that
+contain a field that is required.</p>
+<p>Before TableForm will inject <tt class="docutils literal"><span class="pre">myapp.css</span></tt> into the page, we&#8217;ll have to add
+it to the list of resources. Add the following to the top of the <cite>MovieForm</cite>
+class definition in <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt> just above the line
+<tt class="docutils literal"><span class="pre">title</span> <span class="pre">=</span> <span class="pre">'Movie'</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">resources</span> <span class="o">=</span> <span class="p">[</span><span class="n">tw2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">CSSLink</span><span class="p">(</span><span class="n">link</span><span class="o">=</span><span class="s">&#39;static/myapp.css&#39;</span><span class="p">)]</span>
+</pre></div>
+</div>
+<p>Restart <tt class="docutils literal"><span class="pre">paster</span></tt> and browse to <a class="reference external" href="http://localhost:6543/1">http://localhost:6543/1</a>
+to see the new css in action.</p>
+</div>
+<div class="section" id="connecting-to-a-database">
+<h2>Connecting to a Database<a class="headerlink" href="#connecting-to-a-database" title="Permalink to this headline">¶</a></h2>
+<p>The next step is to save movies to a database.  To do this, we&#8217;ll use only
+<a class="reference external" href="http://www.sqlalchemy.org/">SQLAlchemy</a> just like in the <a class="reference internal" href="turbogears.html"><em>TurboGears 2 Tutorial</em></a>
+tutorial (and not <a class="reference external" href="http://elixir.ematia.de/trac/wiki">elixir</a> as in
+the <a class="reference internal" href="standalone.html"><em>Standalone Tutorial</em></a> tutorial).  SQLAlchemy is built into our pyramid app
+from the get-go by way of us using the pyramid_alchemy paster template.
+Edit <tt class="docutils literal"><span class="pre">development.ini</span></tt> and modify the <tt class="docutils literal"><span class="pre">[filter:tw2.core]</span></tt> section like
+so:</p>
+<div class="highlight-python"><pre>[filter:tw2.core]
+use = egg:tw2.core#middleware
+controller_prefix = /tw2_controllers/
+serve_controllers = True</pre>
+</div>
+<p>Next, edit <tt class="docutils literal"><span class="pre">myapp/__init__.py</span></tt> and add another view:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">config</span><span class="o">.</span><span class="n">add_view</span><span class="p">(</span><span class="s">&#39;myapp.views.view_widget&#39;</span><span class="p">,</span>
+                <span class="n">context</span><span class="o">=</span><span class="s">&#39;myapp.widgets.MovieForm&#39;</span><span class="p">,</span>
+                <span class="n">renderer</span><span class="o">=</span><span class="s">&quot;templates/widget.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Next, edit <tt class="docutils literal"><span class="pre">myapp/models.py</span></tt> with the following changes.  Add this set of
+imports to the top:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">Table</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">ForeignKey</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">relation</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">backref</span>
+</pre></div>
+</div>
+<p>Just above the definition of <tt class="docutils literal"><span class="pre">class</span> <span class="pre">MyModel(Base):</span></tt> add:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">Base</span><span class="o">.</span><span class="n">query</span> <span class="o">=</span> <span class="n">DBSession</span><span class="o">.</span><span class="n">query_property</span><span class="p">()</span>
+
+<span class="n">movie_genre_table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="s">&#39;movie_genre&#39;</span><span class="p">,</span> <span class="n">Base</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
+    <span class="n">Column</span><span class="p">(</span><span class="s">&#39;movie_id&#39;</span><span class="p">,</span> <span class="n">Integer</span><span class="p">,</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="s">&#39;movies.id&#39;</span><span class="p">,</span>
+        <span class="n">onupdate</span><span class="o">=</span><span class="s">&quot;CASCADE&quot;</span><span class="p">,</span> <span class="n">ondelete</span><span class="o">=</span><span class="s">&quot;CASCADE&quot;</span><span class="p">),</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">),</span>
+    <span class="n">Column</span><span class="p">(</span><span class="s">&#39;genre_id&#39;</span><span class="p">,</span> <span class="n">Integer</span><span class="p">,</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="s">&#39;genres.id&#39;</span><span class="p">,</span>
+        <span class="n">onupdate</span><span class="o">=</span><span class="s">&quot;CASCADE&quot;</span><span class="p">,</span> <span class="n">ondelete</span><span class="o">=</span><span class="s">&quot;CASCADE&quot;</span><span class="p">),</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">Movie</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="n">__tablename__</span> <span class="o">=</span> <span class="s">&#39;movies&#39;</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Unicode</span><span class="p">(</span><span class="mi">255</span><span class="p">))</span>
+    <span class="n">director</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Unicode</span><span class="p">(</span><span class="mi">255</span><span class="p">))</span>
+
+<span class="k">class</span> <span class="nc">Genre</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="n">__tablename__</span> <span class="o">=</span> <span class="s">&#39;genres&#39;</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Unicode</span><span class="p">(</span><span class="mi">255</span><span class="p">))</span>
+    <span class="n">movies</span> <span class="o">=</span> <span class="n">relation</span><span class="p">(</span><span class="s">&#39;Movie&#39;</span><span class="p">,</span> <span class="n">secondary</span><span class="o">=</span><span class="n">movie_genre_table</span><span class="p">,</span> <span class="n">backref</span><span class="o">=</span><span class="s">&#39;genres&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__unicode__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">unicode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">Cast</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="n">__tablename__</span> <span class="o">=</span> <span class="s">&#39;casts&#39;</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">movie_id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">ForeignKey</span><span class="p">(</span><span class="n">Movie</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+    <span class="n">movie</span> <span class="o">=</span> <span class="n">relation</span><span class="p">(</span><span class="n">Movie</span><span class="p">,</span> <span class="n">backref</span><span class="o">=</span><span class="n">backref</span><span class="p">(</span><span class="s">&#39;cast&#39;</span><span class="p">))</span>
+    <span class="n">character</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Unicode</span><span class="p">(</span><span class="mi">255</span><span class="p">))</span>
+    <span class="n">actor</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Unicode</span><span class="p">(</span><span class="mi">255</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Add the following hook into the <tt class="docutils literal"><span class="pre">def</span> <span class="pre">__getitem__(self,</span> <span class="pre">key):</span></tt> method of the <tt class="docutils literal"><span class="pre">MyApp</span></tt> class just above the <tt class="docutils literal"><span class="pre">session=</span> <span class="pre">DBSession()</span></tt> line:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s">&#39;movie&#39;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">myapp.widgets</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">widgets</span><span class="o">.</span><span class="n">MovieForm</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__parent__</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__name__</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">return</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>And finally inside the <tt class="docutils literal"><span class="pre">def</span> <span class="pre">populate()</span></tt> method of the same file add:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;Action&#39;</span><span class="p">,</span> <span class="s">&#39;Comedy&#39;</span><span class="p">,</span> <span class="s">&#39;Romance&#39;</span><span class="p">,</span> <span class="s">&#39;Sci-fi&#39;</span><span class="p">]:</span>
+    <span class="n">session</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Genre</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Now done with <tt class="docutils literal"><span class="pre">myapp/models.py</span></tt>, edit <tt class="docutils literal"><span class="pre">myapp/views.py</span></tt> and replace the definition of <tt class="docutils literal"><span class="pre">def</span> <span class="pre">view_widget(context,</span> <span class="pre">request):</span></tt> with:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.core</span>
+<span class="k">def</span> <span class="nf">view_widget</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">fetch_data</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="n">mw</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">request_local</span><span class="p">()[</span><span class="s">&#39;middleware&#39;</span><span class="p">]</span>
+    <span class="n">mw</span><span class="o">.</span><span class="n">controllers</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s">&#39;movie_submit&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s">&#39;widget&#39;</span><span class="p">:</span><span class="n">context</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Lastly, edit <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt> and add:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.sqla</span>
+<span class="kn">import</span> <span class="nn">myapp.models</span>
+</pre></div>
+</div>
+<p>Change <tt class="docutils literal"><span class="pre">class</span> <span class="pre">MovieForm(tw2.forms.FormPage):</span></tt> to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MovieForm</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">sqla</span><span class="o">.</span><span class="n">DbFormPage</span><span class="p">):</span>
+    <span class="n">entity</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Movie</span>
+</pre></div>
+</div>
+<p>To the body of <tt class="docutils literal"><span class="pre">class</span> <span class="pre">child(tw2.forms.TableForm):</span></tt> add:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">action</span> <span class="o">=</span> <span class="s">&#39;/tw2_controllers/movie_submit&#39;</span>
+</pre></div>
+</div>
+<p>And the last for the <cite>MovieForm</cite>, change <tt class="docutils literal"><span class="pre">genres</span> <span class="pre">=</span> <span class="pre">tw2.forms.CheckBoxList(</span> <span class="pre">...</span> <span class="pre">)</span></tt> to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">genres</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">sqla</span><span class="o">.</span><span class="n">DbCheckBoxList</span><span class="p">(</span><span class="n">entity</span><span class="o">=</span><span class="n">myapp</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Genre</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now, in your command prompt run:</p>
+<div class="highlight-python"><pre>rm devdata.db
+paster serve development.ini</pre>
+</div>
+<p>This will recreate and initialize your database in a sqlite DB.</p>
+<p>We&#8217;re almost done, but not quite.  Nonetheless, this is a good point to restart
+your app and test to see if any mistakes have cropped up.  Restart <cite>paster</cite>
+and visit <a class="reference external" href="http://localhost:6543/movie">http://localhost:6543/movie</a>.  Submit your first entry.  It
+should give you an <cite>Error 404</cite>, but don&#8217;t worry.  Point your browser now to
+<a class="reference external" href="http://localhost:6543/movie?id=1">http://localhost:6543/movie?id=1</a> and you should see the same
+movie entry that you just submitted.</p>
+<p>Great &#8211; we can write to the database and read back an entry, now how about
+a list of entries?</p>
+<p>Add a whole new class to <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MovieList</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">sqla</span><span class="o">.</span><span class="n">DbListPage</span><span class="p">):</span>
+    <span class="n">entity</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Movie</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="s">&#39;Movies&#39;</span>
+    <span class="n">newlink</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">LinkField</span><span class="p">(</span><span class="n">link</span><span class="o">=</span><span class="s">&#39;/movie&#39;</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s">&#39;New&#39;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">class</span> <span class="nc">child</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">GridLayout</span><span class="p">):</span>
+        <span class="n">title</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">LabelField</span><span class="p">()</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">LinkField</span><span class="p">(</span><span class="n">link</span><span class="o">=</span><span class="s">&#39;/movie?id=$&#39;</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s">&#39;Edit&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Add another hook into the <tt class="docutils literal"><span class="pre">MyApp</span></tt> <tt class="docutils literal"><span class="pre">__getitem__(...)</span></tt> method in <tt class="docutils literal"><span class="pre">myapp/models.py</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s">&#39;list&#39;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">myapp.widgets</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">widgets</span><span class="o">.</span><span class="n">MovieList</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__parent__</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__name__</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">return</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>And add the following view configuration in <tt class="docutils literal"><span class="pre">myapp/__init__.py</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">config</span><span class="o">.</span><span class="n">add_view</span><span class="p">(</span><span class="s">&#39;myapp.views.view_widget&#39;</span><span class="p">,</span>
+                <span class="n">context</span><span class="o">=</span><span class="s">&#39;myapp.widgets.MovieList&#39;</span><span class="p">,</span>
+                <span class="n">renderer</span><span class="o">=</span><span class="s">&quot;templates/widget.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now restart <cite>paster</cite> and browse to <a class="reference external" href="http://localhost:6543/list">http://localhost:6543/list</a></p>
+</div>
+<div class="section" id="getting-fancy">
+<h2>Getting Fancy<a class="headerlink" href="#getting-fancy" title="Permalink to this headline">¶</a></h2>
+<p>We could also make things dynamic by editing <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt> and adding at the top:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.dynforms</span>
+</pre></div>
+</div>
+<p>replacing <tt class="docutils literal"><span class="pre">class</span> <span class="pre">child(tw2.forms.TableForm):</span></tt> with:</p>
+<div class="highlight-python"><pre>class child(tw2.dynforms.CustomisedTableForm):</pre>
+</div>
+<p>and replacing:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">cast</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">forms</span><span class="o">.</span><span class="n">GridLayout</span><span class="p">):</span>
+    <span class="n">extra_reps</span> <span class="o">=</span> <span class="mi">5</span>
+</pre></div>
+</div>
+<p>with:</p>
+<div class="highlight-python"><pre>class cast(tw2.dynforms.GrowingGridLayout):</pre>
+</div>
+</div>
+<div class="section" id="getting-fancier">
+<h2>Getting Fancier<a class="headerlink" href="#getting-fancier" title="Permalink to this headline">¶</a></h2>
+<p>There are a lot of <cite>non-core</cite> TW2 widget libraries out there, and just to give
+you a taste, we&#8217;ll use one to add one more view to our Movie app.</p>
+<p>Edit <tt class="docutils literal"><span class="pre">myapp/widgets.py</span></tt> and add the following to the top:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">tw2.jqplugins.jqgrid</span>
+</pre></div>
+</div>
+<p>Add the following class definition to the same file:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">GridWidget</span><span class="p">(</span><span class="n">tw2</span><span class="o">.</span><span class="n">jqplugins</span><span class="o">.</span><span class="n">jqgrid</span><span class="o">.</span><span class="n">SQLAjqGridWidget</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="s">&#39;grid_widget&#39;</span>
+    <span class="n">entity</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">Movie</span>
+    <span class="n">excluded_columns</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;id&#39;</span><span class="p">]</span>
+    <span class="n">prmFilter</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;stringResult&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">&#39;searchOnEnter&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">}</span>
+    <span class="n">pager_options</span> <span class="o">=</span> <span class="p">{</span> <span class="s">&quot;search&quot;</span> <span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">&quot;refresh&quot;</span> <span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">&quot;add&quot;</span> <span class="p">:</span> <span class="bp">False</span><span class="p">,</span> <span class="p">}</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">&#39;url&#39;</span><span class="p">:</span> <span class="s">&#39;/tw2_controllers/db_jqgrid/&#39;</span><span class="p">,</span>
+        <span class="s">&#39;rowNum&#39;</span><span class="p">:</span><span class="mi">15</span><span class="p">,</span>
+        <span class="s">&#39;rowList&#39;</span><span class="p">:[</span><span class="mi">15</span><span class="p">,</span><span class="mi">30</span><span class="p">,</span><span class="mi">50</span><span class="p">],</span>
+        <span class="s">&#39;viewrecords&#39;</span><span class="p">:</span><span class="bp">True</span><span class="p">,</span>
+        <span class="s">&#39;imgpath&#39;</span><span class="p">:</span> <span class="s">&#39;scripts/jqGrid/themes/green/images&#39;</span><span class="p">,</span>
+        <span class="s">&#39;width&#39;</span><span class="p">:</span> <span class="mi">900</span><span class="p">,</span>
+        <span class="s">&#39;height&#39;</span><span class="p">:</span> <span class="s">&#39;auto&#39;</span><span class="p">,</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Add the following to your view configuration in <tt class="docutils literal"><span class="pre">myapp/__init__.py</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">config</span><span class="o">.</span><span class="n">add_view</span><span class="p">(</span><span class="s">&#39;myapp.views.view_grid_widget&#39;</span><span class="p">,</span>
+                <span class="n">context</span><span class="o">=</span><span class="s">&#39;myapp.widgets.GridWidget&#39;</span><span class="p">,</span>
+                <span class="n">renderer</span><span class="o">=</span><span class="s">&quot;templates/widget.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Add that view to <tt class="docutils literal"><span class="pre">myapp/views.py</span></tt> itself:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">def</span> <span class="nf">view_grid_widget</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+    <span class="n">mw</span> <span class="o">=</span> <span class="n">tw2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">request_local</span><span class="p">()[</span><span class="s">&#39;middleware&#39;</span><span class="p">]</span>
+    <span class="n">mw</span><span class="o">.</span><span class="n">controllers</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s">&#39;db_jqgrid&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s">&#39;widget&#39;</span><span class="p">:</span><span class="n">context</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Finally add another hook into <tt class="docutils literal"><span class="pre">MyApp.__getitem__(...)</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s">&#39;grid&#39;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">myapp.widgets</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">myapp</span><span class="o">.</span><span class="n">widgets</span><span class="o">.</span><span class="n">GridWidget</span><span class="o">.</span><span class="n">req</span><span class="p">()</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__parent__</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">__name__</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">return</span> <span class="n">w</span>
+</pre></div>
+</div>
+<p>Redirect your browser to <a class="reference external" href="http://localhost:6543/grid">http://localhost:6543/grid</a> and you should
+see the sortable, searchable jQuery grid.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Pyramid Tutorial</a><ul>
+<li><a class="reference internal" href="#getting-set-up">Getting Set Up</a></li>
+<li><a class="reference internal" href="#enabling-toscawidgets2">Enabling ToscaWidgets2</a></li>
+<li><a class="reference internal" href="#building-a-form">Building a Form</a></li>
+<li><a class="reference internal" href="#connecting-to-a-database">Connecting to a Database</a></li>
+<li><a class="reference internal" href="#getting-fancy">Getting Fancy</a></li>
+<li><a class="reference internal" href="#getting-fancier">Getting Fancier</a></li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/pyramid.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="index.html">ToscaWidgets 2 v2.0b5 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Paul Johnston, Alberto Valverde &amp; Contributors.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
