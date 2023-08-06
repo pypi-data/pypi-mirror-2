@@ -1,0 +1,137 @@
+Metadata-Version: 1.0
+Name: SocketTornad.IO
+Version: 0.1.1
+Summary: Python implementation of the Socket.IO protocol for the Tornado webserver/framework.
+Home-page: http://github.com/novus/SocketTornad.IO
+Author: Brendan W. McAdams
+Author-email: bmcadams@novus.com
+License: LICENSE
+Description: SocketTornad.IO
+        ===============
+        
+        Brendan W. McAdams bmcadams@novus.com
+        -------------------------------------
+        
+        Contributors
+        ~~~~~~~~~~~~
+        
+        [Matt Swanson][swanson]
+        ^^^^^^^^^^^^^^^^^^^^^^^
+        
+        Implementation of the [Socket.IO][socket\_io] Websocket emulation
+        protocol in Python on top of the non-blocking [Tornado Web
+        Framework][tornado]. Socket.IO is a JavaScript library for
+        providing full emulation of Websockets for browsers which don’t
+        support it. While the client-side programmer codes as if they have
+        a constantly open bi-directional communication channel, Socket.IO
+        will (if the browser doesn’t support Websockets) use several
+        fallback protocols to provide the behavior. These fallback
+        protocols require a negotiation between the client and server to
+        determine an agreeable protocol; the [reference
+        implementation][socket\_io\_node] of the server is done in Node.JS
+        which was less than agreeable to our needs. There are also
+        implementations in Ruby Rack and Go but we rejected those for
+        simlar reasons to Node.JS.
+        
+        This version is designed for making `Pythonistas`_ happy.
+        
+        Implementing SocketTornad.IO
+        ============================
+        
+        As a user your only major requirement is to subclass
+        ``tornad_io.socket_io.SocketIOHandler``. This base class provides
+        Tornado Handler logic for the entire Socket.IO protocol - it
+        automatically responds to protocol handshakes and notifies you of
+        three events, represented by Python methods on your class:
+        
+        
+        1. ``on_open``: Called when a Socket.IO handshake completes
+        successfully and a client is brought online. Gets a copy of the
+        ``*args`` and ``**kwargs`` from the request… can be used for you as
+        a user to do further authentication of the connection. By way of
+        example, we lookup certain authorization information once a
+        connection finishes and decide if we’ll allow the connection to
+        continue.
+        **This is not a required method - you need not implement it if you don’t care about it.**
+        2. ``on_close``: Called when a Socket.IO connection is fully
+        closed. Passes no arguments, but lets you do any cleanup of
+        database handles, etc.
+        **This is not a required method - you need not implement it if you don’t care about it.**
+        3. ``on_message``: The main method. This is invoked whenever the
+        browser client sends a message. It is automatically decoded, and
+        any JSON will be passed as a fully parsed Python object. This
+        method receives a single argument of ``message`` which contains the
+        parsed message. You can respond with the ``self.send`` method (see
+        below)
+        
+        You can send messages to the client by use of the ``self.send``
+        method. This takes a single argument of ``message`` and transmits
+        it to the client. If you pass a string it will be pased “as is” to
+        the browser; if you want to send JSON you should pass a ``dict``
+        in, which will be JSON encoded and marked as JSON in the Socket.IO
+        wire format. An Object is also acceptable as long as *simplejson*
+        is able to encode it to JSON.
+        
+        There *is* fallback code for the JSON import - if you don’t have
+        ``simplejson`` installed it will import the ``json`` module (based
+        on ``simplejson``) which has been included with Python since 2.6
+        instead (thanks to [swanson] for the patch). However, the version
+        of ``json`` which ships with Python lacks built in support for
+        encoding ``decimal.Decimal`` objects, which is why we prefer (as
+        specified in ``setup.py``) ``simplejson >= 2.1``. If you do not
+        have an appropriate version of ``simplejson`` installed and try to
+        send an object or ``dict`` containing ``decimal.Decimal`` instances
+        to the client, you may encounter errors.
+        
+        For those of you who know Tornado already, do *not* call the
+        ``self.write`` method unless you want things to act weird.
+        ``self.write`` still (in the current iteration) sends raw data to
+        the client - but Socket.IO uses a wire format which requires
+        certain encoding. Anything you pass via ``self.write`` will likely
+        not be understood by the client.
+        
+        This is an example handler:
+        
+        ::
+        
+        class EchoHandler(SocketIOHandler):
+        def on_open(self, *args, **kwargs):
+        logging.info("Socket.IO Client connected with protocol '%s' {session id: '%s'}" % (self.protocol, self.session.id))
+        logging.info("Extra Data for Open: '%s'" % (kwargs.get('extra', None)))
+        
+        def on_message(self, message):
+        logging.info("[echo] %s" % message)
+        self.send("[echo] %s" % message)
+        
+        def on_close(self):
+        logging.info("Closing Socket.IO Client for protocol '%s'" % (self.protocol))
+        
+        This handler is meant to be simple: It merely echoes back any
+        message it receives to the client. Were you to test this in your
+        browser your console will reflect back what you send:
+        
+        ::
+        
+        > socket.send("OMG! Ponies!")
+        [echo] OMG! Ponies!
+        
+        (In this case I have my test page set to print any messages to
+        ``console.log()``.)
+        
+        Useful properties
+        -----------------
+        
+        Every subclass of ``SocketIOHandler`` has a few useful properties
+        attached to it:
+        
+        
+        -  ``protocol``: This is a string containing the name of the
+        protocol currently being used to communicate
+        
+        TRUNCATED! Please download pandoc if you want to convert large
+        files.
+        
+        .. _Pythonistas: http://python.net/~goodger/projects/pycon/2007/idiomatic/handout.html
+        
+        
+Platform: UNKNOWN
