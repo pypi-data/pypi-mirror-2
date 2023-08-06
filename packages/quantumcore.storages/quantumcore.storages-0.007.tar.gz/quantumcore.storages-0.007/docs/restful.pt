@@ -1,0 +1,172 @@
+=====================
+Building RESTful APIs
+=====================
+
+This is an example on how you can easily build a RESTful API using
+``quantumcore.storages``. We assume that we use a MongoDB storage.
+
+As an example we will use a storage for comments which consists of records
+containing a unique id, the fullname and the content of the comment as well
+as the creation date.
+
+The implementation is split into two parts: The actual storage and the RESTful
+adapter which uses access tokens to do authorization.
+
+Defining the data model
+=======================
+
+First we define the model::
+
+  from quantumcore.storage.mongoobjectstore import Model, DataStore
+  
+    class Comment(Model):
+        """a comment"""
+    
+        attribs = ['author', 'comment', 'date'] # defining the attributes we store
+    
+We do not need to define the unique id ``_id`` as this is done automatically.
+
+Now we need to define the database adapter:
+
+    class Comments(DataStore):
+        """a data store for comments"""
+        
+        model = Comment
+        collection = "comments"
+        
+Now we need to instantiate the data store with an existing database object:
+
+    db = pymongo.Connection().commentdb
+    store = Comments(db)
+    
+Using the data store
+--------------------
+
+Now we can use the data store for adding, updating, retrieving and deleting comments::
+
+    # add a comment
+    comment = Comment(author="Christian", comment="cool!", date=datetime.datetime.now())
+    uid = store.add(comment)
+    
+    # retrieve a comment by it's id
+    comment = store[uid]
+    
+    # update a comment
+    comment.content="not so cool anymore!"
+    store.update(comment)
+    
+    # delete it
+    store.delete(uid)
+    
+    # find some comments e.g. by author
+    comments = store.find({'author' : 'Christian'})
+    
+
+Building a RESTful adapter for it
+=================================
+
+Now we want to use this API via the web as a RESTful web service. We want to use::
+
+    # add a comment (returns JSON document with _id)
+    POST /comments/?author=Christian&content=cool&date=2010-01-10
+    
+    # retrieve a comment (retrieves one comment as JSON document or 404)
+    GET /comments/<id>
+    
+    # update a comment
+    POST /comments/<id>?content=notcool
+    
+    # delete a comment
+    DELETE /comments/<id>
+    # or (in case DELETE is not working as e.g. in JS)
+    POST /comments/<id>?method=DELETE
+    
+    # finding comments (returns a JSON list of comment documents)
+    GET /comments/?author=Christian
+    
+We can also protect these calls by adding another parameters ``oauth_token``. Before that
+we need to retrieve the token from the authorization server in an OAuth 2.0 flow described
+below.
+
+Defining the RESTful adapter
+----------------------------
+
+The RESTful adapter is not WSGI dependant in itself but there are addons which provide
+e.g. WSGI compliance in that they receive an ``environ`` and ``start_response`` parameter
+and know what the prefix path of the server is (``comments`` in our case).
+
+They will dispatch it into individual methods to be called on the actual adapter.
+
+The RESTful adapter is initialized with the data store instance we used above. That
+means that it does not need that much more information except an Authorization Policy.
+If this is not provided then the API is publically accessible.
+
+Here is the adapter definition::
+
+    class CommentsAPI(RESTAdapter):
+    
+        authz_policy = 
+        
+        
+Requirements for authorization
+------------------------------
+
+In theory the authz policy can be just a method which checks for every call being made
+if the call is allowed to be made. In our case the requirement is an access token
+which then needs to be verified by the authorization server. All GET requests can be
+public though.
+
+The big question now is how the RESTful API communicates with the authz server as
+it can be a separate server in fact.
+
+Let us summarize the requirements:
+
+* A comment or the list of comments can be retrieved by anybody. No policy needed here
+* A comment can be created by any user who is identified (we need the author)
+* A comment can only be deleted by an admin
+* A comment can only be changed by the user and the admin
+
+Lets assume a blog example where the commenting is injected via AJAX. Here the 
+comments are fetched by Javascript via a GET request to the RESTful API. This should
+work simply via JSONP (which is supported automatically by the adapter).
+
+Now if a user wants to add a comment he has two options: Provide the information manually
+in a form or login via twitter and facebook to retrieve the data and maybe have a user id.
+
+The latter might be done using a user manager which will also store the user's information. Here the iframe trick of obtaining that data is used. The commenting JS
+will end up with a user id in that case. Moreover the user manager also acts as an
+authz manager which can provide an access token with the user id.
+
+So the commenting JS will have::
+
+    {
+        fullname: 'Christian',
+        access_token: 'cz8s7ch8c7sh8cs7hcso8s7chsocgcsocs7g',
+        uid: 12631,
+        perms: ['add']
+    }
+
+     
+Now it can send the access token with the POST request for creating a new comment maybe
+including the fullname and/or UID as well.
+
+The administrator would login as well and will receive a different access token
+which will grant him more access the "delete" perm.
+
+So if the commenting API receives a DELETE request it will then check if the
+'delete' perm is attached to the given access token by asking the authz server::
+
+    GET http://authzserver/<app_id>/<access token>?url=???
+    
+which will result in some metadata including a ``perms`` list of permissions.
+
+How does the authz server know about the URL to be used? And is it the page URL it needs to know? This actually might be more a page id and the question is here how dynamic the
+authz server should be.
+
+But we can assume that it is just a method checking it which knows about the application
+space. Thus when registering the commenting JS also needs to register this page id.
+
+
+        
+    
+
