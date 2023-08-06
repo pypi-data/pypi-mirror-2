@@ -1,0 +1,239 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2009, Purdue University
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 
+# Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# Redistributions in binary form must reproduce the above copyright notice, this
+# list of conditions and the following disclaimer in the documentation and/or
+# other materials provided with the distribution.
+# 
+# Neither the name of the Purdue University nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+"""Tree sync tool for Roster"""
+
+
+__copyright__ = 'Copyright (C) 2009, Purdue University'
+__license__ = 'BSD'
+__version__ = '0.15'
+
+
+import sys
+import shutil
+import os
+import tarfile
+
+from optparse import OptionParser
+import ConfigParser
+
+def main(args):
+  """Collects command line arguments. Exports tree.
+
+  Inputs:
+    args: list of arguments from the command line
+  """
+  usage = ('\n'
+           '\n'
+           'To sync bind trees:\n'
+           '\t%s -i <audit-id> [-c <config-file>] [-d <dest-directory>]\n'
+           '\t[-u <rsync-user>] [-p <rsync-port>]\n' % sys.argv[0])
+
+  parser = OptionParser(version='%%prog (Roster %s)' % __version__, usage=usage)
+
+  parser.add_option('-c', '--config-file', action='store', dest='config_file',
+                    help='Config File Location', metavar='<config-file>',
+                    default='/etc/roster/roster_server.conf')
+  parser.add_option('-d', '--destination-directory',
+                    dest='destination_directory',
+                    help='Destination directory on dns servers.',
+                    metavar='<destination-directory>',
+                    default=None)
+  parser.add_option('-i', '--id', dest='id',
+                    help='ID of tarfile output from Roster tree export.',
+                    metavar='<id>', default=None)
+  parser.add_option('-u', '--user-name', action='store', dest='user_name',
+                    help='Rsync username.', metavar='<user-name>',
+                    default=None)
+  parser.add_option('--rsync-port', action='store', dest='port',
+                    help='Rsync port number.', metavar='<port>',
+                    default=None)
+  parser.add_option('--ssh-port', action='store', dest='ssh_port',
+                    help='SSH port number.', metavar='<ssh-port>',
+                    default=None)
+  parser.add_option('--ssh-id', action='store', dest='ssh_id',
+                    help='SSH id file.', metavar='<ssh-id>',
+                    default=None)
+  parser.add_option('-r', '--rsync-exec', action='store', dest='rsync_exec',
+                    help='Rsync executable location.', metavar='<rsync-exec>',
+                    default='rsync')
+  parser.add_option('--rndc-exec', action='store', dest='rndc_exec',
+                    help='Rndc executable location.', metavar='<rndc-exec>',
+                    default='/usr/sbin/rndc')
+  parser.add_option('--rndc-key', action='store', dest='rndc_key',
+                    help='Rndc key file.', metavar='<rndc-key>',
+                    default=None)
+  parser.add_option('--rndc-conf', action='store', dest='rndc_conf',
+                    help='Rndc conf file.', metavar='<rndc-conf>',
+                    default=None)
+  parser.add_option('-s', '--ssh-exec', action='store', dest='ssh_exec',
+                    help='SSH executable location.', metavar='<ssh-exec>',
+                    default='ssh')
+
+  (globals()["options"], args) = parser.parse_args(args)
+
+  
+  server_config_file = ConfigParser.SafeConfigParser()
+
+  server_config_file.read(options.config_file)
+
+
+  backup_directory = server_config_file.get(
+      'exporter', 'backup_dir').rstrip('/')
+  temp_root_directory = server_config_file.get(
+      'exporter', 'root_config_dir').rstrip('/')
+  if( not os.path.exists(temp_root_directory) ):
+    os.makedirs(temp_root_directory)
+  if( not options.destination_directory ):
+    options.destination_directory = server_config_file.get(
+        'exporter', 'named_dir')
+  if( options.rndc_key ):
+    if( options.rndc_key.startswith('./')
+        or not options.rndc_key.startswith('/') ):
+      options.rndc_key = '%s/%s' % (os.getcwd(), options.rndc_key.lstrip('./'))
+    options.rndc_exec = '%s -k %s' % (
+        options.rndc_exec, os.path.expanduser(options.rndc_key))
+  if( options.rndc_conf ):
+    if( options.rndc_conf.startswith('./')
+        or not options.rndc_conf.startswith('/') ):
+      options.rndc_conf = '%s/%s' % (os.getcwd(), options.rndc_conf.lstrip('./'))
+    options.rndc_exec = '%s -c %s' % (
+        options.rndc_exec, os.path.expanduser(options.rndc_conf))
+
+  file_list = os.listdir(backup_directory)
+  error_files = []
+  if( options.id ):
+    for file_name in file_list:
+      if( not file_name.startswith('dns_tree') ):
+        continue
+      try:
+        if( file_name.split('-')[1].split('.')[0] == options.id ):
+          tar = tarfile.open('%s/%s' % (
+              backup_directory, file_name))
+          tar.extractall()
+          tar.close()
+          root_directory = '%s_%s' % (temp_root_directory, options.id)
+          if( root_directory.startswith('./') ):
+            root_directory = '%s/%s' % (os.getcwd(),
+                                        root_directory.lstrip('./'))
+          shutil.move(temp_root_directory, root_directory)
+          break
+      except IndexError:
+        error_files.append(file_name)
+        continue
+        # If this error occurs, skip if correct numbered file is found.
+    else:
+      # No break, could mean wrong filenames or nonexistant
+      if( error_files ):
+        print 'ERROR: Filenames: %s not named correctly' % ', '.join(error_files)
+      else:
+        print 'ERROR: ID %s not found.' % options.id
+      sys.exit(1)
+  else:
+    newest = 0 
+    new_file_name = None
+    for file_name in file_list:
+      if( not file_name.startswith('dns_tree') ):
+        continue
+      try:
+        id = int(file_name.split('-')[1].split('.')[0])
+      except IndexError:
+        error_files.append(file_name)
+        break
+        # If this error occurs, error out completely
+      if( id > newest ):
+        newest = id
+        new_file_name = file_name
+    if( error_files ):
+      print 'ERROR: Filenames: %s not named correctly' % ', '.join(error_files)
+      sys.exit(1)
+    if( new_file_name is None ):
+      print ('ERROR: An unknown error has occurred trying to find the newest '
+             'file.')
+    tar = tarfile.open('%s/%s' % (backup_directory, new_file_name))
+    tar.extractall()
+    tar.close()
+    root_directory = '%s_%s' % (temp_root_directory, options.id)
+    shutil.move(temp_root_directory, root_directory)
+
+  try:
+    if( options.ssh_port ):
+      options.ssh_exec = '\'%s -p %s\'' % (options.ssh_exec, options.ssh_port)
+    if( options.ssh_id ):
+      options.ssh_exec = '\'%s -i %s\'' % (options.ssh_exec, options.ssh_id)
+    dns_server_sets = None
+    file_dict = {}
+    for server_set in os.listdir(root_directory):
+      config_parser = ConfigParser.SafeConfigParser()
+      config_file_handle = config_parser.read('%s/%s/named/%s' % (
+          root_directory, server_set,
+          server_set.replace('servers', 'config')))
+      for dns_server in config_parser.get(
+            'dns_server_set_parameters', 'dns_servers').split(','):
+        rsync_dir = '%s/%s/*' % (os.path.expanduser(root_directory), server_set)
+        rsync_url_parts = []
+        if( options.user_name ):
+          rsync_url_parts.append('%s@' % options.user_name)
+        rsync_url_parts.append(dns_server)
+        if( options.port ):
+          rsync_url_parts.append(':%s' % options.port)
+        rsync_url_string = ''.join(rsync_url_parts)
+        print 'Connecting to rsync on "%s"' % dns_server
+        rsync_string = '%s -avz -e %s %s %s:%s -r' % (
+            options.rsync_exec, options.ssh_exec,
+            rsync_dir,
+            rsync_url_string,
+            options.destination_directory)
+        handle = os.popen(rsync_string)
+        rsync_text = handle.read()
+        handle.close()
+
+        if( rsync_text != ''):
+          print rsync_text
+
+        print 'Connecting to ssh on "%s"' % dns_server
+        ssh_string = '%s %s \'%s reload\'' % (options.ssh_exec.strip('\''),
+                                              rsync_url_string,
+                                              options.rndc_exec)
+
+        handle = os.popen(ssh_string)
+        ssh_text = handle.read()
+        handle.close()
+
+        if( ssh_text != ''):
+          print ssh_text
+  finally:
+    if( os.path.exists(root_directory) ):
+      shutil.rmtree(root_directory)
+    if( os.path.exists(temp_root_directory) ):
+      shutil.rmtree(temp_root_directory)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
