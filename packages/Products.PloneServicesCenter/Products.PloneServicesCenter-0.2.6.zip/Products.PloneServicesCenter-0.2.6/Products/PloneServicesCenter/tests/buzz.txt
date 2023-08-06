@@ -1,0 +1,90 @@
+.. -*-doctest-*-
+
+====
+Buzz
+====
+
+Start with a portal.
+
+    >>> from Products.PloneServicesCenter import testing
+    >>> app = testing.SERVICES_FUNCTIONAL_TESTING['app']
+    >>> portal = testing.SERVICES_FUNCTIONAL_TESTING['portal']
+
+Open a browser and log in as a user who can add content.
+
+    >>> from plone.testing import z2
+    >>> browser = z2.Browser(app)
+    >>> browser.handleErrors = False
+    >>> browser.open(portal.absolute_url())
+
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl('Login Name').value = 'test-user'
+    >>> browser.getControl('Password').value = 'secret'
+    >>> browser.getControl('Log in').click()
+
+Go to the buzz folder and add a buz object inside.
+
+    >>> browser.open(portal.news.buzz.absolute_url())
+    >>> browser.getLink(url='createObject?type_name=Buzz').click()
+    >>> browser.getControl('Title').value = 'Foo Buzz Title'
+    >>> browser.getControl('Description').value = 'Foo Buzz Description'
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('Transportation and Logistics').selected = True
+    >>> browser.getControl('URL').value = 'http://foo.example.com'
+    >>> browser.getControl('Save').click()
+    >>> print browser.contents
+    <...
+                <dd>Changes saved.</dd>...
+    >>> browser.url
+    'http://nohost/plone/news/buzz/foo-buzz-title'
+    >>> portal.news.buzz.contentValues()
+    [<Buzz at /plone/news/buzz/foo-buzz-title>]
+    >>> buzz = portal.news.buzz['foo-buzz-title']
+
+Tolerate uppercase country codes.
+
+    >>> z2.login(app.acl_users, 'admin')
+    >>> buzz.update(country=buzz.getCountry().upper())
+    >>> import transaction
+    >>> transaction.commit()
+
+After the buzz is now visible on the listing.
+
+    >>> browser.open(portal.news.buzz.absolute_url())
+    >>> print browser.contents
+    <...Foo Buzz Title...
+    ...Foo Buzz Description...
+
+The countries are selectable by the human readable country name.
+
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('Filter').click()
+    >>> print browser.contents
+    <...Foo Buzz Title...
+    ...Foo Buzz Description...
+
+The listing is a clickable link which takes the user to the item.
+
+    >>> browser.getLink('Foo Buzz Title').click()
+    >>> print browser.contents
+    <...Foo Buzz Title...
+    ...Foo Buzz Description...
+    ...http://foo.example.com...
+    >>> browser.url
+    'http://nohost/plone/news/buzz/foo-buzz-title'
+
+The description is only shown twice, once in the <head> and once in
+the <body>.
+
+    >>> browser.contents.count('Foo Buzz Description')
+    2
+
+The industry and country links to the folder view with the appropriate
+filter.
+
+    >>> browser.getLink('Transportation and Logistics')
+    <Link text='Transportation and Logistics'
+    url='http://nohost/plone/news/buzz?industries:list=Transportation%20and%20Logistics'>
+    >>> browser.getLink('United Kingdom')
+    <Link text='United Kingdom'
+    url='http://nohost/plone/news/buzz?countries:list=gb'>
