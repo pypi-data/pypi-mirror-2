@@ -1,0 +1,409 @@
+==========================================
+gecode-python - Gecode bindings for Python
+==========================================
+
+Requirements
+============
+
+  * Python 2.7 (not tested with other versions)
+  * Cython >= 0.14.1 for building
+  * Gecode 3.6.0
+
+Installation
+============
+
+To install globally:
+
+  python setup.py install
+
+or to install in your home directory:
+
+  python setup.py install --prefix $HOME
+
+which would install the package under ~/lib/python2.7/site-packages (if using
+version 2.7 of Python).  If you install in your home, you also need to adjust
+environment variable PYTHONPATH to search in $HOME/python2.7 and
+$HOME/python2.7/size-packages.
+
+If Gecode is installed in a non standard location, before you can build and
+install, you need to adjust environment variables CXXFLAGS, LDFLAGS, and
+LD_LIBRARY_PATH.
+
+Usage
+=====
+
+There are many constants in the gecode package.  It is probably easiest to
+import everything:
+
+    from gecode import *
+
+IntSet
+~~~~~~
+
+intset(int,int)
+intset(SPEC)
+    returns an IntSet for the corresponding domain.  SPEC is a list of ints and
+    pairs of ints (interval).  It might be tempting to simply represent an
+    intset as a list of specs, but this would be ambiguous with IntArgs which,
+    here, are represented as lists of ints.
+
+Space
+~~~~~
+
+space()
+    this function that creates a Space.
+
+Variables
+~~~~~~~~~
+
+Unlike in Gecode, variable objects are not bound to a specific Space.  Each one
+actually contains an index with which it is possible to access a Space-bound
+Gecode variable.  Variables can be created using the following methods of a
+Space:
+
+Space.intvar(int,int)
+Space.intvar(IntSet)
+    returns an IntVar initialized with the corresponding domain.
+
+Space.boolvar()
+    returns a BoolVar initialized with the domain [0,1]
+
+Space.setvar(int glbMin, int glbMax, int lubMin, int lubMax, int cardMin=MIN, int cardMax=MAX)
+Space.setvar(int glbMin, int glbMax, IntSet lub, int cardMin=MIN, int cardMax=MAX)
+Space.setvar(IntSet glb, int lubMin, int lubMax, int cardMin=MIN, int cardMax=MAX)
+Space.setvar(IntSet glb, IntSet lub, int cardMin=MIN, int cardMax=MAX)
+    returns a SetVar initialized with the corresponding domain.
+
+Space.intvars(int N, ...)
+Space.boolvars(int N)
+Space.setvars(int N, ...)
+    returns a list of N variables initialized with the domain as stipulated by
+    the remaining arguments "...".
+
+An advantage of non Space-bound variables, is that you can use them both to
+post constraints in the original space AND to consult their values in
+solutions.  Below are Space methods for looking up information about variables.
+Each of these methods can either take a variable as argument, or a list (or
+tuple) of variables, and returns resp. either a value, or a list of values:
+
+Space.assigned(X)
+    returns True if variable X is assigned (determined) in the Space, False
+    otherwise.
+
+Space.min(X)
+Space.max(X)
+Space.med(X)
+Space.val(X)
+Space.size(X)
+Space.width(X)
+Space.regret_min(X)
+Space.regret_max(X)
+    These can be used for both IntVars and BoolVars and have the same meaning
+    as in Gecode.
+
+Space.ranges(IntVar)
+Space.values(IntVar)
+    Return resp. a list of pairs and a list of ints representing the domain of
+    the argument variable.
+
+Space.glbSize(SetVar)
+Space.lubSize(SetVar)
+Space.unknownSize(SetVar)
+Space.cardMin(SetVar)
+Space.cardMax(SetVar)
+Space.lubMin(SetVar)
+Space.lubMax(SetVar)
+Space.glbMin(SetVar)
+Space.glbMax(SetVar)
+    These can be used for SetVars and have the same meaning as in Gecode.
+
+Space.glbRanges(SetVar)
+Space.lubRanges(SetVar)
+Space.unknownRanges(SetVar)
+    These return lists of pairs of ints representing the corresponding set
+    bounds.
+
+Space.glbValues(SetVar)
+Space.lubValues(SetVar)
+Space.unknownValues(SetVar)
+    These return lists of ints representing the corresponding set bounds.
+
+Search
+~~~~~~
+
+Space.search()
+    returns an iterator of solutions.  Each solution is a Space.
+
+In order to search for optimal solutions, it is necessary to indicate what
+needs to be optimized:
+
+Space.minimize(IntVar x)
+Space.maximize(IntVar x)
+    search for a solution minimizing (resp. maximizing) x.
+Space.minimize(IntVar x,IntVar y)
+Space.maximize(IntVar x,IntVar y)
+    search for a solution minimizing (resp. maximizing) the ration x/y.
+
+Bound Variables
+~~~~~~~~~~~~~~~
+
+A bound variable is essentially a pair of non-bound variable and a Space.
+
+IntVal.__call__(Space)
+BoolVar.__call__(Space)
+SetVar.__call__(Space)
+    a bound variable can be created by applying a non-bound variable to a
+    Space.
+
+Space.bind(X)
+    These returns a bound variable for X; if X is a list of variables, this
+    returns a list of bound variables.
+
+Constants
+~~~~~~~~~
+
+All constants used in Gecode are available with the same names in these
+bindings.
+
+Constraints
+~~~~~~~~~~~
+
+In Gecode, all constraints take a space as first argument.  In these bindings,
+all constraints are methods of Space.  Everywhere Gecode would use an XXXArgs
+argument, here, you should simply use a list (or tuple) of XXX.  In the
+following, we will write [XXX] to represent the type of list of (or tuple of)
+XXX.  All gecode constraints are available (except "extensional", which are not
+yet implemented).  All branchings are available except those with parameters
+that require additional implementation in C++.
+
+Space.dom(IntVar,int,IntConLevel=ICL_DEF)
+Space.dom([IntVar],int,IntConLevel=ICL_DEF)
+Space.dom(IntVar,int,int,IntConLevel=ICL_DEF)
+Space.dom([IntVar],int,int,IntConLevel=ICL_DEF)
+Space.dom(IntVar,IntSet,IntConLevel=ICL_DEF)
+Space.dom([IntVar],IntSet,IntConLevel=ICL_DEF)
+Space.dom(IntVar,int,BoolVar,IntConLevel=ICL_DEF)
+Space.dom(IntVar,int,int,BoolVar,IntConLevel=ICL_DEF)
+Space.dom(IntVar,IntSet,BoolVar,IntConLevel=ICL_DEF)
+
+Space.rel(IntVar,IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.rel([IntVar],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.rel(IntVar,IntRelType,int,IntConLevel=ICL_DEF)
+Space.rel([IntVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.rel(IntVar,IntRelType,IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.rel(IntVar,IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.rel([IntVar],IntRelType,IntConLevel=ICL_DEF)
+Space.rel([IntVar],IntRelType,[IntVar],IntConLevel=ICL_DEF)
+
+Space.rel(BoolVar,IntRelType,BoolVar,IntConLevel=ICL_DEF)
+Space.rel(BoolVar,IntRelType,BoolVar,BoolVar,IntConLevel=ICL_DEF)
+Space.rel([BoolVar],IntRelType,BoolVar,IntConLevel=ICL_DEF)
+Space.rel(BoolVar,IntRelType,int,IntConLevel=ICL_DEF)
+Space.rel(BoolVar,IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.rel([BoolVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.rel([BoolVar],IntRelType,[BoolVar],IntConLevel=ICL_DEF)
+Space.rel([BoolVar],IntRelType,IntConLevel=ICL_DEF)
+Space.rel(BoolVar,BoolOpType,BoolVar,BoolVar,IntConLevel=ICL_DEF)
+Space.rel(BoolVar,BoolOpType,BoolVar,int,IntConLevel=ICL_DEF)
+Space.rel(BoolOpType,[BoolVar],BoolVar,IntConLevel=ICL_DEF)
+Space.rel(BoolOpType,[BoolVar],int,IntConLevel=ICL_DEF)
+
+Space.clause(BoolOpType,[BoolVar],[BoolVar],BoolVar,IntConLevel=ICL_DEF)
+Space.clause(BoolOpType,[BoolVar],[BoolVar],int,IntConLevel=ICL_DEF)
+
+Space.precede([IntVar],int,int,IntConLevel=ICL_DEF)
+Space.precede([IntVar],[int],IntConLevel=ICL_DEF)
+
+Space.element([int],IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.element([int],IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.element([int],IntVar,int,IntConLevel=ICL_DEF)
+Space.element([IntVar],IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.element([IntVar],IntVar,int,IntConLevel=ICL_DEF)
+Space.element([BoolVar],IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.element([BoolVar],IntVar,int,IntConLevel=ICL_DEF)
+Space.element([int],IntVar,int,IntVar,int,IntVar,IntConLevel=ICL_DEF)
+Space.element([int],IntVar,int,IntVar,int,BoolVar,IntConLevel=ICL_DEF)
+Space.element([IntVar],IntVar,int,IntVar,int,IntVar,IntConLevel=ICL_DEF)
+Space.element([BoolVar],IntVar,int,IntVar,int,BoolVar,IntConLevel=ICL_DEF)
+
+Space.distinct([IntVar],IntConLevel=ICL_DEF)
+Space.distinct([int],[IntVar],IntConLevel=ICL_DEF)
+
+Space.channel([IntVar],[IntVar],IntConLevel=ICL_DEF)
+Space.channel([IntVar],int,[IntVar],int,IntConLevel=ICL_DEF)
+Space.channel(BoolVar,IntVar,IntConLevel=ICL_DEF)
+Space.channel(IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.channel([BoolVar],IntVar,int,IntConLevel=ICL_DEF)
+
+Space.sorted([IntVar],[IntVar],IntConLevel=ICL_DEF)
+Space.sorted([IntVar],[IntVar],[IntVar],IntConLevel=ICL_DEF)
+
+Space.count([IntVar],int,IntRelType,int,IntConLevel=ICL_DEF)
+Space.count([IntVar],IntVar,IntRelType,int,IntConLevel=ICL_DEF)
+Space.count([IntVar],[int],IntRelType,int,IntConLevel=ICL_DEF)
+Space.count([IntVar],int,IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.count([IntVar],IntVar,IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.count([IntVar],[int],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.count([IntVar],[IntVar],IntConLevel=ICL_DEF)
+Space.count([IntVar],[IntSet],IntConLevel=ICL_DEF)
+Space.count([IntVar],[IntVar],[int],IntConLevel=ICL_DEF)
+Space.count([IntVar],[IntSet],[int],IntConLevel=ICL_DEF)
+Space.count([IntVar],IntSet,[int],IntConLevel=ICL_DEF)
+
+Space.sequence([IntVar],IntSet,int,int,int,IntConLevel=ICL_DEF)
+Space.sequence([BoolVar],IntSet,int,int,int,IntConLevel=ICL_DEF)
+
+Space.min(IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.min([IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.max(IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.max([IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.abs(IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.mult(IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.sqr(IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.sqrt(IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.divmod(IntVar,IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.div(IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.mod(IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+
+Space.linear([IntVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.linear([IntVar],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.linear([IntVar],IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([IntVar],IntRelType,IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([int],[IntVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.linear([int],[IntVar],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.linear([int],[IntVar],IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([int],[IntVar],IntRelType,IntVar,BoolVar,IntConLevel=ICL_DEF)
+
+Space.linear([BoolVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.linear([BoolVar],IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([BoolVar],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.linear([BoolVar],IntRelType,IntVar,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([int],[BoolVar],IntRelType,int,IntConLevel=ICL_DEF)
+Space.linear([int],[BoolVar],IntRelType,int,BoolVar,IntConLevel=ICL_DEF)
+Space.linear([int],[BoolVar],IntRelType,IntVar,IntConLevel=ICL_DEF)
+Space.linear([int],[BoolVar],IntRelType,IntVar,BoolVar,IntConLevel=ICL_DEF)
+
+Space.binpacking([IntVar],[IntVar],[int],IntConLevel=ICL_DEF)
+
+Space.nooverlap([IntVar],[int],[IntVar],[int],IntConLevel=ICL_DEF)
+Space.nooverlap([IntVar],[int],[IntVar],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.nooverlap([IntVar],[IntVar],[IntVar],[IntVar],[IntVar],[IntVar],IntConLevel=ICL_DEF)
+Space.nooverlap([IntVar],[IntVar],[IntVar],[IntVar],[IntVar],[IntVar],[BoolVar],IntConLevel=ICL_DEF)
+
+Space.cumulatives([IntVar],[IntVar],[IntVar],[IntVar],[IntVar],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([int],[IntVar],[IntVar],[IntVar],[IntVar],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([IntVar],[IntVar],[int],[IntVar],[IntVar],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([int],[IntVar],[int],[IntVar],[IntVar],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([IntVar],[IntVar],[IntVar],[IntVar],[int],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([int],[IntVar],[IntVar],[IntVar],[int],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([IntVar],[IntVar],[int],[IntVar],[int],[int],bool,IntConLevel=ICL_DEF)
+Space.cumulatives([int],[IntVar],[int],[IntVar],[int],[int],bool,IntConLevel=ICL_DEF)
+
+Space.unary([IntVar],[int],IntConLevel=ICL_DEF)
+Space.unary([IntVar],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.unary([TaskType],[IntVar],[int],IntConLevel=ICL_DEF)
+Space.unary([TaskType],[IntVar],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.unary([IntVar],[IntVar],[IntVar],IntConLevel=ICL_DEF)
+Space.unary([IntVar],[IntVar],[IntVar],[BoolVar],IntConLevel=ICL_DEF)
+
+Space.cumulative(int,[TaskType],[IntVar],[int],[int],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[TaskType],[IntVar],[int],[int],IntConLevel=ICL_DEF)
+Space.cumulative(int,[TaskType],[IntVar],[int],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[TaskType],[IntVar],[int],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.cumulative(int,[IntVar],[int],[int],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[IntVar],[int],[int],IntConLevel=ICL_DEF)
+Space.cumulative(int,[IntVar],[int],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[IntVar],[int],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.cumulative(int,[IntVar],[IntVar],[IntVar],[int],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[IntVar],[IntVar],[IntVar],[int],IntConLevel=ICL_DEF)
+Space.cumulative(int,[IntVar],[IntVar],[IntVar],[int],[BoolVar],IntConLevel=ICL_DEF)
+Space.cumulative(IntVar,[IntVar],[IntVar],[IntVar],[int],[BoolVar],IntConLevel=ICL_DEF)
+
+Space.circuit([IntVar],IntConLevel=ICL_DEF)
+Space.circuit(int,[IntVar],IntConLevel=ICL_DEF)
+Space.circuit([int],[IntVar],[IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.circuit([int],int,[IntVar],[IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.circuit([int],[IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.circuit([int],int,[IntVar],IntVar,IntConLevel=ICL_DEF)
+
+Space.path([IntVar],IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.path(int,[IntVar],IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.path([int],[IntVar],IntVar,IntVar,[IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.path([int],int,[IntVar],IntVar,IntVar,[IntVar],IntVar,IntConLevel=ICL_DEF)
+Space.path([int],[IntVar],IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+Space.path([int],int,[IntVar],IntVar,IntVar,IntVar,IntConLevel=ICL_DEF)
+
+Space.unshare([IntVar],IntConLevel=ICL_DEF)
+Space.unshare([BoolVar],IntConLevel=ICL_DEF)
+
+Space.branch([IntVar],IntVarBranch,IntValBranch)
+Space.branch(IntVar,IntValBranch)
+Space.branch([BoolVar],IntVarBranch,IntValBranch)
+Space.branch(BoolVar,IntValBranch)
+
+Space.assign([IntVar],IntAssign)
+Space.assign(IntVar,IntAssign)
+Space.assign([BoolVar], IntAssign)
+Space.assign(BoolVar,IntAssign)
+
+Space.dom(SetVar,SetRelType,int)
+Soace.dom(SetVar,SetRelType,int,int)
+Space.dom(SetVar,SetRelType,IntSet)
+Space.dom(SetVar,SetRelType,int,BoolVar)
+Space.dom(SetVar,SetRelType,int,int,BoolVar)
+Space.dom(SetVar,SetRelType,IntSet,BoolVar)
+
+Space.cardinality(SetVar,int,int)
+
+Space.rel(SetVar,SetRelType,SetVar)
+Space.rel(SetVar,SetRelType,SetVar,BoolVar)
+Space.rel(SetVar,SetRelType,IntVar)
+Space.rel(IntVar,SetRelType,SetVar)
+Space.rel(SetVar,SetRelType,IntVar,BoolVar)
+Space.rel(IntVar,SetRelType,SetVar,BoolVar)
+Space.rel(SetVar,IntRelType,IntVar)
+Space.rel(IntVar,IntRelType,SetVar)
+
+Space.rel(SetVar,SetOpType,SetVar,SetRelType,SetVar)
+Space.rel(SetOpType,[SetVar],SetVar)
+Space.rel(SetOpType,[SetVar],IntSet,SetVar)
+Space.rel(SetOpType,[IntVar],IntSet,SetVar)
+Space.rel(SetOpType,[IntVar],SetVar)
+Space.rel(IntSet,SetOpType,SetVar,SetRelType,SetVar)
+Space.rel(SetVar,SetOpType,IntSet,SetRelType,SetVar)
+Space.rel(SetVar,SetOpType,SetVar,SetRelType,IntSet)
+Space.rel(IntSet,SetOpType,SetVar,SetRelType,IntSet)
+Space.rel(SetVar,SetOpType,IntSet,SetRelType,IntSet)
+
+Space.convex(SetVar)
+Space.convex(SetVar,SetVar)
+
+Space.atmostOne([SetVar],int)
+
+Space.min(SetVar,IntVar)
+Space.notMin(SetVar,IntVar)
+Space.min(SetVar,IntVar,BoolVar)
+Space.max(SetVar,IntVar)
+Space.notMax(SetVar,IntVar)
+Space.max(SetVar,IntVar,BoolVar)
+Space.channelSorted([IntVar],SetVar)
+Space.channel([IntVar],[SetVar])
+Space.channel([BoolVar],SetVar)
+Space.cardinality(SetVar,IntVar)
+Space.weights([int],[int],SetVar,IntVar)
+
+Space.precede([SetVar],int,int)
+Space.precede([SetVar],[int])
+
+Space.element(SetOpType,[SetVar],SetVar,SetVar,IntSet=IntSet(MIN,MAX))
+Space.element(SetOpType,[IntSet],SetVar,SetVar,IntSet=IntSet(MIN,MAX))
+Space.element([SetVar],IntVar,SetVar)
+Space.element([IntSet],IntVar,SetVar)
+Space.element([IntSet],IntVar,int,IntVar,int,SetVar)
+Space.element([SetVar],IntVar,int,IntVar,int,SetVar)
+
+Space.branch([SetVar],SetVarBranch,SetValBranch)
+Space.branch(SetVar,SetValBranch)
+
+Space.assign([SetVar],SetAssign)
+Space.assign(SetVar,SetAssign)
