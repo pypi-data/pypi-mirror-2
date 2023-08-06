@@ -1,0 +1,69 @@
+{% load i18n %}<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>{% block helpdesk_title %}Helpdesk{% endblock %} :: {% trans "Powered by django-helpdesk" %}</title>
+        <script src='{{ MEDIA_URL }}helpdesk/jquery-1.5.min.js' type='text/javascript' language='javascript'></script>
+        <script src='{{ MEDIA_URL }}helpdesk/jquery-ui-1.8.9.custom.min.js' type='text/javascript' language='javascript'></script>
+        <link rel='stylesheet' href='{{ MEDIA_URL }}helpdesk/helpdesk.css' type='text/css' />
+        <link rel='stylesheet' href='{{ MEDIA_URL }}helpdesk/jquery-smoothness-theme/jquery-ui-1.8.9.custom.css' type='text/css' />
+        <link rel='alternate' href='{% url helpdesk_rss "user" %}{{ user.username }}/' type='application/rss+xml' title='{% trans "My Open Tickets" %}' />
+        <link rel='alternate' href='{% url helpdesk_rss "recent_activity" %}' type='application/rss+xml' title='{% trans "All Recent Activity" %}' />
+        <link rel='alternate' href='{% url helpdesk_rss "unassigned" %}' type='application/rss+xml' title='{% trans "Unassigned Tickets" %}' />
+        <script type="text/javascript">
+        $(document).ready(function(){
+
+            // hide queryloadheader div by default
+            $("#queryloadheader").hide();
+            
+            // toggle the event
+            $("#toggle_query").click(function(){
+            }).toggle( function() {
+                $("#queryloadheader").show();
+            }, function() {
+                $("#queryloadheader").hide();
+            });
+    
+        });
+        </script>
+        {% block helpdesk_head %}{% endblock %}
+    </head>
+    <body>
+        <div id='container'>
+            <div id='header'>
+                <h1>{% trans "Helpdesk" %}</h1>
+                <ul>
+                    <li><a href='{% url helpdesk_dashboard %}'>{% trans "Dashboard" %}</a></li>
+                    <li><a href='{% url helpdesk_list %}'>{% trans "Tickets" %}</a></li>
+                    <li><a href='{% url helpdesk_submit %}'>{% trans "New Ticket" %}</a></li>
+                    <li><a href='{% url helpdesk_report_index %}'>{% trans "Stats" %}</a></li>
+                    {% if user_saved_queries %}
+                        <li><a href="#queryloadheader" id="toggle_query">Load Saved Query</a></li>
+                    {% endif %}
+                    <li><a href='{% url logout %}'>{% trans "Logout" %}</a></li>
+                    {% if not query %}<li><form id='searchform' method='get' action='{% url helpdesk_list %}'><input type='text' name='q' size='10' class='input' value='{% trans "Search..." %}' id='search_query' onFocus='s=document.getElementById("search_query");if (s.value == "{% trans "Search..." %}") { s.value = ""; }' title='{% trans "Enter a keyword, or a ticket number to jump straight to that ticket." %}'/><input type='hidden' name='status' value='1' /><input type='hidden' name='status' value='2' /><input type='hidden' name='status' value='3' /><input type='hidden' name='search_type' value='header' />{% csrf_token %}</form></li>{% endif %}
+                </ul>
+            </div>
+
+            {% if user_saved_queries %}            
+            <div id="queryloadheader" style="float:right; padding: 20px; background:#ECF1EF; ">
+                <form method='get' action='{% url helpdesk_list %}'>
+                <label for='id_query_selector'>{% trans "Query" %}</label> <select name='saved_query' id='id_query_selector' />
+                    {% for q in user_saved_queries %}
+                    <option value='{{ q.id }}'>{{ q.title }}{% if q.shared %} (Shared{% ifnotequal user q.user %} by {{ q.user.username }}{% endifnotequal %}){% endif %}</option>
+                    {% endfor %}
+                </select>
+                <input type='submit' value='{% trans "Run Query" %}'>
+                {% csrf_token %}</form>
+            </div>            
+            {% endif %}            
+            
+            <div id='body'>
+                {% block helpdesk_body %}{% endblock %}
+            </div>
+            <div id='footer'>
+                <p>{% trans "Powered by <a href='https://github.com/rossp/django-helpdesk'>django-helpdesk</a>." %} {% if user.is_staff %}{% load svn_revision %}{% helpdesk_svn_revision %}{% endif %} <a href='{% url helpdesk_rss_index %}'><img src='{{ MEDIA_URL }}helpdesk/rss_icon.png' width='14' height='14' alt='{% trans "RSS Icon" %}' title='{% trans "RSS Feeds" %}' border='0' />{% trans "RSS Feeds" %}</a> <a href='{% url helpdesk_api_help %}'>{% trans "API" %}</a> <a href='{% url helpdesk_user_settings %}'>{% trans "User Settings" %}</a> {% if user.is_superuser %}<a href='{% url helpdesk_system_settings %}'>{% trans "System Settings" %}</a>{% endif %}</p>
+            </div>
+        </div>
+        {% include "helpdesk/debug.html" %}
+    </body>
+</html>
