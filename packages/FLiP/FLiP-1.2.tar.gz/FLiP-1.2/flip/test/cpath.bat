@@ -1,0 +1,1 @@
+set PYTHONPATH=..\logic;%PYTHONPATH%
