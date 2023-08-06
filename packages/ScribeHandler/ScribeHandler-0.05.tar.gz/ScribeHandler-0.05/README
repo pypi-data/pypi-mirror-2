@@ -1,0 +1,59 @@
+ScribeHandler is a simple proxy layer that works with the python standard
+logging module (http://docs.python.org/library/logging.html).  ScribeHandler
+acts a a handler object that gets added to a logger in the standard way.
+
+Important bits:
+
+When instantiating the handler, you will want to specify the connection
+setting to scribed.  The following keyword arguments are reconized (and
+defaults):
+
+Argument            Default
+---------------------------
+host                127.0.0.1
+port                1463
+category            %(hostname)s-%(loggername)s
+transport           ScribeHandler.FRAMED
+uri                 None
+
+- Host and port, should be obvious
+
+- If transport is ScribeHandler.FRAMED, then
+    thrift.transport.TTransport.TFramedTransport() is used.
+- If transport is ScribeHandler.BUFFERED, then
+    thrift.transport.TTransport.TBufferedTransport() is used.
+- If transport is ScribeHandler.HTTP then
+    thrift.transport.THttpClient.THttpClient() is used and uri MUST NOT be
+    None
+- If transport is None then you can assign any acceptable Thrift/Scribe
+    transport via 
+
+        ScirbeHandler.transport = <transport>
+
+    where <transport> is a valid Scibe/Thrift transport (this is an attempt at
+    future proofing).
+
+- category is translated into the category parameter to scribe.LogEntry()
+    object.  It should be a standard format string using mapping keys.
+    The following are the reconized mapping keys:
+
+    Key Name        Source
+    ----------------------
+    module          logging.LogRecord.module
+    levelname       logging.LogRecord.levelname
+    loggername      logging.LogRecord.name
+    processname     logging.LogRecord.processName
+    hostname        socket.gethostname()
+
+
+Here's a simple example of how to use it:
+
+import logging
+import ScribeHandler
+mylogger = logging.getLogger('ScribeLogger')
+mylogger.setLevel(logging.DEBUG)
+handler = ScribeHandler.ScribeHandler(category='%(hostname)s-%(levelname)s', file_buffer='/tmp/logbuffer')
+mylogger.addHandler(handler)
+
+mylogger.debug('stuff happens')
+
