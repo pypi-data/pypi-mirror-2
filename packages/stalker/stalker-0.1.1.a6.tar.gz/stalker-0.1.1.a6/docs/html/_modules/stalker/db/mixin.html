@@ -1,0 +1,330 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.db.mixin &mdash; Stalker v0.1.1.a6 documentation</title>
+    <link rel="stylesheet" href="../../../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1.1.a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.1.a6 documentation" href="../../../index.html" />
+    <link rel="up" title="stalker.db" href="../db.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="../../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../../stalker.html" >stalker</a> &raquo;</li>
+          <li><a href="../db.html" accesskey="U">stalker.db</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.db.mixin</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;contains helper classes which helps mixed in classes table and mapper setups</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">relationship</span><span class="p">,</span> <span class="n">synonym</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Table</span><span class="p">,</span>
+    <span class="n">Column</span><span class="p">,</span>
+    <span class="n">Date</span><span class="p">,</span>
+    <span class="n">ForeignKey</span><span class="p">,</span>
+    <span class="n">Integer</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+<span class="kn">from</span> <span class="nn">stalker.db</span> <span class="kn">import</span> <span class="n">tables</span>
+<span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">link</span><span class="p">,</span> <span class="n">status</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span>
+<div class="viewcode-block" id="ReferenceMixinDB"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.ReferenceMixinDB.html#stalker.db.mixin.ReferenceMixinDB">[docs]</a><span class="k">class</span> <span class="nc">ReferenceMixinDB</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A helper class for ReferenceMixin table and mapper setup.</span>
+<span class="sd">    </span>
+<span class="sd">    Helps setting up tables and mappers for classes mixed in with</span>
+<span class="sd">    :class:`~stalker.core.models.mixin.ReferenceMixin`</span>
+<span class="sd">    </span>
+<span class="sd">    See examples/extending/great_entity.py for an example.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="ReferenceMixinDB.setup"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.ReferenceMixinDB.html#stalker.db.mixin.ReferenceMixinDB.setup">[docs]</a>    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">class_</span><span class="p">,</span> <span class="n">class_table</span><span class="p">,</span> <span class="n">mapper_arguments</span><span class="o">=</span><span class="p">{}):</span>
+        <span class="sd">&quot;&quot;&quot;creates the necessary tables and properties for the mappers for the</span>
+<span class="sd">        mixed in class</span>
+<span class="sd">        </span>
+<span class="sd">        use the returning dictionary (mapper_arguments) in your mapper</span>
+<span class="sd">        </span>
+<span class="sd">        :param class_: the mixed in class, in other words the class which will</span>
+<span class="sd">          be extended with the mixin functionalities</span>
+<span class="sd">         </span>
+<span class="sd">        :param class_table: the table holding the information about the class</span>
+<span class="sd">        </span>
+<span class="sd">        :param mapper_arguments: incoming mapper arugments for the</span>
+<span class="sd">          SQLAlchemy.Orm.Mapper, it will be updated with the properties of the</span>
+<span class="sd">          current mixin</span>
+<span class="sd">        </span>
+<span class="sd">        :returns: a dictionary holding the mapper_arguments</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">class_name</span> <span class="o">=</span> <span class="n">class_</span><span class="o">.</span><span class="n">__name__</span>
+        
+        <span class="c"># there is no extra columns in the base table so we don&#39;t need to update</span>
+        <span class="c"># the given class_table</span>
+        
+        <span class="c"># use the given class_name and the class_table</span>
+        <span class="n">secondary_table_name</span> <span class="o">=</span> <span class="n">class_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;_references&quot;</span>
+        <span class="n">secondary_table</span> <span class="o">=</span> <span class="bp">None</span>
+        
+        <span class="c"># check if the table is already defined</span>
+        <span class="k">if</span> <span class="n">secondary_table_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">metadata</span><span class="p">:</span>
+            <span class="n">secondary_table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span>
+                <span class="n">class_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;_references&quot;</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
+                <span class="n">Column</span><span class="p">(</span>
+                    <span class="n">class_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;_id&quot;</span><span class="p">,</span>
+                    <span class="n">Integer</span><span class="p">,</span>
+                    <span class="n">ForeignKey</span><span class="p">(</span><span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                    <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+                <span class="p">),</span>
+                
+                <span class="n">Column</span><span class="p">(</span>
+                    <span class="s">&quot;reference_id&quot;</span><span class="p">,</span>
+                    <span class="n">Integer</span><span class="p">,</span>
+                    <span class="n">ForeignKey</span><span class="p">(</span><span class="n">tables</span><span class="o">.</span><span class="n">links</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                    <span class="n">primary_key</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">secondary_table</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">tables</span><span class="p">[</span><span class="n">secondary_table_name</span><span class="p">]</span>
+        
+        <span class="n">new_properties</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s">&quot;_references&quot;</span><span class="p">:</span> <span class="n">relationship</span><span class="p">(</span>
+                <span class="n">link</span><span class="o">.</span><span class="n">Link</span><span class="p">,</span>
+                <span class="n">secondary</span><span class="o">=</span><span class="n">secondary_table</span><span class="p">,</span>
+                <span class="n">primaryjoin</span><span class="o">=</span>\
+                    <span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="o">==</span>\
+                    <span class="nb">eval</span><span class="p">(</span><span class="s">&quot;secondary_table.c.&quot;</span> <span class="o">+</span> <span class="n">class_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;_id&quot;</span><span class="p">),</span>
+                <span class="n">secondaryjoin</span><span class="o">=</span>\
+                    <span class="n">secondary_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">reference_id</span><span class="o">==</span>\
+                    <span class="n">tables</span><span class="o">.</span><span class="n">links</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="s">&quot;references&quot;</span><span class="p">:</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&quot;_references&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">new_properties</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_properties</span>
+        
+        <span class="k">return</span> <span class="n">mapper_arguments</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span></div></div>
+<div class="viewcode-block" id="StatusMixinDB"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.StatusMixinDB.html#stalker.db.mixin.StatusMixinDB">[docs]</a><span class="k">class</span> <span class="nc">StatusMixinDB</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A helper class for StatusMixin table and mapper setup.</span>
+<span class="sd">    </span>
+<span class="sd">    Helps setting up tables and mappers for classes mixed in with</span>
+<span class="sd">    :class:`~stalker.core.models.mixin.StatusMixin`</span>
+<span class="sd">    </span>
+<span class="sd">    See examples/extending/statused_entity.py for an example.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="StatusMixinDB.setup"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.StatusMixinDB.html#stalker.db.mixin.StatusMixinDB.setup">[docs]</a>    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">class_</span><span class="p">,</span> <span class="n">class_table</span><span class="p">,</span> <span class="n">mapper_arguments</span><span class="o">=</span><span class="p">{}):</span>
+        <span class="sd">&quot;&quot;&quot;creates the necessary tables and properties for the mappers for the</span>
+<span class="sd">        mixed in class</span>
+<span class="sd">        </span>
+<span class="sd">        use the returning dictionary (mapper_arguments) in your mapper</span>
+<span class="sd">        </span>
+<span class="sd">        :param class_: the mixed in class, in other words the class which will</span>
+<span class="sd">          be extended with the mixin functionalities</span>
+<span class="sd">         </span>
+<span class="sd">        :param class_table: the table holding the information about the class</span>
+<span class="sd">        </span>
+<span class="sd">        :param mapper_arguments: incoming mapper arugments for the</span>
+<span class="sd">          SQLAlchemy.Orm.Mapper, it will be updated with the properties of the</span>
+<span class="sd">          current mixin</span>
+<span class="sd">        </span>
+<span class="sd">        :returns: a dictionary holding the mapper_arguments</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">class_name</span> <span class="o">=</span> <span class="n">class_</span><span class="o">.</span><span class="n">__name__</span>
+        
+        <span class="c"># update the given class table with new columns</span>
+        <span class="n">class_table</span><span class="o">.</span><span class="n">append_column</span><span class="p">(</span>
+            <span class="n">Column</span><span class="p">(</span><span class="s">&quot;status&quot;</span><span class="p">,</span> <span class="n">Integer</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+        <span class="p">)</span>
+        
+        <span class="n">class_table</span><span class="o">.</span><span class="n">append_column</span><span class="p">(</span>
+            <span class="n">Column</span><span class="p">(</span>
+                <span class="s">&quot;status_list_id&quot;</span><span class="p">,</span>
+                <span class="n">Integer</span><span class="p">,</span>
+                <span class="n">ForeignKey</span><span class="p">(</span><span class="n">tables</span><span class="o">.</span><span class="n">statusLists</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+                <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        
+        <span class="n">new_properties</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s">&quot;_status&quot;</span><span class="p">:</span> <span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+            <span class="s">&quot;status&quot;</span><span class="p">:</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&quot;_status&quot;</span><span class="p">),</span>
+            <span class="s">&quot;_status_list&quot;</span><span class="p">:</span> <span class="n">relationship</span><span class="p">(</span>
+                <span class="n">status</span><span class="o">.</span><span class="n">StatusList</span><span class="p">,</span>
+                <span class="n">primaryjoin</span><span class="o">=</span>\
+                <span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">status_list_id</span><span class="o">==</span>\
+                <span class="n">tables</span><span class="o">.</span><span class="n">statusLists</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">id</span>
+            <span class="p">),</span>
+            <span class="s">&quot;status_list&quot;</span><span class="p">:</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&quot;_status_list&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">new_properties</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_properties</span>
+        
+        <span class="k">return</span> <span class="n">mapper_arguments</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span></div></div>
+<div class="viewcode-block" id="ScheduleMixinDB"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.ScheduleMixinDB.html#stalker.db.mixin.ScheduleMixinDB">[docs]</a><span class="k">class</span> <span class="nc">ScheduleMixinDB</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A helper class for ScheduleMixin table and mapper setup.</span>
+<span class="sd">    </span>
+<span class="sd">    Helps setting up tables and mappers for classes mixed in with</span>
+<span class="sd">    :class:`~stalker.core.models.mixin.ScheduleMixin`</span>
+<span class="sd">    </span>
+<span class="sd">    For now there is no exmaple for it, but it is pretty similiar to the other</span>
+<span class="sd">    mixin classes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="ScheduleMixinDB.setup"><a class="viewcode-back" href="../../../generated/stalker.db.mixin.ScheduleMixinDB.html#stalker.db.mixin.ScheduleMixinDB.setup">[docs]</a>    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">class_</span><span class="p">,</span> <span class="n">class_table</span><span class="p">,</span> <span class="n">mapper_arguments</span><span class="o">=</span><span class="p">{}):</span>
+        <span class="sd">&quot;&quot;&quot;creates the necessary tables and properties for the mappers for the</span>
+<span class="sd">        mixed in class</span>
+<span class="sd">        </span>
+<span class="sd">        use the returning dictionary (mapper_arguments) in your mapper</span>
+<span class="sd">        </span>
+<span class="sd">        :param class_: the mixed in class, in other words the class which will</span>
+<span class="sd">          be extended with the mixin functionalities</span>
+<span class="sd">         </span>
+<span class="sd">        :param class_table: the table holding the information about the class</span>
+<span class="sd">        </span>
+<span class="sd">        :param mapper_arguments: incoming mapper arugments for the</span>
+<span class="sd">          SQLAlchemy.Orm.Mapper, it will be updated with the properties of the</span>
+<span class="sd">          current mixin</span>
+<span class="sd">        </span>
+<span class="sd">        :type mapper_arguments: dict</span>
+<span class="sd">        </span>
+<span class="sd">        :returns: a dictionary holding the mapper_arguments</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">class_name</span> <span class="o">=</span> <span class="n">class_</span><span class="o">.</span><span class="n">__name__</span>
+        
+        <span class="c"># update the given class table with new columns</span>
+        <span class="n">class_table</span><span class="o">.</span><span class="n">append_column</span><span class="p">(</span>
+            <span class="n">Column</span><span class="p">(</span><span class="s">&quot;start_date&quot;</span><span class="p">,</span> <span class="n">Date</span><span class="p">),</span>
+        <span class="p">)</span>
+        
+        <span class="n">class_table</span><span class="o">.</span><span class="n">append_column</span><span class="p">(</span>
+            <span class="n">Column</span><span class="p">(</span><span class="s">&quot;due_date&quot;</span><span class="p">,</span> <span class="n">Date</span><span class="p">),</span>
+        <span class="p">)</span>
+        
+        
+        <span class="n">new_properties</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s">&quot;_start_date&quot;</span><span class="p">:</span> <span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">start_date</span><span class="p">,</span>
+            <span class="s">&quot;start_date&quot;</span><span class="p">:</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&quot;_start_date&quot;</span><span class="p">),</span>
+            <span class="s">&quot;_due_date&quot;</span><span class="p">:</span> <span class="n">class_table</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">due_date</span><span class="p">,</span>
+            <span class="s">&quot;due_date&quot;</span><span class="p">:</span> <span class="n">synonym</span><span class="p">(</span><span class="s">&quot;_due_date&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">new_properties</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">mapper_arguments</span><span class="p">[</span><span class="s">&quot;properties&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_properties</span>
+        
+        <span class="k">return</span> <span class="n">mapper_arguments</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="../../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../../stalker.html" >stalker</a> &raquo;</li>
+          <li><a href="../db.html" >stalker.db</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

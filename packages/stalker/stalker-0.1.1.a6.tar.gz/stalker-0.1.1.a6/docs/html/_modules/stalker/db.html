@@ -1,0 +1,294 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.db &mdash; Stalker v0.1.1.a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1.1.a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.1.a6 documentation" href="../../index.html" />
+    <link rel="up" title="stalker" href="../stalker.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../stalker.html" accesskey="U">stalker</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.db</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;Database module of Stalker.</span>
+
+<span class="sd">Whenever stalker.db or something under it imported, the</span>
+<span class="sd">:func:`~stalker.db.setup` becomes available to let one setup the database.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+
+<span class="kn">import</span> <span class="nn">sqlalchemy</span>
+<span class="kn">from</span> <span class="nn">stalker.conf</span> <span class="kn">import</span> <span class="n">defaults</span>
+<span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">error</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">department</span>
+
+
+
+<span class="c"># SQLAlchemy database engine</span>
+<span class="n">engine</span> <span class="o">=</span> <span class="bp">None</span>
+
+<span class="c"># SQLAlchemy session manager</span>
+<span class="n">session</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="n">query</span> <span class="o">=</span> <span class="bp">None</span>
+
+<span class="c"># SQLAlchemy metadata</span>
+<span class="n">metadata</span> <span class="o">=</span> <span class="n">sqlalchemy</span><span class="o">.</span><span class="n">MetaData</span><span class="p">()</span>
+
+<span class="c"># a couple of helper attributes</span>
+<span class="n">__mappers__</span> <span class="o">=</span> <span class="p">[]</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="n">database</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">mappers</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot;Utillty function that helps to connect the system to the given database.</span>
+<span class="sd">    </span>
+<span class="sd">    if the database is None then the it setups using the default database in</span>
+<span class="sd">    the settings file.</span>
+<span class="sd">    </span>
+<span class="sd">    These are the steps:</span>
+<span class="sd">     1. creates the engine, and stores it in stalker.db.engine</span>
+<span class="sd">     2. creates the mappers, adds the given mappers to the</span>
+<span class="sd">        stalker.conf.defaults.MAPPERS list</span>
+<span class="sd">     3. creates the session and binds the engine to it, and stores the session</span>
+<span class="sd">        in stalker.db.session</span>
+<span class="sd">    </span>
+<span class="sd">    :param database: The database address, default is None, and in this case it</span>
+<span class="sd">      uses the database defined in stalker.conf.defaults.DATABASE</span>
+<span class="sd">    </span>
+<span class="sd">    :param mappers: The additional mappers module. Use this parameter to</span>
+<span class="sd">      customize SOM and database mapping to add your own classes to SOM</span>
+<span class="sd">    </span>
+<span class="sd">    :param engine_settings: the settings for the SQLAlchemy engine</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+    
+    <span class="k">if</span> <span class="n">database</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">database</span> <span class="o">=</span> <span class="n">defaults</span><span class="o">.</span><span class="n">DATABASE</span>
+    
+    <span class="c"># create engine</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">sqlalchemy</span><span class="o">.</span><span class="n">create_engine</span><span class="p">(</span><span class="n">database</span><span class="p">,</span>
+                                         <span class="o">**</span><span class="n">defaults</span><span class="o">.</span><span class="n">DATABASE_ENGINE_SETTINGS</span><span class="p">)</span>
+    
+    <span class="c"># extend the default mappers with the given mappers list</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mappers</span><span class="p">):</span>
+        <span class="n">defaults</span><span class="o">.</span><span class="n">MAPPERS</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">defaults</span><span class="o">.</span><span class="n">MAPPERS</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">mappers</span><span class="p">)))</span>
+    
+    <span class="c"># create mappers</span>
+    <span class="n">__create_mappers__</span><span class="p">(</span><span class="n">defaults</span><span class="o">.</span><span class="n">MAPPERS</span><span class="p">)</span>
+    
+    <span class="c"># create the database</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">create_all</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+    
+    <span class="c"># create the Session class</span>
+    <span class="n">Session</span> <span class="o">=</span> <span class="n">sqlalchemy</span><span class="o">.</span><span class="n">orm</span><span class="o">.</span><span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="n">db</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span>
+                           <span class="o">**</span><span class="n">defaults</span><span class="o">.</span><span class="n">DATABASE_SESSION_SETTINGS</span><span class="p">)</span>
+    
+    <span class="c"># create and save session object to db.sessison</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">()</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">query</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">query</span>
+    
+    <span class="c"># init database</span>
+    <span class="n">__init_db__</span><span class="p">()</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">__init_db__</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;fills the database with default values</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span> <span class="n">defaults</span><span class="o">.</span><span class="n">AUTO_CREATE_ADMIN</span><span class="p">:</span>
+        <span class="n">__create_admin__</span><span class="p">()</span>
+    
+    <span class="n">__fill_entity_types_table__</span><span class="p">()</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">__create_admin__</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;creates the admin</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+    
+    <span class="c"># check if there is already an admin in the database</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">)</span><span class="o">.</span> \
+           <span class="n">filter_by</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_NAME</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c">#there should be an admin user do nothing</span>
+        <span class="c">#print &quot;there is an admin already&quot;</span>
+        <span class="k">return</span>
+    
+    <span class="c"># create the admin department</span>
+    <span class="n">adminDep</span> <span class="o">=</span> <span class="n">department</span><span class="o">.</span><span class="n">Department</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_DEPARTMENT_NAME</span><span class="p">)</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">adminDep</span><span class="p">)</span>
+    
+    <span class="c"># create the admin user</span>
+    <span class="n">admin</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_NAME</span><span class="p">,</span>
+        <span class="n">first_name</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_NAME</span><span class="p">,</span>
+        <span class="n">login_name</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_NAME</span><span class="p">,</span>
+        <span class="n">password</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_PASSWORD</span><span class="p">,</span>
+        <span class="n">email</span><span class="o">=</span><span class="n">defaults</span><span class="o">.</span><span class="n">ADMIN_EMAIL</span><span class="p">,</span>
+        <span class="n">department</span><span class="o">=</span><span class="n">adminDep</span><span class="p">,</span>
+    <span class="p">)</span>
+    
+    <span class="n">admin</span><span class="o">.</span><span class="n">created_by</span> <span class="o">=</span> <span class="n">admin</span>
+    <span class="n">admin</span><span class="o">.</span><span class="n">updated_by</span> <span class="o">=</span> <span class="n">admin</span>
+    
+    <span class="n">adminDep</span><span class="o">.</span><span class="n">created_by</span> <span class="o">=</span> <span class="n">admin</span>
+    <span class="n">adminDep</span><span class="o">.</span><span class="n">updated_by</span> <span class="o">=</span> <span class="n">admin</span>
+    
+    <span class="n">db</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">admin</span><span class="p">)</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">__create_mappers__</span><span class="p">(</span><span class="n">mappers</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;imports the given mapper helper modules, refer to :ref:`mappers` for</span>
+<span class="sd">    more information about how to create your own mapper modules.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+    
+    <span class="c"># </span>
+    <span class="c"># just import the given list of mapper modules and run the setup function,</span>
+    <span class="c"># if they are in the correct format all the mapping should be done already</span>
+    <span class="c"># by just import ing the mapper helper modules</span>
+    <span class="c">#</span>
+    
+    <span class="k">if</span> <span class="n">db</span><span class="o">.</span><span class="n">__mappers__</span> <span class="o">==</span> <span class="n">mappers</span><span class="p">:</span>
+        <span class="k">return</span>
+    
+    <span class="k">for</span> <span class="n">_mapper</span> <span class="ow">in</span> <span class="n">mappers</span><span class="p">:</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&quot;import &quot;</span> <span class="o">+</span> <span class="n">_mapper</span><span class="p">)</span>
+        <span class="k">exec</span><span class="p">(</span><span class="n">_mapper</span> <span class="o">+</span> <span class="s">&quot;.setup()&quot;</span><span class="p">)</span>
+    
+    <span class="n">db</span><span class="o">.</span><span class="n">__mappers__</span> <span class="o">=</span> <span class="n">mappers</span>
+
+
+
+<span class="c">#----------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">__fill_entity_types_table__</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;fills the entity_types table with the entity_types defined in the</span>
+<span class="sd">    defaults.CORE_MODEL_CLASSES</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="kn">from</span> <span class="nn">stalker</span> <span class="kn">import</span> <span class="n">db</span>
+    <span class="kn">from</span> <span class="nn">stalker.db</span> <span class="kn">import</span> <span class="n">tables</span>
+    
+    <span class="c"># insert the values if there is not any</span>
+    
+    <span class="c"># get the current values in the table</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">sqlalchemy</span><span class="o">.</span><span class="n">sql</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="n">tables</span><span class="o">.</span><span class="n">entity_types</span><span class="o">.</span><span class="n">c</span><span class="o">.</span><span class="n">entity_type</span><span class="p">])</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    
+    <span class="n">entity_types_DB</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+        <span class="n">entity_types_DB</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">)</span>
+    
+    <span class="n">result</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    
+    <span class="c"># get the defaults</span>
+    
+    <span class="n">default_entity_types</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="k">for</span> <span class="n">full_module_path</span> <span class="ow">in</span> <span class="n">defaults</span><span class="o">.</span><span class="n">CORE_MODEL_CLASSES</span><span class="p">:</span>
+        <span class="n">import_info</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">path_to_exec</span><span class="p">(</span><span class="n">full_module_path</span><span class="p">)</span>
+        
+        <span class="n">exec_</span> <span class="o">=</span> <span class="n">import_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="n">import_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">object_</span> <span class="o">=</span> <span class="n">import_info</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        
+        <span class="c"># import the modules</span>
+        <span class="k">exec</span><span class="p">(</span><span class="n">exec_</span><span class="p">)</span>
+        
+        <span class="c"># get the entity_type of the object</span>
+        <span class="n">default_entity_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="nb">eval</span><span class="p">(</span><span class="n">object_</span><span class="o">+</span><span class="s">&quot;.entity_type&quot;</span><span class="p">)</span> <span class="p">)</span>
+    
+    <span class="c"># now for all the values not in the table insert them</span>
+    <span class="k">for</span> <span class="n">entity_type</span> <span class="ow">in</span> <span class="n">default_entity_types</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">entity_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">entity_types_DB</span><span class="p">:</span>
+            <span class="n">db</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="n">tables</span><span class="o">.</span><span class="n">entity_types</span><span class="o">.</span><span class="n">insert</span><span class="p">(),</span>
+                <span class="n">entity_type</span><span class="o">=</span><span class="n">entity_type</span>
+            <span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../stalker.html" >stalker</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

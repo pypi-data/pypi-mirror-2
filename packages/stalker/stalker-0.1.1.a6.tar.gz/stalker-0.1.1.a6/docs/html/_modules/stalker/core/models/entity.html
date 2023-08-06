@@ -1,0 +1,760 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>stalker.core.models.entity &mdash; Stalker v0.1.1.a6 documentation</title>
+    <link rel="stylesheet" href="../../../../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '0.1.1.a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="top" title="Stalker v0.1.1.a6 documentation" href="../../../../index.html" />
+    <link rel="up" title="stalker.core.models" href="../models.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="../../../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../../../stalker.html" >stalker</a> &raquo;</li>
+          <li><a href="../../core.html" >stalker.core</a> &raquo;</li>
+          <li><a href="../models.html" accesskey="U">stalker.core.models</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for stalker.core.models.entity</h1><div class="highlight"><pre>
+<span class="c">#-*- coding: utf-8 -*-</span>
+
+
+
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">stalker.ext.validatedList</span> <span class="kn">import</span> <span class="n">ValidatedList</span>
+
+
+
+<span class="c">########################################################################</span>
+<span class="k">class</span> <span class="nc">EntityMeta</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;the metaclass for the very basic entity, just adds the name of the class</span>
+<span class="sd">    as the entity_type class attribute</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dict_</span><span class="p">):</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="s">&quot;entity_type&quot;</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">classname</span><span class="p">))</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">classname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">dict_</span><span class="p">)</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span>
+<div class="viewcode-block" id="SimpleEntity"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity">[docs]</a><span class="k">class</span> <span class="nc">SimpleEntity</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;The base class of all the others</span>
+<span class="sd">    </span>
+<span class="sd">    This class has the basic information about an entity which are the name,</span>
+<span class="sd">    the description, tags and the audit information like created_by,</span>
+<span class="sd">    updated_by, date_created and date_updated about this entity.</span>
+<span class="sd">    </span>
+<span class="sd">    Two SimpleEntities considered equal if they have the same name, the other</span>
+<span class="sd">    attributes doesn&#39;t matter.</span>
+<span class="sd">    </span>
+<span class="sd">    :param string name: A string or unicode value that holds the name of this</span>
+<span class="sd">      entity. It can not be empty, the first letter should be an alphabetic</span>
+<span class="sd">      ([a-zA-z]) (not alphanumeric [a-zA-Z0-9]) letter and it should not</span>
+<span class="sd">      contain any white space at the beggining and at the end of the string,</span>
+<span class="sd">      giving an object the object will be converted to string and then the</span>
+<span class="sd">      resulting string will be conditioned.</span>
+<span class="sd">    </span>
+<span class="sd">    :param str description: A string or unicode attribute that holds the</span>
+<span class="sd">      description of this entity object, it could be an empty string, and it</span>
+<span class="sd">      could not again have white spaces at the beggining and at the end of the</span>
+<span class="sd">      string, again any given objects will be converted to strings</span>
+<span class="sd">    </span>
+<span class="sd">    :param created_by: The :class:`~stalker.core.models.user.User` who has</span>
+<span class="sd">      created this object</span>
+<span class="sd">    </span>
+<span class="sd">    :type created_by: :class:`~stalker.core.models.user.User`</span>
+<span class="sd">    </span>
+<span class="sd">    :param updated_by: The :class:`~stalker.core.models.user.User` who has</span>
+<span class="sd">      updated this object lastly. The created_by and updated_by attributes</span>
+<span class="sd">      point the same object if this object is just created.</span>
+<span class="sd">    </span>
+<span class="sd">    :param date_created: The date that this object is created.</span>
+<span class="sd">    </span>
+<span class="sd">    :type date_created: :class:`datetime.datetime`</span>
+<span class="sd">    </span>
+<span class="sd">    :param date_updated: The date that this object is updated lastly. For newly</span>
+<span class="sd">      created entities this is equal to date_created and thedate_updated cannot</span>
+<span class="sd">      point a date which is before date_created.</span>
+<span class="sd">    </span>
+<span class="sd">    :type date_updated: :class:`datetime.datetime`</span>
+<span class="sd">    </span>
+<span class="sd">    :param str code: The code name of this object. It accepts string or unicode</span>
+<span class="sd">      values and any other kind of objects will be converted to string. Can be</span>
+<span class="sd">      omitted and it will be set to the uppercase version of the nice_name</span>
+<span class="sd">      attribute. If both the name and code arguments are given the code</span>
+<span class="sd">      attribute will be set to code, but in any update to name attribute the</span>
+<span class="sd">      code also will be updated to the uppercase form of the nice_name</span>
+<span class="sd">      attribute. The default value is the upper case form of the nice_name</span>
+<span class="sd">    </span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="n">__metaclass__</span> <span class="o">=</span> <span class="n">EntityMeta</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.__init__"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">name</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">description</span><span class="o">=</span><span class="s">&quot;&quot;</span><span class="p">,</span>
+                 <span class="n">created_by</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">updated_by</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">date_created</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(),</span>
+                 <span class="n">date_updated</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(),</span>
+                 <span class="n">code</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="o">**</span><span class="n">kwargs</span>
+                 <span class="p">):</span>
+        
+        <span class="c"># code attribute</span>
+        <span class="c"># just set it to None for now</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+        
+        <span class="c"># name and nice_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nice_name</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        
+        <span class="c"># code</span>
+        <span class="c"># if the given code argument is not None</span>
+        <span class="c"># use it to set the code</span>
+        <span class="k">if</span> <span class="n">code</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">code</span> <span class="ow">is</span> <span class="ow">not</span> <span class="s">&quot;&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_description</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_description</span><span class="p">(</span><span class="n">description</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_by</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_created_by</span><span class="p">(</span><span class="n">created_by</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_updated_by</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_updated_by</span><span class="p">(</span><span class="n">updated_by</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_date_created</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_date_created</span><span class="p">(</span><span class="n">date_created</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_date_updated</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_date_updated</span><span class="p">(</span><span class="n">date_updated</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span></div>
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the representation of the SimpleEntity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="s">&quot;&lt;</span><span class="si">%s</span><span class="s"> (</span><span class="si">%s</span><span class="s">, </span><span class="si">%s</span><span class="s">)&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">entity_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_description</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">description_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given description_in value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="n">description_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">description_in</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">description_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given name_in value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># it is None</span>
+        <span class="k">if</span> <span class="n">name_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the name couldn&#39;t be set to None&quot;</span><span class="p">)</span>
+        
+        <span class="n">name_in</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_condition_name</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name_in</span><span class="p">))</span>
+        
+        <span class="c"># it is empty</span>
+        <span class="k">if</span> <span class="n">name_in</span> <span class="o">==</span> <span class="s">&quot;&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the name couldn&#39;t be an empty string&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">name_in</span>
+    
+    
+    
+    <span class="k">def</span> <span class="nf">_condition_code</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;formats the given code_in value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># just set it to the uppercase of what nice_name gives</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_condition_nice_name</span><span class="p">(</span><span class="n">code_in</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_condition_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;conditions the name_in value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># remove unnecesary characters from the string</span>
+        <span class="n">name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">&quot;([^a-zA-Z0-9\s_\-]+)&quot;</span><span class="p">,</span> <span class="s">r&quot;&quot;</span><span class="p">,</span> <span class="n">name_in</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        
+        <span class="c"># remove all the characters which are not alpabetic</span>
+        <span class="n">name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">&quot;(^[^a-zA-Z]+)&quot;</span><span class="p">,</span> <span class="s">r&quot;&quot;</span><span class="p">,</span> <span class="n">name_in</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">name_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_condition_nice_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nice_name_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;conditions the given nice name</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c">## remove unnecesary characters from the beginning</span>
+        <span class="c">#nice_name_in = re.sub(&quot;(^[^A-Za-z]+)&quot;, r&quot;&quot;, nice_name_in)</span>
+        
+        <span class="c"># remove unnecesary characters from the string</span>
+        <span class="n">nice_name_in</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_name</span><span class="p">(</span><span class="n">nice_name_in</span><span class="p">)</span>
+        
+        <span class="c"># replace camel case letters</span>
+        <span class="n">nice_name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">r&quot;(.+?[a-z]+)([A-Z])&quot;</span><span class="p">,</span> <span class="s">r&quot;\1_\2&quot;</span><span class="p">,</span> <span class="n">nice_name_in</span><span class="p">)</span>
+        
+        <span class="c"># replace white spaces with under score</span>
+        <span class="n">nice_name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">&quot;([\s\-])+&quot;</span><span class="p">,</span> <span class="s">r&quot;_&quot;</span><span class="p">,</span> <span class="n">nice_name_in</span><span class="p">)</span>
+        
+        <span class="c"># remove multiple underscores</span>
+        <span class="n">nice_name_in</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">r&quot;([_]+)&quot;</span><span class="p">,</span> <span class="s">r&quot;_&quot;</span><span class="p">,</span> <span class="n">nice_name_in</span><span class="p">)</span>
+        
+        <span class="c"># turn it to lower case</span>
+        <span class="n">nice_name_in</span> <span class="o">=</span> <span class="n">nice_name_in</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        
+        <span class="k">return</span> <span class="n">nice_name_in</span>
+        
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.description"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.description">[docs]</a>    <span class="k">def</span> <span class="nf">description</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_description</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">description_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_description</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_description</span><span class="p">(</span><span class="n">description_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;Description of this object.&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">description</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">description</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.name"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.name">[docs]</a>    <span class="k">def</span> <span class="nf">name</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_name</span><span class="p">(</span><span class="n">name_in</span><span class="p">)</span>
+            
+            <span class="c"># also set the nice_name</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_nice_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_condition_nice_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+            
+            <span class="c"># set the code</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;name of this object&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">name</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">name</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.nice_name"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.nice_name">[docs]</a>    <span class="k">def</span> <span class="nf">nice_name</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nice_name</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;The ``nice name`` of this object.</span>
+<span class="s">        </span>
+<span class="s">        It has the same value with the name (contextually) but with a different</span>
+<span class="s">        format like, all the white spaces replaced by underscores (&quot;\_&quot;), all</span>
+<span class="s">        the CamelCase form will be expanded by underscore (\_) characters and</span>
+<span class="s">        it is always lower case.</span>
+<span class="s">        </span>
+<span class="s">        There is also the ``code`` attribute which is simply the upper case</span>
+<span class="s">        form of ``nice_name`` if it is not defined differently (i.e set to</span>
+<span class="s">        another value).&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">nice_name</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">nice_name</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_code</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given code value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># check if the code_in is None or empty string</span>
+        <span class="k">if</span> <span class="n">code_in</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">code_in</span><span class="o">==</span><span class="s">&quot;&quot;</span><span class="p">:</span>
+            <span class="c"># restore the value from nice_name and let it be reformatted</span>
+            <span class="n">code_in</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nice_name</span>
+        
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_condition_code</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">code_in</span><span class="p">))</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_created_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">created_by_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given created_by_in attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c">#-------------------------------------------------------------------</span>
+        <span class="c"># Python documentation says one of the nice ways to over come circular</span>
+        <span class="c"># imports is late imports and it is perfectly ok to use it like that</span>
+        <span class="c"># </span>
+        <span class="c"># just try to import the module as late as possible</span>
+        <span class="c"># </span>
+        <span class="c"># ref:</span>
+        <span class="c"># http://docs.python.org/faq/programming.html#</span>
+        <span class="c">#     what-are-the-best-practices-for-using-import-in-a-module</span>
+        <span class="c">#-------------------------------------------------------------------</span>
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">user</span>
+        
+        <span class="c">## raise ValueError when:</span>
+        <span class="c">## it is None</span>
+        <span class="c">#if created_by_in is None:</span>
+            <span class="c">#raise ValueError(&quot;the created_by attribute can not be set to None&quot;)</span>
+        
+        <span class="k">if</span> <span class="n">created_by_in</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">created_by_in</span><span class="p">,</span> <span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the created_by attribute should be an &quot;</span>
+                                 <span class="s">&quot;instance of stalker.core.models.user.User&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">created_by_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_updated_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">updated_by_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given updated_by_in attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">user</span>
+        
+        <span class="k">if</span> <span class="n">updated_by_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c"># set it to what created_by attribute has</span>
+            <span class="n">updated_by_in</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_created_by</span>
+        
+        <span class="k">if</span> <span class="n">updated_by_in</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">updated_by_in</span><span class="p">,</span> <span class="n">user</span><span class="o">.</span><span class="n">User</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the updated_by attribute should be an &quot;</span>
+                                 <span class="s">&quot;instance of stalker.core.models.user.User&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">updated_by_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_date_created</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date_created_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given date_creaetd_in</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># raise ValueError when:</span>
+        
+        <span class="c"># it is None</span>
+        <span class="k">if</span> <span class="n">date_created_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the date_created could not be None&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">date_created_in</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the date_created should be an instance of &quot;</span>
+                             <span class="s">&quot;datetime.datetime&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">date_created_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_date_updated</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date_updated_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given date_updated_in</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># raise ValueError when:</span>
+        
+        <span class="c"># it is None</span>
+        <span class="k">if</span> <span class="n">date_updated_in</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the date_updated could not be None&quot;</span><span class="p">)</span>
+        
+        <span class="c"># it is not an instance of datetime.datetime</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">date_updated_in</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the date_updated should be an instance of &quot;</span>
+                             <span class="s">&quot;datetime.datetime&quot;</span><span class="p">)</span>
+        
+        <span class="c"># lower than date_created</span>
+        <span class="k">if</span> <span class="n">date_updated_in</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_created</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the date_updated could not be set to a date &quot;</span>
+                             <span class="s">&quot;before date_created, try setting the &quot;</span>
+                             <span class="s">&quot;date_created before&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">date_updated_in</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.code"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.code">[docs]</a>    <span class="k">def</span> <span class="nf">code</span><span class="p">():</span>
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_code</span>
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_code</span><span class="p">(</span><span class="n">code_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;The code name of this object.</span>
+<span class="s">        </span>
+<span class="s">        It accepts string or unicode values and any other kind of objects will</span>
+<span class="s">        be converted to string. In any update to the name attribute the code</span>
+<span class="s">        also will be updated to the uppercase form of the nice_name attribute.</span>
+<span class="s">        If the not initialized or given as None, it will be set to the</span>
+<span class="s">        uppercase version of the nice_name attribute. Setting the code</span>
+<span class="s">        attribute to None will reset it to the default value. The default value</span>
+<span class="s">        is the upper case form of the nice_name. &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">code</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">code</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.created_by"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.created_by">[docs]</a>    <span class="k">def</span> <span class="nf">created_by</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_created_by</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">created_by_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_created_by</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_created_by</span><span class="p">(</span><span class="n">created_by_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;The :class:`~stalker.core.models.user.User` who has created</span>
+<span class="s">        this object.&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">created_by</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">created_by</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.updated_by"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.updated_by">[docs]</a>    <span class="k">def</span> <span class="nf">updated_by</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_updated_by</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">updated_by_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_updated_by</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_updated_by</span><span class="p">(</span><span class="n">updated_by_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;The :class:`~stalker.core.models.user.User` who has updated</span>
+<span class="s">        this object.&quot;&quot;&quot;</span>
+
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">updated_by</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">updated_by</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.date_created"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.date_created">[docs]</a>    <span class="k">def</span> <span class="nf">date_created</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_date_created</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date_created_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_date_created</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_date_created</span><span class="p">(</span><span class="n">date_created_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;A :class:`datetime.datetime` instance showing the creation</span>
+<span class="s">        date and time of this object.&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">date_created</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">date_created</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SimpleEntity.date_updated"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.SimpleEntity.html#stalker.core.models.entity.SimpleEntity.date_updated">[docs]</a>    <span class="k">def</span> <span class="nf">date_updated</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_date_updated</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date_updated_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_date_updated</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_date_updated</span><span class="p">(</span><span class="n">date_updated_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;A :class:`datetime.datetime` instance showing the update</span>
+<span class="s">        date and time of this object.&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">date_updated</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">date_updated</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the equality operator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">SimpleEntity</span><span class="p">)</span> <span class="ow">and</span> \
+           <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">name</span> <span class="c">#and \</span>
+           <span class="c">#self.description == other.description</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the inequality operator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span></div>
+<div class="viewcode-block" id="Entity"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.Entity.html#stalker.core.models.entity.Entity">[docs]</a><span class="k">class</span> <span class="nc">Entity</span><span class="p">(</span><span class="n">SimpleEntity</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Another base data class that adds tags and notes to the attributes list.</span>
+<span class="sd">    </span>
+<span class="sd">    This is the entity class which is derived from the SimpleEntity and adds</span>
+<span class="sd">    only tags to the list of parameters.</span>
+<span class="sd">    </span>
+<span class="sd">    Two Entities considered equal if they have the same name. It doesn&#39;t matter</span>
+<span class="sd">    if they have different tags or notes.</span>
+<span class="sd">    </span>
+<span class="sd">    :param tags: a list of tag objects related to this entity. tags could be an</span>
+<span class="sd">      empty list, or when omitted it will be set to an empty list</span>
+<span class="sd">    </span>
+<span class="sd">    :param notes: a list of note objects. notes can be an empty list, or when</span>
+<span class="sd">      omitted it will be set to an empty list</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="Entity.__init__"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.Entity.html#stalker.core.models.entity.Entity.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">tags</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="n">notes</span><span class="o">=</span><span class="p">[],</span>
+                 <span class="o">**</span><span class="n">kwargs</span>
+                 <span class="p">):</span>
+        
+        <span class="nb">super</span><span class="p">(</span><span class="n">Entity</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_tags</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_notes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_notes</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span></div>
+    <span class="k">def</span> <span class="nf">_validate_notes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">notes_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given notes value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">notes_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;notes should be an instance of list&quot;</span><span class="p">)</span>
+        
+        <span class="kn">from</span> <span class="nn">stalker.core.models</span> <span class="kn">import</span> <span class="n">note</span>
+        
+        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">notes_in</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">note</span><span class="o">.</span><span class="n">Note</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;every element in notes should be an &quot;</span>
+                                 <span class="s">&quot;instance of stalker.core.models.note.Note &quot;</span>
+                                 <span class="s">&quot;class&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">ValidatedList</span><span class="p">(</span><span class="n">notes_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">_validate_tags</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tags_in</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;validates the given tags_in value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c"># it is not an instance of list</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tags_in</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;the tags attribute should be set to a list&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">ValidatedList</span><span class="p">(</span><span class="n">tags_in</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="Entity.notes"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.Entity.html#stalker.core.models.entity.Entity.notes">[docs]</a>    <span class="k">def</span> <span class="nf">notes</span><span class="p">():</span>
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_notes</span>
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">notes_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_notes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_notes</span><span class="p">(</span><span class="n">notes_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;all the notes about this entity, it should be a list of Notes</span>
+<span class="s">        objects or an empty list, None is not accepted</span>
+<span class="s">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">notes</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">notes</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="Entity.tags"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.Entity.html#stalker.core.models.entity.Entity.tags">[docs]</a>    <span class="k">def</span> <span class="nf">tags</span><span class="p">():</span>
+        
+        <span class="k">def</span> <span class="nf">fget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span>
+        
+        <span class="k">def</span> <span class="nf">fset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tags_in</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validate_tags</span><span class="p">(</span><span class="n">tags_in</span><span class="p">)</span>
+        
+        <span class="n">doc</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;a list of Tag objects which shows the related tags to the</span>
+<span class="s">        entity&quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">locals</span><span class="p">()</span>
+    </div>
+    <span class="n">tags</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="o">**</span><span class="n">tags</span><span class="p">())</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the equality operator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Entity</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
+               <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Entity</span><span class="p">)</span>
+
+
+
+
+
+
+<span class="c">########################################################################</span></div>
+<div class="viewcode-block" id="TypeEntity"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.TypeEntity.html#stalker.core.models.entity.TypeEntity">[docs]</a><span class="k">class</span> <span class="nc">TypeEntity</span><span class="p">(</span><span class="n">Entity</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;The entry point for types.</span>
+<span class="sd">    </span>
+<span class="sd">    It is created to group the `Type` objects, so any other classes accepting a</span>
+<span class="sd">    ``TypeEntity`` object can have one of the derived classes, this is done in</span>
+<span class="sd">    that way mainly to ease the of creation of only one</span>
+<span class="sd">    :class:`~stalker.core.models.types.TypeTemplate` class and let the</span>
+<span class="sd">    others to use this one TypeTemplate class.</span>
+<span class="sd">    </span>
+<span class="sd">    It doesn&#39;t add any new parameters to it&#39;s super.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+<div class="viewcode-block" id="TypeEntity.__init__"><a class="viewcode-back" href="../../../../generated/stalker.core.models.entity.TypeEntity.html#stalker.core.models.entity.TypeEntity.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TypeEntity</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">##----------------------------------------------------------------------</span>
+    <span class="c">#def __repr__(self):</span>
+        <span class="c">#&quot;&quot;&quot;the representation</span>
+        <span class="c">#&quot;&quot;&quot;</span>
+        
+        <span class="c">#return &quot;&lt;TypeEntity (%s, %s)&gt;&quot; % (self.name, self.code)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span></div>
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the equality operator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">TypeEntity</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
+               <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">TypeEntity</span><span class="p">)</span>
+    
+    
+    
+    <span class="c">#----------------------------------------------------------------------</span>
+    <span class="k">def</span> <span class="nf">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;the inequality operator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+    
+    
+    </div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="../../../../index.html">Stalker v0.1.1.a6 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" >Module code</a> &raquo;</li>
+          <li><a href="../../../stalker.html" >stalker</a> &raquo;</li>
+          <li><a href="../../core.html" >stalker.core</a> &raquo;</li>
+          <li><a href="../models.html" >stalker.core.models</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Erkan Ozgur Yilmaz.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
