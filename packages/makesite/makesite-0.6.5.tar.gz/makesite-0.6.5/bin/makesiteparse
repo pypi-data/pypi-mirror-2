@@ -1,0 +1,54 @@
+#!/bin/sh
+
+# makesite show error
+_makesite_error () {
+    echo "ERROR: "$1 1>&2
+    exit 1
+}
+
+# Check usage
+if [ $# -ne 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: $1site PROJECT_BRANCH_PATH\n"
+    echo -n "'$1site' part of makesite scripts. "
+    case $1 in
+        install )
+            echo "Activate install hooks for target project. Run tests for master branch wich option --autotest." ;;
+        remove )
+            echo "Activate remove hooks for target project and remove project dir." ;;
+        update )
+            echo "Activate update hooks for target project. Run tests for master branch wich option --autotest." ;;
+        test )
+            echo "Activate test hooks for target project. Enable test only master branch wich option --auto." ;;
+    esac
+    makesite --version
+    exit 0
+fi
+
+PROJECT_DIR=$1
+ACTION=$2
+
+TEMPLATE_FILE=$PROJECT_DIR/.makesite
+SERVICE_DIR=$PROJECT_DIR/service
+SOURCE_DIR=$PROJECT_DIR/source
+
+if [ ! -z "$VIRTUAL_ENV" ]; then
+    _makesite_error "Please deactivate VIRTUALENV '$VIRTUAL_ENV' first."
+fi
+
+if [ ! -f $TEMPLATE_FILE ]; then
+    _makesite_error "makesite not found templates in '$PROJECT_DIR'."
+fi
+
+echo "Run $ACTION for '$PROJECT_DIR'\n=========="
+for t in `cat $TEMPLATE_FILE`; do
+    for f in $SERVICE_DIR/${t}_*$ACTION*.sh; do
+        if [ -f $f ]; then
+            echo "Run $f\n----------" && sh $f && echo
+        fi
+    done
+done
+
+# Post install, update action
+if [ -f $SOURCE_DIR/.makesite_*$ACTION* ]; then
+    echo "Run $f\n----------" && sh $f && echo
+fi
