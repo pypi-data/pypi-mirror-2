@@ -1,0 +1,55 @@
+{% extends "sewer/base.html" %}
+
+{% block title %}{{ repo.name }} Admin{% endblock %}
+
+{% block head %}
+<script type="text/javascript">
+$(function() {
+  // replace the yes/no with a link.
+  $("#repo-is-public").html("<a href=\"#\" id=\"repo-visibility\">" +
+    $("#repo-is-public").text() + "</a>");
+  $("#repo-visibility").click(function(e) {
+    e.preventDefault();
+    var is_public = this.text == "yes";
+    $.ajax({
+      url: "../set/" + (is_public ? "private/" : "public/"),
+      context: $(this),
+      success: function() {
+        this.text(is_public ? "no" : "yes");
+        reload_messages();
+      },
+    });
+  });
+  $(".repo-remove-access").click(remove_access);
+});
+</script>
+{% endblock %}
+
+{% block content %}
+
+{% include "sewer/repo_info.html" %}
+
+<div id="access-form">
+  <form method="post" action="{% url sewer:repo-add-access repo.name %}">
+    {% csrf_token %}
+    <input class="monospace" type="text" name="name"/>
+    as a
+    <select name="level" class="">
+      {% for x in levels %}
+      <option value="{{ x }}">{{ x }}</option>
+      {% endfor %}
+    </select>
+    <input type="submit" value="add" class="button-add"/>
+  </form>
+</div>
+
+<div id="repo-acl">
+{% for a in repo.get_access_list %}
+<div>
+  {{ a.entity }} &#8712; {{ a.access }} -
+  <a href="../remove/access/{{ a.id }}/" class="repo-remove-access">remove</a>
+</div>
+{% endfor %}
+</div>
+
+{% endblock %}
