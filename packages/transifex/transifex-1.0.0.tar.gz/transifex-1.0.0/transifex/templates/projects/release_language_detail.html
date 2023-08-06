@@ -1,0 +1,173 @@
+{% extends "projects/project_detail_childs.html" %}
+{% load i18n %}
+{% load statistics_resources %}
+
+{% block extra_head %}
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="{% url release_language_feed release.project.slug release.slug language.code %}" />
+  <script type="text/javascript" src="{{ STATIC_URL }}js/watch_toggle.js"></script>
+  <script type="text/javascript" src="{{ STATIC_URL }}js/tablesorted.js"></script>
+  <link media="screen" href="{{ STATIC_URL }}css/tablesorter.css" type="text/css" rel="stylesheet" />
+
+  <script type="text/javascript" src="{{ STATIC_URL }}js/houdini.js"></script>
+  <link media="screen" href="{{ STATIC_URL }}css/houdini.css" type="text/css" rel="stylesheet" />
+
+  <script type="text/javascript">
+    $(function(){
+        // Enable tooltip
+        $(".tipsy_enable").tipsy({'html':true, 'gravity':'s'});
+
+        // Stats table sorter
+        $(".tablesorter_resource").tablesorter({
+            sortList: [[1,1]],
+            widgets: ['zebra'],
+            textExtraction: { // Take value inside an object for the columns
+              0: function(node) {
+                  return $("a", node).text();
+              },
+              1: function(node) {
+                  return $(".origin_format", node).text();
+              }
+            }
+        });
+
+    });
+  </script>
+
+{% endblock %}
+
+{% block body_class %}{{ block.super }} release_detail{% endblock %}
+
+{% block title %}{{ block.super }} | {{ release.name }} | {{ language.name }}{% endblock %}
+
+{% block breadcrumb %}{{ block.super }} &raquo; <a href="{% url release_detail release.project.slug release.slug %}">{% blocktrans with release.name as release_name %}Release '{{ release_name }}{% endblocktrans %}'</a> &raquo; {{ language.name }}{% endblock %}
+
+{% block content_sec %}
+  <a class="simlink" href="{% url release_language_feed release.project.slug release.slug language.code %}" title="Statistics feed for this language and release"><img border="0" src="{{ STATIC_URL }}images/icons/feed.png" /></a>
+{% endblock %}
+
+{% block content_title %}<h2 class="pagetitle">Release '{{ release.name }}':&nbsp;{{ language.name }}</h2>{% endblock %}
+
+{% block content_main %}
+
+<div class="list separate" style="clear:both">
+  <h3>{% blocktrans count resources|length as counter %}Resource under this Release{% plural %}Resources under this Release{% endblocktrans %}</h3>
+ {% if stats %}
+  <table class="stat_table_font stats_table highlighted tablesorter_resource" style="clear:both;margin-top:0.5em;width:100%">
+  <thead>
+  <tr>
+    <th><span class="i16 comment">{% trans "Resource" %}</span></th>
+    <th style="width:320px"><span class="i16 stats">{% trans "Completion" %}</span></th>
+    <th><span class="i16 clock">{% trans "Last Updated" %}</span></th>
+   </tr>
+  </thead>
+  <tbody>
+  {% for stat in stats %}
+    <tr id="stat_row_{{forloop.counter}}" title="{% trans 'click for translation' %}">
+        <td>
+          <span class="clickable">{{ stat.object.name }}</span>
+        </td>
+        <td>
+        {% with 200 as barwidth %}
+            <div class="stats tipsy_enable" style='width:{{ barwidth|add:"40" }}px;' title="{% trans "Translated: " %}{{ stat.num_translated }}<br />{% trans "Untranslated: " %}{{ stat.num_untranslated }}">
+                <div class="stats_string_resource" >
+                    {{ stat.trans_percent }}% 
+                </div> 
+                {% stats_bar_simple stat barwidth %}
+            </div>
+        {% endwith %}
+        </td>
+        <td>
+        <span style="border:0">
+          {% with stat.last_update as last_update %}
+          {% with stat.last_committer as last_committer %}
+          {% if last_update %}
+              <span class="origin_format" style="display:none">{{ last_update|date:"M d,Y h:i A" }}</span>
+              {{ last_update|timesince }} 
+              {% if last_committer %}
+              by {{ last_committer }}
+              {% endif %}
+          {% else %}
+              {% trans "no activity yet" %}
+          {% endif %}
+          {% endwith %}
+          {% endwith %}
+        </span>
+        </td>
+    </tr>
+    <script>
+        $(".highlighted tr#stat_row_{{forloop.counter}}").click(function(){
+           /* FancyBox Using custom settings */ 
+           $.fancybox(
+               { 
+                'href': '{% url resource_actions stat.object.project.slug stat.object.slug language.code %}',
+                'hideOnContentClick': false,
+                'onStart':function(){
+                    // IE8 fix
+                    if(jQuery.browser.msie) {
+                      $('#fancybox-wrap').css('max-width','716px');
+                      $('#fancybox-inner').css('max-width','716px');
+                      $('#fancybox-outer').css('left','50%');
+                    }
+                },
+                'onComplete':function() {
+                    // IE8 fix
+                    if(jQuery.browser.msie){
+                        $('.fancybox-title-outside').css('max-width','716px');
+                    }
+                    $(".tipsy_enable").tipsy({'html':true, 'gravity':'s'});
+                    $("a.language_chooser_trigger").toggle(function(){
+                        $("div.language_chooser").css({'visibility':'visible'});
+                    },function(){
+                        $("div.language_chooser").css({'visibility':'hidden'});
+                    });
+                    $("div.language_chooser a").click( function(){
+                        var target_lang_code = $("div.language_chooser select").val();
+                        if ( target_lang_code != "" ) {
+                            request_url = window.location+'l/{{ language.code }}/clone/'+target_lang_code+'/';
+                            window.location = request_url;
+                        } else {
+                            alert('{% trans "Please select a target language first."|escapejs %}');
+                        }
+                    });
+                    if(!$("#download_for_translation a").hasClass('disabled')){
+                        $("#download_for_translation").click(function(){
+                            $.ajax({
+                                url : '{% url lock_and_download_translation stat.object.project.slug stat.object.slug language.code %}',
+                                contentType : 'application/json',
+                                type : 'POST',
+                                beforeSend: function(){
+                                $("div#notification-container div").html('{% trans "Trying to lock resource..."|escapejs %}');
+                                $("div#notification-container").fadeIn("fast");
+                                },
+                                complete : function(xmlhttpreq, textStatus) {
+                                    if (textStatus=='success'){
+                                        response = JSON.parse(xmlhttpreq.responseText);
+                                        if(response['status']=='FAILED'){
+                                            $("#download_for_translation").siblings("div.error_notes").text(response['message']);
+                                            $("#download_for_translation").siblings("div.error_notes").show();
+                                        }else{
+                                            if(response['redirect']){
+                                                window.location = response['redirect'];
+                                            }
+                                        }
+                                        $("div#notification-container").fadeOut("fast");
+                                    }
+                                }
+                            });
+                        });
+                    }
+                },
+                'titleShow': true,
+                'titlePosition': 'outside',
+                'title': '{% trans "Translation Details"%}'
+           });
+        });
+    </script>
+  {% endfor %}
+  </table>
+ {% else %}
+  <p>{% trans "No resources are registered for this release yet." %}</p>
+ {% endif %}
+</div>
+
+{% endblock %}
