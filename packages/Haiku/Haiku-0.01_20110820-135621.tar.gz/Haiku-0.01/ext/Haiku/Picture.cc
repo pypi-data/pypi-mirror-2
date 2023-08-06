@@ -1,0 +1,177 @@
+/*
+ * Automatically generated file
+ */
+
+/*
+ * The main constructor is implemented in terms of __init__(). This allows
+ * __new__() to return an empty object, so when we pass to Python an object
+ * from the system (rather than one we created ourselves), we can use
+ * __new__() and assign the already existing C++ object to the Python object.
+ *
+ * This does somewhat expose us to the danger of Python code calling
+ * __init__() a second time, so we need to check for that.
+ */
+//static int Haiku_Picture_init(Haiku_Picture_Object* python_self, PyObject* python_args, PyObject* python_kwds);
+static int Haiku_Picture_init(Haiku_Picture_Object* python_self, PyObject* python_args, PyObject* python_kwds) {
+	// python_self->cpp_object already defined
+	
+	// don't let python code call us a second time
+	if (python_self->cpp_object != NULL)
+		return -1;
+	
+	python_self->cpp_object = new BPicture();
+	if (python_self->cpp_object == NULL)
+		return -1;	
+	
+	// we own this object, so we can delete it
+	python_self->can_delete_cpp_object = true;
+	return 0;
+}
+
+//static PyObject* Haiku_Picture_newFromPicture(PyTypeObject* python_type, PyObject* python_args);
+static PyObject* Haiku_Picture_newFromPicture(PyTypeObject* python_type, PyObject* python_args) {
+	Haiku_Picture_Object* python_self;
+	BPicture picture;
+	Haiku_Picture_Object* py_picture; // from generate_py()
+	// python_self->cpp_object already defined
+	
+	python_self = (Haiku_Picture_Object*)python_type->tp_alloc(python_type, 0);
+	
+	PyArg_ParseTuple(python_args, "O", &py_picture);
+	if (py_picture != NULL) {
+		memcpy((void*)&picture, (void*)((Haiku_Picture_Object*)py_picture)->cpp_object, sizeof(BPicture));
+	}
+	
+	python_self->cpp_object = new BPicture(picture);
+	if (python_self->cpp_object == NULL)
+		Py_RETURN_NONE;	
+	
+	// we own this object, so we can delete it
+	python_self->can_delete_cpp_object = true;
+	return (PyObject*)python_self;
+}
+
+//static PyObject* Haiku_Picture_newFromArchive(PyTypeObject* python_type, PyObject* python_args);
+static PyObject* Haiku_Picture_newFromArchive(PyTypeObject* python_type, PyObject* python_args) {
+	Haiku_Picture_Object* python_self;
+	BMessage* archive;
+	Haiku_Message_Object* py_archive; // from generate_py()
+	// python_self->cpp_object already defined
+	
+	python_self = (Haiku_Picture_Object*)python_type->tp_alloc(python_type, 0);
+	
+	PyArg_ParseTuple(python_args, "O", &py_archive);
+	if (py_archive != NULL) {
+		archive = ((Haiku_Message_Object*)py_archive)->cpp_object;
+	}
+	
+	python_self->cpp_object = new BPicture(archive);
+	if (python_self->cpp_object == NULL)
+		Py_RETURN_NONE;	
+	
+	// we own this object, so we can delete it
+	python_self->can_delete_cpp_object = true;
+	return (PyObject*)python_self;
+}
+
+//static void Haiku_Picture_DESTROY(Haiku_Picture_Object* python_self);
+static void Haiku_Picture_DESTROY(Haiku_Picture_Object* python_self) {
+	if (python_self->cpp_object != NULL) {
+		if (python_self->can_delete_cpp_object) {
+			delete python_self->cpp_object;
+		}
+	}
+}
+
+//static PyObject* Haiku_Picture_Instantiate(Haiku_Picture_Object* python_self, PyObject* python_args);
+static PyObject* Haiku_Picture_Instantiate(Haiku_Picture_Object* python_self, PyObject* python_args) {
+	BMessage* data;
+	Haiku_Message_Object* py_data; // from generate_py()
+	BArchivable* retval;
+	Haiku_Archivable_Object* py_retval; // from generate_py() (for outputs)
+	
+	PyArg_ParseTuple(python_args, "O", &py_data);
+	if (py_data != NULL) {
+		data = ((Haiku_Message_Object*)py_data)->cpp_object;
+	}
+	
+	retval = python_self->cpp_object->Instantiate(data);
+	if (retval == NULL)
+		Py_RETURN_NONE;	
+	
+	py_retval = (Haiku_Archivable_Object*)Haiku_Archivable_PyType.tp_alloc(&Haiku_Archivable_PyType, 0);
+	py_retval->cpp_object = (BArchivable*)retval;
+	// we own this object, so we can delete it
+	py_retval->can_delete_cpp_object = true;
+	return (PyObject*)py_retval;
+}
+
+//static PyObject* Haiku_Picture_Archive(Haiku_Picture_Object* python_self, PyObject* python_args);
+static PyObject* Haiku_Picture_Archive(Haiku_Picture_Object* python_self, PyObject* python_args) {
+	BMessage* data;
+	bool deep = true;
+	PyObject* py_deep; // from generate_py ()
+	status_t retval;
+	Haiku_Message_Object* py_data; // from generate_py() (for outputs)
+	
+	PyArg_ParseTuple(python_args, "|O", &py_deep);
+	deep = (bool)(PyObject_IsTrue(py_deep));
+	
+	retval = python_self->cpp_object->Archive(data, deep);
+	
+	if (retval != B_OK) {
+		PyObject* errval = Py_BuildValue("l", retval);
+		PyErr_SetObject(HaikuError, errval);
+		return NULL;
+	}
+	py_data = (Haiku_Message_Object*)Haiku_Message_PyType.tp_alloc(&Haiku_Message_PyType, 0);
+	py_data->cpp_object = (BMessage*)data;
+	// we own this object, so we can delete it
+	py_data->can_delete_cpp_object = true;
+	return (PyObject*)py_data;
+}
+
+static PyObject* Haiku_Picture_RichCompare(PyObject* a, PyObject* b, int op) {
+	bool retval;
+	
+	switch (op) {
+		case Py_EQ:
+			retval = ((Haiku_Picture_Object*)a)->cpp_object == ((Haiku_Picture_Object*)b)->cpp_object;
+			return Py_BuildValue("b", retval ? 1 : 0);
+			break;
+			
+		case Py_NE:
+			retval = ((Haiku_Picture_Object*)a)->cpp_object != ((Haiku_Picture_Object*)b)->cpp_object;
+			return Py_BuildValue("b", retval ? 1 : 0);
+			break;
+			
+		default:
+			return Py_NotImplemented;
+	}
+}
+
+static PyMethodDef Haiku_Picture_PyMethods[] = {
+	{"FromPicture", (PyCFunction)Haiku_Picture_newFromPicture, METH_VARARGS|METH_CLASS, ""},
+	{"FromArchive", (PyCFunction)Haiku_Picture_newFromArchive, METH_VARARGS|METH_CLASS, ""},
+	{"Instantiate", (PyCFunction)Haiku_Picture_Instantiate, METH_VARARGS, ""},
+	{"Archive", (PyCFunction)Haiku_Picture_Archive, METH_VARARGS, ""},
+	{NULL} /* Sentinel */
+};
+
+static void init_Haiku_Picture_PyType(PyTypeObject* type) {
+	type->tp_name        = "Haiku.Picture";
+	type->tp_basicsize   = sizeof(Haiku_Picture_Object);
+	type->tp_dealloc     = (destructor)Haiku_Picture_DESTROY;
+	type->tp_as_number   = 0;
+	type->tp_flags       = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+	type->tp_doc         = "...";
+	type->tp_richcompare = Haiku_Picture_RichCompare;
+	type->tp_methods     = Haiku_Picture_PyMethods;
+	type->tp_getset      = 0;
+	type->tp_base        = &Haiku_Archivable_PyType;
+	type->tp_init        = (initproc)Haiku_Picture_init;
+	type->tp_alloc       = PyType_GenericAlloc;
+	type->tp_new         = PyType_GenericNew;
+	type->tp_bases       = 0;
+}
+
