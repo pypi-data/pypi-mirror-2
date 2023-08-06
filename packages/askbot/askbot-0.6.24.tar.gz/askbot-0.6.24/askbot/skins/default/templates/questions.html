@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+<!-- questions.html -->
+{% import "macros.html" as macros %}
+{% block title %}{% spaceless %}{% trans %}Questions{% endtrans %}{% endspaceless %}{% endblock %}
+{% block forejs %}
+{% endblock %}
+{% block content %}
+{% cache 600 "scope_sort_tabs" search_tags request.user scope sort query context.page context.page_size language_code %}
+<div class="tabBar">
+    <div class="tabsC">
+        <span class="label">{% trans %}In:{% endtrans %}</span>
+        <a id="all" 
+            class="{% if scope == 'all' %}on{% else %}off{% endif %}"
+            href="?scope=all" 
+            title="{% trans %}see all questions{% endtrans %}"
+        >{% trans %}all{% endtrans %}</a>
+        <a id="unanswered" 
+            class="{% if scope == 'unanswered' %}on{% else %}off{% endif %}"
+            href="?scope=unanswered&amp;sort=answers-asc" 
+            title="{% trans %}see unanswered questions{% endtrans %}"
+        >{% trans %}unanswered{% endtrans %}</a>
+        {% if request.user.is_authenticated() %} 
+        <a id="favorite" 
+            class="{% if scope == 'favorite' %}on{% else %}off{% endif %}"
+            href="?scope=favorite" 
+            title="{% trans %}see your favorite questions{% endtrans %}"
+        >{% trans %}favorite{% endtrans %}</a>
+        {% endif %}
+    </div>
+    <div id="sort_tabs" class="tabsA">
+        <span class="label">{% trans %}Sort by:{% endtrans %}</span>
+        {% if show_sort_by_relevance %}
+            {% set asc_relevance_tooltip = gettext('most relevant questions') %}
+            {% set desc_relevance_tooltip = gettext('click to see most relevant questions') %}
+            {% set relevance_label = gettext('relevance') %}
+            {% if query %}
+            <a id="by_relevance"
+                {% if sort == "relevance-desc" %}
+                    href="?sort=relevance-desc"
+                    class="on"
+                    title="{{asc_relevance_tooltip}}">{{relevance_label}}
+                {% else %}
+                    href="?sort=relevance-desc"
+                    class="off"
+                    title="{{desc_relevance_tooltip}}">{{relevance_label}}
+                {% endif %}
+            </a>
+            {% endif %}
+            <script type="text/javascript">
+                var sortButtonData = sortButtonData || {};
+                sortButtonData['relevance'] = {
+                    asc_tooltip: "{{asc_relevance_tooltip}}",
+                    desc_tooltip: "{{desc_relevance_tooltip}}",
+                    asc_label: "{{relevance_label}}",
+                    desc_label: "{{relevance_label}}"
+                };
+            </script>
+        {% endif %}
+        {{macros.reversible_sort_button(
+            button_sort_criterium = 'age',
+            asc_tooltip = gettext('click to see the oldest questions'),
+            asc_label = gettext('oldest'),
+            desc_tooltip = gettext('click to see the newest questions'),
+            desc_label = gettext('newest'),
+            current_sort_method = sort)
+        }}
+        {{macros.reversible_sort_button(
+            button_sort_criterium = 'activity',
+            asc_tooltip = gettext('click to see the least recently updated questions'),
+            asc_label = gettext('inactive'),
+            desc_tooltip = gettext('click to see the most recently updated questions'),
+            desc_label = gettext('active'),
+            current_sort_method = sort)
+        }}
+        {{macros.reversible_sort_button(
+            button_sort_criterium = 'answers',
+            asc_tooltip = gettext('click to see the least answered questions'),
+            asc_label = gettext('less answers'),
+            desc_tooltip = gettext('click to see the most answered questions'),
+            desc_label = gettext('more answers'),
+            current_sort_method = sort)
+        }}
+        {{macros.reversible_sort_button(
+            button_sort_criterium = 'votes',
+            asc_tooltip = gettext('click to see least voted questions'),
+            asc_label = gettext('unpopular'),
+            desc_tooltip = gettext('click to see most voted questions'),
+            desc_label = gettext('popular'),
+            current_sort_method = sort)
+        }}
+    </div>
+</div>
+{% endcache %}
+{% if questions_count > 0 %}
+    <div style="clear:both">
+        <p style="float:right;margin:3px 3px 0 0;">
+            (<a style="text-decoration:none;" 
+                href="{{settings.APP_URL}}/feeds/rss/"
+                title="{% trans %}subscribe to the questions feed{% endtrans %}"
+                ><img 
+                    style="vertical-align:middle;"
+                    alt="{% trans %}subscribe to the questions feed{% endtrans %}"
+                src="{{"/images/feed-icon-small.png"|media}}"/> {% trans %}rss feed{% endtrans %}</a>)
+        </p>
+        <p id="question-count" class="search-result-summary">
+        {% if author_name or search_tags or query %}
+            {% trans cnt=questions_count, q_num=questions_count|intcomma %}
+                {{q_num}} question found
+            {% pluralize %}
+                {{q_num}} questions found
+            {% endtrans %}
+        {% else %}
+            {% trans cnt=questions_count, q_num=questions_count|intcomma %}{{q_num}} question{% pluralize %}{{q_num}} questions{% endtrans %}
+        {% endif %}
+        {% if author_name %}
+            {% trans %}with {{author_name}}'s contributions{% endtrans %}
+        {% endif %}
+        {% if search_tags %}{% if author_name %}, {% endif %}
+            {% trans %}tagged{% endtrans %}
+            "{{ search_tags|join('", "') }}"
+        {% endif %}
+        </p>
+        {% if author_name or search_tags or query %}
+            <p class="search-tips">{% trans %}Search tips:{% endtrans %}
+            {% if reset_method_count > 1 %}
+                {% if author_name %}
+                <a href="{% url questions %}?reset_author=true">{% trans %}reset author{% endtrans %}</a>
+                {% endif %}
+                {% if search_tags %}{% if author_name and query %}, {% elif author_name %}{% trans %} or {% endtrans %}{% endif %}
+                    <a href="{% url questions %}?reset_tags=true">{% trans %}reset tags{% endtrans %}</a>
+                {% endif %}
+                {% if query %}{% trans %} or {% endtrans %}
+                    <a href="{% url questions %}?start_over=true">{% trans %}start over{% endtrans %}</a>
+                {% endif %}
+            {% else %}
+                <a href="{% url questions %}?start_over=true">{% trans %}start over{% endtrans %}</a>
+            {% endif %}
+            {% trans %} - to expand, or dig in by adding more tags and revising the query.{% endtrans %}
+            </p>
+        {% else %}
+            <p class="search-tips">{% trans %}Search tip:{% endtrans %} {% trans %}add tags and a query to focus your search{% endtrans %}</p>
+        {% endif %}
+    </div>
+{% endif %}
+<div id="listA">
+{% cache 0 "questions" questions search_tags scope sort query context.page context.page_size language_code %}
+    {% for question in questions.object_list %}
+        {{macros.question_summary(question)}}
+    {% endfor %}
+{% endcache %}
+        {# comment todo: fix css here #}
+        {% if questions_count == 0 %}
+            {# todo: add tips to widen selection #}
+            <p class="evenMore" style="padding-top:30px;text-align:center;">
+            {% if scope == "unanswered" %}
+                {% trans %}There are no unanswered questions here{% endtrans %}
+            {% endif %}
+            {% if scope == "favorite" %}
+                {% trans %}No favorite questions here. {% endtrans %}
+                {% trans %}Please start (bookmark) some questions when you visit them{% endtrans %}
+            {% endif %}
+            </p>
+            {% if query or search_tags or author_name %}
+            <p class="evenMore" style="text-align:center">
+                {% trans %}You can expand your search by {% endtrans %}
+                {% if reset_method_count > 1 %}
+                    {% if author_name %}
+                    <a href="{% url questions %}?reset_author=true">{% trans %}resetting author{% endtrans %}</a>
+                    {% endif %}
+                    {% if search_tags %}{% if author_name and query %}, {% elif author_name %}{% trans %} or {% endtrans %}{% endif %}
+                        <a href="{% url questions %}?reset_tags=true">{% trans %}resetting tags{% endtrans %}</a>
+                    {% endif %}
+                    {% if query %}{% trans %} or {% endtrans %}
+                        <a href="{% url questions %}?start_over=true">{% trans %}starting over{% endtrans %}</a>
+                    {% endif %}
+                {% else %}
+                    <a href="{% url questions %}?start_over=true">{% trans %}starting over{% endtrans %}</a>
+                {% endif %}
+            </p>
+            {% endif %}
+            <p class="evenMore" style="text-align:center">
+            <a href="{% url ask %}">{% trans %}Please always feel free to ask your question!{% endtrans %}</a>
+            </p>
+        {% else %}
+            <p class="evenMore" style="padding-left:9px">
+                {% trans %}Did not find what you were looking for?{% endtrans %} 
+                <a href="{% url ask %}">{% trans %}Please, post your question!{% endtrans %}</a>
+            </p>
+        {% endif %}
+</div>
+{% endblock %}
+
+    {% block tail %}
+            {% if questions_count > 10 %}{# todo: remove magic number #}
+                <div id="pager" class="pager">{{ macros.paginator(context|setup_paginator) }}</div>
+                <div class="pagesize">{{ macros.pagesize_switch(context) }}</div>
+            {% endif %}
+    {% endblock %}
+
+{% block sidebar %}
+    {% if contributors %}
+        {% cache 600 "contributors" contributors search_tags scope sort query context.page context.page_size language_code %}
+        <div id="contrib-users" class="boxC">
+        <h3 class="subtitle">{% trans %}Contributors{% endtrans %}</h3>
+        {% spaceless %}
+            {% for person in contributors %}
+                {{ macros.gravatar(person,48) }}
+            {% endfor %}
+        {% endspaceless %}
+        </div>
+        {% endcache %}
+    {% endif %}
+
+    {% if request.user.is_authenticated() %} 
+       {% include "tag_selector.html" %}
+    {% endif %}
+
+    {% if tags %}
+        {% cache 600 "tags" tags search_tags scope sort query context.page context.page_size language_code %}
+        <div class="boxC">
+            <h3 class="subtitle">{% trans %}Related tags{% endtrans %}</h3>
+            <div id="related-tags" class="tags">
+                {% for tag in tags %}
+                    <a 
+                        rel="tag" 
+                        title="{% trans tag_name=tag.name %}see questions tagged '{{ tag_name }}'{% endtrans %}"  
+                        href="{% url questions %}?tags={{tag.name|urlencode}}">{{ tag.name }}</a>
+                    <span class="tag-number">&#215; {{ tag.local_used_count|intcomma }}</span>
+                    <br />
+                {% endfor %}
+            </div>
+        </div>
+        {% endcache %}
+    {% endif %}
+{% endblock %}
+{% block endjs %}
+    <script type="text/javascript">
+        {% if request.user.is_authenticated() %}
+        var tags = {{ tags_autocomplete|safe }};
+        {% endif %}
+        var sortMethod = '{{sort}}';
+        var showSortByRelevance = {% if show_sort_by_relevance %}true{% else %}false{% endif %};
+        var minSearchWordLength = {{settings.MIN_SEARCH_WORD_LENGTH}};
+        $().ready(function(){
+            var on_tab = '#nav_questions';
+            $(on_tab).attr('className','on');
+            Hilite.exact = false;
+            Hilite.elementid = "listA";
+            Hilite.debug_referrer = location.href;
+        });
+    </script>
+    <script type='text/javascript' src='{{"/js/com.cnprog.editor.js"|media}}'></script>
+    {% if request.user.is_authenticated() %}
+    <script type='text/javascript' src='{{"/js/com.cnprog.tag_selector.js"|media}}'></script>
+    {% endif %}
+    <script type="text/javascript" src="{{"/js/live_search.js"|media}}"></script>
+{% endblock %}
+<!-- end questions.html -->
