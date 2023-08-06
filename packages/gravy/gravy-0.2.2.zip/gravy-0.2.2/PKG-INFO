@@ -1,0 +1,380 @@
+Metadata-Version: 1.1
+Name: gravy
+Version: 0.2.2
+Summary: Simple VCS wrapper
+Home-page: UNKNOWN
+Author: Gerard Flanagan
+Author-email: grflanagan@gmail.com
+License: UNKNOWN
+Download-URL: http://pypi.python.org/packages/source/g/gravy/gravy-0.2.2.tar.gz
+Description: 
+        gravy.py
+        ########
+        
+        hg/hg-git command-line abstraction
+        
+        development
+        -----------
+        
+        https://github.com/worrp/python-gravy
+        
+        
+        Usage
+        #####
+        
+        mercurial
+        ---------
+        
+        >>> import os
+        >>> from gravy import HgRepo
+        >>> repo = HgRepo.from_bitbucket('jespern', 'django-piston')
+        >>> repo
+        HgRepo (django-piston)
+        >>> repo.url
+        'ssh://hg@bitbucket.org/jespern/django-piston'
+        >>> repo.relpath
+        'bitbucket.org/jespern/django-piston'
+        
+        
+        Repo objects are essentially a facade over a locally-cached repository.
+        
+        >>> repo.clone()
+        >>> assert os.path.exists(repo.path)
+        
+        Methods/properties on the repo object match the options of the command line clients::
+        
+        >>> repo.branches
+        [('default', '278:c4b2d21db51a')]
+        >>> for tag in sorted(repo.tags):
+        ...     print tag
+        ...
+        ('0.1', '50:30c2c6b3a055')
+        ('0.2.1', '117:a14b7b6ffa03')
+        ('0.2.2', '152:6b0364d98837')
+        ('tip', '278:c4b2d21db51a')
+        
+        
+        git
+        ---
+        
+        github.com::
+        
+        >>> repo = HgRepo.from_github('schacon', 'grit')
+        >>> repo.url
+        'git+ssh://git@github.com/schacon/grit.git'
+        >>> repo.clone()
+        >>> repo.branches
+        [('default', '340:e7cd96ec39e0')]
+        >>> for tag in sorted(repo.tags):
+        ...     print tag
+        ...
+        ('gh-pages', '199:52074d70dd2e')
+        ('integration', '198:172cd2460f15')
+        ('master', '340:e7cd96ec39e0')
+        ('tip', '340:e7cd96ec39e0')
+        ('v0.7.0', '43:edce718a3bec')
+        
+        gitorious.org::
+        
+        >>> repo = HgRepo.from_gitorious('zedshaw', 'python-modargs')
+        >>> repo.clone()
+        >>> repo.branches
+        [('default', '12:ec088657941a')]
+        >>> for tag in sorted(repo.tags):
+        ...     print tag
+        ...
+        ('master', '12:ec088657941a')
+        ('tip', '12:ec088657941a')
+        
+        >>> repo.checkout('master')
+        >>> for f in sorted(repo.listdir()):
+        ...     print f
+        ...
+        .gitignore
+        .hg
+        LICENSE
+        README.md
+        docs
+        examples
+        modargs
+        setup.py
+        tests
+        
+        checkout
+        --------
+        
+        >>> repo = HgRepo.from_github('schacon', 'grit')
+        >>> repo.checkout('master')
+        >>> assert 'README.md' in repo.listdir()
+        >>> assert not 'README.txt' in repo.listdir()
+        >>> assert 'submodule.rb' in repo.listdir('lib/grit')
+        
+        >>> repo.checkout('integration')
+        >>> assert not 'README.md' in repo.listdir()
+        >>> assert 'README.txt' in repo.listdir()
+        >>> assert not 'submodule.rb' in repo.listdir('lib/grit')
+        
+        >>> repo.checkout('derpdederp')
+        Traceback (most recent call last):
+        ...
+        RuntimeError: Command hg update -C derpdederp failed with error code 255
+        
+        
+        copy
+        ----
+        
+        >>> repo = HgRepo.from_github('schacon', 'grit')
+        >>> repo.checkout('master')
+        >>> other = repo.copy()
+        >>> assert other.path.startswith('/tmp/gravy-grit.git-')
+        >>> assert other.listdir()
+        >>> assert '.hg' in other.listdir()
+        >>> assert other.listdir('.hg')
+        >>> other.flush()
+        
+        copyfiles
+        ---------
+        
+        Copy files only, not the VCS folders (.hg, .git, .bzr, .svn)::
+        
+        >>> import tempfile
+        >>> tmp = tempfile.mkdtemp(prefix='gravy-TEST-') + '/TEST/'
+        >>> assert tmp.startswith('/tmp/gravy-TEST-')
+        >>> assert not os.path.exists(tmp)
+        >>> repo.copyfiles(tmp)
+        >>> assert os.path.exists(tmp)
+        >>> assert os.listdir(tmp)
+        >>> assert '.hg' not in os.listdir(tmp)
+        
+        anyrepo
+        -------
+        
+        >>> from gravy import anyrepo
+        
+        >>> repo = anyrepo('github', 'facebook', 'tornado')
+        >>> assert isinstance(repo, HgRepo)
+        >>> repo.url
+        'git+ssh://git@github.com/facebook/tornado.git'
+        >>> repo.clone()
+        
+        >>> repo = anyrepo('bitbucket', 'birkenfeld', 'sphinx')
+        >>> assert isinstance(repo, HgRepo)
+        >>> repo.url
+        'ssh://hg@bitbucket.org/birkenfeld/sphinx'
+        >>> repo.clone()
+        
+        >>> repo = anyrepo('git://gitorious.org/python-modargs/python-modargs.git')
+        >>> assert isinstance(repo, HgRepo)
+        >>> repo.url
+        'git://gitorious.org/python-modargs/python-modargs.git'
+        >>> repo.relpath
+        'gitorious.org/python-modargs/python-modargs.git'
+        >>> repo.clone()
+        
+        >>> repo = anyrepo('gitorious', 'zedshaw', 'learn-python-the-hard-way')
+        >>> assert isinstance(repo, HgRepo)
+        >>> repo.url
+        'git://gitorious.org/~zedshaw/learn-python-the-hard-way/learn-python-the-hard-way.git'
+        >>> repo.relpath
+        'gitorious.org/zedshaw/learn-python-the-hard-way/learn-python-the-hard-way.git'
+        >>> repo.clone()
+        
+        urlsplit
+        --------
+        
+        >>> from gravy import urlsplit
+        >>> urlsplit('https://bitbucket.org/birkenfeld/sphinx')
+        ('hg', 'https', 'bitbucket.org', 'birkenfeld', 'sphinx', '')
+        >>> urlsplit('http://bitbucket.org/birkenfeld/sphinx')
+        ('hg', 'http', 'bitbucket.org', 'birkenfeld', 'sphinx', '')
+        >>> urlsplit('ssh://hg@bitbucket.org/birkenfeld/sphinx')
+        ('hg', 'ssh', 'bitbucket.org', 'birkenfeld', 'sphinx', '')
+        >>> urlsplit('https://gitorious.org/python-modargs/python-modargs.git')
+        ('git', 'https', 'gitorious.org', '', 'python-modargs', 'python-modargs.git')
+        >>> urlsplit('https://gitorious.org/~zedshaw/python-modargs/python-modargs.git')
+        ('git', 'https', 'gitorious.org', 'zedshaw', 'python-modargs', 'python-modargs.git')
+        >>> urlsplit('git://gitorious.org/~zedshaw/python-modargs/python-modargs.git')
+        ('git', 'git', 'gitorious.org', 'zedshaw', 'python-modargs', 'python-modargs.git')
+        >>> urlsplit('git://mydomain.org/myproject/myproject.git')
+        ('git', 'git', 'mydomain.org', '', 'myproject', 'myproject.git')
+        >>> urlsplit('http://git.mydomain.org/myproject/myproject.git')
+        ('git', 'http', 'git.mydomain.org', '', 'myproject', 'myproject.git')
+        >>> urlsplit('')
+        ('hg', 'https', '', '', '', '')
+        >>> urlsplit('http://hg.python.org/cpython')
+        ('hg', 'http', 'hg.python.org', '', '', 'cpython')
+        >>> urlsplit('ssh://git@github.com/facebook/tornado.git')
+        ('git', 'ssh', 'github.com', 'facebook', 'tornado', '')
+        
+        incoming, outgoing, commit, pull
+        --------------------------------
+        
+        Create and clone::
+        
+        >>> repo = anyrepo('github', 'pypa', 'pip')
+        >>> repo.clone()
+        >>> assert not repo.incoming()
+        >>> assert not repo.outgoing()
+        
+        Commit with no changes is a no-op::
+        
+        >>> repo.commit('abcdef')
+        
+        Create a copy and make changes to it::
+        
+        >>> copy = repo.copy()
+        >>> assert not copy.outgoing()
+        >>> fname = copy.pathto('pip/__init__.py')
+        >>> with open(fname, 'w+b') as fp:
+        ...     fp.write('GRAVY TEST')
+        ...
+        >>> assert os.path.exists(copy.pathto('pip/locations.py'))
+        >>> copy.remove('pip/locations.py')
+        >>> copy.commit('Testing update')
+        >>> assert not os.path.exists(copy.pathto('pip/locations.py'))
+        >>> assert open(copy.pathto('pip/__init__.py')).read() == 'GRAVY TEST'
+        
+        Outgoing of copy with respect to the original repo::
+        
+        >>> assert copy.outgoing(dest=repo.path)
+        
+        Incoming of original with respect to the changed copy::
+        
+        >>> repo.flush_incoming()
+        >>> assert not os.listdir(repo._incoming)
+        >>> assert repo.incoming(source=copy.path)
+        
+        The call to incoming created a bundle file::
+        
+        >>> assert len(os.listdir(repo._incoming)) == 1
+        
+        Rollback the changes to the copy to help confirm the next pull uses the stored bundle::
+        
+        >>> copy.rollback()
+        >>> copy.revertall()
+        >>> assert os.path.exists(copy.pathto('pip/locations.py'))
+        >>> assert not open(copy.pathto('pip/__init__.py')).read() == 'GRAVY TEST'
+        
+        Now pull::
+        
+        >>> assert os.path.exists(repo.pathto('pip/locations.py'))
+        >>> assert not open(repo.pathto('pip/__init__.py')).read() == 'GRAVY TEST'
+        >>> repo.pull(source=copy.path, update=True)
+        >>> assert not os.path.exists(repo.pathto('pip/locations.py'))
+        >>> assert open(repo.pathto('pip/__init__.py')).read() == 'GRAVY TEST'
+        >>> repo.rollback()
+        >>> repo.revertall()
+        >>> assert os.path.exists(repo.pathto('pip/locations.py'))
+        >>> assert not open(repo.pathto('pip/__init__.py')).read() == 'GRAVY TEST'
+        
+        branch
+        ------
+        
+        Current branch name::
+        
+        >>> sorted(copy.branchmap().keys())
+        ['default']
+        >>> copy.branch()
+        'default'
+        >>> sorted(copy.branchmap().keys())
+        ['default']
+        
+        Create a new branch::
+        
+        >>> copy.branch('testing')
+        >>> sorted(copy.branchmap().keys())
+        ['default']
+        >>> copy.branch()
+        'testing'
+        
+        Make changes::
+        
+        >>> assert os.path.exists(copy.pathto('pip/locations.py'))
+        >>> copy.remove('pip/locations.py')
+        >>> copy.commit('new branch')
+        >>> sorted(copy.branchmap().keys())
+        ['default', 'testing']
+        >>> assert not os.path.exists(copy.pathto('pip/locations.py'))
+        >>> copy.checkout('default')
+        >>> assert os.path.exists(copy.pathto('pip/locations.py'))
+        
+        
+        Find python packages and modules
+        ################################
+        
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        [('pip', 'pip')]
+        >>> sorted(pyfiles['modules'])
+        [('get-pip', 'contrib/get-pip.py')]
+        
+        >>> repo = HgRepo.from_github('schacon', 'grit')
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        []
+        >>> sorted(pyfiles['modules'])
+        []
+        
+        >>> repo = HgRepo.from_bitbucket('jespern', 'django-piston')
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        [('piston', 'piston')]
+        >>> sorted(pyfiles['modules'])
+        []
+        
+        >>> repo = HgRepo.from_gitorious('zedshaw', 'python-modargs')
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        [('modargs', 'modargs')]
+        >>> sorted(pyfiles['modules'])
+        []
+        
+        >>> repo = anyrepo('gitorious', 'zedshaw', 'learn-python-the-hard-way')
+        >>> pyfiles = repo.find_py_files()
+        >>> for x in sorted(pyfiles['packages']):
+        ...     print x
+        ...
+        ('bin', 'ex/ex51/gothonweb/bin')
+        ('gothonweb', 'ex/ex51/gothonweb/gothonweb')
+        ('tests', 'ex/ex51/gothonweb/tests')
+        >>> for x in sorted(pyfiles['modules']):
+        ...     print x #doctest: +ELLIPSIS
+        ...
+        ('app', 'ex/ex50/gothonweb/bin/app.py')
+        ('conf', 'conf.py')
+        ('conf_hard', 'conf_hard.py')
+        ('conf_html', 'conf_html.py')
+        ('conf_paper', 'conf_paper.py')
+        ('ex', 'ex/ex.py')
+        ('ex1', 'ex/ex1.py')
+        ('ex10', 'ex/ex10.py')
+        ('ex11', 'ex/ex11.py')
+        ...
+        
+        >>> repo = HgRepo.from_github('worrp', 'python-dubbel')
+        >>> repo.clone()
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        []
+        >>> sorted(pyfiles['modules'])
+        [('dubbel', 'dubbel.py')]
+        
+        >>> repo = HgRepo.from_github('facebook', 'tornado')
+        >>> repo.clone()
+        >>> pyfiles = repo.find_py_files()
+        >>> sorted(pyfiles['packages'])
+        [('tornado', 'tornado')]
+        >>> for item in sorted(pyfiles['modules']):
+        ...     print item
+        ...
+        ('conf', 'website/sphinx/conf.py')
+        ('sphinx_coverage', 'website/sphinx/sphinx_coverage.py')
+        ('website', 'website/website.py')
+        
+        
+        
+        
+        
+        
+Platform: UNKNOWN
+Requires: pip
