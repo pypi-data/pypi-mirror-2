@@ -1,0 +1,1 @@
+See quintagroup/theme/sunrain/README.txt
