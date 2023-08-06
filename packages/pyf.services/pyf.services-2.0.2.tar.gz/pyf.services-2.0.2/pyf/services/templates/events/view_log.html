@@ -1,0 +1,84 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="master.html" />
+  <xi:include href="pyf.services.templates.misc.paginate" />
+<head>
+	<?python
+	import operator
+	# This is ugly but since we never display more than a few messages, it's ok...
+	messages = list(messages)
+	?>
+	<link rel="stylesheet" type="text/css" media="screen" href="${tg.url('/css/bubbles.css')}" />
+	<link rel="stylesheet" type="text/css" media="screen" href="${tg.url('/css/progress.css')}" />
+	<title py:content="'Event #%d' % eventtrack.id"></title>
+	<script type="text/javascript">
+		max_comment_id = ${max(map(operator.attrgetter('id'), messages))};
+		current_percent = ${int(eventtrack.progression or 0)};
+		current_status = "${eventtrack.status}";
+		json_url = '${tg.url('/events/%s.json' % eventtrack.id)}';
+	</script>
+	<script type="text/javascript" src="${tg.url('/scripts/log_viewer.js')}"></script>
+</head>
+<body>
+	<div id="sidebar">
+		<h3>Status</h3>
+		<p class="text" py:content="eventtrack.status" id="status"></p>
+		<h3>Progress</h3>
+		<div class="progressbar" py:with="progress_percent = '%d%%' % int(eventtrack.progression or 0)">
+	        <div id="progression" class="progressbar-completed" style="width:${progress_percent};">
+	            <div>&nbsp;</div><p py:content="progress_percent" />
+	        </div>
+	    </div>
+		<div py:def="show_sidelink(title, obj_attr, url_base, name_attr)"
+		     py:with="obj = getattr(eventtrack, obj_attr)">
+			<h3 py:if="obj" py:content="title"></h3>
+			<p py:if="obj" class="text">
+				<a href="${tg.url(url_base % getattr(obj, 'id'))}"
+				   py:content="getattr(obj, name_attr)"/>
+			</p>
+		</div>
+		${show_sidelink('Dispatch', 'dispatch', '/dispatchs/%s', 'display_name')}
+		${show_sidelink('Tube', 'tube', '/tubes/%s', 'display_name')}
+		<h3 py:if="eventtrack.variant_name">Variant</h3>
+		<p class="text" py:if="eventtrack.variant_name"
+		   py:content="eventtrack.variant_name"></p>
+		<h3 py:if="eventtrack.storage_file_uuid">Input</h3>
+		<p class="text" py:if="eventtrack.storage_file_uuid">
+			<a href="${tg.url('/events/download_input/%s' % eventtrack.id)}"
+			py:content="eventtrack.source_filename or 'Input File'"></a>
+		</p>
+		<h3>Output</h3>
+		<p class="text" id="output_files">
+			<span py:for="num, output_file in enumerate(eventtrack.ordered_output_files)">
+				<a href="${tg.url('/events/download_output/%d' % output_file.id)}"
+				   py:content="output_file.filename or 'file %d' % (num+1)" />
+			</span>
+		</p>
+	</div>
+	<div id="content">
+		<h2>Viewing event ${eventtrack.id} <span py:if="eventtrack.tube" py:strip="True">(${eventtrack.tube.display_name})</span></h2>
+	    <span py:if="tmpl_context.paginators and tmpl_context.paginators.messages.page_count > 1"
+		      py:strip="True"
+	          py:content="paginate_nav(tmpl_context.paginators.messages)"/>
+		<div id="messages">
+			<div class="bubble" py:for="message in messages">
+				<div class="rounded ${message.message_type}">
+					<blockquote>
+						<span class="message_type" py:content="message.message_type"></span>
+						<p py:content="message.message" />
+					</blockquote>
+				</div>
+				<cite class="rounded ${message.message_type}">
+					<strong
+					py:content="message.user_id and message.user.user_name or message.source" />
+					on <span py:strip="True" py:content="message.timestamp"></span>
+				</cite>
+			</div>
+		</div>
+	    <span py:if="tmpl_context.paginators and tmpl_context.paginators.messages.page_count > 1"
+		      py:strip="True"
+	          py:content="paginate_nav(tmpl_context.paginators.messages)"/>
+	</div>
+</body>
+</html>
