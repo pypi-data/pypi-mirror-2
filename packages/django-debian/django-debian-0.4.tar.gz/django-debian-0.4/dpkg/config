@@ -1,0 +1,58 @@
+# Copyright (C) 2011 Linaro Limited
+#
+# Author: Zygmunt Krynicki <zygmunt.krynicki@linaro.org>
+#
+# This file is part of django-debian.
+#
+# django-debian is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3
+# as published by the Free Software Foundation
+#
+# django-debian is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with django-debian.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# Source common django-debian stuff
+if [ -f /usr/share/django-debian/dpkg/common ]; then
+    . /usr/share/django-debian/dpkg/common
+    # Load default settings, this allows
+    # package maintainer to set some variables
+    # before calling django_debian_go
+    django_debian_load_defaults
+fi
+
+django_debian_go(){
+    # Setup configuration variables
+    django_debian_config $@
+
+    # Store configuration variables set by package maintainer
+    django_debian_store_config
+
+    # Load dbconfig-common if it was requested
+    if [ "$django_debian_use_dbconfig_common" = "yes" ]; then
+        if [ -f /usr/share/dbconfig-common/dpkg/config ]; then
+            if db_get $django_debian_package-sqlite/available && [ $RET = "true" ]; then
+                dbc_dbtypes="sqlite3"
+            else
+                echo "$django_debian_package.config: postponing configuration utill $django_debian_package-sqlite is installed"
+                exit 0
+            fi
+
+            # source dbconfig-common stuff
+            . /usr/share/dbconfig-common/dpkg/config 
+            dbc_go $@
+        fi
+    fi
+
+    #db_get django-hello/admin-created 
+    #if [ "$RET" != "true" ]; then
+    #    db_input medium django-hello/admin-user || true
+    #    db_input medium django-hello/admin-email || true
+    #    db_go
+    #fi
+}

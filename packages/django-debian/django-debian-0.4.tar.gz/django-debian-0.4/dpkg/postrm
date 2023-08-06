@@ -1,0 +1,68 @@
+# Copyright (C) 2011 Linaro Limited
+#
+# Author: Zygmunt Krynicki <zygmunt.krynicki@linaro.org>
+#
+# This file is part of django-debian.
+#
+# django-debian is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3
+# as published by the Free Software Foundation
+#
+# django-debian is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with django-debian.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# Source common django-debian stuff
+if [ -f /usr/share/django-debian/dpkg/common ]; then
+    . /usr/share/django-debian/dpkg/common
+fi
+
+django_debian_go() {
+    # Setup configuration variables
+    django_debian_config $@
+
+    # Load dbconfig-common if it was requested
+    if [ "$django_debian_use_dbconfig_common" = "yes" ]; then
+        # Source dbconfig-common shell library and call the hook function
+        if [ -f /usr/share/dbconfig-common/dpkg/postrm ]; then
+            . /usr/share/dbconfig-common/dpkg/postrm 
+            dbc_go $@
+        fi
+    fi
+
+    if [ "$django_debian_command" = "purge" ]; then
+        # Remove symlinks to static content if we are using django-staticfiles
+        if [ "$django_debian_use_staticfiles" = "yes" ]; then
+            rm -rf /var/lib/$django_debian_package/static
+        fi
+
+        # Remove uploaded and generated application content if requested
+        if [ "$django_debian_purge_media_files" = "yes" ]; then
+            rm -rf /var/lib/$django_debian_package/media
+        fi
+
+        # Remove default database settings (generated with dbconfig-common)
+        if [ "$django_debian_use_dbconfig_common" = "yes" ]; then
+            ucf -p /etc/$django_debian_package/default_database.conf
+            rm -f /etc/$django_debian_package/default_database.conf
+        fi
+
+        # Remove SECRET_KEY
+        rm -f /etc/$django_debian_package/secret_key.conf
+    fi
+
+    # Restart apache if requested
+    if [ "$django_debian_restart_apache" = "yes" ]; then
+        if [ -x "`which invoke-rc.d 2>/dev/null`" -a -x "/etc/init.d/apache2" ] ; then
+            invoke-rc.d --quiet apache2 reload >&2
+        fi
+    fi
+
+    # Erase configuration file used by django-debian
+    django_debian_erase_config
+}

@@ -1,0 +1,96 @@
+# Copyright (C) 2011 Linaro Limited
+#
+# Author: Zygmunt Krynicki <zygmunt.krynicki@linaro.org>
+#
+# This file is part of django-debian.
+#
+# django-debian is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3
+# as published by the Free Software Foundation
+#
+# django-debian is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with django-debian.  If not, see <http://www.gnu.org/licenses/>.
+
+
+django_debian_load_defaults() {
+    # Type: application configuration, related to webapp container, not easily changeable
+    django_debian_conf_owner=root:www-data
+    django_debian_conf_perms=0660
+
+    # Type: admin preference, could be changed later with debconf template
+    django_debian_purge_media_files=no
+    django_debian_restart_apache=no
+
+    # Type: application internal, cannot be changed, must be forced by per-application configuration file
+    django_debian_use_dbconfig_common=no
+    django_debian_synchronize_db=no
+    django_debian_use_staticfiles=no
+}
+
+
+django_debian_store_config() {
+    cat >/etc/django-debian/$django_debian_package.conf <<-EOM
+	# This file contains automatically generated configuration
+	# it contains things that are specific to this particular package
+	# It should not be edited manually.
+	django_debian_conf_owner=$django_debian_conf_owner
+	django_debian_conf_perms=$django_debian_conf_perms
+	django_debian_purge_media_files=$django_debian_purge_media_files
+	django_debian_restart_apache=$django_debian_restart_apache
+	django_debian_synchronize_db=$django_debian_synchronize_db
+	django_debian_use_dbconfig_common=$django_debian_use_dbconfig_common
+	django_debian_use_staticfiles=$django_debian_use_staticfiles
+EOM
+}
+
+
+django_debian_erase_config() {
+    rm -f /etc/django-debian/$django_debian_package.conf
+}
+
+
+django_debian_load_config() {
+    if [ -f /etc/django-debian/$django_debian_package.conf ]; then
+        . /etc/django-debian/$django_debian_package.conf
+    fi
+}
+
+django_debian_config_summary() {
+    # Print config summary
+    cat >&2 <<-EOM
+	Configuration summary for $django_debian_package
+
+	django_debian_conf_owner=$django_debian_conf_owner
+	django_debian_conf_perms=$django_debian_conf_perms
+	django_debian_purge_media_files=$django_debian_purge_media_files
+	django_debian_restart_apache=$django_debian_restart_apache
+	django_debian_synchronize_db=$django_debian_synchronize_db
+	django_debian_use_dbconfig_common=$django_debian_use_dbconfig_common
+	django_debian_use_staticfiles=$django_debian_use_staticfiles
+EOM
+}
+
+
+django_debian_config() {
+    # Calculate some internal variables
+    django_debian_package="$1"
+    django_debian_basepackage=`echo $django_debian_package | cut -d_ -f1`
+    django_debian_command="$2"
+
+    # Load config from debconf
+    django_debian_load_config
+
+    # Calculate configuration variables for dbconfig-common
+    if [ "$django_debian_use_dbconfig_common" = "yes" ]; then
+        dbc_dbfile_owner=root:www-data
+        dbc_dbfile_perms=0660
+        dbc_generate_include=sh:/etc/$django_debian_package/default_database.conf
+        dbc_generate_include_owner=root:www-data
+        dbc_generate_include_perms=0640
+    fi
+}

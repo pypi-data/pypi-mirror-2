@@ -1,0 +1,84 @@
+# Copyright (C) 2011 Linaro Limited
+#
+# Author: Zygmunt Krynicki <zygmunt.krynicki@linaro.org>
+#
+# This file is part of django-debian.
+#
+# django-debian is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3
+# as published by the Free Software Foundation
+#
+# django-debian is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with django-debian.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# Source common django-debian stuff
+if [ -f /usr/share/django-debian/dpkg/common ]; then
+    . /usr/share/django-debian/dpkg/common
+fi
+
+django_debian_go() {
+    # Setup configuration variables
+    django_debian_config $@
+    
+    # Load dbconfig-common if it was requested
+    if [ "$django_debian_use_dbconfig_common" = "yes" ]; then
+        # Source dbconfig-common shell library and call the hook function
+        if [ -f /usr/share/dbconfig-common/dpkg/postinst ]; then
+            . /usr/share/dbconfig-common/dpkg/postinst 
+            dbc_go $@
+        fi
+    fi
+
+    if [ "$django_debian_command" = "configure" ] || [ "$django_debian_command" = "reconfigure" ]; then
+        # Prepare space for settings
+        mkdir -p "/etc/$django_debian_package/"
+
+        # Create the initial empty secret_key.conf and make sure it has the
+        # right permissions
+        touch "/etc/$django_debian_package/secret_key.conf"
+        chown "$django_debian_conf_owner" "/etc/$django_debian_package/secret_key.conf"
+        chmod "$django_debian_conf_perms" "/etc/$django_debian_package/secret_key.conf"
+
+        # Prepare space for media files
+        mkdir -p "/var/lib/$django_debian_package/media"
+        chown root:www-data "/var/lib/$django_debian_package/media"
+        # XXX: media files privacy is not defined, currently we _prevent_
+        # anyone from accessing media files directly but this might be too
+        # strict.
+        chmod 0770 "/var/lib/$django_debian_package/media"
+
+        # Refresh python-support cache so that we can call manage.py below
+        if [ "$django_debian_use_staticfiles" = "yes" ] || [ "$django_debian_synchronize_db" = "yes" ]; then
+            update-python-modules --post-install
+        fi
+
+        # Rebuild the cache of static files if we are using django-staticfiles
+        if [ "$django_debian_use_staticfiles" = "yes" ]; then
+            mkdir -p "/var/lib/$django_debian_package/static"
+            chown root:www-data "/var/lib/$django_debian_package/static"
+            chmod 0755 "/var/lib/$django_debian_package/static"
+            echo " * Rebuilding cache of static files used by $django_debian_package" >&2 
+            rm -rf /var/lib/$django_debian_package/static/*
+            /usr/lib/$django_debian_package/manage.py build_static --noinput --verbosity=0 --link
+        fi
+        
+        # Synchronize the database if requested
+        if [ "$django_debian_synchronize_db" = "yes" ]; then
+            echo " * Synchronizing database used by $django_debian_package" >&2
+            /usr/lib/$django_debian_package/manage.py syncdb --noinput --verbosity=0 
+        fi
+
+        # Restart apache if requested
+        if [ "$django_debian_restart_apache" = "yes" ]; then
+            if [ -x "`which invoke-rc.d 2>/dev/null`" -a -x "/etc/init.d/apache2" ] ; then
+                invoke-rc.d --quiet apache2 reload >&2
+            fi
+        fi
+    fi
+}
