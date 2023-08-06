@@ -1,0 +1,52 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix void: <http://rdfs.org/ns/void#>.
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix http: <http://www.w3.org/2006/http#>.
+@prefix curl: <http://eris.okfn.org/ww/2010/12/curl#>.
+@prefix curate: <http://eris.okfn.org/ww/2010/12/curate#>.
+
+##
+## First clear any broken link tags
+##
+{ ?dataset a dcat:Dataset } =>
+{ ?dataset curate:delTag "broken_link" }.
+
+##
+## For DCat datasets we check the distribution's
+## access URL
+##
+{ ?dataset dcat:distribution ?dist .
+  ?dist dcat:accessURL ?download } =>
+{ ?download curate:curlReq "GET" }.
+
+{ ?dataset dcat:distribution ?dist .
+  ?dist dcat:accessURL ?download .
+  ?download broken ?code } =>
+{ ?dataset curate:addTag "broken_link" }.
+
+##
+## For voidD datasets we also check their example resources
+##
+{ ?dataset void:exampleResource ?example } =>
+{ ?example curate:curlReq "GET" }.
+
+{ ?dataset void:exampleResource ?example . 
+  ?example broken ?code } =>
+{ ?dataset curate:addTag "broken_link" }.
+
+##
+## This chains off the result of curate:httpReq to
+## mark the uri as broken
+##
+{ ?req a http:Request . 
+  ?req http:requestURI ?uri .
+  ?req http:resp ?resp .
+  ?resp http:statusCodeNumber ?code .
+  ?code log:notEqualTo "200" } =>
+{ ?uri broken ?code }.
+
+{ ?curl a curl:Curl .
+  ?curl curl:uri ?uri .
+  ?curl curl:status curl:Failure } =>
+{ ?uri broken curl:Failure }.
