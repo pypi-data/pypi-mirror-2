@@ -1,0 +1,559 @@
+% for name, value in this.properties.items():
+# ${name}: ${value}
+% endfor
+
+% from 'common.pytempl' import types_extra_args, with_type_debug with context
+
+<%macro make_repeatable_deserializer(state, name)>
+cdef object repeat_deserialize_${name}(char **pointer, char *end, ${types_extra_args(state)}):
+    cdef object value = []
+    while pointer[0]<end:
+        value.append(deserialize_${name}(pointer, end, ${types_extra_args(state)}))
+    return value
+<%endmacro>
+
+<%macro make_repeatable_deserializer_with_length(state, name)>
+cdef object repeat_deserialize_${name}(char **pointer, char *end, ${types_extra_args(state)}):
+    cdef object value = []
+    cdef uint64_t size = 0
+    while pointer[0]<end:
+        raw_deserialize_uint64(pointer, end, &size)
+        value.append(deserialize_${name}(pointer, pointer[0]+size, ${types_extra_args(state)}))
+    return value
+<%endmacro>
+
+<%macro make_deserializer(state, name)>
+cdef object deserialize_${name}(char **pointer, char *end, ${types_extra_args(state)}):
+% set body = caller
+% call with_type_debug(name)
+${body()}
+% endcall
+<%endmacro>
+
+from cpython cimport *
+
+${this.title('_', 'EXTERNALS')}
+
+cdef extern from "Python.h":
+    bint PyByteArray_Resize(object bytearray, Py_ssize_t len)
+    char* PyByteArray_AS_STRING(object bytearray)
+    Py_ssize_t PyByteArray_GET_SIZE(object bytearray)
+    object PyUnicode_FromStringAndSize(char *buff, Py_ssize_t len)
+
+cdef extern from "string.h":
+    cdef int strlen(char* s) nogil
+    cdef void* memcpy(void* dest, void* src, size_t len) nogil
+    cdef void* memset(void* s, int c, size_t len) nogil
+
+cdef extern from "stdlib.h":
+    cdef void* malloc(size_t size) nogil
+    cdef void* calloc(size_t nmb, size_t size) nogil
+    cdef void* realloc(void* ptr, size_t size) nogil
+    cdef void  free(void* ptr) nogil
+
+cdef extern from "stdint.h":
+    ctypedef unsigned long long int uint64_t
+    ctypedef long long int int64_t
+    ctypedef unsigned long int uint32_t
+    ctypedef long int int32_t
+
+${this.title('_', 'HELPERS')}
+
+class EncodeError(Exception):
+    pass
+
+class InternalDecodeError(Exception):
+    pass
+
+cdef inline object makeDecodeError(char* pointer, char* message):
+    cdef uint64_t locator = <uint64_t>pointer
+    return InternalDecodeError(PyLong_FromUnsignedLongLong(locator), message)
+
+class DecodeError(Exception):
+    def __init__(self, pointer, message):
+        self.pointer = pointer
+        self.message = message
+    def __str__(self):
+        return self.message.format(self.pointer)
+
+class Extensions(object):
+    __slots__ = 'host',
+    def __init__(self, host):
+        object.__setattr__(self, 'host', host)
+    def __getattr__(self, name):
+        if not self.__check_name(name):
+            raise AttributeError(name)
+        return getattr(self.host, name)
+    def __setattr__(self, name, value):
+        if not self.__check_name(name):
+            raise AttributeError(name)
+        setattr(self.host, name, value)
+    def __getitem__(self, name):
+        if not self.__check_name(name):
+            raise KeyError(name)
+        return getattr(self.host, name)
+    def __setitem__(self, name, value):
+        if not self.__check_name(name):
+            raise KeyError(name)
+        try:
+            setattr(self.host, name, value)
+        except AttributeError:
+            raise KeyError(name)
+    def __check_name(self, name):
+        return name in self.host._extended_fields_
+
+class BaseMessage(object):
+    def SerializePartialToString(self):
+        array = bytearray()
+        self.serialize(array)
+        return bytes(array)
+
+    def ClearExtension(self, name):
+        self._extended_fields_.remove(name)
+
+    def HasExtension(self, name):
+        return name in self._extended_fields_
+
+    def HasField(self, name):
+        return hasattr(self, name)
+
+    def ClearField(self, name):
+        delattr(self, name)
+
+    def __ne__(self, other_msg):
+        return not self==other_msg
+
+    @property
+    def Extensions(self):
+        return Extensions(self)
+
+    def __repr__(self):
+        fields = ''
+        for name in self.__slots__:
+            fields += '{0}={1!r}'.format(name, getattr(self, name, '-?-'))
+        return '<{0} {1} at 0x{2:08x}>'.format(
+            self.__class__.__name__, fields, id(self))
+
+${this.title('_', 'LOW LEVEL')}
+
+ctypedef object(*parsefunc)(char **pointer, char *end, ${types_extra_args(state)})
+
+${this.title(' ', 'uint32')}
+
+cdef inline void serialize_uint32(object array, uint32_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 10)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+
+    if 0!=n:
+        while True:
+            rem = <char>(n & 0x7f)
+            n = n>>7
+            if 0==n:
+                buff[0] = <char> rem
+                buff+=1
+                break
+            else:
+                rem = rem | 0x80
+                buff[0] = <char> rem
+                buff+=1
+    else:
+        buff[0] = '\0'
+        buff+=1
+    PyByteArray_Resize(array, buff - PyByteArray_AS_STRING(array))
+
+cdef inline int raw_deserialize_uint32(char **start, char *end, uint32_t *result) nogil:
+    cdef uint32_t value = 0
+    cdef uint32_t byte
+    cdef char *pointer = start[0]
+    cdef int counter = 0
+    while True:
+        if pointer == end:
+            return -1
+        byte = pointer[0]
+        value |= (byte & 0x7f) << counter
+        counter+=7
+        pointer+=1
+        if byte & 0x80 == 0:
+            break
+    start[0] = pointer
+    result[0] = value
+    return 0
+
+% call make_deserializer(state, 'uint32')
+    cdef uint32_t result
+    if raw_deserialize_uint32(pointer, end, &result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `uint32` at [{0}]")
+% endcall
+    return PyLong_FromUnsignedLong(result)
+
+${make_repeatable_deserializer(state, 'uint32')}
+
+${this.title(' ', 'int32')}
+
+cdef inline void serialize_int32(object array, int32_t n):
+    serialize_uint32(array, <uint32_t>n)
+
+% call make_deserializer(state, 'int32')
+    cdef int32_t result
+    if raw_deserialize_uint32(pointer, end, <uint32_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `int32` at [{0}]")
+% endcall
+    return PyInt_FromLong(result)
+
+${make_repeatable_deserializer(state, 'int32')}
+
+${this.title(' ', 'sint32')}
+
+cdef inline void serialize_sint32(object array, int32_t n):
+    cdef uint32_t un = (<uint32_t>n << 1) ^ (<uint32_t>n >> 31)
+    serialize_uint32(array, un)
+
+% call make_deserializer(state, 'sint32')
+    cdef uint32_t result
+    if raw_deserialize_uint32(pointer, end, &result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `sint32` at [{0}]")
+% endcall
+    return PyInt_FromLong(<int32_t>((result >> 1) ^ (result << 31)))
+
+${make_repeatable_deserializer(state, 'sint32')}
+
+${this.title(' ', 'uint64')}
+
+cdef inline void serialize_uint64(object array, uint64_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 20)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+
+    if 0!=n:
+        while( True):
+            rem = <char>(n & 0x7f)
+            n = n>>7
+            if 0==n:
+                buff[0] = <char> rem
+                buff+=1
+                break
+            else:
+                rem = rem | 0x80
+                buff[0] = <char> rem
+                buff+=1
+    else:
+        buff[0] = '\0'
+        buff+=1
+    PyByteArray_Resize(array, buff - PyByteArray_AS_STRING(array))
+
+cdef inline int raw_deserialize_uint64(char **start, char *end, uint64_t *result) nogil:
+    cdef uint64_t value = 0
+    cdef uint64_t byte
+    cdef char *pointer = start[0]
+    cdef int counter = 0
+    while True:
+        if pointer == end:
+            return -1
+        byte = pointer[0]
+        value |= (byte & 0x7f) << counter
+        counter+=7
+        pointer+=1
+        if byte & 0x80 == 0:
+            break
+    start[0] = pointer
+    result[0] = value
+    return 0
+
+% call make_deserializer(state, 'uint64')
+    cdef uint64_t result
+    if raw_deserialize_uint64(pointer, end, &result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `uint64` at [{0}]")
+% endcall
+    return PyLong_FromUnsignedLongLong(result)
+
+${make_repeatable_deserializer(state, 'uint64')}
+
+${this.title(' ', 'int64')}
+
+cdef inline void serialize_int64(object array, int64_t n):
+    serialize_uint64(array, <uint64_t>n)
+
+% call make_deserializer(state, 'int64')
+    cdef int64_t result
+    if raw_deserialize_uint64(pointer, end, <uint64_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `int64` at [{0}]")
+% endcall
+    return PyLong_FromLongLong(result)
+
+${make_repeatable_deserializer(state, 'int64')}
+
+${this.title(' ', 'sint64')}
+
+cdef inline void serialize_sint64(object array, int64_t n):
+    cdef uint64_t un = (<uint64_t>n<<1) ^ (<uint64_t>n>>63)
+    serialize_uint64(array, un)
+
+% call make_deserializer(state, 'sint64')
+    cdef uint64_t un
+    if raw_deserialize_uint64(pointer, end, &un):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `sint64` at [{0}]")
+% endcall
+    return PyLong_FromLongLong(<int64_t>((un>>1) ^ (un<<63)))
+
+${make_repeatable_deserializer(state, 'sint64')}
+
+${this.title(' ', 'fixed32')}
+
+cdef inline void serialize_fixed32(object array, uint32_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 4)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+    cdef int i
+
+    for i from 0 <= i < 4:
+        rem = n & 0xff
+        n = n >> 8
+        buff[0] = <char> rem
+        buff += 1
+
+cdef inline int raw_deserialize_fixed32(char **pointer, char *end, uint32_t *result) nogil:
+    cdef uint32_t value = 0
+    cdef char *start = pointer[0]
+    cdef int i
+
+    for i from 0 <= i < 4:
+        if start == end:
+            return -1
+        value |= <unsigned char>start[0] << (i * 8)
+        start += 1
+    pointer[0] = start
+    result[0] = value
+    return 0
+
+% call make_deserializer(state, 'fixed32')
+    cdef uint32_t result
+    if raw_deserialize_fixed32(pointer, end, &result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `fixed32` at [{0}]")
+% endcall
+    return PyLong_FromUnsignedLong(result)
+
+${make_repeatable_deserializer(state, 'fixed32')}
+
+${this.title(' ', 'sfixed32')}
+
+cdef inline void serialize_sfixed32(object array, int32_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 4)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+    cdef int i
+
+    for i from 0 <= i < 4:
+        rem = n & 0xff
+        n = n >> 8
+        buff[0] = <char> rem
+        buff += 1
+
+% call make_deserializer(state, 'sfixed32')
+    cdef int32_t result
+    if raw_deserialize_fixed32(pointer, end, <uint32_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `sfixed32` at [{0}]")
+% endcall
+    return PyInt_FromLong(result)
+
+${make_repeatable_deserializer(state, 'sfixed32')}
+
+${this.title(' ', 'fixed64')}
+
+cdef inline void serialize_fixed64(object array, uint64_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 8)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+    cdef int i
+
+    for i from 0 <= i < 8:
+        rem = n & 0xff
+        n = n >> 8
+        buff[0] = <char> rem
+        buff += 1
+
+cdef inline int raw_deserialize_fixed64(char **pointer, char *end, uint64_t *result):
+    cdef uint64_t value = 0
+    cdef char *start = pointer[0]
+    cdef uint64_t temp = 0
+    cdef int i
+    for i from 0 <= i < 8:
+        if start == end:
+            return -1
+        temp = <unsigned char>start[0]
+        value |= temp << (i * 8)
+        start += 1
+    pointer[0] = start
+    result[0] = value
+    return 0
+
+% call make_deserializer(state, 'fixed64')
+    cdef uint64_t result
+    if raw_deserialize_fixed64(pointer, end, &result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `fixed64` at [{0}]")
+% endcall
+    return PyLong_FromUnsignedLongLong(result)
+
+${make_repeatable_deserializer(state, 'fixed64')}
+
+${this.title(' ', 'sfixed64')}
+
+cdef inline void serialize_sfixed64(object array, int64_t n):
+    cdef unsigned short int rem
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 8)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+    cdef int i
+
+    for i from 0 <= i < 8:
+        rem = n & 0xff
+        n = n >> 8
+        buff[0] = <char> rem
+        buff += 1
+
+% call make_deserializer(state, 'sfixed64')
+    cdef int64_t result
+    if raw_deserialize_fixed64(pointer, end, <uint64_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `sfixed64` at [{0}]")
+% endcall
+    return PyLong_FromLongLong(result)
+
+${make_repeatable_deserializer(state, 'sfixed64')}
+
+${this.title(' ', 'bytes')}
+
+cdef inline void serialize_bytes(object array, object n):
+    cdef Py_ssize_t len = PySequence_Length(n)
+    serialize_uint64(array, len)
+    cdef object spare = PySequence_InPlaceConcat(array, n)
+
+% call make_deserializer(state, 'bytes')
+    cdef object value = PyBytes_FromStringAndSize(pointer[0], end-pointer[0])
+    pointer[0] = end
+% endcall
+    return value
+
+${make_repeatable_deserializer_with_length(state, 'bytes')}
+
+${this.title(' ', 'string')}
+
+cdef inline void serialize_string(object array, object n):
+    cdef object encoded = PyUnicode_AsUTF8String(n)
+    cdef Py_ssize_t len = PySequence_Length(encoded)
+    serialize_uint64(array, len)
+    cdef object spare = PySequence_InPlaceConcat(array, encoded)
+
+% call make_deserializer(state, 'string')
+    cdef object value = PyUnicode_FromStringAndSize(pointer[0], end-pointer[0])
+    pointer[0] = end
+% endcall
+    return value
+
+${make_repeatable_deserializer_with_length(state, 'string')}
+
+${this.title(' ', 'bool')}
+
+cdef inline void serialize_bool(object array, int b):
+    cdef Py_ssize_t size = PyByteArray_GET_SIZE(array)
+    PyByteArray_Resize(array, size + 1)
+    cdef char *buff = PyByteArray_AS_STRING(array) + size
+
+    buff[0] = <char> (b and 1)
+
+% call make_deserializer(state, 'bool')
+    cdef char* start = pointer[0]
+    pointer[0] = start + 1
+% endcall
+    return PyBool_FromLong(start[0])
+
+${make_repeatable_deserializer(state, 'bool')}
+
+${this.title(' ', 'type')}
+
+cdef inline void serialize_type(array, unsigned char t, uint32_t n):
+    serialize_uint32(array, n<<3|t)
+
+cdef inline int raw_deserialize_type(char **pointer, char *end, uint32_t *result) nogil:
+    return raw_deserialize_uint32(pointer, end, result)
+
+% call make_deserializer(state, 'type')
+    cdef uint32_t value
+    if raw_deserialize_type(pointer, end, &value):
+        raise makeDecodeError(pointer[0], "Can't deserialize type tag at [{0}]")
+    cdef uint32_t n = value >> 3
+    cdef uint32_t t = value & 7
+% endcall
+    return (PyInt_FromLong(t), PyInt_FromLong(n))
+
+${make_repeatable_deserializer(state, 'type')}
+
+${this.title(' ', 'float')}
+
+cdef inline void serialize_float(array, float f):
+    serialize_fixed32(array, (<uint32_t*>&f)[0])
+
+% call make_deserializer(state, 'float')
+    cdef float result
+    if raw_deserialize_fixed32(pointer, end, <uint32_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `float` at [{0}]")
+% endcall
+    return PyFloat_FromDouble(result)
+
+${make_repeatable_deserializer(state, 'float')}
+
+${this.title(' ', 'double')}
+
+cdef inline void serialize_double(array, double d):
+    serialize_fixed64(array, (<uint64_t*>&d)[0])
+
+% call make_deserializer(state, 'double')
+    cdef double result
+    if raw_deserialize_fixed64(pointer, end, <uint64_t*>&result):
+        raise makeDecodeError(pointer[0], "Can't deserialize value of type `double` at [{0}]")
+% endcall
+    return PyFloat_FromDouble(result)
+
+${make_repeatable_deserializer(state, 'double')}
+
+${this.title(' ', 'default decoders')}
+
+cdef parsefunc __decoder_bytype[6]
+__decoder_bytype[0] = deserialize_uint64
+__decoder_bytype[1] = deserialize_fixed64
+__decoder_bytype[2] = deserialize_bytes
+__decoder_bytype[3] = NULL
+__decoder_bytype[4] = NULL
+__decoder_bytype[5] = deserialize_fixed32
+
+${this.title('_', 'CORE ALGORITHMS')}
+
+% for message in this.messages.values():
+${message.render(state)}
+% endfor
+
+${this.title('_', 'CLASSES STRUCTURE')}
+
+% for message in this.messages_order:
+${this.messages[message].render_structure(state)}
+% endfor
+
+<%macro message_names(obj)>
+% for name, message in obj.messages.items():
+    "${message.fullname}",
+${message_names(message)}
+% endfor
+<%endmacro>
+
+__all__ = [
+${message_names(this)}
+    "DecodeError",
+    "EncodeError",
+    "Extensions",
+    "BaseMessage"
+    ]
+
