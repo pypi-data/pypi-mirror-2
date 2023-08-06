@@ -1,0 +1,76 @@
+To run this test it needs a running FISE server at localhost port 8080.
+
+Imports first::
+
+    >>> import uuid
+    >>> from fise.client.store import Store
+    
+Instatiate a store::    
+    
+    >>> store = Store("http://localhost:8080")
+    
+    >> interact(locals())
+    
+Lets FISE create an ID for the text.
+::
+    
+    >>> content = 'Paris London %s' % uuid.uuid4().hex
+    >>> generated_id = store.add(content)
+    >>> generated_id.startswith('sha1-')
+    True
+    
+Lets fetch non-existing content::
+
+    >>> store['non-existing']
+    Traceback (most recent call last):
+    ...
+    KeyError: 'non-existing'
+    
+    >>> print store.get('non-existing')
+    None  
+
+    >>> store.get('non-existing', 'default')
+    'default'  
+  
+Fetch back content::
+   
+    >>> store[generated_id] == content
+    True
+    
+    >>> store.get(generated_id) == content
+    True
+    
+We can get metadata extracted by FISE engines::
+
+    >>> store.metadata(generated_id)
+    '<rdf:RDF...</rdf:RDF>\n'
+    
+Or request it in different formats::
+    
+    >>> store.metadata(generated_id, format='turtle')
+    '...<http://fise.iks-project.eu/ontology/selection-context>..."Paris London...' 
+
+Test if check works::
+
+    >>> result = store.metadata(generated_id, format='notvalid')   
+    Traceback (most recent call last):
+    ...
+    ValueError: Format "notvalid" is not possible.    
+    
+Theres a generated HTML-Page with all information::
+
+    >>> store.page(generated_id).strip()
+    '<html>...Paris London...</html>'
+
+Controlling the id works too::
+    
+    >>> own_id = 'uuid-%s' % uuid.uuid4().hex    
+    >>> store[own_id] = u'Foo bar baz'    
+    >>> store[own_id]
+    'Foo bar baz'
+
+Change the text::
+
+    >>> store[own_id] = u'Paris Berlin Vienna'
+    >>> store[own_id]
+    'Paris Berlin Vienna'
