@@ -1,0 +1,284 @@
+.. _libdoc_config:
+
+=======================================
+:mod:`config` -- Theano Configuration 
+=======================================
+
+.. module:: config
+   :platform: Unix, Windows
+   :synopsis: Library configuration attributes.
+.. moduleauthor:: LISA
+
+
+Guide
+=====
+
+The config module contains many attributes that modify Theano's behavior.  Many of these
+attributes are consulted during the import of the ``theano`` module and many are assumed to be
+read-only.
+
+*As a rule, the attributes in this module should not be modified by user code.*
+
+Theano's code comes with default values for these attributes, but you can
+override them from your .theanorc file, and override those values in turn by
+the :envvar:`THEANO_FLAGS` environment variable.
+
+The order of precedence is:
+
+1. an assignment to theano.config.<property>
+2. an assignment in :envvar:`THEANO_FLAGS`
+3. an assignment in the .theanorc file (or the file indicated in :envvar:`THEANORC`)
+
+You can print out the current/effective configuration at any time by printing
+theano.config.  For example, to see a list  of all active configuration
+variables, type this from the command-line:
+
+.. code-block:: bash
+
+    python -c 'import theano; print theano.config' | less
+
+Environment Variables
+=====================
+
+
+.. envvar:: THEANO_FLAGS
+
+    This is a list of comma-delimited key=value pairs that control
+    Theano's behavior.
+
+    For example, in bash, you can override your :envvar:`THEANORC` defaults
+    for <myscript>.py by typing this:
+
+    .. code-block:: bash
+
+        THEANO_FLAGS='floatX=float32,device=gpu0,nvcc.fastmath=True'  python <myscript>.py
+
+    If a value is defined several times in ``THEANO_FLAGS``,
+    the right-most definition is used. So, for instance, if
+    ``THEANO_FLAGS='device=cpu,device=gpu0'``, then gpu0 will be used.
+
+.. envvar:: THEANORC
+
+    The location[s] of the .theanorc file[s] in ConfigParser format.
+    It defaults to ``$HOME/.theanorc``.
+
+    Here is the .theanorc equivalent to the THEANO_FLAGS in the example above:
+
+    .. code-block:: cfg
+
+        [global]
+        floatX = float32
+        device = gpu0
+
+        [nvcc]
+        fastmath = True
+
+    Configuration attributes that are available directly in ``config``
+    (e.g. ``config.device``, ``config.mode``) should be defined in the
+    ``[global]`` section.
+    Attributes from a subsection of ``config`` (e.g. ``config.nvcc.fastmath``,
+    ``config.blas.ldflags``) should be defined in their corresponding section
+    (e.g. ``[nvcc]``, ``[blas]``).
+
+    Multiple configuration files can be specified by separating them with ':'
+    characters (as in $PATH).  Multiple configuration files will be merged,
+    with later (right-most) files taking priority over earlier files in the
+    case that multiple files specify values for a common configuration option.
+    For example, to override system-wide settings with personal ones,
+    set ``THEANORC=/etc/theanorc:~/.theanorc``.
+
+Config Attributes
+=====================
+
+The list below describes some of the more common and important flags
+that you might want to use. For the complete list (including documentation),
+import theano and print the config variable, as in:
+
+.. code-block:: bash
+
+    python -c 'import theano; print theano.config' | less
+
+.. attribute:: device
+
+    String value: either ``'cpu'``, ``'gpu'``, ``'gpu0'``, ``'gpu1'``,
+    ``'gpu2'``, or ``'gpu3'``
+
+    Default device for computations. If ``gpu*``, change the default to try
+    to move computation to it and to put shared variable of float32 on
+    it.
+    Choose the default compute device for theano graphs.  Setting this to a
+    ``gpu*`` string will make theano to try by default to move computation to it.
+    Also it will make theano put by default shared variable of float32 on it.
+    ``'gpu'`` lets the driver select the GPU to use, while ``'gpu?'`` makes Theano try
+    to use a specific device. If we are not able to use the GPU, either we fall back
+    on the CPU, or an error is raised, depending on the :attr:`force_device` flag.
+
+.. attribute:: force_device
+
+    Bool value: either ``True`` or ``False``
+
+    Default: ``False``
+
+    If ``True``, we raise an error if we cannot use the specified :attr:`device`.
+    If ``False``, we fall back to the CPU.
+
+.. attribute:: init_gpu_device
+
+    String value: either ``''``, ``'gpu'``, ``'gpu0'``, ``'gpu1'``, ``'gpu2'``,
+    or ``'gpu3'``
+
+    Initialize the gpu device to use.
+    When its value is gpu*, the theano flag :attr:`device` must be ``"cpu"``.
+    Unlike :attr:`device`, setting this flag to a specific GPU will not
+    try to use this device by default, in particular it will **not** move
+    computations, nor shared variables, to the specified GPU.
+
+    This flag is useful to run GPU-specific tests on a particular GPU, instead
+    of using the default one.
+
+.. attribute:: floatX
+
+    String value: either 'float64' or 'float32'.
+
+    Default: 'float64'
+
+    This sets the default dtype returned by tensor.matrix(), tensor.vector(),
+    and similar functions.  It also sets the default theano bit width for
+    arguments passed as Python floating-point numbers.
+
+.. attribute:: mode
+
+    String value: 'Mode', 'ProfileMode', 'DebugMode', 'FAST_RUN', 'FAST_COMPILE'
+
+    Default 'Mode'
+
+    This sets the default compilation mode for theano functions. By default the
+    mode Mode is equivalent to FAST_RUN. See Config attribute linker and optimizer.
+
+.. attribute:: config.lib.amdlibm
+
+    Bool value: either True or False
+
+    Default False
+
+    This makes the compilation use the
+    `amdlibm <http://developer.amd.com/cpu/libraries/libm/>`__
+    library, which is faster than the standard libm.
+
+.. attribute:: linker
+
+    String value: 'c|py', 'py', 'c', 'c|py_nogc', 'c&py'
+
+    Default: 'c|py'
+
+    When the mode is Mode, it sets the default linker used.
+
+.. attribute:: optimizer
+
+    String value: 'fast_run', 'merge', 'fast_compile', 'None'
+
+    Default: 'fast_run'
+
+    When the mode is Mode, it sets the default optimizer used.
+
+.. attribute:: config.warn.ignore_bug_before
+
+    String value: 'None', 'all', '0.3'
+
+    Default: 'None'
+
+    When we fix a Theano bug that generated bad results under some
+    circonstances, we also make Theano raise a warning when it encounter
+    the same circonstances again. This helps to detect if said bug
+    had affected your past experiments, as you only need to run your
+    experiment again with the new version, and you do not have to
+    understand the Theano internal that triggered the bug. A better
+    way to detect this will be implemented. See this `ticket
+    <http://trac-hg.assembla.com/theano/ticket/514>`__.
+
+    This flag allows new users not to get warnings about old bugs, that were
+    fixed before their first checkout of Theano.
+    You can set its value to the first version of Theano
+    that you used (probably 0.3 or higher)
+
+    `None` mean that all warnings will be displayed.
+    `all` mean to hide all warnings.
+
+    It is recommended that you put a version, so that you will see future
+    warnings.
+    It is also recommended you put this into your .theanorc, so this setting
+    will always be used.
+
+.. attribute:: home
+
+    Default: env-variable $HOME
+
+    This is used to compute the compiledir and base_compiledir attributes
+
+.. attribute:: base_compiledir
+
+    Default: $HOME/.theano
+
+    This directory stores the architecture-dependent compilation directories.
+
+.. attribute:: compiledir
+
+    Default: $HOME/.theano/<arch-identifier>
+
+    This directory stores dynamically-compiled modules for a particular
+    architecture.
+
+.. attribute:: config.blas.ldflags
+
+    Default: '-lblas'
+
+    Link arguments to link against a (Fortran) level-3 blas implementation.
+
+.. attribute:: config.cuda.root
+
+    Default: $CUDA_ROOT or failing that, "/usr/local/cuda"
+
+    A directory with bin/, lib/, include/ folders containing cuda utilities.
+
+.. attribute:: config.gcc.cxxflags
+
+    Default: ""
+
+    Extra parameters to pass to gcc when compiling.  Extra include paths,
+    library paths, configuration options, etc.
+
+.. attribute:: optimizer_excluding
+
+    Default: ""
+
+    A list of optimizer tags that we don't want included in the default Mode.
+    If multiple tags, separate them by ':'.
+    Ex: to remove the elemwise inplace optimizer(slow for big graph),
+    use the flags: optimizer_excluding:inplace_opt, where
+    inplace_opt is the name of that optimization.
+
+.. attribute:: optimizer_including
+
+    Default: ""
+
+    A list of optimizer tags that we want included in the default Mode.
+    If multiple tags, separate them by ':'.
+
+.. attribute:: optimizer_requiring
+
+    Default: ""
+
+    A list of optimizer tags that we require for optimizer in the default Mode.
+    If multiple tags, separate them by ':'.
+
+.. attribute:: nocleanup
+
+    Bool value: either True or False
+
+    Default: False
+
+    Remove compiled file when not needed anymore.
+    This mean it remove file that he tried to compile but failed.
+    Set to True to keep the source file that failed to compile to
+    debug them.
+    
