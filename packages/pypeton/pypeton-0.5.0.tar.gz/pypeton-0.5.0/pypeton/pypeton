@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+import os, os.path, sys
+from optparse import OptionParser
+
+from pypeton.environment import *
+
+ ########### Main Program ###########
+
+def success_message(message):
+	""" Simply print message """
+	print(green(message))
+
+def exit_message(message):
+	""" Simply print message and exit """
+	print(yellow(message))
+	sys.exit(1)
+
+def main():
+
+	parser = OptionParser('usage: %(green)s%%prog%(normal)s [options] project_name' % COLORS,
+		version='0.4 %(green)sWhiskey %(yellow)sTango %(red)sRed%(normal)s' % COLORS)
+	parser.add_option('-v', '--virtualenv', action='store_true', default=False,
+		help='initialise virtual envirnment')
+	parser.add_option('-s', '--subversion', action='store_true', default=False,
+		help='create project in svn style with trunk/tags/branches')
+	parser.add_option('-d', '--dir', help='base project directory')
+
+	env_help = []
+	colors = COLORS.__iter__()
+	for e in ENV_TYPES:
+		try:
+			c = colors.next()
+		except:
+			colors = COLORS.__iter__()
+			c = colors.next()
+		env_help.append('[%%(%s)s%s%%(normal)s]'%(c, e))
+
+	parser.add_option('-e', '--env', default='django',
+			help=' or '.join(env_help) % COLORS)
+
+	(options, args) = parser.parse_args()
+
+	# Check if name was given
+	if not len(args):
+		exit_message('Project name required')
+	else: name = os.path.basename(args[0])
+
+	# Check if environment is appropriate
+	env = options.env.lower()
+	if env not in ENV_TYPES:
+		exit_message('Unknown env specified: %s' % env)
+	
+	vcs_root = options.subversion and 'trunk/' or ''
+
+	# Use the given directory
+	if options.dir:
+		if not os.path.exists(options.dir) and not vcs_root:
+			os.makedirs(options.dir)
+		os.chdir(options.dir)
+	else:
+		if os.path.exists(name):
+			exit_message('[%s] already exists' % name)
+		if vcs_root != '':
+			os.mkdir(name)
+			#os.chdir(name)
+	
+	# Make the basic file structure
+	if vcs_root != '':
+		dirs = ['branches','tags',]
+		for d in dirs: os.makedirs(os.path.join(name,d))
+	
+	# Deploy the project
+	Environment(name,env,vcs_root).deploy()
+	success_message('[%s] created successfully' % name)
+	
+	# Try to install virtualenv
+	if options.virtualenv:
+		try:
+			import virtualenv
+			virtualenv.logger = virtualenv.Logger(
+					[(virtualenv.Logger.level_for_integer(2), sys.stdout)])
+			vdir = options.subversion and 'trunk/' or ''
+			virtualenv.create_environment(os.path.join(name,vdir,'env/'))
+			os.symlink('env/bin/activate',os.path.join(name,vdir,'activate'))
+			success_message('Virtualenv for [%s] created successfully' % name)
+		except:
+			exit_message('Virtualenv for [%s] not created' % name)
+	
+	return
+
+if __name__ == '__main__': main()
+
