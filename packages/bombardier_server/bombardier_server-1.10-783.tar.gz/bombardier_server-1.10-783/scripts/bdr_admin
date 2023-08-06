@@ -1,0 +1,313 @@
+#!/usr/bin/python
+"Performs bombardie server management tasks"
+
+import sys, yaml, os, getpass, re
+from bombardier_core.static_data import OK, SERVER_CONFIG_FILE
+from bombardier_core.Cipher import Cipher
+from commands import getstatusoutput as gso
+os.environ["DJANGO_SETTINGS_MODULE"] = 'bombardier_server.web.rest_api.settings'
+
+USAGE  = ["usage:  %prog update",
+          "usage:  %prog init [-s SERVER_HOME] [-k KEY_PATH]",
+          "        %prog passwd",
+          "",
+          "update: update the client, core and pyyaml dist tarballs",
+          "init:   perform initial setup, preserving existing files", 
+          "KEY_PATH := The path to the id_dsa.pub file for ssh key-sharing.",
+          "            Defaults to /root/.ssh/id_dsa.pub",
+          "SERVER_HOME := The path to the bombardier server configuration",
+          "               management database (defaults to /var/deploy) ",
+          "RELEASE_NAME := The version of bombardier to download. The only",
+          "                option right now is 'alpha' which is the default."
+         ]
+
+FILE_TYPES = ["core", "cli", "server", "client"]
+
+def ask_yes_no(prompt):
+    "Ask the user whether or not to proceed"
+    result = ''
+    while result == '':
+        instr = raw_input(prompt)
+        if len(instr) == 0:
+            continue
+        elif instr.lower()[0] == 'y':
+            result = True
+        elif instr.lower()[0] == 'n':
+            result = False
+    return result
+
+def get_server_home():
+    "Read the bombardier server home file from /etc/bombardier.yml"
+    try:
+        config_data = yaml.load(open(SERVER_CONFIG_FILE).read())
+    except:
+        print("Cannot read server_home from %s" % SERVER_CONFIG_FILE)
+        sys.exit(1)
+    server_home = config_data.get("server_home")
+    if not os.path.isdir(server_home):
+        print("server_home not set in %s" % SERVER_CONFIG_FILE)
+        sys.exit(1)
+    return server_home
+
+def check_curl():
+    "Verify cURL is installed. We're going to use it."
+    status = os.system("which curl > /dev/null")
+    if status != OK:
+        msg = "This tool requires curl. Please make sure it is "\
+              "installed and in your path."
+        print(msg)
+        sys.exit(1)
+
+def check_version(version):
+    "Check the version that the user is specifying"
+    if not version:
+        version = "alpha"
+    else:
+        print("That version is not supported. Please choose 'alpha'.")
+        sys.exit(1)
+    return version
+
+def get_url_list(version):
+    "Find all the files downloadable on Launchpad"
+    cmd = "curl https://launchpad.net/bombardier/1.00/%s" % version
+    _status, output = gso(cmd)
+    matcher = re.compile(' href=\"(http:\/\/launchpad\.net\/bombardier\/1\.00\/%s\/\+download\/.*\.tar\.gz)\"\>' % version)
+
+    url_list = matcher.findall(output)
+    if not url_list:
+        print("Error getting urls from Launchpad. Check proxy settings.")
+        print("cmd:\n %s" % cmd)
+        sys.exit(1)
+    return url_list
+
+def get_most_recent(urls):
+    "Given a set of URLs, find the most recent version"
+    matcher = re.compile('.*-(\d+)\.tar\.gz')
+    check_list = []
+    for url in urls:
+        test_val = matcher.findall(url)
+        if not len(test_val):
+            continue
+        try:
+            val = int(test_val[0])
+            check_list.append(val)
+        except ValueError:
+            continue
+    max_version =  max( check_list )
+    for url in urls:
+        if str(max_version) in url:
+            return url
+    return None
+
+def fetch_url(url):
+    "Download a file and get mad if we fail."
+    print("Downloading %s..." % url)
+    cmd = "curl -L -O %s" % url
+    status = os.system(cmd)
+    if status != OK:
+        print("Error downloading %s... Giving up." % url)
+        print("CMD: \n%s" % cmd)
+        sys.exit(1)
+
+def unpack_tarball(file_name, working_dir):
+    "Unpack a tarball and get mad if we fail"
+    print("Unpacking %s..." % file_name)
+    cmd = "tar -xzf %s" % file_name
+    status = os.system(cmd)
+    if status != OK:
+        print("Error unpacking %s... Giving up." % file_name)
+        print("You can look at the file in %s" % working_dir)
+        print("CMD: \n%s" % cmd)
+        sys.exit(1)
+
+def run_setup(directory, working_dir):
+    "Install a python package with setup.py"
+    print("Installing %s..." % directory)
+    os.chdir(os.path.join(working_dir, directory))
+    cmd = "%s setup.py install > /dev/null" % sys.executable
+    status, _output = gso(cmd)
+    #status = OK
+    if status != OK:
+        print("Error installing from %s... Giving up." % directory)
+        print("CMD: \n%s" % cmd)
+        print("You can look at the file in %s" % working_dir)
+        sys.exit(1)
+
+def download(fetch_list):
+    file_list = [ url.split('/')[-1] for url in fetch_list ]
+    for url in fetch_list:
+        fetch_url(url)
+    return file_list
+
+def move_dist(file_list):
+    server_home = get_server_home()
+    for file_name in file_list:
+        if 'client' in file_name or 'core' in file_name or 'PyYAML' in file_name:
+            dist_dir = os.path.join(server_home, "dist")
+            print("Moving %s to %s..." % (file_name, dist_dir))
+            status = os.system("mv %s %s" % (file_name, dist_dir))
+            if status != OK:
+                msg = "Error putting %s in the server home (%s)..."
+                print(msg % (file_name, server_home))
+                print("You can look at the file in %s" % os.getcwd())
+                sys.exit(1)
+
+def update_client_dists(version="alpha"):
+    url_list = get_url_list(version)
+    fetch_list = [ url for url in url_list if "PyYAML" in url ]
+    file_types = [ "client", "core" ]
+    for file_type in file_types:
+        urls = [url for url in url_list if "bombardier_%s-" % file_type in url]
+        fetch_list.append( get_most_recent(urls) )
+    file_list = download(fetch_list)
+    move_dist(file_list)
+    print("Successfully fetched latest client.")
+
+def set_password():
+    """Set the password on the master config file. Note that this does not
+    (yet) go through and verify that the password works on all config files,
+    nor does it modify encrypted values on config files.
+    """
+    server_home = get_server_home()
+    test_decrypt_file = os.path.join(server_home, 'admin',
+                                     'encryption_validation.yml')
+    if os.path.isfile(test_decrypt_file):
+        return
+
+    msg = ["\nYou will need to set your configuration key as part ",
+           "of the setup process. This key will be used to encrypt ",
+           "sensitive configuration items.",
+          ]
+    print("\n".join(msg))
+    
+    password_1 = 'abc123'
+    password_2 = 'def456'
+    while password_1 != password_2:
+        password_1 = getpass.getpass("Please enter your configuration key: ")
+        password_2 = getpass.getpass("Please re-enter your configuration key: ")
+        if password_1 != password_2:
+            print("%%%% Configuration keys do not match. Please try again.")
+
+    lazy_dog = "the_quick_brown_fox_jumped_over_the_lazy_dog\n"
+    cipher = Cipher(password_1)
+    enc_lazy = cipher.encrypt_string(lazy_dog)
+    enc_dict = { "enc_test" : enc_lazy }
+    open( test_decrypt_file, 'w' ).write(yaml.dump( enc_dict ))
+
+def copy_dsa_key(root_pub_key_path, server_home):
+    "Copies the id_pub.dsa key for ssh to the admin directory"
+    admin_dir = os.path.join(server_home, "admin")
+    if not root_pub_key_path:
+        home_directory = os.environ.get("HOME")
+        root_pub_key_path = os.path.join(home_directory, ".ssh", "id_dsa.pub")
+    if not os.path.isfile(root_pub_key_path):
+        print("%%%% ABORTING: %s does not exist. " % root_pub_key_path)
+        print("   Please create it with ssh-keygen -t dsa")
+        sys.exit(1)
+    print("Copying the ssh key from %s..." % root_pub_key_path)
+    os.system("cp -f %s %s" % (root_pub_key_path, admin_dir))
+    return
+
+def create_if_needed(path):
+    "Creates a directory if it doesn't exist or gets mad"
+    if not os.path.isdir(path):
+        status = os.system("mkdir -p %s" % path)
+        if status != OK:
+            print("%%%% ABORTING: Unable to create path %s")
+            sys.exit(1)
+
+def create_directory_structure(server_home):
+    "Creates the directories needed in the server home directory"
+    print("\nCreating directory structure in %s..." % server_home)
+    create_if_needed(os.path.join(server_home, "admin"))
+    create_if_needed(os.path.join(server_home, "dist"))
+    create_if_needed(os.path.join(server_home, "status"))
+    create_if_needed(os.path.join(server_home, "repos"))
+    create_if_needed(os.path.join(server_home, "package"))
+    create_if_needed(os.path.join(server_home, "machine"))
+    create_if_needed(os.path.join(server_home, "bom"))
+    create_if_needed(os.path.join(server_home, "include"))
+
+def run_cmd(cmd):
+    "Runs a command or gets mad if it fails"
+    status = os.system(cmd)
+    if status != OK:
+        print("%%%% ABORTING: Unable to run %s" % cmd)
+        sys.exit(1)
+
+def setup_db(server_home):
+    cnmdb_path = os.path.join(server_home, "admin", "cnmdb")
+    if os.path.isfile(cnmdb_path):
+        print("db already exists, delete %s manually to recreate." % cnmdb_path)
+        return
+    from django.core.management import execute_manager
+    import bombardier_server.web.rest_api.settings as settings
+    from django.core.management import setup_environ
+    from django.core.management import ManagementUtility
+    setup_environ(settings)
+    utility = ManagementUtility(["manage.py", "syncdb"])
+    utility.execute()
+
+def init(server_home, key_path):
+    "Initializes the bombardier server_home"
+    if not server_home:
+        server_home = '/var/deploy'
+    
+    prompt = "Perform initial Bombardier Server environment setup in"\
+             " %s? (y/n): "
+    result = ask_yes_no(prompt % server_home)
+    if result == True: 
+        create_directory_structure(server_home)
+        copy_dsa_key(key_path, server_home)
+        print("Writing configuration to /etc/bombardier.yml...")
+        if not os.path.isfile(SERVER_CONFIG_FILE):
+            config_data = {"server_home": server_home}
+            open(SERVER_CONFIG_FILE, 'w').write(yaml.dump(config_data))
+        else:
+            print("Refusing to modify existing %s file..." % SERVER_CONFIG_FILE)
+    else:
+        print("Aborted.")
+        sys.exit(1)
+    set_password()
+    setup_db(server_home)
+    update_client_dists()
+    print("\n\nBasic server setup complete.")
+    print("Now configure your web server according to the instructions")
+    print("in your documentation.")
+
+def main():
+    "Main method"
+    import optparse
+    parser = optparse.OptionParser('\n'.join(USAGE))
+    parser.add_option("-s", "--server_home", dest="server_home",
+                      help="specify the server home directory")
+    parser.add_option("-v", "--version", dest="version",
+                      help="branch to download")
+    parser.add_option("-k", "--key-path", dest="key_path",
+                      help="path to your public SSH key")
+    parser.add_option("-y", "--yes", dest="no_confirm",
+                      action="store_const", const=True,
+                      help="Don't ask to confirm")
+
+    (options, commands) = parser.parse_args()
+
+    if len(commands) != 1:
+        print("CMD: %s" % ' '.join(sys.argv))
+        print("This command requires a command argument")
+        parser.print_help()
+        sys.exit(1)
+    command = commands[0]
+    if command == "init":
+        init(options.server_home, options.key_path)
+    elif command.startswith("update"):
+        update_client_dists()
+    elif command == "passwd":
+        set_password()
+    else:
+        print("CMD: %s" % ' '.join(sys.argv))
+        print("Unknown command: %s" % command)
+        parser.print_help()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
