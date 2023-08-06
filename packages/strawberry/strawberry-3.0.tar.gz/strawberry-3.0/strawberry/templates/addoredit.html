@@ -1,0 +1,144 @@
+<%doc>
+	Copyright (C) 2010-2011, Guillaume Bour <guillaume@bour.cc>
+
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU Affero General Public License as
+	published by the Free Software Foundation, version 3.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU Affero General Public License for more details.
+
+	You should have received a copy of the GNU Affero General Public License
+	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+</%doc>
+
+<%! import strawberry %>
+<%inherit file="base.html" />
+<%def name="title()">strawberry :: ${'Edit '+values.get('name','') if mode == 'edit' else 'Add a link'}</%def>
+
+<%def name="headers()">
+	<script type="text/javascript" src="${url(strawberry.style)}/jquery.js"></script>
+
+	<script type="text/javascript">
+		$(document).ready(function() {
+			$('form#main_form .clear-default').focusin(function(e) {
+				$(e.target).attr('value','').removeClass('clear-default').unbind('focusin');
+			});
+
+			$('input[name=link]').focusout(function(e) {
+				$.get("${url(strawberry.Link.metadatas, url='')}"+$(e.target).attr('value'), function(data) {
+					$(e.target).removeClass('load')
+					console.log(data);
+					if(data.icon != undefined)
+						$(e.target).css({
+							'background': 'url("'+data.icon+'") no-repeat top left',
+							'-moz-background-size': '16px'
+						});
+
+					$input = $('input[name=name]');
+					if(data.title != undefined && ($input.hasClass('clear-default') || $input.attr('value').length == 0))
+						$input.attr('value', data.title).removeClass('clear-default').unbind('focusin');
+
+					$input = $('textarea[name=description]');
+					if(data.description != undefined && ($input.hasClass('clear-default') || $input.attr('value').length == 0))
+						$input.attr('value', data.description).removeClass('clear-default').unbind('focusin');
+
+
+				}, 'json');
+
+				$(e.target).addClass('icon').addClass('load');
+			});
+
+		});
+	</script>
+</%def>
+
+<%def name="head()">
+<a id="alltags" href="${url(strawberry)}">All Tags</a>
+</%def>
+
+<%def name="content()">
+	<div id="newlink">
+		<% act = url(strawberry.Link, id=values['id']) if 'id' in values else	url(strawberry.Link.html_add) %>
+		<form id="main_form" accept-charset="utf-8" action="${act}" method="POST">
+			<input type="hidden" name="referer" value="${referer}" /> 
+
+			<label for="link">url</label>
+			<%
+				default = ''
+				link = values.get('link', None)
+				if link is None:
+					link = 'Enter/Paste your url'; default = 'clear-default'
+			%>
+			<input name="link"  type="text" value="${link}" tabindex=1
+			 			 class="${default} ${'error' if 'link' in errors else ''}" />
+			% if 'link' in errors:
+			<span class="warning">${errors['link'][1]}</span>
+			% endif
+			<br/>
+
+			<label for="name">name</label>
+			<%
+				name = values.get('name',None); default = ''
+				if name is None:
+					name = 'Enter/Paste url name'; default='clear-default'
+			%>
+			<input name="name" type="text" value="${name}" tabindex=2
+				     class="${default} ${'error' if 'name' in errors else ''}" />
+			% if 'name' in errors:
+			<span class="warning">${errors['name'][1]}</span>
+			% endif
+			<br/>
+
+			<label for="description">description</label>
+			<%
+				desc = values.get('description',None); default = ''
+				if desc is None:
+					desc = 'Enter your description here'; default = 'clear-default'
+			%>
+			<textarea name="description" rows="5" cols="20" class="${default}" tabindex=3>${desc}</textarea><br/>
+
+			<label for="tags">tags</label>
+			<fieldset>
+				<select name="tags" multiple tabindex=4>
+					<option value="nop" selected>-- choose one or more tag(s) --</option>
+					<% selected = values.get('tags',[]) %>
+					%	for tag in tags:
+					<%
+							sel = ''
+							if tag.name in selected:
+								selected.remove(tag.name); sel='selected'
+					%>
+					<option value="${tag.name}" ${sel}>${tag.name}</option>
+					% endfor
+				</select>
+				% if 'tags' in errors:
+					<span class="warning warning-select">${errors['tags'][1]}</span>
+				% endif
+				<br/>
+
+				<%
+					if len(selected) > 0:
+						sel = selected.pop(); default = ''
+					else:
+						sel = 'or enter new one(s)'; default = 'clear-default'
+				%>
+				<input name="tags" type="text" value="${sel}" class="${default}" tabindex=5 /><br/>
+				% for i in xrange(3):
+				<input name="tags" type="text" value="${selected.pop() if len(selected) > 0 else ''}" tabindex=${i+5} /><br/>
+				% endfor
+				
+			</fieldset>
+			<input type="submit" value="${'Save' if mode == 'edit' else 'Add'}">
+	</form>
+</div>
+</%def>
+
+<%def name="tail()">
+	% if mode == 'edit':
+	<a id="addlink" href="${url(strawberry.Link.html_add)}">Add a link</a>
+	% endif
+</%def>
+
