@@ -1,0 +1,242 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+<body>
+
+    <div metal:fill-slot="main">
+    <metal:main-macro define-macro="main"
+                      tal:define="kssClassesView context/@@kss_field_decorator_view;
+                                  getKssClasses nocall:kssClassesView/getKssClassesInlineEditable;
+                                  templateId template/getId;
+                                  is_mobile python:False;
+                                  ">
+
+        <div tal:replace="structure provider:plone.abovecontenttitle" />
+        <h1 metal:use-macro="here/kss_generic_macros/macros/generic_title_view">
+            Title or id
+        </h1>
+        <div tal:replace="structure provider:plone.belowcontenttitle" />
+        <p class="documentDescription">
+            <span tal:replace="context/Description" />
+        </p>
+
+        <div tal:replace="structure provider:plone.abovecontentbody" />
+
+        <div metal:define-macro="text-field-view"
+             id="parent-fieldname-text" class="plain"
+             tal:define="kss_class python:getKssClasses('text',
+                         templateId=templateId, macro='text-field-view');
+                         text here/aq_explicit/getText|nothing"
+             tal:condition="text" >
+            <div metal:define-slot="inside" tal:replace="structure text">The body</div>
+        </div>
+
+        <div tal:define="
+            years       view/all_years;
+            year_now    context/year | python:view.actual().get('year');
+            year        request/y | year_now;
+            year_sel    request/y | year;
+            month       request/m | nothing;
+            day         request/d | nothing;            
+            icount      python: view.count_monthly_events(year);
+            mlist       view/month_of_year;
+            semest      python: ( mlist[0:6], mlist[6:12] );
+			tri         python: ( mlist[0:3], mlist[3:6], mlist[6:9], mlist[9:12], );
+            ">
+			<a name="bluetheme-kalender"></a>
+			
+            <table class="bluetheme-event-kalender" i18n:domain="plonelocales">
+                <tbody>
+                    <tr >                        
+                    <tal:ye tal:repeat="year years" >
+                        <td tal:define="
+                                isHight     python: year == year_sel;
+                                hasEvents   python: view.count_events(year)
+                                "
+                            tal:attributes="class string:highlight-$isHight">
+                            <tal:ev condition="hasEvents">                            
+                                <span tal:condition="isHight" tal:content="year" >2011</span>
+                                <a  tal:condition="python:not isHight" 
+                                    tal:attributes="href  string:${context/absolute_url}?y:int=$year"
+                                    tal:content="year" >2011</a>
+                            </tal:ev>
+                            <tal:ev condition="not: hasEvents">                            
+                                <span tal:content="year" >2011</span>
+                            </tal:ev>
+
+                        </td>
+                    </tal:ye>
+                    </tr>
+                </tbody>
+            </table>			
+			
+            <h2 class="bluetheme-event-kalender-header" tal:content="year">2009</h2>
+            
+            <!-- Kalender -->    
+            <table class="bluetheme-event-kalender" i18n:domain="plonelocales">
+                <tbody>
+                    <tr tal:repeat="se semest">
+                        <tal:rep repeat="mm se">
+                        <td tal:define="
+                                mi      python:mlist.index(mm);
+                                mu      python:mi+1;
+                                isHight python:(month == mu) and (year == year_sel)"
+                            tal:attributes="                                    
+                                class string:internal-link highlight-$isHight"
+                                >
+                            <a  class="internal-link" 
+                                tal:condition="python:icount[mi] and not isHight"
+                                tal:attributes="
+                                    href  string:${context/aq_inner/absolute_url}?y:int=$year&m:int=$mu;"
+                                    i18n:translate="" tal:content="string:month_$mm">January</a>
+                            <span   tal:condition="python: not icount[mi] or isHight"
+                                    i18n:translate="" tal:content="string:month_$mm">January</span>
+                        </td>
+                        </tal:rep>
+                    </tr>
+                </tbody>				
+            </table>
+            <!-- Ende Geländer -->
+            <br /><br />
+                            
+
+            <metal:listingmacro define-macro="listing">
+            <tal:foldercontents define="contentFilter contentFilter|request/contentFilter|nothing;
+                                limit_display limit_display|request/limit_display|nothing;
+                                more_url more_url|request/more_url|string:folder_contents;
+                                folderContents python:here.portal_type=='Topic' and here.queryCatalog(contentFilter, batch=True) or here.getFolderContents(contentFilter, batch=True, b_size=limit_display or 100);
+                                use_view_action site_properties/typesUseViewActionInListings|python:();
+                                over_limit python: limit_display and len(folderContents) > limit_display;
+                                folderContents python: (over_limit and folderContents[:limit_display]) or folderContents;
+                                batch python: folderContents;">
+            <tal:listing condition="folderContents">
+    
+                <table class="bluetheme-event-listing">
+                    <tal:block tal:repeat="item python:view.items_of_period(folderContents,year,month,latest=20,show_only_upcoming_dates=True)">
+                        <tr class="tileItem visualIEFloatFix" 
+                                     tal:define="normalizeString nocall:context/@@plone/normalizeString;
+                                                       item_url item/getURL|item/absolute_url;
+                                                       item_id item/getId|item/id;
+                                                       item_title_or_id item/pretty_title_or_id;
+                                                       item_description python:item.Description.replace('\n','<br />');
+                                                       item_type item/portal_type;
+                                                       item_type_title item/Type;
+                                                       item_type_class python: 'contenttype-' + normalizeString(item_type);
+                                                       item_modified item/ModificationDate;
+                                                       item_created item/CreationDate;
+                                                       item_wf_state        item/review_state|python: wtool.getInfoFor(item, 'review_state', '');
+                                                       item_wf_state_class python:'state-' + normalizeString(item_wf_state);
+                                                       item_creator item/Creator;
+                                                       item_start item/start/ISO|item/StartDate|nothing;
+                                                       item_end item/end/ISO|item/EndDate|nothing;
+                                                       item_object item/getObject;
+                                                   
+                                                   item_start_disp          python:here.toLocalizedTime(item_start,long_format=0)[:-5];
+                                                   item_end_disp            python:here.toLocalizedTime(item_end,long_format=0)[:-5];
+                                                   item_location            python:item_object.getLocation();                              
+                                                   item_event_url           python:item_object.event_url();
+                                                   item_event_url_disp      python:view.nice_event_url(item_event_url);
+                                                item_teaser_image_mini           item_object/@@images/teaser_image/mini | nothing;
+												item_teaser_image_picolo         item_object/@@images/teaser_image/picolo | nothing;
+                                                   item_text                python:item_object.getText();
+                                    item_contact_email python:item_object.contact_email();
+                                           item_pubdate python:view.getPublicationDate(item_object);
+                                                   "
+                                     tal:attributes="class string:tileItem visualIEFloatFix ">
+                                     
+                            <td class="col01" tal:condition="not:is_mobile">
+                                <p>
+                                    <b tal:condition="item_start_disp" tal:content="item_start_disp" />
+                                    <b tal:condition="python:item_end_disp != item_start_disp" tal:content="string: - $item_end_disp" />
+                                <p>
+                                    <a href="#"
+                                       tal:attributes="href string:$item_url/vcs_view"
+                                       title="Termin im vCal-Format runter laden"
+                                       ><img tal:replace="structure here/icon_export_vcal.png" src="" alt="" />
+                                        <span i18n:translate="label_add_to_vcal">vCal</span></a><br />
+                                    <a href="#"
+                                       tal:attributes="href string:$item_url/ics_view"
+                                       title="Termin im iCal-Format runter laden"
+                                       ><img tal:replace="structure here/icon_export_ical.png" src="" alt="" />
+                                        <span i18n:translate="label_add_to_ical">iCal</span></a>
+                                                                
+                                </p>
+                            </td>							
+                            <td class="col02">
+                                <p tal:condition="is_mobile">
+                                    <span tal:condition="item_start_disp" tal:content="item_start_disp" />
+                                    <span tal:condition="python:item_end_disp != item_start_disp" tal:content="string: - $item_end_disp" />&nbsp;&middot;&nbsp;									
+                                    <a href="#"
+                                       tal:attributes="href string:$item_url/vcs_view"
+                                       title="Termin im vCal-Format runter laden"
+                                       ><img tal:replace="structure here/icon_export_vcal.png" src="" alt="" />
+                                        <span i18n:translate="label_add_to_vcal">vCal</span></a>&nbsp;&middot;&nbsp;
+                                    <a href="#"
+                                       tal:attributes="href string:$item_url/ics_view"
+                                       title="Termin im iCal-Format runter laden"
+                                       ><img tal:replace="structure here/icon_export_ical.png" src="" alt="" />
+                                        <span i18n:translate="label_add_to_ical">iCal</span></a>
+                                </p>
+								
+                                <p><b tal:content="string:$item_title_or_id"></b></p>
+                                <div tal:condition="item_description" class="item-description">
+                                    <div class="item-teaser-image" tal:condition="python:is_mobile and item_teaser_image_picolo">    
+                                        <span tal:replace="structure item_teaser_image_picolo" />
+                                    </div>
+                                    <div class="item-teaser-image" tal:condition="python:item_teaser_image_mini and not is_mobile">    
+                                        <a href="#" tal:attributes="href item_url" ><span 
+											tal:replace="structure item_teaser_image_mini" /></a>
+                                    </div> 									
+                                     <div tal:content="structure string: $item_description" />
+                                </div>
+                                <p>Ort:
+									<span tal:condition="item_location" tal:replace="item_location"/>
+								</p>
+                                <p tal:condition="item_event_url_disp"> 
+                                    <a href="#" tal:attributes="href item_event_url" tal:content="item_event_url_disp" />
+                                </p>
+                                <p tal:condition="item_contact_email"><span class="link-mailto"><a tal:content="item_contact_email" tal:attributes="href string:mailto:$item_contact_email"/></span></p>
+                                <p tal:condition="python: item_text">
+                                    <a href="#" tal:attributes="href item_url" >Details ...</a>
+                                </p>
+    
+                            </td>
+                        </tr>                        
+                    </tal:block>
+                </table>
+    
+                <p class="discreet" 
+                    tal:define="hinweis python:context.aq_parent.getProperty('hinweis')" 
+                    tal:condition="hinweis">
+                   <span tal:replace="structure hinweis" >HINWEIS AUS PROPERTY</span>
+                </p>
+    
+                <!-- Navigation -->
+                <div metal:use-macro="here/batch_macros/macros/navigation" />
+    
+            </tal:listing>
+            <metal:empty metal:define-slot="no_items_in_listing">
+                <p class="discreet"
+                   tal:condition="not: folderContents"
+                   i18n:translate="description_no_items_in_folder">
+                    There are currently no items in this folder.
+                </p>
+            </metal:empty>
+    
+            </tal:foldercontents>
+            </metal:listingmacro>
+
+        </div>
+        
+     
+        <div tal:replace="structure provider:plone.belowcontentbody" />
+
+    </metal:main-macro>
+    </div>
+
+</body>
+</html>
