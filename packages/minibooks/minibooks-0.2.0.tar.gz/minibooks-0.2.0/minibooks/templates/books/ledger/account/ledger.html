@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load arrayutil %}
+{% load python %}
+{% load humanize %}
+{% load ledger %}
+
+{% block javascript %}
+<script src="{{ MEDIA_URL }}js/clientside.js" type="text/javascript"></script>
+{{ date_form.media|safe }}
+
+<script type="text/javascript" charset="utf-8">
+// <![CDATA[
+	var pulse = null;
+	window.addEvent('domready', function() {
+		{% if reconcile_enabled %}
+		var sidebar = $('floating-sidebar');
+		pulse = new Fx.Tween('floating-sidebar', {
+			'property': 'background-color',
+			'link': 'chain',
+			'duration': 'short'
+		});
+		if (Browser.Engine.trident4) { // IE 6 :P
+			sidebar.setStyle('position', 'absolute');
+			sidebar.pin(); // use clientside Element.pin() for IE 6
+		} else {
+			sidebar.setStyle('position', 'fixed');
+		}
+	
+		function update_sidebar_position() {
+			var current_offset = document.documentElement.scrollTop || document.body.scrollTop;
+			var desired_offset = 130 - current_offset;
+			if (desired_offset < 10)
+				desired_offset = 10;
+			if (desired_offset != sidebar.getStyle('top'))
+				sidebar.setStyle('top', desired_offset + 'px');
+		
+		}
+		if (!Browser.Engine.trident4) {
+			update_sidebar_position();
+			window.addEvent('scroll', function() {
+				update_sidebar_position();
+			});
+		}
+		{% endif %}
+		
+		$('id_date_form_clear_btn').addEvent('click', function(){
+			$('id_from_date').value = "";
+			$('id_to_date').value = "";
+			// TODO figure out how to submit the form directly with mootools
+			$('id_date_form_submit_btn').click();
+		});
+	});
+	
+	function update_sidebar_data(data) {
+		$('ajax-error-list').set('html', data.errors);
+		$('reconciled-balance').set('text', data.reconciled_balance);
+		pulse.start('#F7F9FA').start('#FFFFFF');
+	}
+	
+	function reconcile_transaction(el) {
+		new Request.JSON({
+			url: "{% url reconcile_transaction %}",
+			onComplete: function (response) {
+				update_sidebar_data(response);
+			}
+		}).post({
+			'transaction': el.get('value'),
+			'account': el.getParent('tr').get('class')
+			{% if to_date %},
+			'to_date': '{{ to_date }}'
+			{% endif %}
+		});
+	}
+	
+// ]]>
+</script>
+{% endblock %}
+
+{% block css %}
+    <link charset='UTF-8' rel="stylesheet" type="text/css" media="print" href="{{ MEDIA_URL }}style/print.css" />
+{% endblock %}
+
+{% block title %}Account Ledger{% endblock %}
+
+{% block content %}
+<h2 class='skinny'>Filter by Date</h2>
+<ul class='header-actions-left'>
+	<li><a href='{% url list_accounts %}'>Return to Accounts</a></li>
+	{% ifequal accounts|length 1 %}
+	<li><a href='{% url account_business_balances accounts.0.pk %}'>Business Balances</a></li>
+	{% endifequal %}
+</ul>
+
+{% include 'books/ledger/_date_filters.html' %}
+
+<form method="get" action="" id="date-filter">
+	<ul id='ledger-date-fieldlist'>
+		{{ date_form.as_ul }}
+		<li>
+			<input type='submit' name='submit' value='Update' id='id_date_form_submit_btn'/>
+		</li>
+		<li>
+			<input type='button' name='clear' value='Clear' id='id_date_form_clear_btn'/>
+		</li>
+	</ul>
+	{% for account in accounts %}
+		<input type="hidden" name="accounts" value="{{ account.id }}" id="accounts-{{ account.id }}" />
+	{% endfor %}
+</form>
+
+{% if reconcile_enabled %}
+<div id='floating-sidebar'>
+	<div id='reconcile'>
+		{% call_python accounts.0.reconciled_balance to_date=to_date %}
+		<span class='label'>Reconciled Balance:</span> $<span id='reconciled-balance'>{{ call_python_result|currency }}</span>
+		{% if to_date %}
+		<div class='help-text'>
+		Through {{ to_date|naturalday }}
+		</div>
+		{% endif %}
+		<div id='ajax-error-list'></div>
+	</div>
+</div>
+{% endif %}
+
+<table cellspacing="0" cellpadding="0" id='ledger_accounts'>
+{% for account in accounts %}
+{% call_python account.get_transactions from_date=from_date, to_date=to_date %}
+{% ifnotequal call_python_result.count 0 %}
+	<tr>
+		<th class='ledger account-name' colspan="7">
+			{{ account.number }}: {{ account.name }} 
+			{% if from_date or to_date %}
+				({{ from_date }}--{{ to_date }})
+			{% endif %}
+			&mdash; {{ account.type|capfirst }}
+		</th>
+	</tr>
+	<tr>
+		<th class='ledger unknown date'>Date</th>
+		<th class='ledger string business'>Business</th>
+		<th class='ledger string memo'>Memo</th>
+		<th class='ledger number debit'>Debit</th>
+		<th class='ledger number credit'>Credit</th>
+		<th class='ledger number credit'>R</th>
+		<th class='ledger number total'>Balance</th>
+	</tr>
+{% for transaction in call_python_result %}
+	<tr class='{% ifequal account transaction.credit %}credit{% else %}debit{% endifequal %}'>
+		<td class='ledger unknown date'>
+			{% if perms.ledger.change_exchange %}
+				{% if transaction.exchange %}
+				<a href='{% url edit_exchange exchange_type_slug=transaction.exchange.type.slug,exchange_id=transaction.exchange.id %}?next={{ request.get_full_path|urlencode }}'>{{ transaction.date }}</a>
+				{% else %}
+				<a href='{% url edit_general_entry transaction_id=transaction.id %}?next={{ request.get_full_path|urlencode }}'>{{ transaction.date }}</a>
+				{% endif %}
+			{% else %}
+				{{ transaction.exchange.date }}
+			{% endif %}
+		</td>
+		<td class='ledger string business'>
+			{% if transaction.exchange.business %}
+				{% if perms.crm.view_business %}
+					<a href='{% url view_business business_id=transaction.exchange.business.id %}'>{{ transaction.exchange.business }}</a>
+				{% else %}
+					{{ transaction.exchange.business }}
+				{% endif %}
+			{% endif %}
+		</td>
+		<td title='{{ transaction.memo|escape }}' class='ledger string memo'>{{ transaction.memo|truncatewords:"8" }}</td>
+		{% ifequal account transaction.credit %}
+		<td class='ledger number debit'></td>
+		<td class='ledger number credit'>{{ transaction.total|currency }}</td>
+		{% else %}
+		<td class='ledger number debit'>{{ transaction.total|currency }}</td>
+		<td class='ledger number credit'></td>
+		{% endifequal %}
+		<td class='ledger boolean reconciled'>
+			{% ifequal account transaction.credit %}
+			<input type="checkbox" name="reconciled" value="{{ transaction.id }}" id="reconciled-{{ transaction.id }}"{% if transaction.credit_reconciled %} checked="checked"{% endif %}{% if not perms.ledger.change_transaction or not reconcile_enabled %} disabled='disabled'{% endif %} />
+			{% else %}
+			<input type="checkbox" name="reconciled" value="{{ transaction.id }}" id="reconciled-{{ transaction.id }}"{% if transaction.debit_reconciled %} checked="checked"{% endif %}{% if not perms.ledger.change_transaction or not reconcile_enabled %} disabled='disabled'{% endif %} />
+			{% endifequal %}
+			{% if reconcile_enabled %}
+			<script type="text/javascript" charset="utf-8">
+			// <![CDATA[
+				window.addEvent('domready', function() {
+					$('reconciled-{{ transaction.id }}').addEvent('click', function(){
+						reconcile_transaction(this);
+					});
+				});
+			// ]]>
+			</script>
+			{% endif %}
+		</td>
+		<td class='ledger number total'>{{ transaction.balance|currency }}</td>
+	</tr>
+{% endfor %}
+	<tr>
+		{% call_python account.reconciled_balance to_date=to_date %}
+		<th colspan='6' class='ledger account-balance'>Reconciled Balance:</th>
+		<td class='ledger number total'>${{ call_python_result|currency }}</td>
+	</tr>
+	<tr>
+		{% call_python account.total_for_date_range from_date=from_date, to_date=to_date %}
+		<th colspan='6' class='ledger account-balance'>All transactions in this date range:</th>
+		<td class='ledger number total'>${{ call_python_result|currency }}</td>
+	</tr>
+{% endifnotequal %}
+{% endfor %}
+</table>
+
+{% endblock %}

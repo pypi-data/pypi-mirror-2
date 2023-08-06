@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Transfer Funds{% endblock %}
+
+{% block javascript %}
+	<script type="text/javascript">
+		// <![CDATA[
+		window.addEvent('domready', function (event) {
+			if (!$('id_credit').value) {
+				$('id_debit').set('disabled', true);
+			}
+			$('id_credit').addEvent('change', function(e) {
+				$('id_debit').set('disabled', true);
+				get_debit_account_list(e.target.value);
+			});
+			get_debit_account_list($('id_credit').value);
+		});
+		
+		function get_debit_account_list(value) {
+			if (value) {
+				new Request.JSON({
+					url: "{% url list_transfer_debit_accounts %}",
+					onComplete: function (response) {
+						update_debit_account_list(response);
+					}
+				}).get({
+					'credit_id': value
+				});
+			}
+		}
+		
+		function update_debit_account_list(response) {
+			debit = $('id_debit');
+			last_value = debit.value;
+			debit.empty();
+			
+			var option = new Element('option');
+			option.set('value', '');
+			option.set('text', '---------');
+			option.set('selected', 'selected');
+			option.injectInside($('id_debit'));
+			response.each(function(account, i) {
+				var option = new Element('option');
+				option.set('value', account.value);
+				option.set('text', account.label);
+				if (account.value == last_value) {
+					option.set('selected', 'selected');
+				}
+				option.injectInside(debit);
+			});
+			
+			debit.set('disabled', false);
+		}
+		// ]]>
+	</script>
+	
+	{{ form.media|safe }}
+{% endblock %}
+
+{% block content %}
+<h2>Transfer Funds</h2>
+<ul class='header-actions-left'>
+	<li><a href='{% url list_accounts %}'>Return to accounts</a></li>
+</ul>
+
+<form id="transfer-funds" action="" method="post" accept-charset="utf-8">
+	<table class='vertical'>
+		{{ form }}
+		<tr>
+			<td>&nbsp;</td>
+			<td class='submit'>
+				<input type='button' value='Cancel' onclick='history.go(-1)' />
+				&nbsp;
+				<input type='submit' name='submit' value='Save &rarr;' />
+			</td>
+		</tr>
+	</table>
+</form>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load ledger %}
+
+{% block javascript %}
+{{ date_form.media|safe }}
+
+<script type="text/javascript" charset="utf-8">
+// <![CDATA[
+	window.addEvent('domready', function() {
+		$('id_date_form_clear_btn').addEvent('click', function(){
+			$('id_from_date').value = "";
+			$('id_to_date').value = "";
+			// TODO figure out how to submit the form directly with mootools
+			$('id_date_form_submit_btn').click();
+		});
+	});
+// ]]>
+</script>
+{% endblock %}
+
+{% block css %}
+    <link charset='UTF-8' rel="stylesheet" type="text/css" media="print" href="{{ MEDIA_URL }}style/print.css" />
+{% endblock %}
+
+{% block title %}Account Ledger{% endblock %}
+
+{% block content %}
+<h2>Profit and Loss Statement</h2>
+<ul class='header-actions-left'>
+	<li><a href='{% url list_reports %}'>Return to Reports</a></li>
+</ul>
+
+{% include 'books/ledger/_date_filters.html' %}
+
+<form method="get" action="" id="date-filter">
+	<ul id='ledger-date-fieldlist'>
+		{{ date_form.as_ul }}
+		<li>
+			<input type='submit' name='submit' value='Update' id='id_date_form_submit_btn'/>
+		</li>
+		<li>
+			<input type='button' name='clear' value='Clear' id='id_date_form_clear_btn'/>
+		</li>
+	</ul>
+	{% for account in accounts %}
+		<input type="hidden" name="accounts" value="{{ account.id }}" id="accounts-{{ account.id }}" />
+	{% endfor %}
+</form>
+
+<table cellspacing="0" cellpadding="0" id='profit-loss'>
+	<tr>
+		<td colspan='2' class='header'>
+			<h3>Revenue</h3>
+		</td>
+	</tr>
+{% for account in profit_accounts %}
+	{% ifnotequal account.date_range_total 0 %}
+		<tr class='{% cycle 'o' 'e' %}'>
+			<td><a href="{% url single_account_ledger account_id=account.id %}?{{ date_query_string }}">{{ account.name }}</a></td>
+			<td class='ledger number'>{{ account.date_range_total|currency }}</td>
+		</tr>
+	{% endifnotequal %}
+{% endfor %}
+	<tr>
+		<th class='ledger account-balance'>Gross Revenue:</th>
+		<td class='ledger number total'>{{ total_profits|currency }}</td>
+	</tr>
+	<tr>
+		<td colspan='2' class='header'>
+			<h3>Expenses</h3>
+		</td>
+	</tr>
+{% for account in loss_accounts %}
+	{% ifnotequal account.date_range_total 0 %}
+		<tr class='{% cycle 'o' 'e' %}'>
+			<td><a href="{% url single_account_ledger account_id=account.id %}?{{ date_query_string }}">{{ account.name }}</a></td>
+			<td class='ledger number'>{{ account.date_range_total|currency }}</td>
+		</tr>
+	{% endifnotequal %}
+{% endfor %}
+	<tr>
+		<th class='ledger account-balance'>Total Expenses:</th>
+		<td class='ledger number'>{{ total_losses|currency }}</td>
+	</tr>
+	<tr>
+		<td colspan='2' class='header'>&nbsp;</td>
+	</tr>
+	<tr>
+		<th class='ledger account-balance'>Net Income:</th>
+		<td class='ledger number'>{{ net_income|currency }}</td>
+	</tr>
+
+</table>
+
+{% endblock %}

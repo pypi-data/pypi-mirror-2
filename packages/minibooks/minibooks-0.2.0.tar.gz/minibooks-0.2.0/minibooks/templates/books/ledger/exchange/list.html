@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load ledger %}
+
+{% block title %}
+{% if exchange_type %}
+    {{ exchange_type.label }}s
+{% else %}
+    Exchanges
+{% endif %}
+
+{% endblock %}
+
+{% block content %}
+
+{% if exchange_type %}
+	{% load pagination_tags %}
+	{% autopaginate exchanges %}
+{% endif %}
+
+<h2>Search Exchanges</h2>
+{% if exchange_type or searching %}
+	<ul class='header-actions-left'>
+		<li><a href='{% url list_exchanges %}'>Return to overview</a></li>
+	</ul>
+{% endif %}
+<form class='search' accept-charset='UTF-8' method='get' action=''>
+	<ul>
+		{{ form.as_ul }}
+		<li class='form-buttons'>
+			<input class='large-button' type='submit' name='submit' value='Search &rarr;' />
+		</li>
+	</ul>
+</form>
+
+{% ifequal exchanges.count 0 %}
+	<p>
+		Your search &mdash; {{ request.REQUEST.search }} &mdash; did not 
+		match any exchanges. Return to the <a href='{% url list_exchanges %}'>
+		exchange overview</a> to start over.
+	</p>
+{% else %}
+
+<table id='exchanges'>
+{% regroup exchanges by type as type_list %}
+
+{% for type in type_list %}
+	<tr>
+		<th class='type' colspan='5'>
+			<h2>{{ type.grouper }}s</h2>
+			<ul class='header-actions-left'>
+			{% if perms.ledger.add_exchange %}
+				<li><a href='{% url create_exchange exchange_type_slug=type.grouper.slug %}'>&rarr; Create {{ type.grouper }}</a></li>
+			{% endif %}
+			{% if exchange_type or searching %}
+				<li><a href='{% url list_exchanges %}'>Return to overview</a></li>
+			{% endif %}
+			</ul>
+			{% if exchange_type %}
+				{% paginate %}
+			{% endif %}
+		</th>
+	</tr>
+	<tr>
+	{% if not exchange_type or exchange_type.deliverable %}
+		<th>&nbsp;</th>
+	{% endif %}
+		<th>ID</th>
+		<th>Date</th>
+		<th>Business</th>
+		<th>Memo</th>
+		<th class='ledger number'>Total</th>
+	</tr>
+	{% for exchange in type.list %}
+		<tr>
+		{% if not exchange_type or exchange_type.deliverable %}
+			<td>
+			{% if exchange.type.deliverable %}
+				{% if exchange.delivered %}
+					<img alt='Delivered Exchange' title='Delivered Exchange' src='{{ MEDIA_URL }}images/icons/accept.png'/>
+				{% else %}
+					<img alt='Undelivered Exchange' title='Undelivered Exchange' src='{{ MEDIA_URL }}images/icons/exclamation.png'/>
+				{% endif %}
+			{% endif %}
+			</td>
+		{% endif %}
+			<td>
+				{% if perms.ledger.change_exchange %}
+					<a href='{% url edit_exchange exchange_id=exchange.id,exchange_type_slug=exchange.type.slug %}?next={{ request.get_full_path }}'>{{ exchange.id }}</a>
+				{% else %}
+					{{ exchange.id }}
+				{% endif %}
+			</td>
+			<td>{{ exchange.date }}</td>
+
+			<td>
+				{% if perms.crm.view_business %}
+					<a href='{% url view_business business_id=exchange.business.id %}'>{{ exchange.business }}</a>
+				{% else %}
+					{{ exchange.business }}
+				{% endif %}
+			</td>
+			<td class='ledger memo'>{{ exchange.memo|truncatewords:"8" }}</td>
+			<td class='ledger number total'>${{ exchange.total|currency }}</td>
+			<td class='ledger links'>
+				<a href='{% url view_exchange_as_pdf exchange_id=exchange.id %}' title='View {{ exchange.type.label }} as PDF'><img alt='{{ exchange.type.label }} PDF' src='{{ MEDIA_URL }}images/icons/page_white_acrobat.png'/></a>
+				{% if exchange.type.deliverable and perms.ledger.email_exchange %}
+					<a href='{% url email_exchange exchange_id=exchange.id %}?next={{ request.path }}' title='E-mail {{ exchange.type.label }}'><img alt='E-mail {{ exchange.type.label }}' src='{{ MEDIA_URL }}images/icons/email_go.png'/></a>
+				{% endif %}
+			</td>
+			<td class='ledger links'>
+				<a href='{% url duplicate_exchange exchange_id=exchange.id %}?next={{ request.path }}' title='Duplicate {{ exchange.type.label }}'><img alt='{{ exchange.type.label }} PDF' src='{{ MEDIA_URL }}images/icons/report_add.png'/></a>
+			</td>
+		</tr>
+	{% endfor %}
+	{% if not exchange_type and not searching %}
+	<tr>
+		<td class='show-all' colspan='5'>
+			<a href='{% url list_exchanges_by_type exchange_type_slug=type.grouper.slug %}'>Show all {{ type.grouper.exchanges.count }} {{ type.grouper|lower }}s...</a>
+		</td>
+	</tr>
+	{% endif %}
+{% endfor %}
+</table>
+
+{% endifequal %}
+
+{% endblock %}
+
