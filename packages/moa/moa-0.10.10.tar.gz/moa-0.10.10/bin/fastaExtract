@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+# 
+# Copyright 2009 Mark Fiers, Plant & Food Research
+# 
+# This file is part of Moa - http://github.com/mfiers/Moa
+# 
+# Moa is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+# 
+# Moa is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with Moa.  If not, see <http://www.gnu.org/licenses/>.
+# 
+"""
+Extract a set of sequences from a multifasta file
+"""
+
+import re
+import sys
+import time
+import copy
+import optparse
+
+def fastareader(f):
+    F = open(f)
+    id, header, seq = "", "", []
+
+    while True:
+        l = F.readline()
+        if not l: break
+        
+        l = l.strip()
+        if not l: continue
+
+        if l[0] == '>':
+            if id  and seq:
+                yield id, header, "".join(seq)
+            seq = []
+            id = l[1:].split()[0]
+            header = " ".join(l[1:].split()[1:])
+                        
+        else:
+            seq.append("".join(l.split()).lower())
+
+    if id and seq:
+        yield id, header, "".join(seq)
+
+    F.close()
+
+parser = optparse.OptionParser()
+
+parser.add_option('-l', '--list', dest='list',
+    help = 'list of ids to extract')
+
+parser.add_option('-f', '--fasta', dest='fasta',
+    help = 'fasta file to extract from')
+
+parser.add_option('-o', '--order', dest='order', action='store_true',
+    help = 'keep the order of the list')
+
+parser.add_option('-R', '--regex', dest='regex',
+                   help='regular expression to extract the identifier ' + \
+                      'from the fasta headers')
+
+(options, args) = parser.parse_args()
+
+if not options.list:
+    raise "Must define a list!"
+if not options.fasta:
+    raise "Must define a fasta file!"
+
+def log(m):
+    sys.stderr.write("fastaextractor: %s\n" % m)
+
+if options.list == '-':
+    rawIds = sys.stdin.read().split()
+else:
+    rawIds = open(options.list, 'U').readlines()
+
+ids = [x.split()[0].replace('>', '') for x in rawIds]
+idsInfo = dict([(x.split()[0],x) for x in rawIds])
+
+log("read %d ids" % len(ids))
+log("first three ids: %s" % (" ".join(ids[:3])))
+        
+import string
+def rc(sequence):
+    return sequence.upper().translate(string.maketrans("ATCG", "TAGC"))[::-1]
+
+output = {}
+
+i = 0
+cre = None
+if options.regex:
+    cre = re.compile(options.regex)
+    
+for seqId, header, seq in fastareader(options.fasta):
+
+    if cre: testId = cre.search("%s %s" % (seqId, header)).groups()[0]
+    else: testId = seqId
+
+    if not testId in ids: 
+        continue
+    else:
+        #remove the testId from ids - we don't want to see
+        #sequences twice.
+        ids.remove(testId)
+    
+
+    if 'antisense' in idsInfo[testId]:
+        seq = rc(seq)
+        header += " reverse complement"
+
+    if options.order:
+        output[seqId] = (header, seq)
+    else:
+        i += 1
+        print ">%s %s" % (seqId, header)
+        while seq:       
+            print "%s" % seq[:80]
+            seq = seq[80:]
+
+if options.order:
+    for seqId in ids:
+        header, seq = output[seqId]
+        i += 1
+        print ">%s %s" % (seqId, header)
+        while seq:       
+            print "%s" % seq[:80]
+            seq = seq[80:]
+
+log("written %d sequences" % i)
+
+
