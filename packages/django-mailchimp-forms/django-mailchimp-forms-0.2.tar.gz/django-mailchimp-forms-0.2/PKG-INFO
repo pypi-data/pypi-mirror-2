@@ -1,0 +1,135 @@
+Metadata-Version: 1.0
+Name: django-mailchimp-forms
+Version: 0.2
+Summary: Mailchimp registration framework for Django
+Home-page: http://code.indifex.com/django-mailchimp-forms/
+Author: Konstantinos Bairaktaris
+Author-email: kbairak@indifex.com
+License: BSD
+Download-URL: http://code.indifex.com/django-mailchimp-forms/downloads/
+Description: ================
+        Django-mailchimp-forms
+        ================
+        
+        Django-mailchimp-forms is a django tool that helps with the integration of web
+        applications with Mailchimp. With django-mailchimp-forms you will be able to add and
+        remove user emails to a mailchimp mailing list with minimum effort.
+        
+        Installing
+        ==========
+        
+        You can install the latest version of django-mailchimp-forms running 
+        ``pip install django-mailchimp-forms`` or ``easy_install django-mailchimp-forms``
+        You can also install the `in-development version`_ of django-mailchimp-forms with
+        ``pip install django-mailchimp-forms==dev`` or ``easy_install django-mailchimp-forms==dev``.
+        
+        .. _in-development version: http://code.indifex.com/django-mailchimp-forms/get/tip.tar.gz#egg=django-mailchimp-forms-dev
+        
+        Features
+        ========
+        
+        * utility methods that use the module chimpy to communicate with mailchimp.com
+        and add/remove emails
+        * form wrappers to enhance your registration form so that it contains a
+        'newsletter' checkbox and registers the user's email to mailchimp.com on save()
+        * views that logged-in users can navigate to register/unregister themselved
+        from the mailing list
+        
+        Form enhancement
+        ================
+        
+        In order to be able to register users with newsletter functionality using
+        django-mailchimp-forms you have 3 options:
+        
+        1. The default form:
+        
+        The default form contains fields for: *username*, *password*, *password
+        confirmation*, *email*, *newsletter*. (In fact it is a
+        django.contrib.auth.forms.UserCreationForm wrapped with the django-mailchimp-forms
+        form wrapper).
+        
+        It is used in a view like this:
+        
+        ::
+        
+          from django_mailchimp_forms.forms import ChimpyForm
+          
+          def register(request):
+              if request.method == 'POST':
+                  form = ChimpyForm(request.POST)
+                  if form.is_valid():
+                      newuser = form.save()
+                      return HttpResponseRedirect('profile_page', user_id=newuser.id)
+              else:
+                  form = ChimpyForm()
+              return render_to_response('register.html', {'form': form})
+        
+        2. The form class wrapper:
+        
+        You can use this if you have already defined a form for registration or if you
+        are currently using a registration form from another django app
+        (django-registration, django-userprofile, etc). The only requirement of the
+        initial form is that it defines a 'save' method that creates and returns the
+        newly created User instance.
+        
+        ::
+        
+          from registration import RegistrationForm
+          from django_mailchimp_forms.forms import chimpy_form_class_wrapper
+          
+          form_class = chimpy_form_class_wrapper(RegistrationForm)
+          def register(request):
+                if request.method == 'POST':
+                    form = form_class(request.POST)
+                    if form.is_valid():
+                        newuser = form.save()
+                        return HttpResponseRedirect('profile_page', user_id=newuser.id)
+                else:
+                    form = form_class()
+                return render_to_response('register.html', {'form': form})
+        
+        3. The form instance wrapper:
+        
+        If you are already use a form instance you can 'enhance' it as well with
+        newsletter capabilities. Note: the wrapper function takes a second optional
+        'data' argument that should be the POST dictionary in case the form is supposed
+        to be bound to post data.
+        
+        ::
+        
+          from registration import RegistrationForm
+          from django_mailchimp_forms import chimpy_form_instance_wrapper
+          
+          def register(request):
+                  if request.method == 'POST':
+                      form = RegistrationForm(request.POST)
+                      form = chimpy_form_instance_wrapper(form, request.POST)
+                      if form.is_valid():
+                          newuser = form.save()
+                          return HttpResponseRedirect('profile_page', user_id=newuser.id)
+                  else:
+                      form = form_class()
+                      form = chimpy_form_instance_wrapper(form)
+                  return render_to_response('register.html', {'form': form})
+        
+        Views
+        =====
+        
+        There are 2 views, one to register a user to a mailing list and one to
+        unregister. The views require HTTP POST request methods and support both AJAX
+        and non-AJAX requests. In the case of an AJAX request, the view will return a
+        JSON string with 'success'(boolean) and 'message'(string) attributes while in
+        the case of a non-AJAX request, the view will redirect to the path designated
+        by the 'next' GET variable and an appropriate message will be added to the
+        relevant user's message set.
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Django
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Utilities
