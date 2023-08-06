@@ -1,0 +1,114 @@
+=====================
+ConflictsOptionParser
+=====================
+
+ConflictsOptionParser provides a command line interface, based off the Python
+Standard Library's own `optparse.OptionParser
+<http://docs.python.org/library/optparse.html>`_. (Users of this library
+should have familiarity with the ``optparse`` library.)
+``conflictsparse.ConflictsOptionParser`` acts as a drop-in replacement for
+``optparse.OptionParser`` that has a few additional methods for specifying
+options which conflict with each other, and has additional behavior for
+automatically raising an error when detecting conflicting options parsed from
+the command line arguments.
+
+These two additional methods in ``conflictsparse.ConflictsOptionParser`` are
+
+``register_conflict(options, message=None)``
+  where ``options`` is an iterable of options, either ``optparse.Option``
+  instances, or their corresponding option strings; marks any combination of
+  these options as conflicting, and will cause the parser to report the
+  conflicting options through an error, using either the specified ``message``
+  or constructing one as needed, and to exit immediately.
+
+``unregister_conflict(options)``
+  like ``register_conflict`` but removes the combination of options from
+  registered conflicts.
+
+
+Example Usage
+=============
+
+::
+
+  #/usr/bin/env python
+  # File: tryconflictsparse.py
+  import conflictsparse
+  parser = conflictsparse.ConflictsOptionParser("python %prog [OPTIONS] ARG")
+  # You can retain the Option instances for flexibility, in case you change
+  # option strings later
+  verbose_opt = parser.add_option('-v', '--verbose', action='store_true')
+  quiet_opt = parser.add_option('-q', '--quiet', action='store_true')
+  # Alternatively, you don't need to keep references to the instances;
+  # we can re-use the option strings later
+  parser.add_option('--no-output', action='store_true')
+  # Register the conflict. Specifying an error message is optional; the
+  # generic one that is generated will usually do.
+  parser.register_conflict((verbose_opt, quiet_opt, '--no-output'))
+  # Now we parse the arguments as we would with
+  # optparse.OptionParser.parse_args()
+  opts, args = parser.parse_args()
+  print "Opts are", opts
+  print "Args are", args
+
+Then if we ran
+
+::
+
+  python tryconflictsparse.py -v 42
+
+
+we would get
+
+::
+
+  Opts are {'verbose': True, 'no_output': None, 'quiet': None}
+  Args are ['42']
+
+
+But suppose we give conflicting options on the command line.
+
+::
+
+  python tryconflictsparse.py -v --no-output 42
+
+Then the parser would automatically raise an error and exit.
+
+::
+
+  Usage: python tryconflictsparse.py [OPTIONS] ARG
+
+  tryconflictsparse.py: error: --verbose, --quiet, --no-output are incompatible options.
+
+
+Installation
+============
+
+ConflictsOptionParser is available from the Python Package Index at
+http://pypi.python.org/pypi/ConflictsOptionParser
+
+You can install using `pip <http://pypi.python.org/pypi/pip>`_.
+
+::
+
+  pip install ConflictsOptionParser
+
+
+Development
+===========
+
+Source code is hosted on BitBucket at
+https://bitbucket.org/gotgenes/conflictsoptionparser/
+
+
+Bug Reports
+===========
+
+Please report any bugs on the BitBucket Issue Tracker at
+https://bitbucket.org/gotgenes/conflictsoptionparser/issues
+
+
+Acknowledgements
+================
+
+This work was originally inspired by `a solution on Stack Overflow by Támas <http://stackoverflow.com/questions/2729426/how-do-you-handle-options-that-cant-be-used-together-using-optionparser/2729560#2729560>`_.
