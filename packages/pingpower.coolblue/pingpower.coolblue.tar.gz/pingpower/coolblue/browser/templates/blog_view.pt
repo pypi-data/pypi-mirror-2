@@ -1,0 +1,93 @@
+ <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+
+
+<div metal:fill-slot="body"> 
+
+  <tal:block define="mtool context/portal_membership;
+                   contentFilter python:{'portal_type':('Document','Event','File','News Item','Image'),'review_state':'published','sort_on':'Date','sort_order':'reverse'};
+                   blogitem python:here.queryCatalog(contentFilter);
+                   batch blogitem;
+				   portal_discussion nocall:here/portal_discussion;
+                   isDiscussionAllowedFor nocall:portal_discussion/isDiscussionAllowedFor;
+                   getDiscussionFor nocall:portal_discussion/getDiscussionFor;
+				   ">
+	 <tal:listing tal:repeat="item blogitem">
+      	 <div class="post" tal:define="DateTime nocall:modules/DateTime/DateTime;
+						               item_effective item/EffectiveDate;">
+
+      		<div class="right" tal:define="item_url item/getURL|item/absolute_url">
+
+            	<h2><a href="index.html" tal:content="item/pretty_title_or_id" tal:attributes="href item_url">Title</a></h2>
+
+                <p class="post-info" tal:content="item/Description">Description</p>
+
+                <div tal:define="item_object item/getObject;
+				               item_text item_object/getText;"
+					tal:omit-tag="">
+				   <div tal:content="structure item_object/getText">
+                       Text areas
+				   </div>
+                </div>
+
+                <p>
+				   <a class="more" href="index.html" tal:attributes="href item_url" >
+				   continue reading &raquo;
+				   </a>
+				</p>
+
+            </div>
+
+            <div class="left" tal:define="blog_date item/Date;
+			                              format_blog_date blog_date;
+										  blog_year python:DateTime(blog_date).year();
+										  blog_month python:DateTime(blog_date).month();
+										  blog_day python:DateTime(blog_date).day();
+										  month_En python:{'1':'Jan','2':'Fab','3':'Mar','4':'Apr','5':'May','6':'Jun','7':'Jul','8':'Aug','9':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+										  month_En_item python:month_En[str(blog_month)];
+										 ">
+				<p class="dateinfo" tal:define="
+				dateinfo python:'%s <span> %s </span> ' %(month_En_item,blog_day)"
+				tal:content="structure dateinfo">JAN<span>31</span>
+				</p>
+               	<div class="post-meta">
+                  	<h4>Post Info</h4>
+                     	<ul tal:define="
+						item_creator item/Creator;
+						author python:mtool.getMemberInfo(item_creator);
+						">
+                           <li class="user"><a href="#" tal:attributes="href string:${context/@@plone_portal_state/navigation_root_url}/author/${item_creator}" 
+						   tal:content="python:author and author['fullname'] or item_creator">Author</a></li>
+                           <li class="time" tal:define="
+						   format_blog_time python:DateTime(blog_date).AMPMMinutes();
+						   ">
+						   <a href="#" tal:content="format_blog_time">Blog Time 12:30 PM</a>
+						   </li>
+                           <li class="comments"                             
+						   tal:define=" resultObject item/getObject;
+						                resulturl resultObject/absolute_url;
+						                talkback python: getDiscussionFor(resultObject);
+										replys talkback/getReplies">
+								<a href="#" tal:content="python:'%s Comments'%len(replys)"
+								            tal:attributes="href string:${resulturl}#comments;">
+											2 Comments
+								</a>
+						   </li>
+                           <li class="permalink" tal:define="item_url item/getURL|item/absolute_url">
+						   <a href="#" tal:attributes="href item_url">Permalink</a>
+						   </li>
+                        </ul>
+						</div>
+            </div>
+			</div>
+			</tal:listing>
+        <!-- /main -->
+		</tal:block>
+
+ </div>
+ </html>
