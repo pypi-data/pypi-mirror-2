@@ -1,0 +1,123 @@
+# -*- mode: python; coding: utf-8 -*-
+# We extend with custom categories those defined by tsp95
+# (C) 2010 Carlos Martín
+ 
+# The name of the problem
+NAME: sal10
+# Problem type. Use CUSTOM if not yet supported by TSPLIB
+TYPE: ATSP
+# Problem description
+COMMENT: A 10 clients and depots problem
+# Number of nodes involved into problem (clients and depots)
+DIMENSION: 10
+# Type of vehicles
+VEHICLE_CATEGORY_TYPE: SPECIAL
+# How distances are given. Use special for a custom weight problem
+EDGE_WEIGHT_TYPE: EXPLICIT
+# Distances format
+EDGE_WEIGHT_FORMAT: FULL_MATRIX
+# Use this for graphical display. Coors of a node
+NODE_COORD_TYPE: TWOD_COORDS
+# Use Node coordinates to diplay data
+DISPLAY_DATA_TYPE: COORD_DISPLAY
+
+EOF
+
+ 
+# Node coordinates on the form NODE_INDEX, LATTITUDE, LONGITUDE
+NODE_COORD_SECTION:
+01 0000,00000 0000,00000
+02 0000,00000 0000,00000
+03 0000,00000 0000,00000
+04 0000,00000 0000,00000
+05 0000,00000 0000,00000
+06 0000,00000 0000,00000
+07 0000,00000 0000,00000
+08 0000,00000 0000,00000
+09 0000,00000 0000,00000
+10 0000,00000 0000,00000
+
+# Edge weight
+EDGE_WEIGHT_SECTION:
+***** 00000 00000 00000 00000 00000 00000 00000 00000 00000
+
+00000 ***** 00000 00000 00000 00000 00000 00000 00000 00000
+
+00000 00000 ***** 00000 00000 00000 00000 00000 00000 00000
+
+00000 00000 00000 ***** 00000 00000 00000 00000 00000 00000
+
+00000 00000 00000 00000 ***** 00000 00000 00000 00000 00000
+
+00000 00000 00000 00000 00000 ***** 00000 00000 00000 00000
+
+00000 00000 00000 00000 00000 00000 ***** 00000 00000 00000
+
+00000 00000 00000 00000 00000 00000 00000 ***** 00000 00000
+
+00000 00000 00000 00000 00000 00000 00000 00000 ***** 00000
+# last line comment
+00000 00000 00000 00000 00000 00000 00000 00000 00000 *****
+
+# Sets capacity for dealers. It has de forms. Vehicle type, 
+# ancestor, speed, max orders, max weight, max volume x, y, z
+# use -1 to ignore elements
+VEHICLE_CATEGORY_SECTION:
+01 00 00 00 00 00 00 00
+02 00 00 00 00 00 00 00
+03 00 00 00 00 00 00 00
+04 00 00 00 00 00 00 00
+
+# Describes vehicles that participates into the problem
+# it has the form vehicle, vehicle type, time window1, ..time windown
+VEHICLE_SECTION:
+01 01 00.00 00.00 00.00 00.00
+02 04 00.00 00.00
+
+# There's one order for each client this also implies dependence info
+# ci:, tau function, beta, time window1, time window2, ...
+# pik:, tau function, beta, time window, ...
+# TIP: Use a kalman filter to estimate park times and future demands
+ORDERS_SECTION:
+# Order for Client 00 with 2 orders from depot 01,02
+00 00.00 00.00 00.00 00.00
+01 00.00 00.00 00.00 00.00 00.00
+02 00.00 00.00
+# Order for Client 04 with one order from depot 06
+04 00.00 00.00
+06 00.00 00.00 00.00 00.00
+
+EOF
+# All from here is ignored
+
+ >>> mro = unmarshal.create(tsp_filter, 1)[0]
+ >>> tsp = mro.load(__file__) or None
+ >>> assert tsp is not None
+
+# count number of headers and sections
+ >>> assert len(tsp.comments) == 3
+ >>> assert len(tsp.sections) == 9
+ >>> assert len(tsp.contents) == 5
+
+# verify section headers and contents
+ >>> assert hasattr(tsp.edge_weight, 'section')
+ >>> assert hasattr(tsp.edge_weight, 'content')
+
+# verify edge_weight header
+ >>> assert tsp.sections.edge_weight.name  == 'EDGE_WEIGHT'
+ >>> assert tsp.sections.edge_weight.value == 'EDGE_WEIGHT_TYPE'
+ >>> assert len(tsp.sections.edge_weight.comments) == 1
+ >>> assert tsp.sections.edge_weight.values[0](str) == 'EXPLICIT'
+
+# verify edge_weight contents
+ >>> assert tsp.contents.edge_weight.name  == 'EDGE_WEIGHT'
+ >>> assert tsp.contents.edge_weight.value == 'EDGE_WEIGHT_SECTION'
+ >>> assert len(tsp.contents.edge_weight.comments) == 1
+ >>> assert len(tsp.contents.edge_weight.values) == 10
+ >>> assert tsp.edge_weight.content.values[9](str).endswith('*****')
+ >>> assert tsp.edge_weight.content.values[9].comments[0](str).startswith('last')
+
+# Unmarshal tests
+ >>> uro = marshal.create(tsp_filter, 1)[0]
+ >>> out = uro.dump(tsp)
+ >>> assert mro.load(out) == tsp
