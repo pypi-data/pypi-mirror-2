@@ -1,0 +1,92 @@
+#! /usr/bin/env python
+# -*- Mode: Python; tab-width: 4; indent-tabs-mode: nil; -*-
+
+import argparse
+import logging
+import sys
+import os
+
+from syncless import coio
+
+prefix = os.path.normpath(os.path.join(os.path.abspath(sys.argv[0]), os.pardir, os.pardir))
+sys.path.insert(0, prefix)
+
+from tako import configuration
+from tako.nodeserver import NodeServer
+from tako.utils import debug
+from tako.utils import convert
+
+def makedirs(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+def main():
+    global prefix
+    default_var_path = os.path.join(prefix, 'var', 'tako')
+
+    parser = argparse.ArgumentParser(description="Tako Node")
+    parser.add_argument('-id', '--id', help='Server id. Default = n1', default='n1')
+    parser.add_argument('-c', '--coordinator', help='Coordinator Server (address port)', nargs=2, action='append')
+    parser.add_argument('-f','--file', help='Database file.')
+    parser.add_argument('-cfg','--config', help='Configuration file. For use without a coordinator.')
+    parser.add_argument('-d', '--debug', help='Enable debug logging.', action='store_true')
+    parser.add_argument('-p', '--profiling-file', help='Enable performance profiling.')
+    parser.add_argument('-l', '--log-file', help='Log file.')
+    parser.add_argument('-u', '--update', help='Configuration update interval (seconds). Default = 300', type=int, default=300)
+    parser.add_argument('-v', '--var', help='var directory. Default = %s' % default_var_path, default=default_var_path)
+
+    args = parser.parse_args()
+
+    if args.profiling_file:
+        import cProfile
+        cProfile.runctx('_main(args)', globals(), locals(), args.profiling_file)
+    else:
+        _main(args)
+
+def _main(args):
+    level = logging.DEBUG if args.debug else logging.INFO
+    debug.configure_logging('tako-node', level, args.log_file)
+
+    logging.info('Tako Node starting (pid:%d)', os.getpid())
+    logging.info('Node id: %s', args.id)
+
+    try:
+        makedirs(os.path.join(args.var, 'data'))
+        makedirs(os.path.join(args.var, 'etc'))
+        makedirs(os.path.join(args.var, 'log'))
+    except Exception, e:
+        logging.critical("Failed to create var directories.")
+        exit(1)
+
+    config = None
+    if args.config:
+        config = configuration.try_load_file(args.config)
+        if not config:
+            logging.critical('Failed to load configuration file "%s"', args.config)
+            exit(1)
+        if args.id not in config.active_deployment.nodes:
+            logging.critical('Configuration for Node (id = %s) not found in configuration file', args.id)
+            exit(1)
+
+    coordinators = []
+    if args.coordinator:
+        for address, port_string in args.coordinator:
+            port = convert.try_int(port_string)
+            if not port:
+                logging.critical("Invalid port '%s'", port_string)
+                exit(1)
+            coordinators.append((address, port))
+    try:
+        server = NodeServer(args.id, store_file=args.file, explicit_configuration=config, coordinator_addresses=coordinators,
+                            configuration_update_interval=args.update, var_directory=args.var)
+        server.serve()
+        while True:
+            coio.sleep(1)
+    except KeyboardInterrupt:
+        logging.info('Keyboard interrupt received. Exiting...')
+    except Exception, e:
+        logging.critical(e)
+        exit(1)
+
+if __name__ == '__main__':
+    main()
