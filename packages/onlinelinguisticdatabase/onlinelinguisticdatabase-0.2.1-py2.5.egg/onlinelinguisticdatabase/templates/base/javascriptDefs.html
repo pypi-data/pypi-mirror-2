@@ -1,0 +1,418 @@
+<%doc>
+    toggleLabelsJavascript creates a JS function which uses the Yahoo! UI library
+    to get all elements with 'fileTableRowLabel' as class name.  All such items are then
+    either hidden or revealed.
+</%doc>
+<%def name="toggleLabelsJavaScript(targetClass='formTableRowLabel')">
+<script type="text/javascript">
+(function() {
+    var targetClass = '${targetClass}';
+    var toggleRowLabels = function(e) {
+        var buttonID = 'toggleRowLabelsButton';
+        var plusOrMinus = document.getElementById(buttonID).innerHTML;
+        var labels = YAHOO.util.Dom.getElementsByClassName(targetClass);
+        if(plusOrMinus=='+')
+        {
+            document.getElementById(buttonID).innerHTML = '-';
+            document.getElementById(buttonID).title = "hide labels"
+            for (i=0;i<labels.length;i++)
+            {
+                labels[i].style.display="block";
+                labels[i].style.display="visible";
+            } 
+        }
+        else
+        {
+            document.getElementById(buttonID).innerHTML = '+';
+            document.getElementById(buttonID).title = "show labels"
+            for (i=0;i<labels.length;i++)
+            {
+                labels[i].style.display="none";
+            } 
+        }
+    };
+
+    YAHOO.util.Event.on('toggleRowLabelsButton', 'click', toggleRowLabels);
+
+})();
+</script>
+</%def>
+
+
+<%def name="labelsHidden(targetClass='formTableRowLabel')">
+<script type="text/javascript">
+(function() {
+    var targetClass = '${targetClass}';
+    var hide = function(e) {
+        var labels = YAHOO.util.Dom.getElementsByClassName(targetClass);
+        for (i=0;i<labels.length;i++)
+        {
+            labels[i].style.display="none";
+        } 
+    };
+    window.onload = hide;
+})();
+</script>
+</%def>
+
+
+<%def name="closeHelpDivScript()">
+<script type="text/javascript">
+ function closeHelpDiv()
+ {
+  helpDiv = document.getElementById('helpDiv');
+  helpDiv.style.display="none";
+ }
+</script>
+</%def>
+
+
+<%def name="fillHelpDivScript()">
+<script type="text/javascript">
+ function fillHelpDiv(helpContent)
+ {
+  helpDiv = document.getElementById('helpDiv');
+  helpDiv.style.display="block";
+  helpDiv.style.display="visible";
+  helpDivInner = document.getElementById('helpDivInner');
+  helpDivInner.innerHTML = helpContent;
+ }
+</script>
+</%def>
+
+
+<%def name="getMemoryContentsScript()">
+ <%doc>
+    Inserts JavaScript which, when called,
+    uses Ajax to insert references to the Forms
+    stored in Memory into the contents textarea
+    of the Collection
+ </%doc>
+<script type="text/javascript">
+ function getMemoryContents(sUrl)
+ {
+    var responseSuccess = function(o) {
+        content = document.getElementById('collectionContent');
+        content.value += o.responseText;
+    };
+ 
+    var responseFailure = function(o) {
+        alert('failure');
+    };
+ 
+    var callback = {
+      success:responseSuccess,
+      failure:responseFailure
+    };
+ 
+    var transaction = YAHOO.util.Connect.asyncRequest('GET', sUrl, callback, null);
+ }
+</script>
+</%def>
+
+
+<%def name="getMatchingLanguagesScript2()">
+<script type="text/javascript">
+ function getMatchingLanguages(sUrl, sourceID, targetID)
+ {
+    alert(sUrl);
+ }
+</script>
+</%def>
+
+
+<%def name="getMatchingLanguagesScript()">
+ <%doc>
+    Inserts JavaScript which, when called,
+    uses Ajax to get a list of languages
+    that match the string entered by the user
+ </%doc>
+ <script type="text/javascript">
+
+ function getMatchingLanguages(sUrl, activeInputID, mode)
+ {
+    var counterpartInputID = getLanguageCounterpartID(activeInputID);
+    var suggestionInputID = activeInputID + 'Suggestion';
+    
+    var source = document.getElementById(activeInputID);
+    var counterpart = document.getElementById(counterpartInputID);
+    var target = document.getElementById(suggestionInputID);
+    
+    if ((mode=='Id' && source.value.length > 0) || source.value.length > 1)
+    {
+        YAHOO.util.Connect.abort();
+        var responseSuccess = function(o) {
+            xml = o.responseXML;
+            languages = xml.getElementsByTagName('language');
+            msg = formatLanguagesAsOL(languages, activeInputID, counterpartInputID, mode);
+            target.innerHTML = msg; 
+        };
+ 
+        var responseFailure = function(o) {
+            target.innerHTML = 'nothing';
+        };
+ 
+        var callback = {
+          success:responseSuccess,
+          failure:responseFailure,
+          argument: activeInputID
+        };       
+        var uInput = escape(uni2ent(source.value));
+        sUrl = sUrl + '?input=' + uInput + '&sourceID=' + activeInputID + '&mode=' + mode;
+        var transaction = YAHOO.util.Connect.asyncRequest('GET', sUrl, callback, null);
+    }
+ }
+ 
+ 
+ function copyToTarget(targetID, msg)
+ {
+    target = document.getElementById(targetID);
+    target.value = msg;
+ }
+ 
+ 
+ function uni2ent(srcTxt) 
+ {
+    var entTxt = '';
+    var c, hi, lo;
+    var len = 0;
+    for (var i=0, code; code=srcTxt.charCodeAt(i); i++) {
+      var rawChar = srcTxt.charAt(i);
+      // needs to be an HTML entity
+      if (code > 255) {
+        // normally we encounter the High surrogate first
+        if (0xD800 <= code && code <= 0xDBFF) {
+          hi  = code;
+          lo = srcTxt.charCodeAt(i+1);
+          // the next line will bend your mind a bit
+          code = ((hi - 0xD800) * 0x400) + (lo - 0xDC00) + 0x10000;
+          i++; // we already got low surrogate, so don't grab it again
+        }
+        // what happens if we get the low surrogate first?
+        else if (0xDC00 <= code && code <= 0xDFFF) {
+          hi  = srcTxt.charCodeAt(i-1);
+          lo = code;
+          code = ((hi - 0xD800) * 0x400) + (lo - 0xDC00) + 0x10000;
+        }
+        // wrap it up as Hex entity
+        c = "&#x" + code.toString(16).toUpperCase() + ";";
+      }
+      else {
+        c = rawChar;
+      }
+      entTxt += c;
+      len++;
+    }
+    return entTxt;
+  } 
+
+  function getLanguageCounterpartID(inputID){
+      if (inputID.slice(2) == 'Name'){
+          return inputID.slice(0,2) + 'Id';
+      }
+      else {
+          return inputID.slice(0,2) + 'Name';
+      }
+  }
+    
+  function formatLanguagesAsOL(languages, sourceID, counterpartID, mode)
+  {
+    var msg = '<ol>';
+    for (i=0;i<languages.length;i++)
+    {
+        var Id = languages[i].getElementsByTagName('id')[0].childNodes[0].nodeValue;
+        var Ref_Name = languages[i].getElementsByTagName('name')[0].childNodes[0].nodeValue;
+        if (mode == 'Id'){
+            var contentVisible = Id + ' (' + Ref_Name + ')';
+            var sourceFiller = Id;
+            var counterpartFiller = Ref_Name;
+        }
+        else {
+            var contentVisible = Ref_Name + ' (' + Id + ')';
+            var sourceFiller = Ref_Name;
+            var counterpartFiller = Id;
+        }
+        msg += '<li class="suggestionList" onclick="copyToTarget(\'' + sourceID + '\', \'' + sourceFiller + '\'); copyToTarget(\'' + counterpartID + '\', \'' + counterpartFiller + '\'); divOff(\'' + sourceID + 'Suggestion\');">' + contentVisible + '</li>'
+    }
+    msg += '</ol>';
+    return msg;
+  }
+  
+ </script>
+</%def>
+
+
+<%def name="getToggleDivByTextInputScripts()">
+ <%doc>
+    Writes JavaScript functions that allow a div to be
+    turned on or off by an focus or blur event
+    (respectively).
+ </%doc>
+ <script type="text/javascript">
+    function applyFuncToAll(func, divIDs)
+    {
+        for (i=0;i<divIDs.length;i++)
+        {
+            func(divIDs[i]);
+        } 
+    }
+    
+    function divOn(divID)
+    {
+        div = document.getElementById(divID);
+        div.style.visibility='visible';
+        div.style.display='block';        
+    }
+    
+    function divOff(divID)
+    {
+        div = document.getElementById(divID);
+        div.style.display='none';
+    }
+ </script>
+</%def>
+
+
+<%def name="getCharCodeScript()">
+ <%doc>
+    Writes JavaScript function that puts the character codes entered into a
+    text input into a specified div
+ </%doc>
+ <script type="text/javascript">
+    function pad(number, length)
+    {
+        while (number.length < length)
+        {
+            number = '0' + number;
+        }
+        return number;
+    }
+
+    function getCharCode(inputID, divID, compareID)
+    {
+        input = document.getElementById(inputID);
+        output = document.getElementById(divID);
+        compare = document.getElementById(compareID);
+        if (input.value != '')
+        {
+            var result = ''
+            for(i=0; i<input.value.length; i++)
+            {
+                var char = input.value.charCodeAt(i).toString(16).toUpperCase();
+                char = pad(char, 4);
+                result += 'U+' + char + ' ';
+            }
+            result = result.trim();
+            if (compare.innerHTML.trim() == result)
+            {
+                var assess = '&#x2713;';
+                output.style.color = 'green';
+            }
+            else
+            {
+                var assess = '&#x2717;';
+                output.style.color = 'red';
+            }
+            output.innerHTML = assess + ' ' + result;
+        }
+        else
+        {
+            output.innerHTML = ''
+        }
+    }
+ </script>
+</%def>
+
+
+<%def name="translateOrthographyScript()">
+ <%doc>
+    Writes the JavaScript function that makes and handles the AJAX call to
+    translate a string in one orthography into another.  This function is used
+    in the settings/orthography page.
+ </%doc>
+ <script type="text/javascript">
+    function translateOrthography()
+    {
+        var inputOrthography = document.getElementById('inputOrthography').value;
+        var outputOrthography = document.getElementById('outputOrthography').value;
+        var input = document.getElementById('input').value;
+        var outputorthographydiv = document.getElementById('outputorthographydiv');
+        if (inputOrthography == outputOrthography)
+        {
+            outputorthographydiv.innerHTML = input;
+        }
+        else
+        {
+            getTranslation(input, inputOrthography, outputOrthography, outputorthographydiv);
+        }
+    }
+
+    function getTranslation(input, inputOrthography, outputOrthography, outputorthographydiv)
+    {
+       var responseSuccess = function(o) {
+           outputorthographydiv.innerHTML = o.responseText;
+       };
+    
+       var responseFailure = function(o) {
+           alert('failure');
+       };
+    
+       var callback = {
+         success:responseSuccess,
+         failure:responseFailure
+       };
+       var sUrl = '/settings/translate' + '?input=' + input + '&inputOrthography=' + inputOrthography + '&outputOrthography=' + outputOrthography;
+       var transaction = YAHOO.util.Connect.asyncRequest('GET', sUrl, callback, null);
+    }
+ </script>
+</%def>
+
+
+<%def name="graphToInputScript()">
+ <%doc>
+ </%doc>
+ <script type="text/javascript">
+    function graphToInput(graph, inputId)
+    {
+        input = document.getElementById(inputId);
+        input.value += graph;
+        input.focus();
+    }
+ </script>
+</%def>
+
+
+<%def name="checkForDuplicateTranscriptionScript()">
+ <%doc>
+    Writes the JavaScript function that makes and handles the AJAX call to
+    check whether the Form transcription just entered is already in the db.
+ </%doc>
+ <script type="text/javascript">
+
+    function checkForDuplicateTranscription()
+    {
+       var duplicateWarningDiv = document.getElementById('duplicateWarningDiv');
+       var responseSuccess = function(o) {
+           duplicateWarningDiv.style.display="block";
+           duplicateWarningDiv.style.visibility="visible";
+           duplicateWarningDiv.innerHTML = o.responseText;
+       };
+    
+       var responseFailure = function(o) {
+           pass;
+       };
+    
+       var callback = {
+         success:responseSuccess,
+         failure:responseFailure
+       };
+       
+       var transcription = document.getElementById('transcription').value;
+       if (transcription)
+       {
+           var sUrl = '/form/findduplicate/' + transcription;
+           var transaction = YAHOO.util.Connect.asyncRequest('GET', sUrl, callback, null);
+       }
+    }
+ </script>
+</%def>
