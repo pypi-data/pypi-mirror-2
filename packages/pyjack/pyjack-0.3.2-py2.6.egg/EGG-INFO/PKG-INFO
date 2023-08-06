@@ -1,0 +1,133 @@
+Metadata-Version: 1.0
+Name: pyjack
+Version: 0.3.2
+Summary: Tools to reversibly replace functions / objects with proxy functions / objects for debug, testing, monkey-patching.
+Home-page: http://packages.python.org/pyjack/
+Author: Andrew Carter
+Author-email: andrewjcarter@gmail.com
+License: MIT
+Description: pyjack
+        ======
+        
+        pyjack is a debug/test/monkey-patching toolset that allows you to reversibly
+        replace *all* references to a function or object in memory with a
+        proxy function or object. pyjack has two major functions:
+        
+        * function "connect" can connect a 'proxy' function to almost
+        any python function/method.  This proxy function is called instead of the
+        original function.  However, the original function is passed to the proxy
+        function along with all args, kwargs so you can do things like:
+        
+        - Modify the args, kwargs first, print a debug message, then call the original
+        function
+        - Not call the function, rather just log it and print a debug message
+        
+        etc. etc. -- it's all up to you.
+        
+        * function "replace_all_refs" can be used to replace all
+        references to a object with references to another object. This replaces all
+        references in the _entire_ memory space.  You get one final reference to the
+        original reference, so it is possible to call this function again to restore
+        the memory state back to it's original state.
+        
+        "connect" function
+        ------------------
+        
+        >>> import pyjack
+        >>>
+        >>> def fakeimport(orgopen, *args, **kwargs):
+        ...     print 'Trying to import %s' % args[0]
+        ...     return 'MODULE_%s' % args[0]
+        ...
+        >>> pyjack.connect(__import__, proxyfn=fakeimport)
+        <..._PyjackFuncBuiltin object at 0x...>
+        >>>
+        >>> import time
+        Trying to import time
+        >>> print time
+        MODULE_time
+        >>>
+        >>> __import__.restore()
+        >>>
+        >>> import time
+        >>> print time
+        <module 'time' (built-in)>
+        
+        "replace_all_refs" function
+        ---------------------------
+        
+        Setup an 'item' reference and put it in a few places::
+        
+        >>> item = (100, 'one hundred')
+        >>> data = {item: True, 'itemdata': item}
+        >>>
+        >>> class Foobar(object):
+        ...     the_item = item
+        ...
+        >>> def outer(datum):
+        ...     def inner():
+        ...         return ("Here is the datum:", datum,)
+        ...
+        ...     return inner
+        ...
+        >>> inner = outer(item)
+        >>>
+        >>> print item
+        (100, 'one hundred')
+        >>> print data
+        {'itemdata': (100, 'one hundred'), (100, 'one hundred'): True}
+        >>> print Foobar.the_item
+        (100, 'one hundred')
+        >>> print inner()
+        ('Here is the datum:', (100, 'one hundred'))
+        
+        Then replace them::
+        
+        >>> new = (101, 'one hundred and one')
+        >>> org_item = pyjack.replace_all_refs(item, new)
+        >>>
+        >>> print item
+        (101, 'one hundred and one')
+        >>> print data
+        {'itemdata': (101, 'one hundred and one'), (101, 'one hundred and one'): True}
+        >>> print Foobar.the_item
+        (101, 'one hundred and one')
+        >>> print inner()
+        ('Here is the datum:', (101, 'one hundred and one'))
+        
+        But you still have **one** final reference to the org data::
+        
+        >>> print org_item
+        (100, 'one hundred')
+        
+        So the process is reversible::
+        
+        >>> new = pyjack.replace_all_refs(new, org_item)
+        >>>
+        >>> print item
+        (100, 'one hundred')
+        >>> print data
+        {'itemdata': (100, 'one hundred'), (100, 'one hundred'): True}
+        >>> print Foobar.the_item
+        (100, 'one hundred')
+        >>> print inner()
+        ('Here is the datum:', (100, 'one hundred'))
+        
+        Other References
+        ----------------
+        
+        For full documentation and several examples please visit:
+        
+        * http://packages.python.org/pyjack/
+        
+        The git repo is here:
+        
+        * https://github.com/cart0113/pyjack
+        
+        
+        
+Keywords: debug callback test monkey monkey-patch
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Topic :: Utilities
+Classifier: License :: OSI Approved :: MIT License
