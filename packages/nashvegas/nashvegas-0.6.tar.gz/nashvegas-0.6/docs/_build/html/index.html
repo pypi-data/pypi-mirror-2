@@ -1,0 +1,190 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>nashvegas &mdash; nashvegas v0.6a1.dev1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.6a1.dev1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="nashvegas v0.6a1.dev1 documentation" href="#" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="#">nashvegas v0.6a1.dev1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="nashvegas">
+<h1>nashvegas<a class="headerlink" href="#nashvegas" title="Permalink to this headline">¶</a></h1>
+<p>The purpose of this app is to enable a plug and play method for managing
+database changes.</p>
+<p>Database migrations is a large topic with a lot of different approaches.  This
+approach worked well for my needs and maybe it will for you as well.</p>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>pip install nashvegas</li>
+<li>Add the application to your INSTALLED_APPS list in your settings.py file.</li>
+</ul>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>nashvegas ships with two management commands, <tt class="docutils literal"><span class="pre">upgradedb</span></tt> and <tt class="docutils literal"><span class="pre">comparedb</span></tt>.
+The first, <tt class="docutils literal"><span class="pre">upgradedb</span></tt>, will manage the creation, listing, and execution of
+individual migrations. The second, <tt class="docutils literal"><span class="pre">comparedb</span></tt>, is currently an experimental
+command that attempts to help you discover missing migrations.</p>
+<ul>
+<li><p class="first">Execute the command line:</p>
+<blockquote>
+<div><p>$ ./manage.py upgradedb &#8211;create|&#8211;list|&#8211;execute
+$ ./manage.py comparedb</p>
+</div></blockquote>
+</li>
+</ul>
+</div>
+<div class="section" id="options-for-upgradedb">
+<h2>Options for upgradedb<a class="headerlink" href="#options-for-upgradedb" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><dl class="first docutils">
+<dt><tt class="docutils literal"><span class="pre">--create</span></tt> - Compares database with current models in apps that are</dt>
+<dd><p class="first last">installed and outputs the sql for them so that you can easily
+pipe the contents to a migration.</p>
+</dd>
+</dl>
+</li>
+<li><p class="first"><tt class="docutils literal"><span class="pre">--list</span></tt> - Lists all the scripts that will need to be executed.</p>
+</li>
+<li><p class="first"><tt class="docutils literal"><span class="pre">--execute</span></tt> - Executes all the scripts that need to be executed.</p>
+</li>
+<li><dl class="first docutils">
+<dt><tt class="docutils literal"><span class="pre">--seed</span></tt> - Populates Migration model with scripts that have already been</dt>
+<dd><p class="first last">applied to your database and effectively want to skip execution.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="conventions">
+<h2>Conventions<a class="headerlink" href="#conventions" title="Permalink to this headline">¶</a></h2>
+<p>Part of the simplicity of this solution is based on the naming conventions of
+the sql scripts.  They should be named in a manner that enforces order.  Some
+examples include:</p>
+<div class="highlight-python"><pre>0001_short_comment_about_migration.sql
+0001.sql</pre>
+</div>
+<p>The model, <tt class="docutils literal"><span class="pre">nashvegas.Migration</span></tt> will get synced into your database if it
+doesn&#8217;t exist when you go to execute any of the <tt class="docutils literal"><span class="pre">upgradedb</span></tt> commands.  In this
+model the scripts that have been executed will be recorded, effectively
+versioning your database.</p>
+<p>In addition to sql scripts, <tt class="docutils literal"><span class="pre">--execute</span></tt> will also execute python scripts that
+are in the directory.  This are run in filename order interleaved with the sql
+scripts.  For example:</p>
+<div class="highlight-python"><pre>0001.sql
+0002.py
+0003.sql</pre>
+</div>
+<p>The Python script will be executed 2nd between <tt class="docutils literal"><span class="pre">0000.sql</span></tt> and <tt class="docutils literal"><span class="pre">0003.sql</span></tt>. The script will only be executed if the module contains a callable named <tt class="docutils literal"><span class="pre">migrate</span></tt>. It is a good idea to put all your executing code within a class or series of functions or within a singe <tt class="docutils literal"><span class="pre">migrate()</span></tt> function so as to avoid code executing upon import.</p>
+<p>For example, your script might light like this if you need to update all your
+product codes on next release:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">store.models</span> <span class="kn">import</span> <span class="n">Product</span>
+
+<span class="k">def</span> <span class="nf">migrate</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="n">Product</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="n">product</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="s">&quot;NEW-</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">product</span><span class="o">.</span><span class="n">code</span>
+        <span class="n">product</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="section" id="indices-and-tables">
+<h3>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
+<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
+<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">nashvegas</a><ul>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#options-for-upgradedb">Options for upgradedb</a></li>
+<li><a class="reference internal" href="#conventions">Conventions</a><ul>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="#">nashvegas v0.6a1.dev1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Patrick Altman.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
