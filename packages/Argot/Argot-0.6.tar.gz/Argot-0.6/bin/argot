@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""Argot script to turn argot marked up files to html."""
+
+from __future__ import with_statement
+
+import optparse
+from pygments.formatters import HtmlFormatter
+from argot import *
+
+
+document = '''\
+<html>
+  <head>
+    <title>%(title)s</title>
+    <style type="text/css">
+      %(style)s
+    </style>
+  </head>
+  <body>
+    %(content)s
+  </body>
+</html>'''
+
+def parse_args():
+    parser = optparse.OptionParser(version=VERSION, usage='%prog [options] file')
+    parser.add_option('-r', '--referer', help='http referer for google link parser')
+    parser.add_option('-d', '--document', action='store_true', help='render as full html document')
+    parser.add_option('-t', '--title', help='title to use in HEAD (implies -d)')
+    parser.add_option('-s', '--style', help='pygments style to use', default='default')
+    return parser.parse_args()
+
+def main():
+    opts, args = parse_args()
+    filename = args[0]
+    set_google_referer(opts.referer)
+    context = {'title' : opts.title or ''}
+    if opts.title:
+        opts.document = True
+    # XXX: fetch the css
+    with open(filename) as fp:
+        content = unicode(render(fp.read())).encode('utf-8')
+        context['content'] = content 
+    if opts.document:
+        opts.style = opts.style or 'default'
+        context['style'] = HtmlFormatter(style=opts.style).get_style_defs()
+        print document % context
+    else:
+        print content
+
+if __name__ == '__main__':
+    import sys
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(-1)
+
