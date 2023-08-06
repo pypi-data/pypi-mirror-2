@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+"""
+Really silly schema migration framework, built for SQLAlchemy.
+
+Commands:
+    migrate ENGINE_FROM ENGINE_TO
+        Migrate schema or data from one engine to another.
+
+    upgrade ENGINE UPGRADE_FN
+        Perform in-place upgrade of a schema in an engine.
+
+Examples:
+    %prog migrate "mysql://foo:bar@localhost/baz" "sqlite:///:memory:" \\
+        --metadata model.meta:metadata --verbose
+
+    %prog upgrade "mysql://foo:bar@localhost/baz" migration.001_change_fancy_column:upgrade
+
+Hint: The upgrade command can also be used to downgrade, just point it
+to the relevant downgrade function. For extra awesomeness, use schema-altering
+DDLs provided by sqlalchemy-migrate.
+"""
+import sqlalchemy
+import sys
+import time
+
+from sqlalchemygrate import migrations
+
+import logging
+log = logging.getLogger(__name__)
+
+from optparse import OptionParser, OptionGroup
+
+
+def import_module(path):
+    # FIXME: There's a builtin for this in Python 2.7
+    module, obj = path.split(':', 1)
+    o = __import__(module, fromlist=[obj])
+    return getattr(o, obj)
+
+
+def main():
+    usage="%prog COMMAND [ARGS ...]\n" + __doc__
+
+    # FIXME: Use argparse someday
+    parser = OptionParser(usage)
+    parser.add_option("--verbose", "-v", dest="verbose", action="count", help="Enable verbose output. Use twice to enable debug output.")
+    parser.add_option("--show-sql", dest="show_sql", action="store_true", default=False, help="Echo SQLAlchemy queries.")
+
+    migrate_group = OptionGroup(parser, "migrate")
+    migrate_group.add_option("--only-tables", dest="only_tables", metavar="TABLES", help="Only perform migration on the given tables. (comma-separated table names)")
+    migrate_group.add_option("--skip-tables", dest="skip_tables", metavar="TABLES", help="Skip migration on the given tables. (comma-separated table names)")
+    migrate_group.add_option("--limit", dest="limit", default=100000, help="Number to select per insert loop. (default: %default)")
+
+    migrate_group.add_option("--metadata", dest="metadata", help="MetaData object bound to the target schema definition. Example: model.metadata:MetaData")
+    migrate_group.add_option("--convert", dest="convert", metavar="FN", help="(Optional) Convert function to run data through. Example: migration.v1:convert")
+    parser.add_option_group(migrate_group)
+
+    options, args = parser.parse_args()
+
+    if not args:
+        parser.error("Must specify a command.")
+
+    command = args[0].lower()
+
+    if options.verbose > 1:
+        log.setLevel(logging.DEBUG)
+    elif options.verbose > 0:
+        log.setLevel(logging.INFO)
+
+    only_tables = None
+    if options.only_tables:
+        only_tables = [t.strip() for t in options.only_tables.split(',')]
+
+    skip_tables = None
+    if options.skip_tables:
+        skip_tables = [t.strip() for t in options.skip_tables.split(',')]
+
+    if command == 'migrate':
+        if len(args) < 3:
+            parser.error("Need to specify two engines.")
+
+        metadata = import_module(options.metadata)
+
+        convert_fn = None
+        if options.convert:
+            convert_fn = import_module(options.convert)
+
+        e1 = sqlalchemy.create_engine(args[1])
+        e2 = sqlalchemy.create_engine(args[2], echo=options.show_sql)
+
+        now = time.time()
+        migrations.migrate(e1, e2, metadata=metadata, convert_fn=convert_fn, only_tables=only_tables, skip_tables=skip_tables, limit=options.limit)
+        log.info("Done in {0:.2f}s".format(time.time()-now))
+    elif command == 'upgrade':
+        if len(args) < 3:
+            parser.error("Need to specify an engine and an upgrade function.")
+
+        upgrade_fn = import_module(args[2])
+
+        e = sqlalchemy.create_engine(args[1], echo=options.show_sql)
+
+        migrations.upgrade(e, upgrade_fn)
+
+if __name__ == '__main__':
+    log_handler = logging.StreamHandler()
+    log_handler.setFormatter(logging.Formatter('%(levelname)-8s %(message)s'))
+    log.addHandler(log_handler)
+
+    n = main()
+    if n:
+        sys.exit(n)
