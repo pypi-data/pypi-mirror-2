@@ -1,0 +1,149 @@
+CompositePack
+=============
+
+Installation
+------------
+
+CompositePack depends on Archetypes, kupu, ATContentTypes :
+when you install it, they get installed if they were not previously.
+
+>>> plone = self.portal
+>>> from Products.CompositePack.config import get_ATCT_TYPES
+>>> IMAGE_TYPE = get_ATCT_TYPES(plone)['Image']
+>>> DOCUMENT_TYPE = get_ATCT_TYPES(plone)['Document']
+>>> qi = plone.portal_quickinstaller
+>>> dummy = qi.installProduct('CompositePack')
+>>> qi.isProductInstalled('Archetypes')
+True
+>>> qi.isProductInstalled('kupu')
+True
+
+CompositePack installs a layer :
+>>> ps = plone.portal_skins
+>>> 'compositepack' in ps.objectIds()
+True
+
+CompositePack installs a tool :
+>>> tool = plone.composite_tool
+
+The tool has two specialized folders that hold layouts and viewlets :
+>>> layouts = tool.layouts
+>>> viewlets = tool.viewlets
+
+The layouts folder holds default layouts :
+>>> ids = layouts.objectIds()
+>>> ids.sort()
+>>> ids
+['three_slots', 'two_columns', 'two_slots']
+
+The viewlets folder holds default viewlets :
+>>> ids = viewlets.objectIds()
+>>> ids.sort()
+>>> ids
+['fragment_viewlet', 'image_caption_viewlet', 'image_title_viewlet',
+'image_viewlet', 'link_viewlet', 'title_date_viewlet',
+'title_description_with_link', 'title_viewlet', 'topic_viewlet']
+
+CompositePack installs a content type :
+>>> pt = plone.portal_types
+>>> hasattr(pt, 'Navigation Page')
+True
+
+Navigation Page is registered as Composite : you can query the tool for the composites.
+>>> tool.getRegisteredComposites()
+['Navigation Page']
+
+Navigation Page has two layouts registered : you can query the tool for them.
+>>> rl = tool.getRegisteredLayoutsForType('Navigation Page')
+>>> ids = [layout.getId() for layout in rl]
+>>> 'three_slots' in ids
+True
+>>> 'two_slots' in ids
+True
+
+Navigation Page has a default layout : 
+>>> tool.getDefaultLayoutForType('Navigation Page').getId()
+'two_columns'
+
+A few content types are registered as composables.
+Instances of those types are addable to composite types through the design view.
+>>> composables = tool.getRegisteredComposables()
+>>> 'CompositePack Titles' in composables
+True
+>>> 'CompositePack Fragments' in composables
+True
+
+Viewlets are registered for composables :
+>>> vl = tool.getRegisteredViewletsForType(IMAGE_TYPE)
+>>> ids = [viewlet.getId() for viewlet in vl]
+>>> 'image_viewlet' in ids
+True
+>>> 'link_viewlet' in ids
+True
+>>> 'image_title_viewlet' in ids
+True
+>>> 'image_caption_viewlet' in ids
+True
+
+Navigation Pages are selectable as default page
+>>> site_props = plone.portal_properties.site_properties
+>>> 'Navigation Page' in site_props.getProperty('default_page_types')
+True
+
+Layouts
+-------
+
+You can register a new layout:
+>>> new_layout = tool.registerLayout('test', 'Test Layout', 'test_method')
+>>> new_layout.getId()
+'test'
+>>> new_layout.Title()
+'Test Layout'
+>>> new_layout.getSkinMethod()
+'test_method'
+
+The new layout is found in the 'layouts' folder of the tool.
+>>> new_layout in layouts.objectValues()
+True
+
+You can setup the new layout for a registered composite. 
+>>> new_layout.registerForType('Navigation Page')
+>>> new_layout in layouts.getRegisteredLayoutsForType('Navigation Page')
+True
+
+It can be setup as default layout for a type.
+>>> new_layout.setDefaultForType('Navigation Page')
+>>> new_layout == tool.getDefaultLayoutForType('Navigation Page')
+True
+
+Viewlets
+--------
+
+You can register a new viewlet:
+>>> new_viewlet = tool.registerViewlet('test', 'Test Viewlet', 'test_method')
+>>> new_viewlet.getId()
+'test'
+>>> new_viewlet.Title()
+'Test Viewlet'
+>>> new_viewlet.getSkinMethod()
+'test_method'
+
+The new viewlet is found in the 'viewlets' folder of the tool.
+>>> new_viewlet in viewlets.objectValues()
+True
+
+You can setup the new viewlet for a registered composable. 
+>>> new_viewlet.registerForType(DOCUMENT_TYPE)
+>>> new_viewlet in viewlets.getRegisteredViewletsForType(DOCUMENT_TYPE)
+True
+
+It can be setup as default viewlet for a type.
+>>> new_viewlet.setDefaultForType(DOCUMENT_TYPE)
+>>> new_viewlet == tool.getDefaultViewletForType(DOCUMENT_TYPE)
+True
+
+You cannot unregister a default viewlet :
+>>> new_viewlet.unregisterForType(DOCUMENT_TYPE)
+Traceback (most recent call last):
+...
+CompositePackError: Viewlet test cannot be unregistered : it is set as default.

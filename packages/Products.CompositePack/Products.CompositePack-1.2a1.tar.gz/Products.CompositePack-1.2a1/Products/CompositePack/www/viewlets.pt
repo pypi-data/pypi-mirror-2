@@ -1,0 +1,96 @@
+<h1 tal:replace="structure here/manage_page_header" />
+<h1 tal:replace="structure here/manage_tabs" />
+<style metal:use-macro="here/composite_tool/macros_template/macros/style" />
+<!--tal:request replace="structure request" /-->
+<tal:defines define="global url_quote nocall:modules/Products/PythonScripts/standard/url_quote;
+                     global quoted_type python:url_quote(options['type']);
+                     global default_setup python:options['type']=='(Default Setup)';
+                     global manage_viewlets python:default_setup or not options['use_default_viewlets']" />    
+<h3>Viewlets for "<span tal:replace="options/type" />"</h3>
+<p class="form-help">
+<a href="manage_composables">Composable types</a> have associated <a href="viewlets/manage_main">viewlets</a>. Viewlets are HTML views presenting part or whole information of an instance. In the 'design' view, one viewlet can be selected for each composable added.
+</p>
+<div tal:condition="manage_viewlets">
+    <h3>Manage associated viewlets</h3>
+    <p class="form-help">
+    The default viewlet is assigned when adding content to composites through 'design' view.
+    </p>
+    <form action="manage_defaultViewlet" method="POST">
+    <table>
+        <tr>
+            <th>Associated viewlets<input type="hidden" name="type" tal:attributes="value options/type" /></th>
+            <th>Default viewlet</th><th></th><th></th></tr>
+        <tr tal:attributes="class python:test(repeat['viewlet'].odd(), 'odd', 'even')" 
+            tal:repeat="viewlet options/registered_viewlets">
+            <tal:defines define="quoted_id python:url_quote(viewlet.getId());
+                                 default python:viewlet.isDefaultForType(options['type'])">
+            <td class="form-label" tal:content="viewlet/title">Viewlet</td>
+            <td class="form-element default">
+                <input type="radio" name="default" tal:attributes="value viewlet/getId; checked default">
+            </td>
+            <td class="form-element">
+                <a tal:attributes="href string:viewlets/${quoted_id}/manage_registerTypes">[Manage viewlet]</a>
+            </td>
+            <td tal:condition="not:default" class="form-element"> 
+                <a tal:attributes="href string:manage_unregisterViewlet?type=${quoted_type}&viewlet_id=${quoted_id}">[Unregister]</a>
+            </td>
+            <td tal:condition="default" class="form-element">
+                As this viewlet is default, it cannot be unregistered.
+            </td>
+            </tal:defines>
+        </tr>
+        <tr><td>&nbsp;</td></tr>
+        <tr>
+            <td tal:attributes="class python:test(options['nodefault'], 'form-label caution', 'form-label')">
+                No default
+            </td>
+            <td class="form-element default">
+                <input type="radio" name="default" value="nodefault" tal:attributes="checked options/nodefault">
+            </td>
+        </tr>    
+    </table>
+    <input type="submit" value="Set default" />
+    </form>
+</div>
+<div tal:condition="not:default_setup">
+<h3>Default Setup</h3> 
+<p class="form-help">
+You can select a set of viewlets for the <a href="manage_viewlets?type=%28Default%20Setup%29">default setup</a>.
+</p>
+<div tal:condition="not:options/use_default_viewlets">
+    <p class="form-help">
+    If you unregister all viewlets, the default setup will be used.
+    </p>
+</div>
+<div tal:condition="options/use_default_viewlets">
+    <p class="form-help caution">
+    The default setup is used.
+    </p>
+</div>
+</div>
+<div tal:condition="options/unregistered_viewlets">
+    <h3>Select viewlets</h3>
+    <p class="form-help">Select <a href="viewlets/manage_main">viewlets</a> which should be associated with "<span tal:replace="options/type" />".</p>
+    <form action="manage_addViewlets" method="POST">
+    <table>
+        <tr>
+            <input type="hidden" name="type" tal:attributes="value options/type" />
+            <td class="form-label">Viewlets</td>
+            <td class="form-element">
+                <select multiple="mutiple" size="5" name="viewlets:list">
+                    <option tal:repeat="viewlet options/unregistered_viewlets" 
+                            tal:attributes="value viewlet/getId" tal:content="viewlet/title" />
+                </select>
+            </td>
+        </tr>
+    </table>
+    <input type="submit" name="submit" value="Select" />
+    </form>
+</div>
+
+<div tal:condition="not:options/unregistered_viewlets">
+    <p class="form-help">
+        All viewlets are registered for "<span tal:replace="options/type"/>".
+    </p>
+</div>
+<h1 tal:replace="structure here/manage_page_footer" />
