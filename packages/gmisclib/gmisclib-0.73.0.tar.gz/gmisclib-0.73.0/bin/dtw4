@@ -1,0 +1,46 @@
+#!/usr/bin/python
+
+import sys
+import numpy
+import pylab
+import gpkimgclass
+from gmisclib import dtw4
+# dtw4.test()
+
+
+def process(fileA, fileB, x):
+	assert x['step'] >= 0.0
+	dA = gpkimgclass.read(fileA)
+	dB = gpkimgclass.read(fileB)
+	assert abs(dA.dt()-dB.dt())/(dA.dt()+dB.dt()) < 0.0001
+	if x['limit_edges']:
+		i0A = int(round(dA.t_index(x['x0'], limit=x['limit_edges'])))
+		ieA = int(round(dA.t_index(x['xe'], limit=x['limit_edges'])))
+		i0B = int(round(dB.t_index(x['y0'], limit=x['limit_edges'])))
+		ieB = int(round(dB.t_index(x['ye'], limit=x['limit_edges'])))
+	else:
+		i0A = 0
+		ieA = dA.n[2]
+		i0B = 0
+		ieB = dB.n[2]
+	# die.info("dtw_guts: array sizes: %s %s" % (dA.d.shape, dB.d.shape))
+	da = dA.d[:, i0A:ieA]
+	db = dB.d[:, i0B:ieB]
+	dA.hdr['CRPIX2'] = float(dA.hdr['CRPIX2']) - i0A
+	dB.hdr['CRPIX2'] = float(dB.hdr['CRPIX2']) - i0B
+	m = x['step']/dA.dt() + 1
+	imap0 = dtw4.dtwjump(da, db, 1, x['alpha'], x['beta'])
+	imap1 = dtw4.dtwjump(da, db, m, x['alpha'], x['beta'])
+	pylab.plot(imap0[:,0]*dA.dt()+dA.start(), imap0[:,1]*dB.dt()+dB.start(), 'r-')
+	pylab.plot(imap1[:,0]*dA.dt()+dA.start(), imap1[:,1]*dB.dt()+dB.start(), 'g-')
+	t0, d0 = dtw4.map2dist(da, db, imap0, x['alpha'], x['beta'])
+	t1, d1 = dtw4.map2dist(da, db, imap1, x['alpha'], x['beta'])
+	pylab.figure()
+	pylab.plot(t0, d0, 'r-')
+	pylab.plot(t1, d1, 'g-')
+	pylab.show()
+
+
+if __name__ == '__main__':
+	fA, fB, x = dtw4.parse_args(sys.argv[1:])
+	process(fA, fB, x)
