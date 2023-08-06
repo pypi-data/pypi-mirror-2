@@ -1,0 +1,103 @@
+Metadata-Version: 1.0
+Name: tgext.asyncjob
+Version: 0.1
+Summary: Asynchronous jobs worker for TurboGears2
+Home-page: http://bitbucket.org/_amol_/tgext.asyncjob
+Author: Alessandro Molina
+Author-email: alessandro.molina@axant.it
+License: LGPL
+Description: About AsyncJob
+        -------------------------
+        
+        AsyncJob is a TurboGears2 extension made to handle background/synchronous jobs.
+        Permits to quickly return responses to the user while the system performs more work on
+        background, it can be useful for video transcoding, thumbnails generation or other
+        tasks where the user cannot expect the require time before getting an answer.
+        
+        To perform a task in background simply perform::
+        
+        from tgext.asyncjob import asyncjob_perform
+        asyncjob_perform(callable, arg1, arg2, kwarg=value)
+        
+        Installing
+        -------------------------------
+        
+        tgext.asyncjob can be installed both from pypi or from bitbucket::
+        
+        easy_install tgext.asyncjob
+        
+        should just work for most of the users
+        
+        Enabling AsyncJob
+        ----------------------------------
+        
+        In your application *lib/app_globals.py* import **start_async_worker**::
+        
+        from tgext.asyncjob import start_async_worker
+        
+        And call it inside the **__init__**::
+        
+        class Globals(object):
+        def __init__(self):
+        start_async_worker()
+        
+        You can pass the **Globals** object itself to the start_async_worker function,
+        which will be used to store the tasks queue, otherwise asyncjob will autodetect
+        the Globals object from the call stack frame getting the object inside where
+        it has been called.
+        
+        Performing background tasks
+        ----------------------------
+        
+        To perform a background task you can simply use **tgext.asyncjob.asyncjob_perform**
+        it called from any context where there is a valid request it will perform the callable
+        passed as first argument in background with the parameters provided::
+        
+        from tgext.asyncjob import asyncjob_perform
+        
+        def background_task(number):
+        print number*2
+        
+        asyncjob_perform(background_task, 5)
+        
+        Accessing the database
+        ------------------------
+        
+        By default asyncjob manages SQLAlchemy sessions and transactions by itself. Each background task
+        is encapsulated in a transaction which is reverted in case of any exception.
+        
+        AsyncJob uses its own SQLAlchemy session, so never pass an object already bound to another session.
+        Query them again.
+        
+        The only issue that developers might have to keep in mind is that when looking for objects
+        that they just created before starting the background task, they might not yet be available inside
+        the DB. To avoid this issue asyncjob provides **asyncjob_timed_query** which will perform a query
+        looking for a result until the result itself is found or a timeout is reached (by default 60 seconds).
+        
+        This can be used to fetch back objects created before starting the background task waiting for
+        them to appear on the database::
+        
+        from tgext.asyncjob import asyncjob_perform, asyncjob_timed_query
+        
+        @expose()
+        def controller_method(self):
+        def async_query_action(group_id):
+        group = asyncjob_timed_query(DBSession.query(Group).filter_by(group_id=group_id)).first()
+        group.display_name = 'Prova'
+        
+        g = Group(group_name='test_group')
+        DBSession.add(g)
+        DBSession.flush()
+        asyncjob_perform(async_query_action, g.group_id)
+        return 'OK'
+        
+        To change the timeout you can simply pass different *retries* and *interval* parameters to
+        asyncjob_timed_query::
+        
+        asyncjob_timed_query(DBSession.query(Group).filter_by(group_id=group_id),
+        retries=10, interval=6).first()
+Keywords: turbogears2.extension pylons
+Platform: UNKNOWN
+Classifier: Environment :: Web Environment
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Framework :: TurboGears
