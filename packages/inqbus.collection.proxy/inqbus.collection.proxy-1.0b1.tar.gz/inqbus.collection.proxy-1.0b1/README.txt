@@ -1,0 +1,33 @@
+Introduction
+============
+
+Allow Plone Collections to proxy the content to not switch the context.
+The proxied content is shown directly in the context of the collection.
+If the user klick on a collectionitem, only the url change but neither
+the navigation nor the breadcrums are modified.
+
+To activate the proxy just edit a collection, go to the settings and
+there you will find a checkbox.
+
+Installing
+==========
+
+If you are using buildout, just add it to your eggs and your zcml in
+the instance part::
+
+    [instance]
+    eggs = inqbus.collection.proxy
+    ...
+    zcml = inqbus.collection.proxy
+
+Now, just run ''bin/buildout'' in your instance rootfolder to get the
+package and all of it dependencies. After that, you are able to install 
+it via the quickinstaller.
+
+Copyright and Credits
+=====================
+
+The Author of inqbus.collection.proxy: Max Brauer <max.brauer@inqbus.de>
+
+Maintainer: Thomas Massmann, Maik Derstappen
+
