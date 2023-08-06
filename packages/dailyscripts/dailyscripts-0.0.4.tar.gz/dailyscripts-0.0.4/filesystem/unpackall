@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+
+# This is a part of 'dailyscripts' bundle.
+# 'unpackall' looks for archives in given path and extracts them.
+
+# Copyright (C) 2010, Tomas Varaneckas 
+# http://www.varaneckas.com
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+import sys
+import os
+import subprocess
+
+class HandlerFactory(object):
+    """Formats should be handled in a way which would easilly allow \
+adding new archive types. This class tries to solve it."""
+
+    def __init__(self):
+        """Registers archive handlers and handler mappings to arvhive \
+files."""
+        self.handlers = {
+            'unrar' : 'unrar x -y %s',
+            'unzip' : 'unzip %s',
+            'tar' : 'tar zxvf %s'
+        }
+        self.handler_map = {
+            '.rar' : 'unrar',
+            '.zip' : 'unzip',
+            '.tar.gz' : 'tar'
+        }
+
+    def get_handler(self, file_name):
+        """Analyzes given file and if it's possible to handle, returns \
+a new instance of an appropriate ArchiveHandler."""
+        basename, ext = os.path.splitext(file_name)
+        if ext in self.handler_map.keys():
+            return ArchiveHandler(self.handlers[self.handler_map[ext]])
+
+class ArchiveHandler(object):
+    """Handles archives by invoking appropriate system command for unpacking \
+them."""
+    
+    def __init__(self, command):
+        self.command = command
+
+    def unpack(self, file, dir):
+        """Unpacks the given file in given directory."""
+        cmd = self.command.split(' ')
+        cmd[cmd.index('%s')] = file
+        print 'Unpacking %s with %s' % (file, cmd[0])
+        retcode = subprocess.call(cmd, cwd = dir)
+        if retcode:
+            return False
+        return True
+
+class UnpackAll(object):
+    """Main 'unpackall' program. Glues up the logic."""
+    def main(self, argv):
+        """ Main method for 'unpackall' program."""
+        args = list(argv)
+        if '--help' in args or '-h' in args:
+            print 'Usage: unpackall [--delete] [path]'
+            sys.exit(0)
+        if '--delete' in args:
+            self.delete = True
+            args.remove('--delete')
+        else:
+            self.delete = False
+        self.argv = args
+        self.handler_factory = HandlerFactory()    
+        if len(self.argv) > 1:
+            target_dir = argv.pop()
+        else:
+            target_dir = os.curdir
+
+        if not os.path.exists(os.path.abspath(target_dir)):
+            print 'Target directory does not exist: %s' % target_dir
+            sys.exit(1)
+        print 'Recursively unpacking everything in %s' % target_dir
+        self.unpack_dir(os.path.abspath(target_dir))
+        print 'Done.'
+
+    def unpack_dir(self, dir, depth=10):
+        """Recursively scans directory for archives and unpacks them upon \
+discovery."""
+        print 'Scanning for archives: %s' % dir
+        for file in os.listdir(dir):
+            file_path = dir + os.path.sep + file
+            if os.path.isdir(file_path) and depth > 0:
+                self.unpack_dir(file_path, depth - 1)
+            handler = self.handler_factory.get_handler(file)
+            if handler:
+                if handler.unpack(file, dir):
+                    if self.delete:
+                        print 'Deleting original archive: %s' % file
+                        os.remove(file_path)
+
+if __name__ == '__main__':
+    program = UnpackAll()
+    program.main(sys.argv)
