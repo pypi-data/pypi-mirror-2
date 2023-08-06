@@ -1,0 +1,107 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xml:lang="en"
+      lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      i18n:domain="plone">
+<head>
+
+<metal:block metal:define-macro="javascript_head">
+<style type="text/css">
+.pfg-draft {display:none;}
+.pfg-drafts-float { position: absolute; right: 0; width: 200px;}
+.fixed {position: fixed; top: 0; margin-right: 1em;}
+</style>
+
+<script type="text/javascript">
+$(function() {
+  var noformerrorshow = function(el) {
+      var o = $(el),
+          emsg = o.find('dl.portalMessage.error');
+      if (emsg.length) {
+          o.children().replaceWith(emsg);
+          return false;
+      } else {
+          $('#fg-base-edit').attr('action','@@fg_save_draft').submit();
+      }
+  }
+  
+  $('.pfg-draft').show();
+  $('.pfg-draft-register').prepOverlay({
+      subtype: 'ajax',
+      filter: common_content_filter,
+      formselector: 'form',
+      noform: function(el) {return noformerrorshow(el);}
+  });
+  $('.pfg-draft-save').click(function (e) {
+    e.preventDefault();
+    $('#fg-base-edit').attr('action','@@fg_save_draft').submit();
+  });
+  
+  var msie6 = $.browser == 'msie' && $.browser.version < 7;
+  if (!msie6) {
+    var top = $('.pfg-drafts-float').offset().top - parseFloat($('.pfg-drafts-float').css('margin-top').replace(/auto/, 0));
+    $(window).scroll(function (event) {
+      // what the y position of the scroll is
+      var y = $(this).scrollTop();
+      
+      // whether that's below the form
+      if (y >= top) {
+        // if so, ad the fixed class
+        $('.pfg-drafts-float').addClass('fixed');
+      } else {
+        // otherwise remove it
+        $('.pfg-drafts-float').removeClass('fixed');
+      }
+    });
+  }
+});
+</script>
+</metal:block>
+    
+</head>
+  <body>
+
+<metal:block metal:define-macro="body">
+  <tal:block tal:define="isAnon python:context.portal_membership.isAnonymousUser()">
+    <metal:block metal:use-macro="context/fg_edit_macros_p3/macros/body">
+      <metal:slot metal:fill-slot="extra_top">
+        <div class="pfg-draft pfg-drafts-float">
+          <dl class="portalMessage">
+            <dt>Info</dt>
+            <dd>
+              <p>To save your form in progress so you can return to it later,
+                <a class="pfg-draft-register"
+                   tal:condition="isAnon"
+                   tal:attributes="href string:${context/portal_url}/@@register">register now</a><a
+                   class="pfg-draft-save"
+                   tal:condition="not:isAnon"
+                   href="#">click here</a>.
+              </p>
+              <p tal:condition="isAnon">To retrieve a previously saved form,
+                 <a id="pfg-draft-login" tal:attributes="href string:${context/absolute_url}/require_login">log in</a>
+                 to continue.
+              </p>
+            </dd>
+          </dl>
+        </div>
+      </metal:slot>
+      <metal:slot metal:fill-slot="extra_buttons">
+        <div class="pfg-draft">
+          <input type="hidden" name="fg_uid" tal:attributes="value context/UID"/>
+          <tal:comment tal:condition="nothing">href gives the target for the popup</tal:comment>
+          <input tal:condition="isAnon"
+                 class="pfg-draft-register" type="submit" name="save_draft"
+                 value="Save Form in Progress"
+                 tal:attributes="href string:${context/portal_url}/@@register"/>
+          <button tal:condition="not:isAnon"
+                 class="pfg-draft-save">Save Form in Progress</button>
+        </div>
+      </metal:slot>
+    </metal:block>
+  </tal:block>
+</metal:block>
+
+  </body>
+</html>
