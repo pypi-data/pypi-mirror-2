@@ -1,0 +1,378 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Aspect oriented programming tools &mdash; Pytilities v1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="Pytilities v1.0.1 documentation" href="../../" />
+    <link rel="up" title="Programming guide" href="../" />
+    <link rel="prev" title="Importing classes and functions" href="" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Importing classes and functions"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../">Pytilities v1.0.1 documentation</a> &raquo;</li>
+          <li><a href="../" accesskey="U">Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="aspect-oriented-programming-tools">
+<h1>Aspect oriented programming tools<a class="headerlink" href="#aspect-oriented-programming-tools" title="Permalink to this headline">¶</a></h1>
+<p>This guide starts with an introduction to give you a general idea of AOP (for
+a decent introduction to AOP I suggest (e)books, google, ...). It then proceeds
+with a top down approach running you through: using aspects, making aspects and
+eventually writing advice for your aspects.</p>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>The aim of aspect oriented programming (AOP) is to allow better separation of
+concerns. It allows you to centralise code spread out over multiple classes into
+a single class, called an aspect, uncluttering code.</p>
+<p>Aspects consist of pieces of advice which are given to methods of a class. Advice are functions/methods
+that wrap around a method/descriptor, allowing them to change its behaviour.</p>
+<p>With this AOP library you can give advice to methods, and any other kind of descriptor (e.g. properties).
+You can even &#8216;advise&#8217; unexisting attributes on a class, effectively adding new attributes to the class.</p>
+</div>
+<div class="section" id="using-aspects">
+<h2>Using aspects<a class="headerlink" href="#using-aspects" title="Permalink to this headline">¶</a></h2>
+<p>Advice is given by applying aspects to classes or instances, for example:</p>
+<div class="highlight-python"><pre># Making a Vector instance that sends out change events
+
+from pytilities.geometry import Vector, verbose_vector_aspect
+
+Vector vector = Vector()  # a Vector is an (x, y) coordinate
+
+# this adds functionality to just this vector instance so that you can listen for
+# change events on it
+verbose_vector_aspect.apply(vector)
+
+def on_changed(old_xy_tuple):
+    pass
+
+vector.add_handler('changed', on_changed)  # this now works</pre>
+</div>
+<p>The aspect&#8217;s <cite>apply()</cite> method accepts either a class or an instance. If given a class, it is applied to
+all instances of that class, &#8216;static&#8217; methods of the class, ... (this is called class advice).
+If given an instance, it is applied to just that instance (this is refered to as instance advice).
+Note that built-in/extension types cannot have aspects or any type of advice applied to them.</p>
+<p>Multiple aspects can be applied to the same instance/class, but you cannot apply the
+same advice to the same object more than once.
+Note that when an aspect is applied to an instance, it takes precedence over aspects applied to the instance&#8217;s class.
+Apart from that non-intuitive bit, aspect advice wraps previously given aspect advice.</p>
+<p>Aspects can be unapplied to objects with the <cite>unapply()</cite> method, this can be done in any order. The
+unapplied aspect is then removed from the &#8216;chain&#8217; of aspects applied to the object.</p>
+</div>
+<div class="section" id="writing-new-aspects">
+<h2>Writing new aspects<a class="headerlink" href="#writing-new-aspects" title="Permalink to this headline">¶</a></h2>
+<p>You write new aspects by extending the <cite>Aspect</cite> class (you don&#8217;t have to, but you&#8217;d have to use advisor in pytilities.aop directly).
+Here&#8217;s an example of a basic aspect:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities</span> <span class="kn">import</span> <span class="n">aop</span>
+<span class="kn">from</span> <span class="nn">pytilities.aop</span> <span class="kn">import</span> <span class="n">Aspect</span>
+
+<span class="k">class</span> <span class="nc">SpamAspect</span><span class="p">(</span><span class="n">Aspect</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Aspect</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="c"># map advice to attribute names of the objects it will be applied to</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_advise</span><span class="p">(</span><span class="s">&#39;eat_spam&#39;</span><span class="p">,</span> <span class="n">call</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spam</span><span class="p">)</span>  <span class="c"># in this case apply spam advice to calls to some_object.eat_spam</span>
+
+    <span class="c"># some advice that prints spam and then calls the original method</span>
+    <span class="k">def</span> <span class="nf">spam</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;Spam&#39;</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span>
+
+<span class="c"># singleton code (you could parameterise your aspect of course, e.g. like the DelegationAspect)</span>
+<span class="n">verbose_vector_aspect</span> <span class="o">=</span> <span class="n">VerboseVectorAspect</span><span class="p">()</span>
+<span class="k">del</span> <span class="n">VerboseVectorAspect</span>
+</pre></div>
+</div>
+<p>The <cite>_advise()</cite> method inherited from Aspect, is used to map advice onto
+members/attributes. (the member names refer to those of the objects that to which the aspect may be applied to)</p>
+<p>Note that the members should contain either a descriptor (function, property, ...) or contain nothing at all (i.e. the attribute does not exist).</p>
+<p>Attributes can have advice applied to them by get, set, del or call access:</p>
+<ul class="simple">
+<li>get: whenever you __get__ an attribute: e.g. obj.x</li>
+<li>set: whenever you __set__ an attribute: e.g. obj.x = 1</li>
+<li>del: whenever you __del__ an attribute: e.g. del obj.x</li>
+<li>call: whenever you __call__ an attribute: e.g. obj.x()</li>
+</ul>
+<p>The members parameter not only accepts regular attribute names, but also accepts the
+special &#8216;*&#8217; attribute. This applies the advice to all attributes on the class (even to missing attributes).
+Note that &#8216;*&#8217; advice can only be given to classes/instances that have <cite>AOPMeta</cite> as its metaclass.</p>
+<p>No advice, not even &#8216;*&#8217; advice, can advice private/protected members. Members are
+considered private/protected if their name begins with a single &#8216;_&#8217;, but aren&#8217;t special.
+Though you can advise special attributes, you cannot advise the attributes listed in
+in <cite>pytilities.aop.advisor.unadvisables</cite></p>
+<p>Note you can also advice non-existing attributes, an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities</span> <span class="kn">import</span> <span class="n">aop</span>
+<span class="kn">from</span> <span class="nn">pytilities.aop</span> <span class="kn">import</span> <span class="n">Aspect</span>
+
+<span class="k">class</span> <span class="nc">MagicAspect</span><span class="p">(</span><span class="n">Aspect</span><span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;Advise a non-existing attribute to return 3&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Aspect</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_advise</span><span class="p">(</span><span class="s">&#39;x&#39;</span><span class="p">,</span> <span class="n">get</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">advice</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">advice</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="n">return_close</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="n">magic_aspect</span> <span class="o">=</span> <span class="n">MagicAspect</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">SomeClass</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span> <span class="k">pass</span>
+<span class="n">someClass</span> <span class="o">=</span> <span class="n">SomeClass</span><span class="p">()</span>
+
+<span class="c"># print(someClass.x) would fail</span>
+<span class="n">magic_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">someClass</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">someClass</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="c"># now prints 3</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="writing-advice-for-your-aspects">
+<h2>Writing advice for your aspects<a class="headerlink" href="#writing-advice-for-your-aspects" title="Permalink to this headline">¶</a></h2>
+<p>Advice is a generator that yields aop commands (the commands are discussed below).
+When some form of access is done on a particular attribute of a class (this is defined by your self._advise calls
+your aspect), the advice is called before that attribute is accessed. The advice function
+can yield commands to return straight away, manipulate the return value, manipulate the args to pass to the advised member,
+proceed with accessing the member in the &#8216;normal&#8217; way.</p>
+<p>The following sections introduce each of the commands by example
+(they are located in pytilities.aop.commands, but can also be imported from pytilities.aop).
+For brevity, the following examples omit the Aspect class&#8217; declaration.</p>
+<div class="section" id="the-proceed-command">
+<h3>The proceed command<a class="headerlink" href="#the-proceed-command" title="Permalink to this headline">¶</a></h3>
+<p>Yielding proceed from your advice proceeds with accessing the advised member:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># the object whose increase() call accesses will be advised</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span> <span class="c"># reset counter to 0</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="c"># increase counter by 1 and return the new value (in this case, 1)</span>
+
+<span class="c"># this advice proceeds with attribute access,</span>
+<span class="c"># and then prints the return value</span>
+<span class="k">def</span> <span class="nf">advice</span><span class="p">():</span>
+    <span class="n">return_value</span> <span class="o">=</span> <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">return_value</span><span class="p">)</span>
+
+<span class="c"># with advice2 applied to counter</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># prints 1, then returns 1</span>
+
+<span class="c"># this advice will proceed twice</span>
+<span class="k">def</span> <span class="nf">advice2</span><span class="p">():</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span>
+
+<span class="c"># with advice2 applied to counter</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># returns 2. increase(1) is called twice by the double proceed, only the last return value is returned</span>
+</pre></div>
+</div>
+<p>Using yield proceed() you can change the args of the underlying call:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># using the same counter from the example above</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># returns 1</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>  <span class="c"># returns 6</span>
+
+<span class="k">def</span> <span class="nf">advice</span><span class="p">():</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c"># change the argument to 2</span>
+
+<span class="c"># after applying the advice</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># returns 2</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>  <span class="c"># returns 4</span>
+</pre></div>
+</div>
+<p>proceed also supports keyword arguments (see the api reference).</p>
+</div>
+<div class="section" id="the-return-command">
+<h3>The return_ command<a class="headerlink" href="#the-return-command" title="Permalink to this headline">¶</a></h3>
+<p>Yielding return_ from your advice returns the last:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># using the same counter from the example above</span>
+
+<span class="c"># don&#39;t call the original increase() and return 1</span>
+<span class="k">def</span> <span class="nf">advice</span><span class="p">():</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">return_</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">&#39;this statement is never reached&#39;</span><span class="p">)</span>
+
+<span class="c"># after applying the advice</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># returns 1</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>  <span class="c"># returns 1</span>
+
+<span class="c"># proceed, then return 3</span>
+<span class="k">def</span> <span class="nf">advice2</span><span class="p">():</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">proceed</span>
+    <span class="k">yield</span> <span class="n">aop</span><span class="o">.</span><span class="n">return_</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="c"># after applying the advice</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+<span class="n">counter</span><span class="o">.</span><span class="n">increase</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># returns 3</span>
+</pre></div>
+</div>
+<p>Upon yielding return_, the generator is closed and the value is returned.
+When the generator ends naturally (by never yielding return_), an implicit return_ is assumed.</p>
+</div>
+<div class="section" id="various-other-commands">
+<h3>Various other commands<a class="headerlink" href="#various-other-commands" title="Permalink to this headline">¶</a></h3>
+<p>The rest of the commands available to you:</p>
+<div class="highlight-python"><pre># using that same counter from the examples above
+
+def advice():
+    print(yield aop.arguments)  # arguments returns (args, kwargs)
+    print(yield aop.name)  # name of the advised member (the same advice can be applied to multiple members)
+    print(yield aop.obj)  # the object that carries the advised member
+    print(yield aop.advised)  # the value of the advised member
+
+# after applying the advice
+counter.reset()
+counter.increase(2) # prints: ((2,), {})
+                    # then prints: increase
+                    # then prints: the counter object
+                    # then prints: the increase function descriptor object</pre>
+</div>
+</div>
+</div>
+<div class="section" id="views">
+<h2>Views<a class="headerlink" href="#views" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes you want to apply an aspect only when accesed through a special wrapper;
+pytilities refers to this as a View and provides pytilities.aop.aspects.create_view()
+to aid you in making views.</p>
+<p>We&#8217;ll explain views using an example. You may have a getSize method that returns an
+x,y coordinate. In your class you store this coordinate in a mutable Vector instance.
+You don&#8217;t want users to be able to manipulate the size using the return of that method.
+You want to provide an immutable view to your size Vector.</p>
+<p>Here&#8217;s how you could do this with pytilities:</p>
+<div class="highlight-python"><pre>from pytilities.aop.aspects import ImmutableAspect, create_view
+from pytilities.geometry import Vector
+
+# your size vector
+size = new Vector()
+
+# make an aspect that makes the x and y attributes immutable
+immutable_vector_aspect = ImmutableAspect(('x', 'y'))
+
+# create a view that only enables the given aspect when
+# you access the object it wraps through the wrapper
+ImmutableVector = create_view(immutable_vector_aspect)
+
+# make an ImmutableVector view instance of the size vector
+immutableSize = ImmutableVector(size)
+
+size.x = 1  # this still works
+immutableSize.x = 5  # this will throw an exception</pre>
+</div>
+<p>Note that the ImmutableVector of the above example is included in
+pytilities.geometry.</p>
+</div>
+<div class="section" id="more-examples">
+<h2>More examples<a class="headerlink" href="#more-examples" title="Permalink to this headline">¶</a></h2>
+<p>For more examples: See the unit tests in pytilities.test.aop</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Aspect oriented programming tools</a><ul>
+<li><a class="reference internal" href="#introduction">Introduction</a></li>
+<li><a class="reference internal" href="#using-aspects">Using aspects</a></li>
+<li><a class="reference internal" href="#writing-new-aspects">Writing new aspects</a></li>
+<li><a class="reference internal" href="#writing-advice-for-your-aspects">Writing advice for your aspects</a><ul>
+<li><a class="reference internal" href="#the-proceed-command">The proceed command</a></li>
+<li><a class="reference internal" href="#the-return-command">The return_ command</a></li>
+<li><a class="reference internal" href="#various-other-commands">Various other commands</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#views">Views</a></li>
+<li><a class="reference internal" href="#more-examples">More examples</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href=""
+                        title="previous chapter">Importing classes and functions</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/guide/aop.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search/" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Importing classes and functions"
+             >previous</a> |</li>
+        <li><a href="../../">Pytilities v1.0.1 documentation</a> &raquo;</li>
+          <li><a href="../" >Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Tim Diels (limyreth).
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre.
+    </div>
+  </body>
+</html>
