@@ -1,0 +1,758 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>slacklog.formatters &mdash; slacklog 0.0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="slacklog 0.0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">slacklog 0.0.6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for slacklog.formatters</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">SlackLog formatters</span>
+<span class="sd">===================</span>
+
+<span class="sd">SlackLog formatter takes an in-memory representation of a Slackware ChangeLog.txt and produces a different representation of it.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">codecs</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">slacklog</span> <span class="kn">import</span> <span class="n">models</span>
+
+<div class="viewcode-block" id="SlackLogFormatter"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter">[docs]</a><span class="k">class</span> <span class="nc">SlackLogFormatter</span> <span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for SlackLog formatters.</span>
+
+<span class="sd">    This class is ment for subclassing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+
+    <span class="n">max_entries</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;If not :py:const:`None`, must be an :py:class:`int`</span>
+<span class="sd">    representing how many entries are formatted from the beginning of</span>
+<span class="sd">    the log.  Rest of the entries are ignored.&quot;&quot;&quot;</span>
+    <span class="n">max_pkgs</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;If not :py:const:`None`, must be an :py:class:`int`</span>
+<span class="sd">    representing how many packages are formatted from the beginning of</span>
+<span class="sd">    each entry.  Rest of the packages are ignored.&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="SlackLogFormatter.format"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format">[docs]</a>    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the in-memory representation of the log.</span>
+
+<span class="sd">        Default implementation calls :py:meth:`format_log_preamble`,</span>
+<span class="sd">        followed by a call to :py:meth:`format_entry` for each log</span>
+<span class="sd">        entry, and finally calls :py:meth:`format_log_postamble`.</span>
+
+<span class="sd">        The return value is the concatenation of the return values of</span>
+<span class="sd">        the mentioned functions.</span>
+
+<span class="sd">        :param log: in-memory representation of the log.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: Unicode representation of the log.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_log_preamble</span><span class="p">(</span><span class="n">log</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_list</span><span class="p">(</span><span class="n">log</span><span class="o">.</span><span class="n">entries</span><span class="p">,</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry</span><span class="p">,</span> <span class="n">cls</span><span class="o">.</span><span class="n">max_entries</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_log_postamble</span><span class="p">(</span><span class="n">log</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_log_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_log_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_log_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log preamble, the part</span>
+<span class="sd">        before entries.</span>
+
+<span class="sd">        Default implementation returns empty string.</span>
+
+<span class="sd">        :param log: in-memory representation of the log.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: Unicode representation of log preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_log_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_log_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_log_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_log_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_log_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log postamble, the part</span>
+<span class="sd">        after all entries.</span>
+
+<span class="sd">        Default implementation returns empty string.</span>
+
+<span class="sd">        :param log: in-memory representation of the log.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: Unicode representation of log postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_log_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_log_postamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogFormatter.format_entry"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_entry">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of a single log entry.</span>
+
+<span class="sd">        Default implementation calls :py:meth:`format_entry_separator`</span>
+<span class="sd">        with arguments `is_first` and `is_last`, followed by a call to</span>
+<span class="sd">        :py:meth:`format_entry_preamble`, followed by a call to</span>
+<span class="sd">        :py:meth:`format_pkg` for each package in this log entry,</span>
+<span class="sd">        finally followed by a call to</span>
+<span class="sd">        :py:meth:`format_entry_postamble`.</span>
+
+<span class="sd">        The return value is the concatenation of the return values of</span>
+<span class="sd">        the mentioned functions.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_separator</span><span class="p">(</span><span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_preamble</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_list</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">pkgs</span><span class="p">,</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_pkg</span><span class="p">,</span> <span class="n">cls</span><span class="o">.</span><span class="n">max_pkgs</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_postamble</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_entry_separator"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_entry_separator">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_separator</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry separator.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry separator.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_entry_separator</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_separator</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_entry_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_entry_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry preamble, the</span>
+<span class="sd">        part before packages.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_entry_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_entry_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_entry_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry postamble, the</span>
+<span class="sd">        part after packages.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_entry_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_postamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogFormatter.format_pkg"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_pkg">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of a single log entry package.</span>
+
+<span class="sd">        Default implementation calls :py:meth:`format_pkg_separator`,</span>
+<span class="sd">        followed by a call to :py:meth:`format_pkg_preamble`, and</span>
+<span class="sd">        finally calls :py:meth:`format_pkg_postamble`.</span>
+
+<span class="sd">        The return value is the concatenation of the return values of</span>
+<span class="sd">        the mentioned functions.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first package, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last package, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry package.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_pkg_separator</span><span class="p">(</span><span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_pkg_preamble</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_pkg_postamble</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_pkg</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_pkg_separator"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_pkg_separator">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_separator</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry package</span>
+<span class="sd">        separator.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first package, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last package, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry package separator.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_pkg_separator</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_separator</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_pkg_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_pkg_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry package</span>
+<span class="sd">        preamble.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :return: Unicode representation of log entry package preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_pkg_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_pkg_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_pkg_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of the log entry package</span>
+<span class="sd">        postamble.</span>
+
+<span class="sd">        Default implementation returns an empty string.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :return: Unicode representation of log entry package postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_pkg_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_postamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogFormatter.format_list"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogFormatter.format_list">[docs]</a>    <span class="k">def</span> <span class="nf">format_list</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">list_of_items</span><span class="p">,</span> <span class="n">item_formatter</span><span class="p">,</span> <span class="n">max_items</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return unicode representation of a list of objects.</span>
+
+<span class="sd">        This method is not ment for subclassing.</span>
+
+<span class="sd">        :param list_of_items: List of items to format.</span>
+<span class="sd">        :type: list</span>
+<span class="sd">        :param item_formatter: Function that formats one item.</span>
+<span class="sd">        :type: A callable that takes one item as the first positional</span>
+<span class="sd">               argument, two booleans `is_first` and `is_last` as</span>
+<span class="sd">               second and third positional arguments, and returns a</span>
+<span class="sd">               :py:class:`unicode` string.</span>
+<span class="sd">        :return: Formatted data.</span>
+<span class="sd">        :rtype: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">num_items</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">list_of_items</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">max_items</span><span class="p">:</span>
+            <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">max_items</span><span class="p">,</span> <span class="nb">int</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">num_items</span> <span class="o">&gt;</span> <span class="n">max_items</span><span class="p">:</span>
+                <span class="n">num_items</span> <span class="o">=</span> <span class="n">max_items</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">num_items</span><span class="p">):</span>
+            <span class="n">is_first</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">is_last</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">is_first</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="n">num_items</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">is_last</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="n">item_formatter</span><span class="p">(</span><span class="n">list_of_items</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_list</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_list</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="SlackLogTxtFormatter"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogTxtFormatter">[docs]</a><span class="k">class</span> <span class="nc">SlackLogTxtFormatter</span> <span class="p">(</span><span class="n">SlackLogFormatter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Concrete SlackLog formatter that tries to regenerate the original</span>
+<span class="sd">    ChangeLog.txt.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SlackLogTxtFormatter.format_entry_separator"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogTxtFormatter.format_entry_separator">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_separator</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_separator`.</span>
+
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry separator.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_first</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">u&#39;+--------------------------+</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span></div>
+    <span class="n">format_entry_separator</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_separator</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogTxtFormatter.format_entry_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogTxtFormatter.format_entry_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_preamble`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a %b </span><span class="si">%d</span><span class="s"> %H:%M:%S %Z %Y&quot;</span><span class="p">)</span>
+        <span class="c"># Remove leading zero from the day-of-month only</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s">r&#39; 0(\d) &#39;</span><span class="p">,</span> <span class="s">r&#39;  \1 &#39;</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogTxtFormatter.format_pkg_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogTxtFormatter.format_pkg_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_pkg_preamble`.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :return: Unicode representation of log entry package preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;</span><span class="si">%s</span><span class="s">:</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">pkg</span><span class="p">,</span> <span class="n">pkg</span><span class="o">.</span><span class="n">description</span><span class="p">)</span></div>
+    <span class="n">format_pkg_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_preamble</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="SlackLogRssFormatter"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter">[docs]</a><span class="k">class</span> <span class="nc">SlackLogRssFormatter</span> <span class="p">(</span><span class="n">SlackLogFormatter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Concrete SlackLog formatter that generates an RSS feed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">slackware</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode` description of the distro version.</span>
+<span class="sd">    E.g. &#39;Slackware 13.37&#39; or &#39;Slackware64 current&#39;.&quot;&quot;&quot;</span>
+    <span class="n">rssLink</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  Full URL of the RSS feed.&quot;&quot;&quot;</span>
+    <span class="n">webLink</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  Full URL of the WWW version of the</span>
+<span class="sd">    feed.&quot;&quot;&quot;</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode` description of the feed.&quot;&quot;&quot;</span>
+    <span class="n">language</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode` language identifier.  E.g. &#39;en&#39;.&quot;&quot;&quot;</span>
+    <span class="n">managingEditor</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  Email, and possibly name, of the feed</span>
+<span class="sd">    manager.  E.g. &#39;jane@doe.net (Jane Doe)&#39;.&quot;&quot;&quot;</span>
+    <span class="n">webMaster</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  Email, and possibly name, of the</span>
+<span class="sd">    webmaster.  E.g. &#39;john@doe.net (John Doe)&#39;. &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SlackLogRssFormatter.format_log_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter.format_log_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_log_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_log_preamble`.</span>
+
+<span class="sd">        :param log: in-memory representation of the log.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: Unicode representation of log preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="n">data</span>  <span class="o">=</span> <span class="s">u&#39;&lt;?xml version=&quot;1.0&quot;?&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;&lt;rss version=&quot;2.0&quot; xmlns:atom=&quot;http://www.w3.org/2005/Atom&quot;&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;  &lt;channel&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;atom:link href=&quot;</span><span class="si">%s</span><span class="s">&quot; rel=&quot;self&quot; type=&quot;application/rss+xml&quot; /&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">rssLink</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;title&gt;</span><span class="si">%s</span><span class="s"> ChangeLog&lt;/title&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">slackware</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">webLink</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;link&gt;</span><span class="si">%s</span><span class="s">&lt;/link&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">webLink</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;link&gt;</span><span class="si">%s</span><span class="s">&lt;/link&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">rssLink</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;description&gt;</span><span class="si">%s</span><span class="s">&lt;/description&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">description</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;docs&gt;http://www.rssboard.org/rss-specification&lt;/docs&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;language&gt;</span><span class="si">%s</span><span class="s">&lt;/language&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">language</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">managingEditor</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;managingEditor&gt;</span><span class="si">%s</span><span class="s">&lt;/managingEditor&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">managingEditor</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">webMaster</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;webMaster&gt;</span><span class="si">%s</span><span class="s">&lt;/webMaster&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">webMaster</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;pubDate&gt;</span><span class="si">%s</span><span class="s">&lt;/pubDate&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">log</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a, </span><span class="si">%d</span><span class="s"> %b %Y %H:%M:%S GMT&quot;</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;lastBuildDate&gt;</span><span class="si">%s</span><span class="s">&lt;/lastBuildDate&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a, </span><span class="si">%d</span><span class="s"> %b %Y %H:%M:%S GMT&quot;</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;    &lt;generator&gt;SlackLog&lt;/generator&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_log_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_log_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogRssFormatter.format_log_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter.format_log_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_log_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_log_postamble`.</span>
+
+<span class="sd">        :param log: in-memory representation of the log.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: Unicode representation of log postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;  &lt;/channel&gt;</span><span class="se">\n</span><span class="s">&lt;/rss&gt;</span><span class="se">\n</span><span class="s">&#39;</span></div>
+    <span class="n">format_log_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_log_postamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogRssFormatter.format_entry_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter.format_entry_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_preamble`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span>  <span class="o">=</span> <span class="s">u&#39;    &lt;item&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">webLink</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;      &lt;guid isPermaLink=&quot;true&quot;&gt;</span><span class="si">%s</span><span class="s">#</span><span class="si">%s</span><span class="s">&lt;/guid&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">webLink</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%Y%m</span><span class="si">%d</span><span class="s">T%H%M%SZ&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;      &lt;guid isPermaLink=&quot;false&quot;&gt;</span><span class="si">%s</span><span class="s">-</span><span class="si">%s</span><span class="s">&lt;/guid&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">slackware</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39; &#39;</span><span class="p">,</span> <span class="s">&#39;-&#39;</span><span class="p">),</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%Y%m</span><span class="si">%d</span><span class="s">T%H%M%SZ&quot;</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;      &lt;title&gt;</span><span class="si">%s</span><span class="s"> changes for </span><span class="si">%s</span><span class="s">&lt;/title&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">slackware</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a, </span><span class="si">%d</span><span class="s"> %b %Y %H:%M:%S GMT&quot;</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;      &lt;pubDate&gt;</span><span class="si">%s</span><span class="s">&lt;/pubDate&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a, </span><span class="si">%d</span><span class="s"> %b %Y %H:%M:%S GMT&quot;</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;      &lt;description&gt;&lt;![CDATA[&lt;pre&gt;&#39;</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;&lt;&#39;</span><span class="p">,</span><span class="s">&#39;&amp;lt;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogRssFormatter.format_entry_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter.format_entry_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_postamble`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;&lt;/pre&gt;]]&gt;&lt;/description&gt;</span><span class="se">\n</span><span class="s">    &lt;/item&gt;</span><span class="se">\n</span><span class="s">&#39;</span></div>
+    <span class="n">format_entry_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_postamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogRssFormatter.format_pkg_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogRssFormatter.format_pkg_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_pkg_preamble`.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :return: Unicode representation of log entry package preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">u&#39;</span><span class="si">%s</span><span class="s">:</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pkg</span><span class="o">.</span><span class="n">pkg</span><span class="p">,</span> <span class="n">pkg</span><span class="o">.</span><span class="n">description</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;&lt;&#39;</span><span class="p">,</span><span class="s">&#39;&amp;lt;&#39;</span><span class="p">))</span></div>
+    <span class="n">format_pkg_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_preamble</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter">[docs]</a><span class="k">class</span> <span class="nc">SlackLogPyblosxomFormatter</span> <span class="p">(</span><span class="n">SlackLogFormatter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Concrete SlackLog formatter that generates Pyblosxom blog entries.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">quiet</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="sd">&quot;&quot;&quot;If :py:const:`True`, &quot;&quot;&quot;</span>
+    <span class="n">slackware</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode` description of the distro version.</span>
+<span class="sd">    E.g. &#39;Slackware 13.37&#39; or &#39;Slackware64 current&#39;.&quot;&quot;&quot;</span>
+    <span class="n">datadir</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;Blog entry directory.&quot;&quot;&quot;</span>
+    <span class="n">extension</span> <span class="o">=</span> <span class="s">&#39;txt&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Blog entry filename extension.&quot;&quot;&quot;</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="s">&#39;utf-8&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Blog entry file encoding.&quot;&quot;&quot;</span>
+    <span class="n">tags_separator</span> <span class="o">=</span> <span class="s">&#39;,&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Separator for tags.&quot;&quot;&quot;</span>
+    <span class="n">pkg_separator</span> <span class="o">=</span> <span class="s">&#39;:&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Separator for packages.&quot;&quot;&quot;</span>
+    <span class="n">pyfilemtime</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="sd">&quot;&quot;&quot;If :py:const:`True`, a pyfilemtime compatible filenames are generated.&quot;&quot;&quot;</span>
+    <span class="n">overwrite</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="sd">&quot;&quot;&quot;If :py:const:`True`, already existing blog entries are overwritten.&quot;&quot;&quot;</span>
+    <span class="n">backup</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="sd">&quot;&quot;&quot;If :py:const:`True`, already existing blog entries are copied to backups before overwriting.&quot;&quot;&quot;</span>
+
+    <span class="c"># Subclass can change these</span>
+    <span class="n">entry_preamble</span>       <span class="o">=</span> <span class="s">u&#39;&lt;div class=&quot;slackLogEntry&quot;&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before the entry.&quot;&quot;&quot;</span>
+    <span class="n">entry_postamble</span>      <span class="o">=</span> <span class="s">u&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after the entry.&quot;&quot;&quot;</span>
+    <span class="n">entry_desc_preamble</span>  <span class="o">=</span> <span class="s">u&#39;&lt;div class=&quot;slackLogEntryDesc&quot;&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before the entry description.&quot;&quot;&quot;</span>
+    <span class="n">entry_desc_postamble</span> <span class="o">=</span> <span class="s">u&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after the entry description.&quot;&quot;&quot;</span>
+    <span class="n">entry_pkgs_preamble</span>  <span class="o">=</span> <span class="s">u&#39;&lt;div class=&quot;slackLogEntryPkgs&quot;&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before the list of packages.&quot;&quot;&quot;</span>
+    <span class="n">entry_pkgs_postamble</span> <span class="o">=</span> <span class="s">U&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after the list of packages.&quot;&quot;&quot;</span>
+    <span class="n">pkg_preamble</span>         <span class="o">=</span> <span class="s">u&#39;&lt;div class=&quot;slackLogPkg&quot;&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before a package.&quot;&quot;&quot;</span>
+    <span class="n">pkg_postamble</span>        <span class="o">=</span> <span class="s">u&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after a package.&quot;&quot;&quot;</span>
+    <span class="n">pkg_name_preamble</span>    <span class="o">=</span> <span class="s">u&#39;&lt;span class=&quot;slackLogPkgName&quot;&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before package name.&quot;&quot;&quot;</span>
+    <span class="n">pkg_name_postamble</span>   <span class="o">=</span> <span class="s">u&#39;&lt;/span&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after package name.&quot;&quot;&quot;</span>
+    <span class="n">pkg_desc_preamble</span>    <span class="o">=</span> <span class="s">u&#39;&lt;span class=&quot;slackLogPkgDesc&quot;&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert before package description.&quot;&quot;&quot;</span>
+    <span class="n">pkg_desc_postamble</span>   <span class="o">=</span> <span class="s">u&#39;&lt;/span&gt;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;:py:class:`unicode`.  HTML to insert after package description.&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :param bool is_first: :py:const:`True` if this is first entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :param bool is_last: :py:const:`True` if this is last entry, :py:const:`False` otherwise.</span>
+<span class="sd">        :return: Unicode representation of log entry.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">SlackLogPyblosxomFormatter</span><span class="p">,</span> <span class="n">cls</span><span class="p">)</span><span class="o">.</span><span class="n">format_entry</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">is_first</span><span class="p">,</span> <span class="n">is_last</span><span class="p">)</span>
+
+        <span class="c"># generate filename for this entry</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;</span><span class="si">%s%s%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">datadir</span><span class="p">,</span>
+                               <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span>
+                               <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_basename</span><span class="p">(</span><span class="n">entry</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">pyfilemtime</span><span class="p">:</span>
+            <span class="n">filename</span> <span class="o">+=</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;-%Y-%m-</span><span class="si">%d</span><span class="s">-%H-%M&quot;</span><span class="p">)</span>
+        <span class="n">filename</span> <span class="o">+=</span> <span class="s">&#39;.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">extension</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="c"># Ensure that the directory exists</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">filename</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="c"># Directory already exists</span>
+            <span class="k">pass</span>
+
+        <span class="c"># Handle the entries that already exist</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">overwrite</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">backup</span><span class="p">:</span>
+                    <span class="c"># Make a backup</span>
+                    <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
+                    <span class="n">backup</span> <span class="o">=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s">~</span><span class="si">%d</span><span class="s">~&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                    <span class="k">while</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">backup</span><span class="p">):</span>
+                        <span class="n">backup</span> <span class="o">=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s">~</span><span class="si">%d</span><span class="s">~&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">cls</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+                        <span class="k">print</span> <span class="s">&quot;Backing up entry: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">backup</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">backup</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">print</span> <span class="s">&quot;Overwriting entry: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">filename</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">cls</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+                    <span class="k">print</span> <span class="s">&quot;Entry already exists: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">filename</span>
+                <span class="k">return</span> <span class="n">data</span>
+
+        <span class="c"># Write the entry</span>
+        <span class="nb">file</span> <span class="o">=</span> <span class="n">codecs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">,</span> <span class="n">cls</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="nb">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="nb">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c"># Set the mtime (for those who do not want to use the</span>
+        <span class="c"># pyfilemtime plugin)</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">mktime</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">timetuple</span><span class="p">())</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">utime</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_preamble`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_title</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">tags_separator</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;#tags </span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">format_entry_tags</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">entry_preamble</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="s">u&#39;</span><span class="si">%s%s%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">entry_desc_preamble</span><span class="p">,</span>
+                                 <span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+                                 <span class="n">cls</span><span class="o">.</span><span class="n">entry_desc_postamble</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">pkgs</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">entry_pkgs_preamble</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_preamble</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry_postamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry_postamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_postamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_entry_postamble`.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry postamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">pkgs</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">entry_pkgs_postamble</span>
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">cls</span><span class="o">.</span><span class="n">entry_postamble</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_entry_postamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_postamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_pkg_preamble"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_pkg_preamble">[docs]</a>    <span class="k">def</span> <span class="nf">format_pkg_preamble</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">pkg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Overrides :py:meth:`SlackLogFormatter.format_pkg_preamble`.</span>
+
+<span class="sd">        :param pkg: in-memory representation of the log entry package</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        :return: Unicode representation of log entry package preamble.</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;</span><span class="si">%s%s%s%s%s%s%s%s%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">pkg_preamble</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_name_preamble</span><span class="p">,</span>
+                                        <span class="n">pkg</span><span class="o">.</span><span class="n">pkg</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_name_postamble</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_separator</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_desc_preamble</span><span class="p">,</span>
+                                        <span class="n">pkg</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_desc_postamble</span><span class="p">,</span>
+                                        <span class="n">cls</span><span class="o">.</span><span class="n">pkg_postamble</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">format_pkg_preamble</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_pkg_preamble</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry_basename"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry_basename">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_basename</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return basename for the log entry.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry name</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cls</span><span class="o">.</span><span class="n">slackware</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39; &#39;</span><span class="p">,</span><span class="s">&#39;-&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">,</span><span class="s">&#39;_&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span></div>
+    <span class="n">format_entry_basename</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_basename</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry_title"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry_title">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_title</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return log entry title.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry title</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s">u&#39;</span><span class="si">%s</span><span class="s"> changes for </span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cls</span><span class="o">.</span><span class="n">slackware</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">&quot;%a, </span><span class="si">%d</span><span class="s"> %b %Y %H:%M:%S GMT&quot;</span><span class="p">))</span></div>
+    <span class="n">format_entry_title</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_title</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogPyblosxomFormatter.format_entry_tags"><a class="viewcode-back" href="../../doc/formatters.html#slacklog.formatters.SlackLogPyblosxomFormatter.format_entry_tags">[docs]</a>    <span class="k">def</span> <span class="nf">format_entry_tags</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return log entry tags.</span>
+
+<span class="sd">        :param entry: in-memory representation of the log entry.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: Unicode representation of log entry tags</span>
+<span class="sd">        :type: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s">u&#39;</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">cls</span><span class="o">.</span><span class="n">slackware</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39; &#39;</span><span class="p">,</span><span class="n">cls</span><span class="o">.</span><span class="n">tags_separator</span><span class="p">)</span></div>
+    <span class="n">format_entry_tags</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">format_entry_tags</span><span class="p">)</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">slacklog 0.0.6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Mikko Värri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre/60813183c80a.
+    </div>
+  </body>
+</html>

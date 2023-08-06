@@ -1,0 +1,337 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>slacklog.parsers &mdash; slacklog 0.0.6 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.0.6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="slacklog 0.0.6 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">slacklog 0.0.6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for slacklog.parsers</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">SlackLog parsers</span>
+<span class="sd">================</span>
+
+<span class="sd">SlackLog parser reads a Slackware ChangeLog.txt and builds an in-memory representation of it using SlackLog models.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">stderr</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">dateutil</span> <span class="kn">import</span> <span class="n">parser</span>
+<span class="kn">from</span> <span class="nn">dateutil</span> <span class="kn">import</span> <span class="n">tz</span>
+<span class="kn">from</span> <span class="nn">slacklog</span> <span class="kn">import</span> <span class="n">models</span>
+
+
+<span class="n">pkg_name_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">r&#39;\A[a-z/]+[-a-zA-Z0-9_.]+:  &#39;</span><span class="p">)</span>
+
+<span class="n">tzinfos</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;CDT&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">5</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">,</span>
+    <span class="s">&#39;CST&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">6</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">,</span>
+    <span class="p">}</span>
+
+<div class="viewcode-block" id="SlackLogParser"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser">[docs]</a><span class="k">class</span> <span class="nc">SlackLogParser</span> <span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parser for recent (13.x) Slackware ChangeLogs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">quiet</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="sd">&quot;&quot;&quot;If :py:const:`True`, warnings about date parsing are not printed.&quot;&quot;&quot;</span>
+    <span class="n">min_date</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;If set to a :py:class:`datetime.datetime` object, any log entries whose timestamp is older are ignored (not parsed).&quot;&quot;&quot;</span>
+
+    <span class="n">ENTRY</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="sd">&quot;&quot;&quot;Counter of entries (for debugging).&quot;&quot;&quot;</span>
+    <span class="n">PKG</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="sd">&quot;&quot;&quot;Counter of packages (for debugging).&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse">[docs]</a>    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the in-memory representation of the data.</span>
+
+<span class="sd">        :param unicode data: the ChangeLog.txt content.</span>
+<span class="sd">        :returns: in-memory representation of data</span>
+<span class="sd">        :rtype: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">entry_data</span> <span class="ow">in</span> <span class="n">cls</span><span class="o">.</span><span class="n">split_log_to_entries</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_entry</span><span class="p">(</span><span class="n">entry_data</span><span class="p">,</span> <span class="n">log</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">entries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">log</span></div>
+    <span class="n">parse</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.split_log_to_entries"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.split_log_to_entries">[docs]</a>    <span class="k">def</span> <span class="nf">split_log_to_entries</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split the ChangeLog.txt into a list of unparsed entries.</span>
+
+<span class="sd">        :param unicode data: the ChangeLog.txt content.</span>
+<span class="sd">        :returns: list of unparsed entries, separators removed.</span>
+<span class="sd">        :rtype: [:py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">*\+-+\+</span><span class="se">\n</span><span class="s">*&#39;</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span></div>
+    <span class="n">split_log_to_entries</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">split_log_to_entries</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_entry"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_entry">[docs]</a>    <span class="k">def</span> <span class="nf">parse_entry</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">log</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse a single ChangeLog entry.</span>
+
+<span class="sd">        :param unicode data: ChangeLog entry content.</span>
+<span class="sd">        :param log: in-memory representation that is being parsed.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLog`</span>
+<span class="sd">        :return: in-memory representation of the ChangeLog entry.</span>
+<span class="sd">        :rtype: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLog</span><span class="p">))</span>
+        <span class="n">cls</span><span class="o">.</span><span class="n">ENTRY</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">cls</span><span class="o">.</span><span class="n">PKG</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c">#print &quot;%s:%s&quot; % (cls.ENTRY, cls.PKG)</span>
+        <span class="n">timestamp</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_entry_timestamp</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cls</span><span class="o">.</span><span class="n">min_date</span> <span class="ow">and</span> <span class="n">cls</span><span class="o">.</span><span class="n">min_date</span> <span class="o">&gt;</span> <span class="n">timestamp</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="n">description</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_entry_description</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">log</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">pkg_data</span> <span class="ow">in</span> <span class="n">cls</span><span class="o">.</span><span class="n">split_entry_to_pkgs</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="n">pkg</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_pkg</span><span class="p">(</span><span class="n">pkg_data</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+            <span class="n">entry</span><span class="o">.</span><span class="n">pkgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">entry</span></div>
+    <span class="n">parse_entry</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_entry</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_entry_timestamp"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_entry_timestamp">[docs]</a>    <span class="k">def</span> <span class="nf">parse_entry_timestamp</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse ChangeLog entry timestamp from data.</span>
+
+<span class="sd">        :param unicode data: ChangeLog entry content.</span>
+<span class="sd">        :returns: a two element list: timestamp and the rest of the entry.</span>
+<span class="sd">        :rtype: [:py:class:`datetime.datetime`, :py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="n">timestamp_str</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">get_line</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="n">timestamp_str</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">data</span><span class="p">]</span></div>
+    <span class="n">parse_entry_timestamp</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_entry_timestamp</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_entry_description"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_entry_description">[docs]</a>    <span class="k">def</span> <span class="nf">parse_entry_description</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse ChangeLog entry desctiption from data.</span>
+
+<span class="sd">        :param unicode data: ChangeLog entry content (without timestamp).</span>
+<span class="sd">        :returns: a two element list: description and the rest of the entry.</span>
+<span class="sd">        :rtype: [:py:class:`unicode`, :py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="k">while</span> <span class="n">data</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pkg_name_re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="n">line</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">get_line</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">description</span> <span class="o">+=</span> <span class="n">line</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">description</span><span class="p">,</span> <span class="n">data</span><span class="p">]</span></div>
+    <span class="n">parse_entry_description</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_entry_description</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.split_entry_to_pkgs"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.split_entry_to_pkgs">[docs]</a>    <span class="k">def</span> <span class="nf">split_entry_to_pkgs</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split ChangeLog entry content into a list of unparsed packages.</span>
+
+<span class="sd">        :param unicode data: ChangeLog entry content (without timestamp or description).</span>
+<span class="sd">        :return: a list of unparsed packages.</span>
+<span class="sd">        :rtype: [:py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="n">pkgs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">pkg</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="o">==</span> <span class="s">u&#39;&#39;</span> <span class="ow">or</span> <span class="n">data</span> <span class="o">==</span> <span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pkg_name_re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+                <span class="n">line</span> <span class="o">+=</span> <span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span>
+                <span class="n">pkg</span> <span class="o">+=</span> <span class="n">line</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">pkg</span><span class="p">:</span>
+                    <span class="n">pkgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span>
+                    <span class="n">pkg</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+                <span class="k">if</span> <span class="n">line</span><span class="p">:</span>
+                    <span class="n">line</span> <span class="o">+=</span> <span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span>
+                    <span class="n">pkg</span> <span class="o">+=</span> <span class="n">line</span>
+        <span class="k">if</span> <span class="n">pkg</span><span class="p">:</span>
+            <span class="n">pkgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pkgs</span></div>
+    <span class="n">split_entry_to_pkgs</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">split_entry_to_pkgs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_pkg"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_pkg">[docs]</a>    <span class="k">def</span> <span class="nf">parse_pkg</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">entry</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse a single package.</span>
+
+<span class="sd">        :param unicode data:  Package name and description of the update.</span>
+<span class="sd">        :param entry: in-memory representation of the ChangeLog entry being parsed.</span>
+<span class="sd">        :type: :py:class:`slacklog.models.SlackLogEntry`</span>
+<span class="sd">        :return: in-memory representation of the package.</span>
+<span class="sd">        :rtype: :py:class:`slacklog.models.SlackLogPkg`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogEntry</span><span class="p">))</span>
+        <span class="n">cls</span><span class="o">.</span><span class="n">PKG</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="c">#print &quot;%s:%s&quot; % (cls.ENTRY, cls.PKG)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pkg</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_pkg_name</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">print</span> <span class="s">&quot;data: &#39;</span><span class="si">%s</span><span class="s">...&#39;&quot;</span> <span class="o">%</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">50</span><span class="p">]</span>
+            <span class="k">raise</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="n">cls</span><span class="o">.</span><span class="n">parse_pkg_description</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">models</span><span class="o">.</span><span class="n">SlackLogPkg</span><span class="p">(</span><span class="n">pkg</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span></div>
+    <span class="n">parse_pkg</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_pkg</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_pkg_name"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_pkg_name">[docs]</a>    <span class="k">def</span> <span class="nf">parse_pkg_name</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse package name from a package.</span>
+
+<span class="sd">        :param unicode data: Package name and description.</span>
+<span class="sd">        :return: a two element list: package name and package description.</span>
+<span class="sd">        :rtype: [:py:class:`unicode`, :py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">u&#39;:&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+    <span class="n">parse_pkg_name</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_pkg_name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_pkg_description"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_pkg_description">[docs]</a>    <span class="k">def</span> <span class="nf">parse_pkg_description</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse package description from a package.</span>
+
+<span class="sd">        :param unicode data: Package description.</span>
+<span class="sd">        :return: Package description.</span>
+<span class="sd">        :rtype: :py:class:`unicode`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+    <span class="n">parse_pkg_description</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_pkg_description</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.get_line"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.get_line">[docs]</a>    <span class="k">def</span> <span class="nf">get_line</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Consume one line from data.</span>
+
+<span class="sd">        :param unicode data: Data.</span>
+<span class="sd">        :return: a two element list: first line, rest of the data.</span>
+<span class="sd">        :rtype: [:py:class:`unicode`, :py:class:`unicode`]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">line</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="c">#print line</span>
+            <span class="n">line</span> <span class="o">+=</span> <span class="s">u&#39;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span> <span class="c"># No newlines</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">data</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">data</span><span class="p">]</span></div>
+    <span class="n">get_line</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">get_line</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SlackLogParser.parse_date"><a class="viewcode-back" href="../../doc/parsers.html#slacklog.parsers.SlackLogParser.parse_date">[docs]</a>    <span class="k">def</span> <span class="nf">parse_date</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse a time string into a timestamp.</span>
+
+<span class="sd">        :param unicode data: Time string.</span>
+<span class="sd">        :return: Timestamp in UTC timezone.</span>
+<span class="sd">        :rtype: :py:class:`datetime.datetime`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">assert</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">))</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">tzinfos</span><span class="o">=</span><span class="n">tzinfos</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">timestamp</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c"># Timestamp was ambiguous, assume UTC</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">cls</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+                <span class="k">print</span> <span class="o">&gt;&gt;</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Warning: Assuming UTC, input was &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">data</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="n">timestamp</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">tz</span><span class="o">.</span><span class="n">tzutc</span><span class="p">())</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">timestamp</span><span class="o">.</span><span class="n">tzinfo</span><span class="p">,</span> <span class="n">tz</span><span class="o">.</span><span class="n">tzutc</span><span class="p">):</span>
+            <span class="c"># Timestamp was in some local timezone,</span>
+            <span class="c"># convert to UTC</span>
+            <span class="n">tzname</span> <span class="o">=</span> <span class="n">timestamp</span><span class="o">.</span><span class="n">tzinfo</span><span class="o">.</span><span class="n">tzname</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">cls</span><span class="o">.</span><span class="n">quiet</span> <span class="ow">and</span> <span class="n">tzname</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tzinfos</span><span class="p">:</span>
+                <span class="k">print</span> <span class="o">&gt;&gt;</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Warning: Converting &#39;</span><span class="si">%s</span><span class="s">&#39; to UTC&quot;</span> <span class="o">%</span> <span class="n">tzname</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="n">timestamp</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">tz</span><span class="o">.</span><span class="n">tzutc</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">timestamp</span></div>
+    <span class="n">parse_date</span> <span class="o">=</span> <span class="nb">classmethod</span><span class="p">(</span><span class="n">parse_date</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">slacklog 0.0.6 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Mikko Värri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre/60813183c80a.
+    </div>
+  </body>
+</html>
