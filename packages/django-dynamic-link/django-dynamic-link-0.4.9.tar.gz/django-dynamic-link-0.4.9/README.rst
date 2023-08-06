@@ -1,0 +1,113 @@
+===========
+Description
+===========
+
+Django file streaming application to provide download links without showing the real path to the served file. The links can be set to expire by date or by clicks. It is also possible to use it for counting clicks on a download link.
+
+**License**
+
+    New BSD license
+
+**Notes**
+
+    * It's tested with Django 1.2 / 1.3
+    * Example project is included
+
+========
+Features
+========
+
+    * Link expires by clicks (optional)
+    * Link expires by time (optional)
+    * Is usable for counting clicks
+
+============
+Installation
+============
+
+**Dependences**
+
+    * This app
+    * Django itself, its redirects from django.contrib and its locale middleware.
+
+**Installation**
+
+    *Manual Installation*
+
+        * Download the file and unzip it.
+        * Copy the folder in your project root.
+
+    *Installation with pip*
+
+        * Type in your terminal: "pip install django-dynamic-link"
+        * With pip you can also uninstall it: "pip uninstall django-dynamic-link"
+
+    *Other possibilities*
+
+        * Open a terminal and change to the folder which contains the setup.py and then type "setup.py install"
+
+**test your installation**
+
+    Go to console and type:
+
+::
+
+    :~$ python
+    import dynamicLink
+    dynamicLink.VERSION
+
+=====
+Setup
+=====
+
+    * Add "dynamicLink" to you installed apps in the settings file.
+    * Make sure that:
+        -   'django.middleware.locale.LocaleMiddleware', is in your MIDDLEWARE_CLASSES.
+        -   'django.contrib.redirects.middleware.RedirectFallbackMiddleware', is in your MIDDLEWARE_CLASSES.
+        -   'django.contrib.redirects', is added to your INSTALLED_APPS.
+        -   Your Admin is enabled ('django.contrib.admin', is in your INSTALLED_APPS.)
+    * Add the following to your urls.py:
+        -   from dynamicLink import dl_settings
+        -   (r'^%s/' % dl_settings.DYNAMIC_LINK_URL_BASE_COMPONENT, include('dynamicLink.urls')),
+    * Run "python manage.py syncdb".
+    * And finally "python manage.py runserver".
+
+**Make it custom**
+
+    You have the following variables to overwrite the applications presettings.
+
+    * DYNAMIC_LINK_MEDIA
+        - Default: settings.MEDIA_ROOT
+        - A path to a directory. From this point you can walk down the subdirectories to choose your files to serve.
+    * DYNAMIC_LINK_URL_BASE_COMPONENT
+        - Default: 'serve'
+        - A string that modifies your url serve path.
+        - Example: www.example.com/DYNAMIC_LINK_URL_BASE_COMPONENT/link/3839hd8HKl3/example.zip.
+
+    Use the global settings.py in your projects root or create an extra file named dl_settings.py there (which is used then instead of settings.py. May customize and use the file from the example folder).
+
+=====
+Usage
+=====
+
+Open the admin interface and go to "Dynamiclink" section. The rest should be self-explanatory.
+
+**Hints**
+
+    * Zero value for link age means never expires.
+    * Zero value for clicks means unlimited clicks.
+    * If a link never expires you can use it for click counting.
+    * Trough the action menu you can serve a site with several links. 
+    * The filename from the created links are only for human readability. You can delete or change this filenames in any way you want.
+
+===============
+Example project
+===============
+
+djang-dynamic-links ships with an example proect.
+
+    1. First unpack the tar.gz
+    2. Than move "dynamicLink" in to the "example" folder or install it (see install section).
+    3. Run "python manage.py syncdb" and "python manage.py runserver".
+    4. Open a Browser, go to: http://127.0.0.1:8000/
+
