@@ -1,0 +1,44 @@
+About
+============
+
+Simple content type based contacts presentation dedicated for small Plone based websites with contacts section.
+
+Installing
+============
+
+This package requires Plone 3.x or 4.x
+
+Installing without buildout
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install this package in either your system path packages or in the lib/python
+directory of your Zope instance. You can do this using either easy_install or
+via the setup.py script.
+
+Installing with buildout
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you are using `buildout`_ to manage your instance installing
+collective.sitecontacts is even simpler. You can install
+collective.sitecontacts by adding it to the eggs line for your instance::
+
+    [instance]
+    eggs = collective.sitecontacts
+
+After updating the configuration you need to run the ''bin/buildout'', which
+will take care of updating your system.
+
+.. _buildout: http://pypi.python.org/pypi/zc.buildout
+
+
+Copyright and Credits
+=====================
+
+collective.sitecontacts is licensed under the GPL. See LICENSE.txt for details.
+
+Author: `Lukas Zdych (lzdych)`__
+
+.. _lzdych: mailto:lukas.zdych@gmail.com
+
+__ lzdych_
+
