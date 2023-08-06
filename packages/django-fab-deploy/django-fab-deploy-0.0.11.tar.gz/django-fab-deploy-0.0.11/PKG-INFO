@@ -1,0 +1,293 @@
+Metadata-Version: 1.1
+Name: django-fab-deploy
+Version: 0.0.11
+Summary:  Opinionated django deployment tool 
+Home-page: http://bitbucket.org/kmike/django-fab-deploy/
+Author: Mikhail Korobov
+Author-email: kmike84@gmail.com
+License: MIT license
+Download-URL: http://bitbucket.org/kmike/django-fab-deploy/get/tip.zip
+Description: =====================================================
+        django-fab-deploy: Opinionated django deployment tool
+        =====================================================
+        
+        django-fab-deploy is intended to be an easy deployment and management
+        solution for django projects using mercurial, fabric, virtualenv, pip,
+        nginx and apache with mod_wsgi. The supported OS is Debian Lenny.
+        
+        This software is very opinionated. It is a collection of fabric scripts
+        that work well together for my projects. Please note it is in early
+        stages of development.
+        
+        Several projects can be deployed on the same VPS using django-fab-deploy.
+        One project can be deployed on several servers. Projects are isolated
+        with virtualenv.
+        
+        Please don't use OpenVZ or Virtuozzo VPS's for deployment! Use XEN or KVM or
+        real servers instead. OpenVZ has very serious issues with memory management
+        (VIRT is counted and limited instead of RSS or something) so apache (and a
+        lot of other software like mysql's InnoDB engine) is totally unusable on
+        OpenVZ while being memory-wise and performant on XEN.
+        
+        Requirements
+        ============
+        
+        * python 2.5+
+        * your project is stored in mercurial repository
+        * Debian Lenny server or VPS with ssh access. I don't have other servers
+          so e.g. Ubuntu is untested but it will possibly work with some small changes.
+        * South is used for migrations
+        * Fabric trunk (http://github.com/bitprophet/fabric)
+        * jinja2
+        * Optional: django-compress is used for css and js bundling
+        
+        I tested the setup only with mysql.
+        
+        License
+        =======
+        
+        Licensed under a MIT license.
+        
+        
+        What is it for
+        ==============
+        
+        1. Deploying several small django sites on one Debian Lenny VPS.
+        
+        2. Deploying and managing django project with several hg branches that should
+           go to different servers (e.g. staging and production).
+        
+        3. Repeatable deployments
+        
+        Getting started
+        ===============
+        
+        1. Install django-fab-deploy and its requirements::
+        
+               $ pip install -r http://bitbucket.org/kmike/django-fab-deploy/raw/1a2d97a54b59/requirements.txt
+        
+        2. Make sure that your project match this structure::
+        
+                my_project
+                    ...
+                    hosting          <- this folder should be copied from django-fab-deploy
+                        ...
+                    reqs             <- a folder with project's pip requirement files
+                        all.txt      <- include all other files in here using pip '-r' syntax
+                        active.txt   <- put recently modified apps here
+                        ...
+                    static           <- static files folder
+                        ...
+        
+                    fabfile.py       <- your project's Fabric deployment script, see below
+                    config.py        <- this file should be included in settings.py and ignored in .hgignore
+                    config.server.py <- this is a production config template, see below
+                    settings.py
+                    manage.py
+        
+           ``config.py`` trick is also known as ``local_settings.py``.
+        
+        3. Copy 'hosting' folder from django-fab-deploy to your project and adjust
+           web server configs if it is needed. Basic configs are good starting point and
+           should work as-is.
+        
+        4. Make sure your .hgignore has these lines::
+        
+                syntax: regexp
+                ^hosting/generated/(?!noremove)
+                ^hosting/backups/(?![noremove|before-migrate/noremove])
+                ^hosting/backups/before-migrate/(?!noremove)
+                ^config.py
+        
+        5. Create fabfile.py. It should provide functions with your server-specific
+           environment variables and you own deployment utils.
+        
+           Short example::
+        
+                from fabric.api import *
+                from fab_deploy import *
+        
+                def my_site():
+                    env.hosts = ['my_site.com']
+                    env.user = 'my_site'
+                    env.conf = dict(
+                        DB_PASSWORD = 'vaqu6Eiy',
+                        APACHE_PORT = 8082,
+                    )
+                    update_env()
+        
+                my_site()
+        
+        
+           Long example::
+        
+                from fabric.api import *
+                from fab_deploy import *
+        
+                def stage():
+        
+                    # how to connect via ssh:
+                    env.hosts = ['my-stage-server.com']   # host
+                    env.user = 'user'                     # user (must not be root)
+        
+                    # instance parameters
+                    env.conf = dict(
+        
+                        # distinct instance name
+                        INSTANCE_NAME = "my_site",
+        
+                        # server name. It will be used for web server configs.
+                        SERVER_NAME = "my-site.example.com",
+        
+                        # DB credentials
+                        DB_NAME = 'my_site_testing',
+                        DB_PASSWORD = '123',
+        
+                        # apache and mod_wsgi config
+                        PROCESSES = 1,
+                        THREADS = 5,
+        
+                        # port should be distinct from other instances' ports
+                        APACHE_PORT = 8083,
+        
+                        # named hg branch that will be active by default
+                        HG_BRANCH = 'default',
+        
+                        # any other parameters. They will be available in config
+                        # templates as template variables
+                        VERSION = 'STAGING',
+                    )
+                    update_env()
+        
+                def prod():
+                    env.hosts = ['my-site.com']
+                    env.user = 'user'
+                    env.conf = dict(
+        
+                        # this should be different if stage and production
+                        # instances share the same server
+                        INSTANCE_NAME = "my_site",
+        
+                        SERVER_NAME = "my-site.com",
+        
+                        # DB credentials
+                        DB_NAME = 'my_site_production',
+                        DB_PASSWORD = '345',
+        
+                        # apache and mod_wsgi config
+                        PROCESSES = 5,
+                        THREADS = 15,
+        
+                        # port should be distinct from other instances'
+                        # ports on the same server
+                        APACHE_PORT = 8083,
+        
+                        # named hg branch that will be active by default
+                        HG_BRANCH = 'production',
+        
+                        # any other parameters. They will be available in config
+                        # templates as template variables
+                        VERSION = 'PROD',
+                    )
+                    update_env()
+        
+                stage() # use stage versions as default
+        
+        6. Create config.server.py. Example::
+        
+                #config file for environment-specific settings
+                DEBUG = False
+                DATABASES = {
+                    'default': {
+                        'ENGINE': 'django.db.backends.mysql',
+                        'NAME': '{{ DB_NAME }}',
+                        'USER': 'root',
+                        'PASSWORD': '{{ DB_PASSWORD }}',
+                        'HOST': '',
+                        'PORT': '',
+                        'OPTIONS': {
+                            "init_command": "SET storage_engine=INNODB"
+                        },
+                    }
+                }
+                MEDIA_URL = 'http://{{ SERVER_NAME }}/static/'
+        
+        
+        7. You should be able to run ``fab full_deploy`` from project root now. Run it.
+           'stage' server will be configured: necessary system and python packages
+           will be installed, apache and ngnix will be configured, virtualenv will be
+           created and project will be on the server. If you want to deploy on
+           prod server, run ``fab prod full_deploy``.
+        
+           Project sources will be available under ``~/src/<instance_name>``, virtualenv
+           will be placed in ``~/envs/<instance_name>``.
+        
+        8. TODO: this step should be eliminated?
+           Finish some tasks that were not handled by django-fab-tools:
+        
+           a) For now mysql should be installed manually::
+        
+                $ aptitude install mysql-server
+        
+           b) Then you should create a DB using mysql shell::
+        
+                CREATE DATABASE db_name DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci
+        
+           c) Then perform the 'syncdb' step on your server::
+        
+                $ ./manage syncdb
+        
+           d) And then 'migrate' step (from local machine)::
+        
+                $ fab migrate
+        
+           e) Django session tables MUST be MyISAM. If the default engine is InnoDB
+              then the following command should be performed in mysql shell::
+        
+                alter table django_session engine=myisam;
+        
+           f) Configuring the email server::
+        
+                $ dpkg-reconfigure exim4-config
+        
+        9. You project should be now up and running.
+        
+        
+        Some common tasks (dig into source code for more)
+        =================================================
+        
+        1. Deploy changes on default server::
+        
+                $ fab push
+        
+        2. Deploy changes on another server, update pip requirements and
+           perform migrations::
+        
+                $ fab prod push:pip_update,migrate
+        
+        3. Update requirements specified in reqs/active.txt::
+        
+                $ fab pip_update
+        
+        4. Update requirements specified in reqs/my_apps.txt::
+        
+                $ fab pip_update:my_apps
+        
+        5. Remotely change hg branch::
+        
+                $ fab up:my_branch
+        
+        TODO: provide complete list of commands
+        
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Django
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires: Fabric
+Requires: jinja2
+Requires: South
