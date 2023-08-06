@@ -1,0 +1,252 @@
+Metadata-Version: 1.0
+Name: bzrsync
+Version: 0.2
+Summary: Tool to automatically synchronize Bazaar repositories between multiple nodes
+Home-page: http://pypi.python.org/pypi/bzrsync/
+Author: Marco Pantaleoni
+Author-email: m.pantaleoni@softwarefabrica.org
+License: GNU GPL v2
+Description: BzrSync - Bazaar repository/branch synchronization tool
+        =======================================================
+        
+        BzrSync is a tool to help a developer using Bazaar on multiple machines.
+        It automatically keeps selected repositories and branches synchronized across
+        the machines. Bazaar itself is used for the synchronization (with "bzr pull"),
+        ensuring consistency at all times.
+        
+        Features
+        --------
+        
+        - any number of machines are supported
+        
+        - consistency is guaranteed at all times
+        
+        Installation
+        ------------
+        
+        To install the latest stable version of BzrSync, using pip_:
+        
+        ::
+        
+          pip install bzrsync
+        
+        or using setuptools_:
+        
+        ::
+        
+          easy_install bzrsync
+        
+        Otherwise, if neither pip_ nor setuptools_ are available, it is possible
+        to download (eg. from PyPI_) the `source`_ package, extract it and run the
+        usual ``setup.py`` commands:
+        
+        ::
+        
+          python setup.py install
+        
+        .. _pip: http://pypi.python.org/pypi/pip
+        .. _setuptools: http://pypi.python.org/pypi/setuptools
+        .. _EasyInstall: http://peak.telecommunity.com/DevCenter/EasyInstall
+        .. _PyPI: http://pypi.python.org/pypi
+        .. _`source`: http://pypi.python.org/pypi/bzrsync
+        
+        
+        Usage
+        -----
+        
+        Let's suppose you work from three different workstations, and their hostnames
+        are `alpha`, `beta` and `gamma`. You want to keep your Bazaar repositories and
+        branches synchronized between all three nodes using BzrSync.
+        BzrSync is meant to be used with shared repositories, so if you are not
+        using these, you should re-organize your branches to use shared repositories.
+        It's easier to keep all the repositories inside the same directory.
+        In our example our repositories will reside in ~/bzr and their names will
+        end in ".bzr".
+        In each shared repository, at the top level there should be a directory for
+        each node. In our case `alpha`, `beta` and `gamma`.
+        For example, let's imagine we have a repository named "project-foo.bzr".
+        We are working on `alpha`, and have created a `trunk` and a `feature-1` branch.
+        We'll have:
+        
+        ::
+        
+          ~/bzr/project-foo.bzr/
+          ~/bzr/project-foo.bzr/alpha
+          ~/bzr/project-foo.bzr/alpha/trunk
+          ~/bzr/project-foo.bzr/alpha/feature-1
+          ~/bzr/project-foo.bzr/beta
+          ~/bzr/project-foo.bzr/gamma
+        
+        Let's suppose we also have a `local.bzr` repository we don't want to
+        synchronize, in either direction.
+        
+        BzrSync needs a YAML config file, by default `~/.bazaar/bzrsync.yaml`,
+        listing the repositories and the branches we.
+        In this example its contents will be:
+        
+        ::
+        
+          # remote nodes
+          # (a host can be specified with an optional port as HOST:PORT)
+          hosts:
+          - alpha
+          - beta
+          - gamma
+        
+          # where repositories specified with a relative path/pattern are located
+          root: ~/bzr
+        
+          # *all* repositories
+          repositories: "*.bzr"
+        
+          # specific repositories to exclude from 'repositories'
+          exclude:
+          - local.bzr
+        
+          # repositories to export to remote nodes
+          export: "*.bzr"
+        
+          # specific repositories excluded from export
+          export_exclude:
+          - local.bzr
+        
+          # repositories to sync from remotes
+          sync: "*.bzr"
+        
+          # specific repositories excluded from sync
+          sync_exclude:
+          - local.bzr
+        
+        We can use exactly this same configuration file on all three nodes.
+        
+        BzrSync won't create the shared repositories for you, so before proceeding,
+        do so now on all the nodes, remembering to create also the node
+        subdirectories.
+        
+        Then launch the BzrSync daemon on all the nodes:
+        
+        ::
+        
+          alpha$ bzrsync serve
+        
+          beta$ bzrsync serve
+        
+          gamma$ bzrsync serve
+        
+        Now let's sync project-foo.bzr from alpha to beta:
+        
+          beta$ bzrsync sync ~/bzr/project-foo.bzr
+        
+        This will pull to `beta` all the branches from `~/bzr/project-foo.bzr/alpha/`
+        on `alpha`, and all the branches from `~/bzr/project-foo.bzr/gamma/`
+        on `gamma`.
+        In our case, only alpha has branches right now, so in practice we'll
+        get the branches `alpha/trunk` and `alpha/feature-1` from `alpha` to
+        `beta`, keeping them as `alpha/trunk` and `alpha/feature-1`.
+        
+        If you want to work on `beta`, now branch from the newly synchronized branches
+        to their counterparts inside the `beta/` subdirectory:
+        
+        ::
+        
+          beta$ bzr branch ~/bzr/project-foo.bzr/alpha/feature-1 ~/bzr/project-foo.bzr/beta/feature-1
+          beta$ bzr co ~/bzr/project-foo.bzr/beta/feature-1 foo-feature-1
+          beta$ cd foo-feature-1
+          ...
+          hack hack hack
+          ...
+          beta$ commit
+        
+        Now on `beta` we'll have:
+        
+        ::
+        
+          ~/bzr/project-foo.bzr/
+          ~/bzr/project-foo.bzr/alpha
+          ~/bzr/project-foo.bzr/alpha/trunk
+          ~/bzr/project-foo.bzr/alpha/feature-1
+          ~/bzr/project-foo.bzr/beta
+          ~/bzr/project-foo.bzr/beta/feature-1
+          ~/bzr/project-foo.bzr/gamma
+        
+        When you have finished working on beta, you can sync from alpha:
+        
+          alpha$ bzrsync sync ~/bzr/project-foo.bzr
+        
+        and this will create `beta/feature-1` on `alpha` too, which you can
+        pull onto `alpha/feature-1` if not diverged, or merge it otherwise,
+        and start working from `alpha` again.
+        
+        Please see the example `bzrsync.yaml` file for a more complete example, which
+        includes also branch sets.
+        
+        Help and Development
+        --------------------
+        
+        Alternatively, if you'd like to update the software occasionally to pick
+        up the latest bug fixes and enhancements before they make it into an
+        offical release, branch from the `Bazaar`_ repository hosted on `LaunchPad`_
+        instead.
+        Just follow the procedure outlined below:
+        
+        1. Make sure that you have `Bazaar`_ installed, and that you can run its
+           commands from a shell. (Enter ``bzr help`` at a shell prompt to test
+           this.)
+        
+        2. Create a local branch and working tree from the official one::
+        
+            bzr branch lp:bzrsync bzrsync
+        
+        3. Then from the ``bzrsync`` directory you can run the ``setup.py develop``
+           command to install the library in your Python `site-packages` directory
+           using a link, which allows to continue developing inside the working tree
+           without the need to re-install after every change. See the
+           `setuptools development mode`_ documention for more information::
+        
+            $ sudo
+            # python setup.py develop
+        
+        .. _`development home page`: https://launchpad.net/bzrsync
+        .. _`bugs`: https://bugs.launchpad.net/bzrsync
+        .. _`LaunchPad`: http://launchpad.net
+        .. _`Bazaar`: http://bazaar-vcs.org/
+        .. _`changes`: http://bazaar.launchpad.net/~softwarefabrica/bzrsync/trunk/changes
+        .. _`PYTHONPATH`: http://docs.python.org/tut/node8.html#SECTION008110000000000000000
+        .. _`junction`: http://www.microsoft.com/technet/sysinternals/FileAndDisk/Junction.mspx
+        .. _`setuptools development mode`: http://peak.telecommunity.com/DevCenter/setuptools#development-mode
+        
+        
+        LICENSE
+        -------
+        
+        This software is covered by the GNU General Public License version 2.
+        It is:
+        
+            Copyright (C) 2010-2011  Marco Pantaleoni. All rights reserved.
+        
+            This program is free software; you can redistribute it and/or modify
+            it under the terms of the GNU General Public License version 2 as
+            published by the Free Software Foundation.
+        
+            This program is distributed in the hope that it will be useful,
+            but WITHOUT ANY WARRANTY; without even the implied warranty of
+            MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+            GNU General Public License for more details.
+        
+            You should have received a copy of the GNU General Public License along
+            with this program; if not, write to the Free Software Foundation, Inc.,
+            51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+        
+Keywords: softwarefabrica bazaar bzr sync bzrsync synchronize synchronization repositories branches vcs version control
+Platform: UNKNOWN
+Classifier: Topic :: Software Development :: Version Control
+Classifier: Topic :: Software Development
+Classifier: Topic :: Utilities
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: GNU General Public License (GPL)
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 4 - Beta
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Environment :: Console

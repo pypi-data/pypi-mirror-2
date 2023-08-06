@@ -1,0 +1,492 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "/usr/share/sgml/xhtml/xhtml-1.0/DTD/xhtml1-transitional.dtd">
+<html><head>
+
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="description" content="Personal Pages of Etienne Posthumus">
+<meta name="keywords" content="Etienne Posthumus, Mnemosyne, Python Programmer, Amsterdam, Nederland, Afrikaans">
+<title>Super-simple RPC in CherryPy with JSON - Focus Pocus by Etienne Posthumus</title>
+<link rel="author" href="http://www.epoz.org/blog/entries/20060630.1/ep@epoz.org">
+<link rel="STYLESHEET" type="text/css" href="super-simple-rpc-in-cherrypy_files/main.css">
+<link rel="alternate" title="www.epoz.org RSS" href="http://www.epoz.org/blog/rss20.xml" type="application/rss+xml">
+</head><body>
+
+  <div id="banner">
+  <h2 style="margin: 0pt;">Focus Pocus</h2>
+  <div>Agnostic, Bibliophile, Biker, Dreamer, Expat, Aspirant Iconographer, Father,
+  Phlegmatist, Programmer, Pythonist, Sapiosexual, Rooibos Imbiber</div>
+  <h2 style="margin: 0.5em 0pt 0pt;">Super-simple RPC in CherryPy with JSON</h2>
+  </div>
+
+  <div id="content"> 
+  <div class="blogentry">
+    <h3>2006/06/30</h3>        
+       <p>I was recently hunting for some docs on how to handle POST requests in Cherrypy 2.2 yourself,
+in stead of having the CP machinery decoding the variables for you.</p>
+
+<p>“Why do you want to do this?” you may ask.</p>
+
+<p>Well, in my case, I wanted to do some simple RPC calls to my server, 
+but I wanted to do something even simpler than XMLRPC or JSONRPC.
+Specifically I didn’t want all my calls to be routed through a single 
+URL, and have the methodnames be dispatched based on some paramter in 
+the message payload. Rather I want to be able to do a POST on a URL 
+where the body of my request contains a JSON serialized data packet, 
+which is the paramters of my call. This is in spirit similar to those 
+other RPC-over-HTTP schemes, but simpler and more in the HTTP spirit 
+IMNHO.</p>
+
+<p>Calling it, you want to do something like:</p>
+
+<pre>import httplib, simplejson
+h = httplib.HTTPConnection('localhost:8080')
+z = {'a':123, 'b':456}
+h.request('POST', '/rpc', simplejson.dumps(z))
+r = h.getresponse()
+r.read()
+# But I have wrapped it up in a utility class, so you can also do:
+p = ssrpc.Proxy('localhost:8080')
+p.rpc(a=123, b=456)
+</pre>
+
+<p>I found some examples on the CherryPy Wiki at 
+http://www.cherrypy.org/wiki/FileUpload which started me on the way, and
+ looking at tutorial_09 in the CherryPy distribution also helped. Some 
+light reading of the source, and I came up with the following code for 
+doing the server-side in CherryPy 2.2:</p>
+
+<pre>import cherrypy
+import simplejson
+
+class StreamFilter(cherrypy.filters.basefilter.BaseFilter):
+    def before_request_body(self):
+        if cherrypy.request.path == '/rpc':
+            # if you don't check that it is a post method the server might lock up
+            # we also check to make sure something was submitted
+            if not 'Content-Length' in cherrypy.request.headerMap or \
+               (cherrypy.request.method != 'POST'):
+                raise cherrypy.HTTPRedirect('/')
+            else:
+                # Tell CherryPy not to parse the POST data itself for this URL
+                cherrypy.request.processRequestBody = False
+
+#
+class Root:
+    _cpFilterList = [StreamFilter()]
+    def index(self):
+        return """
+            
+            <p>Testing POST handling in body.</p>
+            """
+    index.exposed = True
+
+    def rpc(self):
+        dataLength = int(cherrypy.request.headers.get('Content-Length') or 0)
+        data = cherrypy.request.rfile.read(dataLength)
+
+        o = simplejson.loads(data)
+
+        return "You asked: %s" % o
+    rpc.exposed = True
+
+cherrypy.root = Root()
+cherrypy.server.start()
+</pre>
+
+<p>Hope these snippets help someone else looking to do the same thing.</p>
+
+     <h3>Last modified: 2006/06/30 10:12:13.648 GMT+2</h3>
+  </div>
+</div>
+
+  <div id="rightbar">
+<a style="display: block;" href="http://www.epoz.org/blog/rss20.xml">RSS feed</a>
+<a style="display: block;" href="http://www.epoz.org/blog/">Blog Home</a>
+<div style="margin-top: 1em;">
+<b>Weblog entries:</b><br>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070921.1/view">
+          A belly-laugh can SO brighten a gloomy day</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070718.1/view">
+          My Amazon Wish-List</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070619.1/view">
+          Do you have my dongle? (dingle-dangle)</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070617.2/view">
+          flickrapi.py using JSON</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070617.1/view">
+          Presentation Stress</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070613.1/view">
+          London Hackday - Folksonomies Reloaded</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070608.2/view">
+          My eerste Potgooi</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20070608.1/view">
+          Many dead fishes</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20060927.1/view">
+          Amazon Elastic Compute Cloud</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20060728.1/view">
+          Die kraaie gaap</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20060630.1/view">
+          Super-simple RPC in CherryPy with JSON</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20060621.1/view">
+          Recursive tree walk</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20060607.1/view">
+          A picnic in the park</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20051002.1/view">
+          Indisch Lexicon</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050810.2/view">
+          Flat tyre at speed on the bike</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050810.1/view">
+          Fun to watch the search terms roll by</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050805.2/view">
+          PUN Meeting 5</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050805.1/view">
+          Great Illustrator</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050726.1/view">
+          Delicacies from Belgium</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050721.1/view">
+          Afrikaans op Nederlandse TV advertensies</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050711.1/view">
+          Tsotsitaal</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050707.1/view">
+          London Blasts</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050620.1/view">
+          Roald Theunis Posthumus</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050608.1/view">
+          SA Blogs</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050603.1/view">
+          Starting UML</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050602.2/view">
+          Web-content stored in SQL databases considered bullshit</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050602.1/view">
+          PUN Meeting 4</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050530.1/view">
+          Hinke Screuders' Notes On Art</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050526.1/view">
+          'n Pierneef vernietig</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050524.1/view">
+          Why I love reading Tim Bray</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050519.3/view">
+          Back from Scotland</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050519.2/view">
+          Google as web-hosting company</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050519.1/view">
+          Yet another cold-call on my mobile</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050503.2/view">
+          Die lewe word ge-outsource</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050503.1/view">
+          The Power of Two</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050412.1/view">
+          Parent Teacher Conference</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050331.1/view">
+          PUN Meeting 3 and Pornography</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050328.2/view">
+          Stef Bos in Kleine Komedie</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050328.1/view">
+          What The Hack</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050322.1/view">
+          Sometimes spam is useful</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050321.2/view">
+          Giving back to Zope/Python</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050321.1/view">
+          So what have you produced today?</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050317.1/view">
+          Iconclass</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050314.1/view">
+          Pi Day 2005</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050310.1/view">
+          I don't like killing things</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050308.1/view">
+          Geslaagd!</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050304.1/view">
+          Polisiekoffie</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050302.2/view">
+          Heavy Snowfall</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050302.1/view">
+          Mixing Danish and Swedish</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050225.1/view">
+          Gates in Central park</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050215.1/view">
+          I love Python</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050214.1/view">
+          Python .setdefault on dict</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050209.2/view">
+          Sommer</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050209.1/view">
+          Blog Comments</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050206.1/view">
+          So how is Python on Solaris?</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050131.1/view">
+          Blogging in your sleep</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050125.3/view">
+          ADSL at work</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050125.2/view">
+          More IND mega-bucks paid: EUR 430</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050125.1/view">
+          XML-bickering in Python land</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050109.1/view">
+          The impossible necessity of running elections</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050105.1/view">
+          Self-pity</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050104.1/view">
+          Vanwaar Gehasi?</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20050103.1/view">
+          2005 hier kom ons</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041225.2/view">
+          amsterdam.nl webmasters</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041225.1/view">
+          meta shower</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041222.1/view">
+          2nd PUN meeting</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041216.2/view">
+          Office space</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041216.1/view">
+          It is 12 weeks now</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041214.1/view">
+          Losing the Past</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041212.1/view">
+          She is such a big girl suddenly</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041206.1/view">
+          Fluids</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041125.1/view">
+          ZA in Ukraine</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041124.1/view">
+          iBook therefore iAm</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041123.2/view">
+          Update on Van Gogh Murder</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041123.1/view">
+          PUN - Python Users Nederland</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041122.1/view">
+          Laibach Concert in Amsterdam</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041116.1/view">
+          Meta Bitten</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041110.2/view">
+          Google cheque</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041110.1/view">
+          ADSL at Kaya</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041107.2/view">
+          Anton got married</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041107.1/view">
+          Charmaine died</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041103.2/view">
+          Murder</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041103.1/view">
+          The Gross Test</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041029.1/view">
+          Image Index Prototype</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041026.1/view">
+          ILL WILL PRESS</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041021.1/view">
+          Sinusitis</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041015.1/view">
+          DNA as RFID alternative</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041013.1/view">
+          Sub-contracting note-to-self</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041009.2/view">
+          Flickr phot service</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041009.1/view">
+          On Spending Money</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20041001.1/view">
+          Listening to Mauritz Lotz</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040919.3/view">
+          Home-brew time-slice</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040919.2/view">
+          Windows Puter</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040919.1/view">
+          We need more challenges in computing</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040913.1/view">
+          First Party at Kaya</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040903.1/view">
+          RSI</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040829.2/view">
+          Excessive MSN bot vists</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040829.1/view">
+          Magic Music</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040824.1/view">
+          Games I own</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040811.1/view">
+          All cut up</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040803.1/view">
+          Python on Series 60 - my quest for a phone</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040729.1/view">
+          Plone Rocks!</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040722.1/view">
+          African Dope</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040719.1/view">
+          Back Home Again</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040705.1/view">
+          John Died</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040701.2/view">
+          June has gone - too</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040701.1/view">
+          Beer Tasting</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040630.1/view">
+          note from Elise</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040629.1/view">
+          Edinburgh and Blisters</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040622.2/view">
+          Shave and a Haircut</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040622.1/view">
+          Emblembooks</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040621.1/view">
+          Prune</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040618.1/view">
+          Classics</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040617.3/view">
+          Zope Tips</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040617.2/view">
+          Creating SSL certs</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040617.1/view">
+          Red Hot Chili Peppers</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040616.1/view">
+          In search of an IMAP server</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040615.1/view">
+          Vusi Mahlasela and Johnny Clegg</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040614.1/view">
+          Interactive Interpreter Rules</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040613.1/view">
+          Meta Dolly Moment</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040612.1/view">
+          Fluidiom at V2</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040609.1/view">
+          Back from EuroPython 2004</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040602.1/view">
+          May has gone- again</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040601.1/view">
+          Thunderstruck!</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040531.1/view">
+          Planted a chestnut tree</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040527.1/view">
+          Don't tell me URLs aren't important</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040526.1/view">
+          Server being sucked dry</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040523.2/view">
+          Semi-Live Google search term display</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040523.1/view">
+          Een wijze les in woord en beeld</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040522.2/view">
+          Logfile analysis</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040522.1/view">
+          Neck Stress</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040521.2/view">
+          Illness in the House</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040521.1/view">
+          Museum Vrolik</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040520.1/view">
+          Quixote Webmail</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040516.2/view">
+          Open Galerie in Lisse, and Poly dinner</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040516.1/view">
+          Another weekend has zoomed by</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040513.1/view">
+          Nederlander Worden</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040512.2/view">
+          Tips for the day</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040512.1/view">
+          elise's first appearance</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040511.3/view">
+          Apache &amp; Zope Config updated</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040511.2/view">
+          Allergic to vitamins</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040511.1/view">
+          Lust from The Economist</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040510.1/view">
+          Birfday 2004</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040508.2/view">
+          RSS Auto-Discovery</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040508.1/view">
+          Swept Away - thrown away</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040507.2/view">
+          OS X Battery Status from Command Line</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040507.1/view">
+          No worries? Not.</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040506.1/view">
+          Getting Sidetracked in the midnight hours</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040506.2/view">
+          Blog To-Do List</a>
+      <a style="display: block;" href="http://www.epoz.org/blog/entries/20040505.1/view">
+          First Post!</a>
+</div>
+</div>
+
+  <div id="googlejuice">
+     <p style="background-color: black; color: white; padding: 5px;">The following search terms were used in Google to find pages on this site recently:</p>
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=post%20json%20python">post json python</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=indexing%20with%20iconclass">indexing with iconclass</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=cherrypy%20handle%20xml%20post%20body">cherrypy handle xml post body</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=time%20slice%20picture%20at%20home">time slice picture at home</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=recursively%20walk%20a%20tree">recursively walk a tree</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=json%20interpreter%20cherrypy">json interpreter cherrypy</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=+kraaie%20gaap">+kraaie gaap</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=%22sore%20eyeballs%22%20after%20sinusitis">"sore eyeballs" after sinusitis</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=cherrypy%20post%20JSON%20data">cherrypy post JSON data</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=iconclass%20xml">iconclass xml</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=cherrypy%20+%20json">cherrypy + json</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=cherrypy%20json%20examples">cherrypy json examples</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=%22what%20have%20you%20produced%22">"what have you produced"</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=json%20rpc%20python%20cherrypy">json rpc python cherrypy</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=example%20using%20simplejson%20and%20urllib%20and%20cherrypy%20in%20a%20python%20program">example using simplejson and urllib and cherrypy in a python program</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=cherrypy%20httplib.HTTPConnection%20GET">cherrypy httplib.HTTPConnection GET</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=focus%20software%20dongle">focus software dongle</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=httplib%20POST%20request%20json%20example">httplib POST request json example</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=dojo%20cherrypy%20json">dojo cherrypy json</a>·
+      
+      
+         <a style="font-size: 80%;" href="http://www.google.com/search?q=api%20fluidiom">api fluidiom</a>·
+      
+  </div>
+
+  <div style="float: left; margin-left: 20px;">
+     <a href="http://www.spreadfirefox.com/?q=affiliates&amp;id=0&amp;t=80"><img class=" gpweotgmabmwhidjrqcn" alt="Get Firefox!" title="Get Firefox!" src="super-simple-rpc-in-cherrypy_files/rediscover.gif" border="0"></a>
+<script type="text/javascript">
+<!-- 
+
+flickr_badge_background_color = "";
+flickr_badge_border = "";
+flickr_badge_width = "120px";
+flickr_badge_text_font = "11px Arial, Helvetica, Sans serif";
+flickr_badge_image_border = "1px solid #000000";
+flickr_badge_link_color = "";
+
+//-->
+</script>
+<script type="text/javascript" src="super-simple-rpc-in-cherrypy_files/badge_code.html"></script>
+
+  </div> 
+</body></html>
