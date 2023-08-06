@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+<!-- signin.html -->
+{% load i18n %}
+{% load extra_tags %}
+{% load smart_if %}
+{% block title %}{% spaceless %}{% trans "User login" %}{% endspaceless %}{% endblock %}
+{% block forejs %}
+    <link rel="stylesheet" type="text/css" media="screen" href="{% media  "/jquery-openid/openid.css" %}"/>
+    <script type='text/javascript' src='{% media  "/js/jquery.validate.pack.js" %}'></script>
+    <script type="text/javascript" src="{% media  "/jquery-openid/jquery.openid.js" %}"></script>
+    <script type="text/javascript">
+        $(document).ready( function() { $("body").authenticator(); })
+            var extra_token_name = {};
+            var create_pw_text = {};
+            var change_pw_text = {};
+            var authUrl = '/{% trans "account/" %}';
+            var siteName = '{{settings.APP_SHORT_NAME}}';
+            var provider_count = {{existing_login_methods|length}};
+            {% for login_provider in major_login_providers %}
+                {% if login_provider.extra_token_name %}
+                    extra_token_name['{{login_provider.name}}'] = '{{login_provider.extra_token_name}}';
+                {% endif %}
+                {% if login_provider.type == 'password' %}
+                    create_pw_text['{{login_provider.name}}'] = '{{login_provider.create_password_prompt}}';
+                    change_pw_text['{{login_provider.name}}'] = '{{login_provider.change_password_prompt}}';
+                {% endif %}
+            {% endfor %}
+            {% for login_provider in minor_login_providers %}
+                {% if login_provider.extra_token_name %}
+                    extra_token_name['{{login_provider.name}}'] = '{{login_provider.extra_token_name}}';
+                {% endif %}
+                {% if login_provider.type == 'password' %}
+                    create_pw_text['{{login_provider.name}}'] = '{{login_provider.create_password_prompt}}';
+                    change_pw_text['{{login_provider.name}}'] = '{{login_provider.change_password_prompt}}';
+                {% endif %}
+            {% endfor %}
+            {% if user.is_authenticated %}
+                var userIsAuthenticated = true;
+            {% else %}
+                var userIsAuthenticated = false;
+            {% endif %}
+    </script>
+{% endblock %}
+{% block content %}
+<h1>{{page_title}}</h1>
+    {% if answer %}
+        <div class="message">
+        {% blocktrans with answer.question.title as title and answer.summary as summary %}
+        Your answer to {{title}} {{summary}} will be posted once you log in
+        {% endblocktrans %}
+        </div>
+    {% endif %}
+    {% if question %}
+        <div class="message">
+        {% blocktrans with question.title as title and question.summary as summary %}Your question 
+        {{title}} {{summary}} will be posted once you log in
+        {% endblocktrans %}
+        </div>
+    {% endif %}
+    <p id='login-intro'>
+    {% if view_subtype == 'default' %}
+        {% trans "Take a pick of your favorite service below to sign in using secure OpenID or similar technology. Your external service password always stays confidential and you don't have to rememeber or create another one." %}
+    {% endif %}
+    {% if view_subtype == 'add_openid' %}
+        {% if existing_login_methods %}
+            {% trans "It's a good idea to make sure that your existing login methods still work, or add a new one. Please click any of the icons below to check/change or add new login methods." %}
+        {% else %}
+            {% trans "Please add a more permanent login method by clicking one of the icons below, to avoid logging in via email each time." %}
+        {% endif %}
+    {% endif %}
+    {% if view_subtype == 'change_openid' %}
+        {% if existing_login_methods %}
+            {% trans "Click on one of the icons below to add a new login method or re-validate an existing one." %}
+        {% else %}
+            {% trans "You don't have a method to log in right now, please add one or more by clicking any of the icons below." %}
+        {% endif %}
+    {% endif %}
+    {% if view_subtype == 'email_sent' %}
+        {% trans "Please check your email and visit the enclosed link to re-connect to your account" %}
+    {% endif %}
+    </p>
+    {% if openid_error_message %}
+        <p class="warning">{{ openid_error_message }}</p>
+    {% endif %}
+    {% if view_subtype != 'email_sent' and view_subtype != 'bad_key' %}
+        <form id="signin-form" method="post" action="{% url user_signin %}">
+        {{login_form.login_provider_name}}
+        <div id="login-icons">
+            <ul class="login-icons large">
+                {% for login_provider in major_login_providers %}
+                <li>
+                    <input
+                        name="{{login_provider.name}}"
+                        type="image"
+                        class="{{login_provider.type}}"
+                        src="{% media login_provider.icon_media_path %}"
+                        alt="{{login_provider.tooltip_text}}"
+                        title="{{login_provider.tooltip_text}}"
+                    />
+                </li>
+                {% endfor %}
+            </ul>
+            <ul class="login-icons small">
+                {% for login_provider in minor_login_providers %}
+                <li>
+                    <input
+                        name="{{login_provider.name}}"
+                        type="image"
+                        class="{{login_provider.type}}"
+                        src="{% media login_provider.icon_media_path %}"
+                        alt="{{login_provider.tooltip_text}}"
+                        title="{{login_provider.tooltip_text}}"
+                    />
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {{ login_form.next }}
+        <fieldset 
+            id="openid-fs" 
+            {% if not login_form.openid_login_token.errors %}
+                style="display:none;"
+            {% endif %}
+        >
+            <h2 id="openid-heading">{% trans "Please enter your <span>user name</span>, then sign in" %}</h2>
+            <p class="hint">{% trans "(or select another login method above)" %}</p>
+            <input type="text" name="openid_login_token" />
+            <input class="submit-b" type="submit" name="openid_login_with_extra_token" value="{% trans "Sign in" %}"/>
+        </fieldset> 
+        {% if settings.RECAPTCHA_KEY and settings.RECAPTCHA_SECRET %}
+        <fieldset 
+            id="password-fs"
+            {% if user.is_anonymous %}
+                {% if not login_form.username.errors and not login_form.password_login_failed %}
+                    style="display:none;"
+                {% endif %}
+            {% else %}
+                {% if not login_form.new_password.errors and not login_form.new_password_retyped.errors %}
+                    style="display:none;"
+                {% endif %}
+            {% endif %}
+        >
+            {{login_form.password_action}}
+            {% if user.is_anonymous %}
+                <h2 id="password-heading">
+                    {% trans "Please enter your <span>user name and password</span>, then sign in" %}
+                </h2>
+                <p class="hint">{% trans "(or select another login method above)" %}</p>
+                {% if login_form.password_login_failed %}
+                    <p class="error">{% trans "Login failed, please try again" %}</p>
+                {% endif %}
+                <p>
+                    <label for="id_username">{% trans "Login name" %}</label>
+                    {{login_form.username}}
+                </p>
+                <p>
+                    <label for="id_password">{% trans "Password" %}</label>
+                    {{login_form.password}}
+                </p>
+                <p id="local_login_buttons">
+                    <input class="submit-b" name="login_with_password" type="submit" value="{% trans "Login" %}" />
+                    <a class="create-password-account" style="vertical-align:middle" href="{% url user_signup_with_password %}">{% trans "Create a password-protected account" %}</a>
+                </p>
+            {% else %}
+                <h2 id="password-heading">
+                    {% trans "To change your password - please enter the new one twice, then submit" %}
+                </h2>
+                <p>
+                    <label for="id_new_password">{% trans "New password" %}</label>
+                    {{login_form.new_password}}
+                    <span class="error">{{login_form.new_password.errors.0}}</span>
+                </p>
+                <p>
+                    <label for="id_new_password_retyped">{% trans "Please, retype" %}</label>
+                    {{login_form.new_password_retyped}}
+                    <span class="error">{{login_form.new_password_retyped.errors.0}}</span>
+                </p>
+                <p id="local_login_buttons">
+                    <input class="submit-b" name="change_password" type="submit" value="{% trans "Change password" %}" />
+                </p>
+            {% endif %}
+        </fieldset>
+        {% endif %}
+        </form>
+        {% if user.is_authenticated and existing_login_methods %}
+        <div 
+            id='existing-login-methods'
+            {% if login_form.password_change_failed %}
+                style="display:none";
+            {% endif %}
+        >
+            <h2 id='ab-show-login-methods'>
+                {% trans "Here are your current login methods" %}
+            </h2>
+            <table id='ab-existing-login-methods'>
+                <tr>
+                    <th>{% trans "provider" %}</th>
+                    <th>{% trans "last used" %}</th>
+                    <th>{% trans "delete, if you like" %}</th>
+                </tr>
+                {% for login_method in existing_login_methods %}
+                <tr class="ab-provider-row">
+                    <td class="ab-provider-name">
+                        {{login_method.provider_name}}
+                    </td>
+                    <td>
+                        {% if login_method.last_used_timestamp %}
+                            {% diff_date login_method.last_used_timestamp %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button>{% trans "delete" %}</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+    {% endif %}
+    {% if view_subtype != 'email_sent' or view_subtype == 'bad_key' %}
+        {% if user.is_anonymous %}
+        <form id="account-recovery-form" action="{% url user_account_recover %}" method="post">
+            {% if view_subtype != 'bad_key' %}
+                <h2 id='account-recovery-heading'>{% trans "Still have trouble signing in?" %}</h2>
+            {% endif %}
+            <p class="hint">
+                <span class="text">
+                {% if view_subtype == 'bad_key' %}
+                    {% trans "Please, enter your email address below and obtain a new key" %}
+                {% else %}
+                    {% trans "Please, enter your email address below to recover your account" %}
+                {% endif %}
+                </span>
+                <span style="display:none" class="link"> - <a href="#">{% trans "recover your account via email" %}</a></span>
+            </p>
+            <fieldset id='email-input-fs'>
+                {% if account_recovery_form.email.errors %}
+                <p class="error">{{account_recovery_form.email.errors.0}}</p>
+                {% endif %}
+                {{ account_recovery_form.email }}
+                <input
+                    class="submit-b"
+                    type="submit"
+                    {% if view_subtype == 'bad_key' %}
+                    value="{% trans "Send a new recovery key" %}"
+                    {% else %}
+                    value="{% trans "Recover your account via email" %}"
+                    {% endif %}
+                />
+            </fieldset>
+        </form>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block sidebar %}
+<div class="boxC">
+    <h3 class="subtitle">{% trans "Why use OpenID?" %}</h3>
+    <ul class="list-item">
+        <li>
+            {% trans "with openid it is easier" %}
+        </li>
+        <li>
+            {% trans "reuse openid" %}
+        </li>
+        <li>
+            {% trans "openid is widely adopted" %}
+        </li>
+        <li>
+            {% trans "openid is supported open standard" %}
+        </li>
+        
+    </ul>
+    <p class="info-box-follow-up-links">
+        <a href="http://openid.net/what/" target="_blank">{% trans "Find out more" %} »</a><br/>
+        <a href="http://openid.net/get/" target="_blank">{% trans "Get OpenID" %} »</a>
+    </p>
+</div>
+{% if settings.FACEBOOK_KEY and settings.FACEBOOK_SECRET %}
+<div id="fb-root"></div>
+<script src="http://connect.facebook.net/en_US/all.js"></script>
+<script>
+    $(document).ready(function(){
+        FB.init({appId: '{{settings.FACEBOOK_KEY}}', status: true, cookie: true, xfbml: true});
+        FB.Event.subscribe('auth.sessionChange', function(response){
+                if (response.session) {
+                // A user has logged in, and a new cookie has been saved
+                    $('#signin-form').submit();
+                } else {
+                // The user has logged out, and the cookie has been cleared
+                }
+        });
+    });
+</script>
+{% endif %}
+{% endblock%}
+<!-- end signin.html -->
