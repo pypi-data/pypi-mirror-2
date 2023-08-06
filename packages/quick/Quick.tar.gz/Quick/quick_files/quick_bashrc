@@ -1,0 +1,62 @@
+
+function __activate {
+if [ "$deactivate" != "" ]; then
+    deactivate;
+fi
+if [ -f ./bin/activate ]; then
+    source ./bin/activate
+fi
+if [ -f ./virtual/bin/activate ]; then
+    source ./virtual/bin/activate
+fi
+}
+
+function quick
+{
+case $1 in
+'')
+   WHERE=$(python $QUICK_HOME/quick_backend.py -w)
+   cd $(python $QUICK_HOME/quick_backend.py)
+   __activate
+   cd $WHERE
+   ;;
+'--add')
+  cd $QUICK_PROJECTS
+  ln -s $2
+  ;;
+'--create')
+  mkdir $QUICK_PROJECTS/$2
+  if [ $3 ]; then
+       virtualenv $QUICK_PROJECTS/$2 --python=$3
+   fi
+   ;;
+*)
+    cd $QUICK_PROJECTS/$1;
+    deactivate=`declare -f deactivate`;
+    __activate
+    ;;
+esac
+}
+
+_quick()
+{
+    local cur
+    COMPREPLY=()
+    #Variable to hold the current word
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    #Build a list of our keywords for auto-completion using
+    #the tags file
+    local tags=$(for t in `ls $QUICK_PROJECTS`; do echo ${t}; done)
+
+    #Generate possible matches and store them in the
+    #array variable COMPREPLY
+    COMPREPLY=($(compgen -W "${tags}" $cur))
+}
+
+complete -F _quick quick
+
+quick
+
+
+
