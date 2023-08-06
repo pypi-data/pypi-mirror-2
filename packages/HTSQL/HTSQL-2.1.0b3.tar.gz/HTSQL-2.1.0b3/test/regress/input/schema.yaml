@@ -1,0 +1,176 @@
+#
+# Copyright (c) 2006-2011, Prometheus Research, LLC
+# Authors: Clark C. Evans <cce@clarkevans.com>,
+#          Kirill Simonov <xi@resolvent.net>
+#
+
+title: The Regression Schema
+id: schema
+tests:
+
+- title: Tables
+  tests:
+  # Administrative Directory
+  - uri: /school
+  - uri: /department
+  - uri: /program
+  - uri: /course
+  # Instructor Directory
+  - uri: /instructor
+  - uri: /confidential
+  - uri: /appointment
+  # Class Directory
+  - uri: /semester
+  - uri: /class
+  # Enrollment Directory
+  - uri: /student
+  - uri: /enrollment
+  # Requirement Directory
+  - uri: /prerequisite
+  - uri: /classification
+  - uri: /course_classification
+  - uri: /program_requirement
+
+- title: Links
+  tests:
+  # FIXME: rewrite using locators once we have them.
+
+  # School -> Department
+  - uri: /(school?code='art').department
+  # School -> Program
+  - uri: /(school?code='art').program
+
+  # Department -> School (singular, optional)
+  - uri: /(department?code='ee').school
+  # Department -> Course
+  - uri: /(department?code='ee').course
+  # Department -> Appointment
+  - uri: /(department?code='ee').appointment
+
+  # Program -> School (parental)
+  - uri: /(program?school_code='eng'&code='umech').school
+  # Program -> Program (singular, self-referencial)
+  # FIXME: broken! Does not work as a link.
+  - uri: /(program?school_code='eng'&code='umech').part_of
+  # FIXME: should `program` generate an ambiguous name error?
+  - uri: /(program?school_code='eng'&code='umech').program
+  # FIXME: need a name for the link.
+  - uri: /(program?school_code='eng'&code='umech')
+          .({school_code,part_of} -> program{school_code,code})
+  # Program -> Program (reverse self-referential)
+  # FIXME: no name for a reverse self-referential link.
+  - uri: /(program?school_code='eng'&code='umech')
+          .({school_code,code} -> program{school_code,part_of})
+  # Program -> Student
+  - uri: /(program?school_code='eng'&code='umech').student
+  # Program -> Program Requirement
+  - uri: /(program?school_code='eng'&code='umech').program_requirement
+
+  # Course -> Department (parental)
+  - uri: /(course?department_code='psych'&no=610).department
+  # Course -> Class
+  - uri: /(course?department_code='psych'&no=610).class
+  # Course -> Prerequisite
+  # FIXME: cannot choose between on_course and of_course links.
+  - uri: /(course?department_code='psych'&no=610).prerequisite
+    expect: 400
+  # FIXME: need a name for the links.
+  # FIXME: not enough data in the table.
+  - uri: /(course?department_code='psych'&no=610)
+          .({department_code,no} -> prerequisite{on_department_code,on_course_no})
+  - uri: /(course?department_code='psych'&no=610)
+          .({department_code,no} -> prerequisite{of_department_code,of_course_no})
+  # Course -> Course Classification
+  - uri: /(course?department_code='psych'&no=610).course_classification
+
+  # Instructor -> Confidential (singular, optional)
+  - uri: /(instructor?code='kcavallaro').confidential
+  # Instructor -> Appointment
+  - uri: /(instructor?code='kcavallaro').appointment
+  # Instructor -> Class
+  - uri: /(instructor?code='kcavallaro').class
+
+  # Confidential -> Instructor
+  - uri: /(confidential?instructor_code='tobrien21').instructor
+
+  # Appointment -> Department (parental)
+  - uri: /(appointment?department_code='eng'
+                      &instructor_code='wyu112').department
+  # Appointment -> Instructor (parental)
+  - uri: /(appointment?department_code='eng'
+                      &instructor_code='wyu112').instructor
+
+  # Semester -> Class
+  - uri: /(semester?year=2010&season='fall').class
+
+  # Class -> Course (parental)
+  - uri: /(class?class_seq=10086).course
+  # Class -> Semester (parental)
+  - uri: /(class?class_seq=10086).semester
+  # Class -> Instructor (singular, optional)
+  - uri: /(class?class_seq=10086).instructor
+  # Class -> Enrollment
+  - uri: /(class?class_seq=10086).enrollment
+
+  # Student -> Program (singular, optional)
+  - uri: /(student?id=25371).program
+  # Student -> Enrollment
+  - uri: /(student?id=25371).enrollment
+
+  # Enrollment -> Student (parental)
+  - uri: /(enrollment?student_id=92039&class_seq=10071).student
+  # Enrollment -> Class (parental)
+  - uri: /(enrollment?student_id=92039&class_seq=10071).class
+
+  # Prerequisite -> Department (ambiguous)
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315).department
+    expect: 400
+  # Prerequisite -> Course (parental, using of_course)
+  # FIXME: not a link.
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315).of_course_no
+  # FIXME: need a name.
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315)
+          .({of_department_code,of_course_no} -> course{department_code,no})
+  # Prerequisite -> Course (parental, using on_course)
+  # FIXME: not a link.
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315).on_course_no
+  # FIXME: need a name.
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315)
+          .({on_department_code,on_course_no} -> course{department_code,no})
+  # Prerequisite -> Course (ambiguous)
+  - uri: /(prerequisite?of_department_code='capmrk'&of_course_no=818
+                       &on_department_code='acc'&on_course_no=315).course
+    expect: 400
+
+  # Classification -> Classification (singular, self-referencial)
+  - uri: /(classification?code='modlanguage').part_of
+  # FIXME: shouldn't this generate an ambiguous name error?
+  - uri: /(classification?code='modlanguage').classification
+  # Classification -> Classification (reverse self-referential)
+  # FIXME: need an explicit name.
+  - uri: /(classification?code='modlanguage')
+          .(code -> classification{part_of})
+  # Classification -> Course Classification
+  - uri: /(classification?code='modlanguage').course_classification
+  # Classification -> Program Requirement
+  - uri: /(classification?code='modlanguage').program_requirement
+
+  # Course Classification -> Course (parental)
+  - uri: /(course_classification?department_code='be'&course_no=112
+                                &classification_code='begeneral').course
+  # Course Classification -> Classification (parental)
+  - uri: /(course_classification?department_code='be'&course_no=112
+                                &classification_code='begeneral').classification
+
+  # Program Requirement -> Program (parental)
+  - uri: /(program_requirement?school_code='bus'&program_code='uacct'
+                              &classification_code='accounting').program
+  # Program Requirement -> Classification (parental)
+  - uri: /(program_requirement?school_code='bus'&program_code='uacct'
+                              &classification_code='accounting').classification
+
