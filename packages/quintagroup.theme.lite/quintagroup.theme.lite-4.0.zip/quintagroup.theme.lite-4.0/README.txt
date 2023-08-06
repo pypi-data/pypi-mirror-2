@@ -1,0 +1,4 @@
+Lite Plone Theme
+================
+
+Check the README.txt inside of the package.
