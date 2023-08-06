@@ -1,0 +1,129 @@
+=========================
+django-vkontakte-merchant
+=========================
+
+django-vkontakte-merchant - приложение для интеграции платежной системы
+ВКонтакте (Merchant API) в проекты на Django.
+
+Для исползования следует ознакомиться с официальной документацией
+по Merchant API (http://vkontakte.ru/developers.php?id=-1_12904887&s=1).
+
+
+Установка
+=========
+
+::
+
+    $ pip install -U django-vkontakte-merchant vkontakte
+
+Потом следует добавить 'merchant_api' в INSTALLED_APPS и выполнить ::
+
+    $ python manage.py syncdb
+
+или, если используется South, ::
+
+    $ python manage.py migrate
+
+
+Настройка
+=========
+
+В settings.py нужно указать следующие настройки:
+
+* MERCHANT_API_SHOP_ID - id магазина
+* MERCHANT_API_SHOP_SECRET_KEY - секретный ключ магазина
+* MERCHANT_API_ORDER_FORMS - (не обязательно) модуль с формой для
+  обработки заказа
+
+
+Использование
+=============
+
+Написание логики обработки заказа
+---------------------------------
+
+django-vkontakte-merchant не берет на себя ответственность за логику
+обработки заказа, т.к. эта логика может отличаться от сайта к сайту.
+Вместо этого можно реализовать любую логику, предоставив свою форму
+обработки уведомлений (унаследовав ее от базовой, в которой уже выполнена
+основная работа по проверке данных).
+
+Для того, чтобы изменить логику обработки данных, следует указать модуль с
+формой обработки заказа в settings.py::
+
+    # settings.py
+    MERCHANT_API_ORDER_FORMS = 'orders.forms'
+
+В модуле orders.forms должна быть форма с названием OrderForm. Ее удобно
+унаследовать от merchant_api.forms.OrderForm. Пример::
+
+    # coding: utf-8
+    # my_project/orders/forms.py
+
+    from django import forms
+    from merchant_api.forms import OrderForm as MerchantOrderForm
+    from goods.models import Product, Purchase
+
+    class OrderForm(MerchantOrderForm):
+
+        def clean_currency(self):
+            # например, магазин поддерживает только рубли
+            currency = self.cleaned_data['currency']
+            if currency != '643':
+                raise forms.ValidationError('Currencies other than RUR are not supported')
+            return currency
+
+        def clean_notification_type(self):
+            # простой магазин, обрабатываем только уведомления
+            # типа "Изменение статуса заказа"
+            tp = self.cleaned_data['notification_type']
+            if not tp.startswith('order-state-change'):
+                raise forms.ValidationError('This notification type is not supported.')
+            return tp
+
+        def clean_item(self, item):
+            # переопределяйте этот метод, чтобы проверить, что заказаны
+            # правильные позиции по нужной цене
+            try:
+                product = Product.objects.get(pk = item['item_id'])
+                if product.price != int(item['price']):
+                    raise forms.ValidationError("Price is invalid", 22)
+                if not product.have_enough(int(item['quantity'])):
+                    raise forms.ValidationError("Can't buy so many", 24)
+            except Product.DoesNotExist:
+                raise forms.ValidationError("Invalid product id.")
+
+        def save(self, *args, **kwargs):
+            # тут можно выполнить любые доп. действия по обработке заказа
+            vk_order = super(OrderForm, self).save(*args, **kwargs)
+            for item in vk_order.items.all():
+                for x in range(0, item.quantity):
+                    Purchase.objects.create(
+                        product_id = item.item_id,
+                        order = vk_order,
+                        user = vk_order.django_user
+                    )
+            return vk_order
+
+
+urls.py
+-------
+
+Для приема платежей следует подключить merchant_api.urls::
+
+    urlpatterns = patterns('',
+        #...
+        url(r'^merchant/', include('merchant_api.urls')),
+        #...
+    )
+
+После этого следует указать адрес обратного вызова в настройках магазина
+(``http://<домен>/merchant/callback`` в данном примере).
+
+
+Клиентская часть
+----------------
+
+Инструкцию по написанию клиентской части можно найти в официальной
+документации по Merchant API
+( http://vkontakte.ru/developers.php?id=-1_12904887&s=1 )
