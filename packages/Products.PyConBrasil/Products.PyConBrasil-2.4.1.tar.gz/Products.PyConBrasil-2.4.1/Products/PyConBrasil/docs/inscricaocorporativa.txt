@@ -1,0 +1,69 @@
+Fluxo de uma inscricao corporativa (grupo)
+============================================
+
+Ajustando
+-----------
+
+Abrimos as inscricoes::
+
+  >>> self.abreInscricoes()
+
+Criamos um novo objeto browser::
+
+  >>> from Products.Five.testbrowser import Browser
+  >>> browser = Browser()
+  >>> browser.handleErrors = False
+
+Usuário anônimo acessa o site
+-------------------------------
+
+Acessamos a raiz do portal, e verificamos se o evento de 2042 está lá::
+  
+    >>> browser.open(self.portal.absolute_url())
+    >>> '2042' in browser.contents
+    True
+
+Acessamos a pasta do evento::
+
+    >>> browser.open('%s/2042' % self.portal.absolute_url())
+    >>> 'inscricoes' in browser.contents
+    True
+
+Vamos criar uma nova inscrição corporativa com o usuário anônimo::
+
+    >>> browser.getLink('Inscricoes').click()
+    >>> browser.url
+    'http://nohost/plone/2042/inscricoes'
+    >>> browser.getLink(id='nova-inscricao-corporativa').click()
+    >>> 'portal_factory/Inscricao' in browser.url
+    True
+
+Preencheremos o formulário::
+
+    >>> browser.getControl('Razão Social').value = 'Associação Python Brasil'
+    >>> browser.getControl('E-Mail').value = 'contato@apyb.org.br'
+    >>> browser.getControl('Telefone').value = '+555492334567'
+    >>> browser.getControl('Endereço').value = 'R. das Flores 132'
+    >>> browser.getControl('CEP').value = '90535-033'
+    >>> browser.getControl('Cidade').value = 'Garibaldi'
+    >>> browser.getControl('Rio Grande do Sul').selected = True
+    >>> browser.getControl('Empresa / Organização').selected = True
+    >>> browser.getControl('Enviar').click()
+
+Fizemos quase tudo certo, faltava apenas os nomes de participantes::
+
+    >>> 'fieldErrorBox' in browser.contents
+    True
+    >>> browser.mech_browser.select_form(name='edit_form')
+    >>> form = browser.mech_browser.form
+    >>> form.new_control('text','participantes.nome:records',{'value':'Dorneles Tremea'})
+    >>> form.new_control('text','participantes.email:records',{'value':'deo@apyb.org.br'})
+    >>> form.new_control('text','participantes.sexo:records',{'value':'M'})
+    >>> form.new_control('text','participantes.camiseta:records',{'value':'M'})
+    >>> form.fixup()
+    >>> browser.getControl('Enviar').click()
+
+Agora sim, temos um novo participante::
+
+    >>> 'Esta inscri&ccedil;&atilde;o ainda n&atilde;o est&aacute; paga' in browser.contents
+    True
