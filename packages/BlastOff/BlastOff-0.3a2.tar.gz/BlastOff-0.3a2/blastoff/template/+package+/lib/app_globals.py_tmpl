@@ -1,0 +1,66 @@
+"""The application's Globals object"""
+
+{{if rum_admin}}
+from pylons import config
+from paste.deploy.converters import asbool
+from rum import RumApp
+
+from {{package}}.model import meta
+{{endif}}
+
+class Globals(object):
+
+    """Globals acts as a container for objects available throughout the
+    life of the application
+
+    """
+
+    def __init__(self):
+        """One instance of Globals is created during application
+        initialization and is available during requests via the
+        'app_globals' variable
+
+        """
+{{if rum_admin}}
+        # Database Admin Interface (RUM) at /admin
+        # The check for "admin.enable" config is performed in multiple
+        #   places for paranoid security.
+        if asbool(config.get('admin.enable', False)):
+            self.admin_app = self._make_admin_app()
+
+    def _make_admin_app(self):
+        # Path to where you are keeping rum-specific templates.
+        # You can imit this if you're not overriding them.
+        # search_path = [os.path.join(
+        #     config['paths']['templates'][0],
+        #     'admin'
+        #     )]
+        
+        app = RumApp({
+            'debug': asbool(config.get('debug')),
+            'full_stack': True,
+            'rum.repositoryfactory': {
+                'use': 'sqlalchemy',
+                'session_factory': meta.Session,
+                'models': [
+                    # list the model classes you want Rum to handle here
+                    '{{package}}.model:User',
+{{if email_confirmation}}
+                    '{{package}}.model:UserActivation',
+{{endif}}
+                ]
+            },
+            'rum.viewfactory': {
+                'use': 'toscawidgets',
+            },
+            'rum.translator': {
+                'use': 'default',
+                # 'locales': ['es', 'en'],
+                'locales': ['en'],
+            },
+            # 'templating': {
+            #     'search_path': search_path,
+            # }
+        })
+        return app
+{{endif}}
