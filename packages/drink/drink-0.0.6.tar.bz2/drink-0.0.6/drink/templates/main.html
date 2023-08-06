@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr" lang="fr">
+    <head>
+        <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+        <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <!-- Cascading Style Sheets -->
+        <link href="/static/page.css" rel="stylesheet" type="text/css" />
+        <link href="/static/pygments.css" rel="stylesheet" type="text/css" />
+        {% if css %}
+        {% for url in css %}
+        <link href="{{url}}" rel="stylesheet" type="text/css" />
+        {% endfor %}
+        {% endif %}
+        <!-- Javascript -->
+        <script type="text/javascript" src="/static/jquery-1.5.min.js"></script>
+        <script type="text/javascript" src="/static/jquery-ui-1.8.custom.min.js"></script>
+        <script type="text/javascript" src="/static/jquery.validate.min.js"></script>
+        <script type="text/javascript" src="/static/main.js"></script>
+        {% if js %}
+            {% for url in js %}
+            <script type="text/javascript" src="{{url}}"></script>
+            {% endfor %}
+        {% endif %}
+
+        {% block head %}
+        <title>Drink!</title>
+        {% endblock %}
+
+    <body>
+    </head>
+
+    {% if not authenticated and obj.id == '.' and obj.rootpath == '/' %}
+    <form id="login_form" class="autovalidate" action="/login" method="POST">
+        <label for="ilogin">Authenticate as:</label>
+        <input type="text" class="required" name="login_name" id="ilogin" />
+        <label for="ipasswd">Password:</label>
+        <input type="password" class="required" name="login_password" id="ipassword" />
+        <input class="submit" type="submit" value="Log in!"/>
+    </form>
+    {% elif not no_admin and authenticated %}
+    <fieldset class="toggler" id="commands">
+        <legend onclick="$('.togglable').slideToggle('slow');">{{authenticated.id}}</legend>
+        <div class="togglable" >
+        <a title="Account settings" href="/users/{{authenticated.id}}/edit"><img width="42px" src="/static/mime/user.png" /></a>
+        <a title="log out" href="/logout"><img src="/static/img/exit.png" /></a>
+        <a title="Search" href="/search/"><img src="/static/img/search.png" /></a>
+        {% if obj.id != '.' %}
+            <a title="Back to parent element" href="{{obj.path}}../"><img src="/static/img/back.png" /></a>
+        {% endif %}
+        {% if obj.id != '.' and 'w' in authenticated.access(obj) %}
+            <a title="Edit current element" href="{{obj.path}}edit"><img src="/static/img/edit.png" /></a>
+            {% if classes and 'a' in authenticated.access(obj) %}
+            <form id="add_form" class="autovalidate" action="add" method="get">
+                <label for="selected_class"><img src="/static/img/add.png" /></label>
+                <select id="selected_class" class="required" name="class" size="0">
+                {% for k in classes.iterkeys() %}
+                    <option value="{{k}}" label="{{k}}">{{k}}</option>
+                {% endfor %}
+                </select>
+                <label for="obj_name">as</label>
+                <input id="obj_name" type="text" name="name" class="required identifier" minlength="2" />
+                <input class="submit" type="submit" value="Create!"/>
+            </form>
+            {% endif %}
+            {% if obj and 'a' in authenticated.access(obj) %}
+            <form id="rm_form" action="rm" class="autovalidate" method="get" enctype="text/plain">
+                <label for="selected_rm_key"><img id="rm_form_image" class="droppable" src="/static/img/delete.png" /></label>
+                <select id="selected_rm_key" name="name" size="0" class="required">
+                    <option value="" label="-nothing-"></option>
+                {% for k in obj.iterkeys() %}
+                    {% if authenticated.access(obj[k]) %}
+                    <option value="{{k}}" label="{{k}}">{{k}}</option>
+                    {% endif %}
+                {% endfor %}
+                </select>
+                <input class="submit" type="submit" value="Delete!"/>
+            </form>
+
+            <form id="edit_form" class="autovalidate" action="edit" method="get" enctype="text/plain">
+                <label for="selected_edit_key"><img src="/static/img/edit.png" /></label>
+                <select id="selected_edit_key" size="0" class="required">
+                    <option value="" label="-none-"></option>
+                {% for k in obj.iterkeys() %}
+                    {% if authenticated.access(obj[k]) %}
+                    <option value="{{k}}" label="{{k}}">{{k}}</option>
+                    {% endif %}
+                {% endfor %}
+                </select>
+                <input class="submit" type="submit" value="Go!!"/>
+            </form>
+            {% endif %}
+            </div>
+        {% endif %}
+    </fieldset>
+    {% endif %}
+    {% block body %}
+        {% if html %}
+            {{ html|safe }}
+        {% else %}
+            Please, add some body block or html content...
+        {% endif %}
+    {% endblock %}
+    </body>
+</html>
