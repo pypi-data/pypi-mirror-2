@@ -1,0 +1,92 @@
+Introduction
+============
+
+This is a book reading UI application for items that have been deposited in a 
+DSpace repository that has the OAI-PMH repository views enabled.
+
+Using the bookreader
+====================
+
+Installation
+------------
+
+Package
+_______
+
+Install the ``bookreader`` Python package by doing one of the following:
+
+- Adding it to your list of eggs in buildout.cfg and running ``bin/buildout``
+- Use ``easy_install bookreader`` to install it globally
+- Download the source code, unpack it and run ``python setup.py install``
+
+Django
+______
+
+In your project's settings.py, add ``bookreader`` to the list of ``INSTALLED_APPS`` 
+and run ``manage.py syncdb`` to add the tables to the database. Then include 
+``bookreader.urls`` in your url patterns. Last, you will need to add the base 
+URL for your Djatoka server in your settings file as ``DJATOKA_BASE_URL``.
+
+Administration
+--------------
+
+The bookreader uses the Django admin interface for the manipulation of the data.
+First, you must add a *Repository*. The only input required is the OAI-PMH server
+url of your DSpace repository. Using that url, Django will connect to the server
+and query for its name. Then collections can be added by DSpace handle. Once a 
+handle is entered, Django will query the server to validate that it is a valid 
+handle and query for the name of the collection. At this point, it will also query
+for all books (items) in the collection and harvest the metadata and pages for 
+those books. This automatic behavior can be disabled by setting 
+``BOOKREADER_SIGNALS_ENABLED`` to False in your settings.
+
+
+DSpace Requirements
+===================
+
+Item and Bitstream Layout
+-------------------------
+
+For the use case of this Django UI, books are DSpace items and pages are 
+bitstreams attached to those book items. The page bitstreams must be JPEG2000 
+files in the 'ORIGINAL' or main content bundle. Thumbnails can be provided for 
+each page by adding a jpeg file in a 'THUMBNAILS' bundle that has the same base 
+filename as the original page bitstream. For example, if the page bitstream 
+filename is ``tamu_pl_0001.jpf`` then the thumbnail must end with ``tamu_pl_0001.jpg``.
+In this case ``thumbs/tamu_pl_0001.jpg`` would also be acceptable.
+
+OAI-PMH Repository
+------------------
+
+In order for the data be harvested, the DSpace OAI-PMH server must have the 
+``ORE`` and ``DIM`` metadata prefixes enabled and compatible crosswalks installed
+for the books.
+
+Metadata Fields
+---------------
+
+DIM data
+________
+
+The DIM metadata prefix is used to gather the book (item) metadata. The fields 
+are harvested using the `pyoai <http://pypi.python.org/pypi/pyoai>`_ ``MetadataReader``
+that is extended in the Python `dspace <http://pypi.python.org/pypi/dspace>`_ 
+library, ``NestedMetadataReader``. XPath evaluators are used to map xml elements
+to fields. For the current mapping, see ``bookreader.harvesting.metadata.dim_reader``.
+
+ORE data
+________
+
+The ORE metadata prefix is used to gather the page and link (bitstream) metadata.
+The bitstream URL, title, and bundle are all gathered from the ORE xml document.
+
+Canonical Items
+===============
+
+Starting with version 0.3, a new canonical items requirement was added. The 
+list of bitstreams is checked for an additional bitstream in the 'METADATA' 
+bundle that is named ``bitstream_metadata.xml``. This file is then parsed for 
+a repository url of a canonical version of the book as well as additional 
+metadata about the page bitstreams so that missing pages can be marked for 
+future reference/use. See the schema at ``docs/bitstream_metadata.xsd`` for more 
+reference on the format. 
