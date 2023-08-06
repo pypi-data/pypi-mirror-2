@@ -1,0 +1,431 @@
+=========
+ChangeDoc
+=========
+
+Let's test the CHANGES.txt file handler which is able to update our version
+and release text::
+
+  >>> import os
+  >>> import shutil
+  >>> import tempfile
+  >>> from pprint import pprint
+  >>> import p01.releaser
+  >>> import p01.releaser.base
+
+  >>> import re
+  >>> line = "0.5.0 (unreleased)"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match.group('version')
+  '0.5.0'
+  >>> match.group('date')
+  'unreleased'
+
+  >>> line = "0.5.0 (2011.12.12)"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match.group('version')
+  '0.5.0'
+  >>> match.group('date')
+  '2011.12.12'
+
+  >>> line = "0.5.0 (2011-12-12)"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match.group('version')
+  '0.5.0'
+  >>> match.group('date')
+  '2011-12-12'
+
+  >>> line = "0.5.0 window.open('')"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match is None
+  True
+
+  >>> line = "0.5.0 window.open(unreleased)"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match is None
+  True
+
+  >>> line = "0.5.0 unreleased"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match is None
+  True
+
+  >>> line = "1.2 (more)"
+  >>> match = p01.releaser.base.RE_VERSION.search(line)
+  >>> match is None
+  True
+
+
+  >>> content = """=======
+  ... CHANGES
+  ... =======
+  ... 
+  ... 0.5.1 (unreleased)
+  ... ------------------
+  ... 
+  ... - ...
+  ... 
+  ... 0.5.0 (2011-08-19)
+  ... ------------------
+  ... 
+  ... - initial release
+  ... 
+  ... """
+
+  >>> tmpDir = tempfile.mkdtemp()
+  >>> path = os.path.join(tmpDir, 'CHANGES.txt')
+  >>> f = open(path, 'wb')
+  >>> f.write(content)
+  >>> f.close()
+
+  >>> doc = p01.releaser.base.ChangeDoc(path)
+  >>> doc
+  <p01.releaser.base.ChangeDoc object at ...>
+
+As you can see we extracted the content to lines:
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': 'unreleased', 'line': 4, 'type': 'headline', 'version': '0.5.1'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- ...', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 9, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 10, 'text': '------------------', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '- initial release', 'type': 'text'},
+   {'line': 13, 'text': '', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'}]
+
+
+setVersion
+----------
+
+Now let's add a new version:
+
+  >>> doc.setVersion('0.6.0', 'more comments\nand another line')
+  True
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 4, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- more comments', 'type': 'text'},
+   {'line': 8, 'text': '  and another line', 'type': 'text'},
+   {'line': 9, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 10, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 11, 'text': '------------------', 'type': 'text'},
+   {'line': 12, 'text': '', 'type': 'text'},
+   {'line': 13, 'text': '- initial release', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'},
+   {'line': 15, 'text': '', 'type': 'text'}]
+
+
+getVersionText
+--------------
+
+This method is able to get the text for a given version:
+
+  >>> doc.getVersionText('unknown')
+  ''
+
+  >>> doc.getVersionText('0.6.0')
+  '- more comments\n  and another line'
+
+  >>> print doc.getVersionText('0.6.0')
+  - more comments
+    and another line
+
+Now, let's tore the file and check the content:
+
+  >>> doc.save()
+  >>> f = open(path, 'rb')
+  >>> res = f.read()
+  >>> f.close()
+  >>> print res
+  =======
+  CHANGES
+  =======
+  <BLANKLINE>
+  0.6.0 (...-...-...)
+  ------------------
+  <BLANKLINE>
+  - more comments
+    and another line
+  <BLANKLINE>
+  0.5.0 (2011-08-19)
+  ------------------
+  <BLANKLINE>
+  - initial release
+  <BLANKLINE>
+
+
+Let's the the revert method and check if the lst version get reverted to an
+empty text marker:
+
+  >>> doc.revert()
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 4, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- ...', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 9, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 10, 'text': '------------------', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '- initial release', 'type': 'text'},
+   {'line': 13, 'text': '', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'}]
+
+Now, set version text and check again:
+
+  >>> doc.setVersion('0.6.0', 'new release text')
+  True
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 4, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- new release text', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 9, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 10, 'text': '------------------', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '- initial release', 'type': 'text'},
+   {'line': 13, 'text': '', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'}]
+
+Remove the SAMPLE.txt file:
+
+  >>> os.remove(path)
+
+
+Prepend version text
+--------------------
+
+Check if we can add prepend version text if some text already exist:
+
+  >>> content = """=======
+  ... CHANGES
+  ... =======
+  ... 
+  ... 0.5.1 (unreleased)
+  ... ------------------
+  ... 
+  ... - fix performance test
+  ... 
+  ... 
+  ... 0.5.0 (2011-08-19)
+  ... ------------------
+  ... 
+  ... - initial release
+  ... 
+  ... """
+
+  >>> tmpDir = tempfile.mkdtemp()
+  >>> path = os.path.join(tmpDir, 'CHANGES.txt')
+  >>> f = open(path, 'wb')
+  >>> f.write(content)
+  >>> f.close()
+
+  >>> doc = p01.releaser.base.ChangeDoc(path)
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': 'unreleased', 'line': 4, 'type': 'headline', 'version': '0.5.1'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- fix performance test', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'line': 9, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 10, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 11, 'text': '------------------', 'type': 'text'},
+   {'line': 12, 'text': '', 'type': 'text'},
+   {'line': 13, 'text': '- initial release', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'},
+   {'line': 15, 'text': '', 'type': 'text'}]
+
+Let's check if we can get the getVersionText for `unreleased` version marker:
+
+  >>> doc.getVersionText('unreleased')
+  '- fix performance test'
+
+Now, let's test if we could prepend version text to the existing text:
+
+  >>> doc.setVersion('0.6.0', 'more comments\nand another line')
+  True
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 4, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- more comments', 'type': 'text'},
+   {'line': 8, 'text': '  and another line', 'type': 'text'},
+   {'line': 9, 'text': '', 'type': 'text'},
+   {'line': 10, 'text': '- fix performance test', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 13, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 14, 'text': '------------------', 'type': 'text'},
+   {'line': 15, 'text': '', 'type': 'text'},
+   {'line': 16, 'text': '- initial release', 'type': 'text'},
+   {'line': 17, 'text': '', 'type': 'text'},
+   {'line': 18, 'text': '', 'type': 'text'}]
+
+  >>> doc.setVersion('0.6.0', 'and a last line')
+  True
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 4, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- and a last line', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'line': 9, 'text': '- more comments', 'type': 'text'},
+   {'line': 10, 'text': '  and another line', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '- fix performance test', 'type': 'text'},
+   {'line': 13, 'text': '', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 15, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 16, 'text': '------------------', 'type': 'text'},
+   {'line': 17, 'text': '', 'type': 'text'},
+   {'line': 18, 'text': '- initial release', 'type': 'text'},
+   {'line': 19, 'text': '', 'type': 'text'},
+   {'line': 20, 'text': '', 'type': 'text'}]
+
+back2Dev
+--------
+
+Now let's add the next version and a dev marker with (unreleased) as data:
+
+  >>> doc.back2Dev()
+  True
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': 'unreleased', 'line': 4, 'type': 'headline', 'version': '0.6.1'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- ...', 'type': 'text'},
+   {'line': 8, 'text': '', 'type': 'text'},
+   {'date': '...-...-...', 'line': 9, 'type': 'headline', 'version': '0.6.0'},
+   {'line': 10, 'text': '------------------', 'type': 'text'},
+   {'line': 11, 'text': '', 'type': 'text'},
+   {'line': 12, 'text': '- and a last line', 'type': 'text'},
+   {'line': 13, 'text': '', 'type': 'text'},
+   {'line': 14, 'text': '- more comments', 'type': 'text'},
+   {'line': 15, 'text': '  and another line', 'type': 'text'},
+   {'line': 16, 'text': '', 'type': 'text'},
+   {'line': 17, 'text': '- fix performance test', 'type': 'text'},
+   {'line': 18, 'text': '', 'type': 'text'},
+   {'line': 19, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 20, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 21, 'text': '------------------', 'type': 'text'},
+   {'line': 22, 'text': '', 'type': 'text'},
+   {'line': 23, 'text': '- initial release', 'type': 'text'},
+   {'line': 24, 'text': '', 'type': 'text'},
+   {'line': 25, 'text': '', 'type': 'text'}]
+
+Remove the SAMPLE.txt file:
+
+  >>> os.remove(path)
+
+
+multiline
+---------
+
+  >>> content = """=======
+  ... CHANGES
+  ... =======
+  ... 
+  ... 0.5.1 (unreleased)
+  ... ------------------
+  ... 
+  ... - text and more
+  ...   and more lines
+  ... 
+  ... 0.5.0 (2011-08-19)
+  ... ------------------
+  ... 
+  ... - initial release
+  ... 
+  ... """
+
+  >>> tmpDir = tempfile.mkdtemp()
+  >>> path = os.path.join(tmpDir, 'CHANGES.txt')
+  >>> f = open(path, 'wb')
+  >>> f.write(content)
+  >>> f.close()
+
+  >>> doc = p01.releaser.base.ChangeDoc(path)
+
+As you can see we extracted the content to lines:
+
+  >>> pprint(doc.lines)
+  [{'line': 0, 'text': '=======', 'type': 'text'},
+   {'line': 1, 'text': 'CHANGES', 'type': 'text'},
+   {'line': 2, 'text': '=======', 'type': 'text'},
+   {'line': 3, 'text': '', 'type': 'text'},
+   {'date': 'unreleased', 'line': 4, 'type': 'headline', 'version': '0.5.1'},
+   {'line': 5, 'text': '------------------', 'type': 'text'},
+   {'line': 6, 'text': '', 'type': 'text'},
+   {'line': 7, 'text': '- text and more', 'type': 'text'},
+   {'line': 8, 'text': '  and more lines', 'type': 'text'},
+   {'line': 9, 'text': '', 'type': 'text'},
+   {'date': '2011-08-19', 'line': 10, 'type': 'headline', 'version': '0.5.0'},
+   {'line': 11, 'text': '------------------', 'type': 'text'},
+   {'line': 12, 'text': '', 'type': 'text'},
+   {'line': 13, 'text': '- initial release', 'type': 'text'},
+   {'line': 14, 'text': '', 'type': 'text'},
+   {'line': 15, 'text': '', 'type': 'text'}]
+
+  >>> doc.getVersionText('unreleased')
+  '- text and more\n  and more lines'
+
+  >>> doc.setVersion('0.5.1')
+  True
+
+  >>> doc.getVersionText('0.5.1')
+  '- text and more\n  and more lines'
+
+
+tear down
+---------
+
+Remove the temp SAMPLE.txt file:
+
+  >>> os.remove(path)
+
+And cleanup our tmp directory:
+
+  >>> shutil.rmtree(tmpDir)
