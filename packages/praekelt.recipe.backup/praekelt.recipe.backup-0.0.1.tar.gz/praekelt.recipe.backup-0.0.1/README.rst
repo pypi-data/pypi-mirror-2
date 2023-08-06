@@ -1,0 +1,87 @@
+praekelt.recipe.backup
+======================
+**Filesystem and database backup Buildout recipe.**
+
+Creates a ``bin/`` script with which you can easily create backups of any path and/or database. 
+
+Usage
+-----
+
+Add a part in ``buildout.cfg`` like so::
+
+    [buildout]
+    parts = backup
+
+    [backup]
+    recipe = praekelt.recipe.backup
+    archive_prefix = backmeup
+    local_location = /var/backup
+
+Running the buildout will add a backup script with the same name as your backup part in the ``bin/`` directory. In this case ``bin/backup``.
+
+**Note: The basic script created by the part specified above will create empty backups. To actually backup usefull data you need to enable path and/or database backups. See options below.**
+
+Options
+-------
+archive_prefix
+    String prefixed to backup archive filenames. *Required*
+database_enabled
+    Whether or not to include a database backup. *Defaults to False*
+database_engine
+    Type of database to backup. *Supported options mysql or postgres*
+database_name
+    Name of the database to backup.
+database_username
+    Username of the database to backup.
+database_password
+    Password of the database to backup.
+path_enabled = True
+    Whether or not to recursively include a path in the backup. *Defaults to False*
+path
+    Path to backup. *Defaults to the buildout directory*
+local_count
+    Number of backups to keep locally. As new backups are created older backups are deleted. *Defaults to 3*
+local_location
+    Local path in which to store backups. Also used as a sandbox when creating backups. Make sure the user running the backup script has appropriate rights to this path. *Required*
+scp_enabled
+    Whether or not to send a copy of created backups to a remote location via scp. *Default to False*
+
+    **Note: scp functionality is limited to key based authentication. Make sure to setup your keys appropriately for passwordless authentication.**
+scp_username
+    Remote scp login username.
+scp_host
+    Remote scp hostname.
+scp_path
+    Remote path in which to store backups.
+
+Full Example
+------------
+
+The following example illustrates all available options::
+    
+    [buildout]
+    parts = backup
+
+    [backup]
+    recipe = praekelt.recipe.backup
+    archive_prefix = shop
+
+    database_enabled = True
+    database_engine = postgres
+    database_name = shop
+    database_username = admin
+    database_password = pass1word
+
+    path_enabled = True
+    path = /var/www
+
+    local_count = 2
+    local_location = /var/backups
+
+    scp_enabled = True
+    scp_username = admin
+    scp_host = 10.23.12.1
+    scp_path = /var/backups/shop
+
+The resulting script will create backup archives prefixed with the string ``shop`` in ``/var/backups``. The archive will contain all the files in ``/var/www`` as well as a database dump of the postgres database named ``shop``. A copy of each created archive will be sent to ``10.23.12.1`` via scp and stored in the ``/var.backups/shop`` path. Only the latest 2 backups will be retained locally. Older backups will be deleted automatically.
+
