@@ -1,0 +1,87 @@
+{% load i18n %}
+<div id="map"> </div>
+<script type="text/javascript">
+  var popup;
+
+  var map = new OpenLayers.Map('map');
+
+  var imagen = "{{ panorama.image.url }}";
+  var size = new OpenLayers.Size({{ panorama.image.width }}, {{ panorama.image.height }});
+  var bounds = new OpenLayers.Bounds(0,0,{{ panorama.image.width }},{{ panorama.image.height }});
+  var options = {numZoomLevels: 3};
+  var fondo = new OpenLayers.Layer.Image('panorama', imagen, bounds, size, options);
+
+  OpenLayers.Feature.Vector.style['default']['strokeWidth'] = '2';
+  vectors = new OpenLayers.Layer.Vector("Vector Layer");
+
+  map.addLayers([fondo,vectors]);
+  map.setBaseLayer(fondo);
+
+  var starting_panorama = document.getElementById('id_panorama').selectedIndex;
+  panorama_layer(map, '{{json_url}}');
+
+  controls = {
+      regular: new OpenLayers.Control.DrawFeature(vectors,
+                  OpenLayers.Handler.RegularPolygon,
+                  {handlerOptions: {sides: 4,
+                                    irregular: true}}),
+      modify: new OpenLayers.Control.ModifyFeature(vectors)
+  };
+  
+  map.addControl(controls.regular);
+  map.addControl(controls.modify);
+
+  controls.modify.mode = OpenLayers.Control.ModifyFeature.RESHAPE;
+  controls.modify.mode |= OpenLayers.Control.ModifyFeature.RESIZE;
+  controls.modify.mode |= OpenLayers.Control.ModifyFeature.DRAG;
+
+{% if panoramainfo %}
+  var geometry = new OpenLayers.Bounds(
+          {{panoramainfo.x0}},
+          {{panorama.image.height}} - {{panoramainfo.y0}},
+          {{panoramainfo.x1}},
+          {{panorama.image.height}} - {{panoramainfo.y1}}).toGeometry();
+
+  var info = new OpenLayers.Feature.Vector(geometry);
+  vectors.addFeatures(info);
+
+  controls.modify.activate();
+{% else %}
+  controls.regular.activate();
+{% endif %}
+
+  function update(event) {
+      OpenLayers.Console.log(event.type, event.feature ? event.feature.id : event.components);
+      //alert(event.feature.geometry.getBounds());
+      var bounds = event.feature.geometry.getBounds();
+      document.getElementById("id_x0").value = parseInt(bounds.left) + "\n"
+      document.getElementById("id_x1").value = parseInt(bounds.right) + "\n"
+      document.getElementById("id_y0").value = {{panorama.image.height}}-parseInt(bounds.top) + "\n"
+      document.getElementById("id_y1").value = {{panorama.image.height}}-parseInt(bounds.bottom) + "\n"
+  }
+
+  function from_create_to_modify(event) {
+      update(event);
+      controls.regular.deactivate();
+      controls.modify.activate();
+  }
+
+  vectors.events.on({
+      //"beforefeaturemodified": report,
+      "featuremodified": update,
+      //"afterfeaturemodified": report,
+      //"vertexmodified": report,
+      //"sketchmodified": report,
+      //"sketchstarted": report,
+      "sketchcomplete": from_create_to_modify,
+  });
+
+  
+  // allow testing of specific renderers via "?renderer=Canvas", etc
+  //var renderer = OpenLayers.Util.getParameters(window.location.href).renderer;
+  //renderer = (renderer) ? [renderer] : OpenLayers.Layer.Vector.prototype.renderers;
+
+  var lonlat = new OpenLayers.LonLat({{panorama.image.width}}/2 ,
+                                 {{panorama.image.height}}/2 );
+  map.setCenter(lonlat, 0);
+</script>
