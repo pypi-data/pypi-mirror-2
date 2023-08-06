@@ -1,0 +1,117 @@
+Metadata-Version: 1.0
+Name: pfg.drafts
+Version: 1.1.1
+Summary: Allows users to save drafts of PloneFormGen forms in progress
+Home-page: http://svn.plone.org/svn/collective/pfg.drafts/trunk
+Author: David Glick, Groundwire
+Author-email: davidglick@groundwire.org
+License: GPL
+Description: Introduction
+        ============
+        
+        ``pfg.drafts`` adds support for Plone users to save copies of PloneFormGen
+        forms in progress and restore the saved values later.  This removes the need
+        for users to fill out a lengthy form in one sitting.
+        
+        The package adds a new display option for Form Folders, called "Form View with
+        Drafts".  If selected, a message is shown prompting the user to save a draft
+        of the form. (It also adds an additional button at the bottom of the form which
+        does the same thing.) If the user clicks this, they are presented with a
+        registration form to create a site account with which to associate the saved
+        data. After registration, the form is saved.
+        
+        When the user returns to the form, if logged in, the form will be repopulated
+        with the saved values automatically.  If logged out, the user can click a link
+        to log in and restore their values. Then the form can be submitted normally
+        when the form is complete.
+        
+        Compatibility
+        -------------
+        
+        ``pfg.drafts`` has been tested with Plone 4 and PloneFormGen 1.6.0.
+        
+        Installation
+        ------------
+        
+        1. Add pfg.drafts to your buildout, and activate it via the Plone Add-ons
+           control panel.
+        2. Go to the Security control panel and turn on "Enable self-registration"
+           and "Let users select their own passwords". (If the latter is off,
+           users will not be able to immediately register. You may want to add
+           captcha to the registration form to prevent mechanical registrations.)
+        3. Go to the form for which you want to enable drafts, and change its
+           display layout to "Form View with Drafts", using the Display menu.
+        
+        Implementation Details
+        ----------------------
+        
+        Drafts are stored in a BTree in a custom tool (portal_fg_drafts), keyed by
+        form UID and user id.
+        
+        To save form values, Javascript changes the action of the form to go to the
+        custom @@fg_save_draft view, which writes the values to portal_fg_drafts.
+        Any FileUpload objects are marshalled specially into a pickleable
+        FakeFieldStorage object.
+        
+        When the form is visited, the custom display template (pfg_draft_view.cpt)
+        calls the portal_fg_draft tool's retrieveDraft method to repopulate the
+        request form with any saved data for the current form and user. Values in
+        the request take precedence over values from the draft, so the saved values
+        won't clobber new values after a validation error.
+        
+        When the form is submitted, it is processed via the custom
+        pfg_draft_validate.vpy script.  This augments the submitted values with values
+        from the draft (such as fileuploads that were saved but cannot be repopulated)
+        and then processes the form normally.  If the form passes validation, the
+        saved draft (if any) is deleted from the portal_fg_drafts tool.
+        
+        Credits
+        -------
+        
+        ``pfg.drafts`` was created by `Web Collective`_ and David Glick. Thanks to
+        Bryan Wilson and Fulvio Casali.
+        
+        .. _`Web Collective`: http://webcollective.coop
+        
+        Changelog
+        =========
+        
+        1.1.1 (2011-01-06)
+        ------------------
+        
+        - Fix missing import.
+          [davisagli]
+        
+        1.1 (2011-01-06)
+        ----------------
+        
+        - Make it possible for Managers to load another user's draft for debugging,
+          by adding debug_user=[username] to the query string. If a draft loaded in
+          this way is submitted, the draft is not removed from the draft storage.
+          [davisagli]
+        
+        1.0.1 (2011-01-06)
+        ------------------
+        
+        - Make sure file uploads don't get lost when a draft is saved a second time.
+          [davisagli]
+        
+        - Fill the correct slot to inject javascript for main_templates based on the
+          classic Plone theme instead of sunburst.
+          [davisagli]
+        
+        1.0 (2010-12-20)
+        ----------------
+        
+        - Fix error in including widget javascript.
+          [davisagli]
+        
+        1.0b1 (2010-12-09)
+        ------------------
+        
+        - Initial release
+        
+Keywords: ploneformgen form draft save
+Platform: UNKNOWN
+Classifier: Framework :: Plone
+Classifier: Programming Language :: Python
