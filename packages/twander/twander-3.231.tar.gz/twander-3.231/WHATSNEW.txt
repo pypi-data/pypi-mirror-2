@@ -1,0 +1,1127 @@
+WHATSNEW For 'twander' 3.231    (Tue Jul 14 12:12:38 CDT 2009)
+----------------------------------------------------------------------
+
+NEW FEATURES
+
+- It is now possible to select the number of digits of precision to
+  display when scaling file lengths (i.e., when ACTUALENGTH is set or
+  toggled to False).  A new variable, SCALEPRECISION (Default: 1), has
+  been implemented to support this.  SCALEPRECISION sets how many
+  digits to the right of the decimal point to display in the scaled
+  length.  Notice that this does not do proper rounding and thus the
+  rightmost digit can be off by -1.
+
+- It is now possible to do case-insensitive matching of both
+  Association and Association Exclusion patterns on Unix-like systems
+  (this is the default on Win32 systems).  This is done by prepending
+  the "/" symbol to the beginning of the pattern:
+
+    ASSOC !     /*tXt  # Exludes files ending in txt, TXT, TxT, TXt, ...
+    ASSOC /*txT emacs [SELECTION] # Invokes emacs for files ending as above
+
+  Notice that exclusions have higher precedence than associations.  In
+  the example above, files ending in txt, Txt, and so on would always
+  be excluded and the association with emacs would never happen.
+
+
+CHANGES
+
+- None
+
+
+BUG FIXES
+
+- Any selections and/or the active marker are now properly preserved
+  if files are added or deleted between rereads of the directory.
+  Previously, the list of active/selected items was kept by position.
+  Now it is preserved by name and thus will be correct even if the
+  position of an item changes in the list.  This means that if a
+  selected/active item is renamed, it will lose its
+  selection/activation on the next directory update.
+
+- Symbolic links pointing to directories using a relative path were
+  not being properly sorted as directories the first time the
+  containing directory was entered, even if SYMDIR was set to True.
+
+
+DOCUMENTATION
+
+- The 'twander' license has been relaxed to permit commercial
+  use of the program without any payment requirments.
+  Voluntary donations are gladly accepted however ;)
+
+- The manual has been updated to reflect the new features.
+
+
+WHATSNEW For 'twander' 3.224    (Fri Jun  1 15:15:22 CDT 2007)
+----------------------------------------------------------------------
+
+NEW FEATURES
+
+- Implemented option to display date/time in  ISO 8601 format (ISODATE,
+  default: False)
+
+- Removed trailing spaces from lines in sample configuration file.
+
+- Directory Shortcut Definitions may now contain references to
+  variables (user-defined, environment, or execution).  This
+  enables definitions like:
+
+    ~ = [$HOME]
+
+    DIRSC1 = [~]/Desktop       # User-defined variable
+    DIRSC3 = [$HOME]           # Environment variable
+    DIRSC5 = [`echo "/tmp"`]   # Execution variable (but silly)
+
+  If you use one of these forms, it's up to you to make sure that when
+  when the variables are dereferenced (substituted), the resulting string
+  is the name of a directory. Be careful, you may not spot a definition
+  that is not a directory right away. Variables are dereferenced at
+  runtime not at the time the Configuration File is read in. Therefore,
+  Directory Shortcut assignments with variable references in them are shown
+  literally in the Shortcut Menu. twander cannot know what the value of
+  the variable will be until you actually press the relevant shortcut key. 
+
+- The display of symbolic links has been enhanced with the introduction
+  of several new program options:
+
+  By default, symbolic link targets are now displayed as originally defined
+  when the link was created.  The old behavior was to display the absolute
+  path of the target.  A new program option, SYMRESOLV (default: False)
+  has been introduced.  You can get the old behavior by setting this to True.
+
+  A new program option, SYMEXPAND (default: True) has been added.  By
+  setting this option to False, the targets of symbolic links will not
+  be displayed, only the symbolic link name.  Setting this option to
+  False effectively causes symbolic links to be displayed like any other
+  file or directory.
+
+- Added key bindings to toggle the various symbolic link program options:
+
+   Option        Key Name       Default Binding
+   ------        --------       ---------------
+
+   SYMDIR        TOGSYMDIR      Control-~
+   SYMEXPAND     TOGSYMEXPAND   Control-!
+   SYMRESOLV     TOGSYMRESOLV   Control-@
+
+
+  Toggling the state of SYMRESOLV implies you want to view symlink
+  targets, so this option also forces SYMEXPAND to True as well.
+
+- The title bar now displays the state of these various symbolic
+  link options in the form:
+
+     Symlinks: <Status>  where status is one or more of:
+
+     D or F - Symlinks pointing to directories are sorted
+              as Directories or Files (state of SYMDIR).
+
+     E      - Present only if symlink expansion is enabled
+              (SYMEXPAND=True).
+
+     R      - Present only if absolute symlink target resolution
+              is enabled (SYMRESOLV=True).
+
+CHANGES
+
+- The title bar directory display will now use "~" to indicate
+  a directory relative to the user's home directory (to save
+  title bar space).
+
+
+BUG FIXES
+
+- If SYMDIR=False, symlinks that pointed to directories did not end
+  with trailing path separator.
+
+- Symlink named as dotfiles were not being hidden when HIDEDOT=True.
+
+
+
+WHATSNEW For 'twander' 3.210    (Tue Dec 19 04:09:39 CST 2006)
+----------------------------------------------------------------------
+
+NEW FEATURES
+
+- Implemented Association exclusions.  You can now exclude the named
+  file types from being associated with an application:
+
+    ASSOC !   *.txt *.ps *.pdf
+
+
+  This is handy if you want to use a default association for most
+  things, but have a select group of files not be affected by the
+  default and thereby passed down to the OS for normal processing.
+
+- Any association (normal, default, exclusion) can be removed by
+  leaving the right-hand-side blank:
+
+    ASSOC *.foo
+    ASSOC *
+    ASSOC !
+
+  This is useful within conditional blocks when you want to define
+  'twander' behavior differently based on some condition you're
+  checking.  Another use is to undefine an Association that was put in
+  place in a global configuration you .included into your setup.
+
+CHANGES
+
+- All association checks are now case-insensitive under Windows.
+
+- Association "types" now support filename "globbing" meta-
+  characters.  This means that association statements supported in the
+  previous release need to be changed slightly.  This:
+
+    ASSOC .txt  ...
+
+  Need to be changed to this:
+
+    ASSOC *.txt ....
+
+  This feature enables far more complete filename type specification
+  than was previously possible with just the "filename ends with .."
+  semantic.
+
+- If a file is selected and the user double-clicks or hits "Enter",
+  and that file is not executable AND has no applicable association
+  defined, 'twander' will present an error message.  It does this
+  only on the Unix-like systems.  On Windows, the request is
+  handed down to the underlying OS without comment because
+  Windows itself may have an applicable association.
+
+
+DOCUMENTATION
+
+- The manual has been updated and corrected in several places.
+
+- Documentation for the new features has been added.
+
+
+WHATSNEW For 'twander' 3.204    (Sat Dec 16 02:37:58 CST 2006)
+----------------------------------------------------------------------
+
+NEW FEATURES
+
+- A new boolean configuration option, CMDMENUSORT (default: False),
+  has been added.  This allows the user to force the Command Menu to
+  appear in sorted order (as opposed to the default which is to
+  display commands in the order they are defined).
+
+- It is now possible to temporarily assign the current directory to
+  any of the Directory Shortcut keys.  The user presses KDIRSCSET
+  (default: Control-8) and is presented with a dialog to enter which
+  of the 12 Directory Shortcut keys to load with the current
+  directory.  This allows directory waypoints to be saved as shortcuts
+  during the user's workflow.  The shortcuts revert to the definitions
+  found in the Configuration File if the program is exited and
+  restarted or if a configuration reload (default: Control-r) is
+  initiated within the running program.
+
+- A new configuration verb, ASSOC, has been added to implement file
+  "Associations".  Associations allow the user to define which program
+  to start when the user selects a non-executable file and does a
+  mouse doubleclick or presses "Enter".  For example, this
+  configuration statement associates files whose names end with the
+  string ".text" with emacs:
+
+    ASSOC .text emacs [SELECTION]
+
+  There is also provision for a "default" association that is invoked
+  if the user double-clicks or presses "Enter" on a non-executable
+  file that has no specific association defined for it:
+
+    ASSOC *  MyFineEditor [SELECTION]
+
+  The right-hand-side of association statements can make use of almost
+  all of the 'twander' configuration language features such as runtime
+  prompting, symbolic variable substitution, execution variables, and
+  so forth.
+
+
+CHANGES & BUG FIXES
+
+- The default mouse assignment to popup the shortcut menu (MOUSESC)
+  has been moved to Alt-Control-LeftButton.  This was necessary
+  because the previous assignment interfered with the mouse command to
+  move up a directory level (MOUSEUP).
+
+- The "Shortcut Key" help menu has been removed.  It was redundant
+  with the identical menu on the menu bar and mouse popup menu.
+
+- The titlebar status strings have been shortened to keep to overall
+  title length more reasonable.
+
+- Selected help menus have now been formatted into 3 columns (as
+  opposed to the previous 2 column format) to make long help screens
+  fit on the display better.
+
+- A new help menu, "Associations" has been added to display any
+  user-defined Associations (as described above).
+
+- The order of the help menus has been changed to be slightly more
+  intuitive (to the author anyway :).
+
+
+DOCUMENTATION
+
+- The new features and changes are reflected in the manual.
+
+- The example Configuration File (.twander) now contains examples of
+  "Execution Variables".  These were introduced in 3.193 but examples
+  were not included in the example configuration.
+
+
+
+WHATSNEW For 'twander' 3.195    (Thu Feb 17 14:57:28 CST 2005)
+----------------------------------------------------------------------
+
+BUG FIXES
+
+- Fixed bug that counted the ".." entry in the total number of files
+  displayed on the title bar.  Now the title bar only counts actual
+  files or directories within the currently-viewed directory.
+
+
+CHANGES
+
+None
+
+
+NEW FEATURES
+
+- You can now choose whether or not to display so-called 'dotfiles'.
+  By convention on Unix and many other systems, files beginning
+  with a dot ('.') are usually used as configuration files.  Unless
+  you specifically want to edit a configuration, you typically do
+  little or nothing with these files.  Since there can be quite
+  a few of them on a modern system, it's helpful to be able to
+  block them from view.  This feature is enabled with:
+
+  Key Binding:  TOGHIDEDOT   (default: Control-9)
+  Option:       DOTFILE      (default: .)
+  Option:       HIDEDOTFILES (default: False)
+
+  HIDEDOTFILES determines whether or not to hide the dotfiles.
+  TOHIDEDOT "toggles" the state of HIDEDOTFILES from the
+  keyboard.  You can also set the initial state of HIDEDOTFILES
+  in your configuration file.
+
+  DOTFILE sets what a "dotfile" begins with.  Ordinarily, this
+  is just ".", however you can change it.  If, say, you set
+  DOTFILE to "D", then a files or directories, whose names begin with
+  the letter "D" will be hidden.  DOTFILE can be any valid string.
+
+  A few notes on hiding dotfiles:
+
+  HIDEDOTFILES sets the initial state of the option when used
+  in the configuration file, but it can still be toggled with
+  TOGHIDEDOT.
+
+  Unlike Wildcard Filters (which test the entire displayed line),
+  dotfile hiding is triggered only by the name of the file or
+  directory.
+
+  If you change DOTFILE to some other string, be aware that
+  the test to see if a file (or directory) name starts with
+  this string is *case-sensitive*.  If you set DOTFILE to "De",
+  it will not hide files starting with "de", for example.
+
+  The current state of dotfile hiding is displayed in the window
+  title bar, immediately after the Filter information.
+
+  Note that even though you cannot see the files with this option
+  enabled, commands you write can still operate on these
+  files.  For example, if you define a command that does something
+  like:
+
+     c clean rm .*~ *~
+
+  This command will remove any backup (~) files, whether or not
+  you can see them in the interface.
+
+
+
+WHATSNEW For 'twander' 3.193    (Fri Feb  4 17:38:14 CST 2005)
+----------------------------------------------------------------------
+
+****** IMPORTANT NOTE *****
+
+As of this release, several configuration keywords have changed:
+
+  The delimiters for the PROMPT and YESNO features have changed
+  from [] to {}.
+
+  The WILDCARD= option is no longer supported (or relevant).
+  Two new options, WILDFILTER = and WILDSELECT=, have replaced it.
+
+Existing configurations files that use these will have to be changed
+to reflect this.
+
+
+BUG FIXES
+
+- Fixed longstanding problem that prompt strings within PROMPT and
+  YESNO builtins were not preserved as written by the user.
+  Previously, multiple spaces were replaced with a single space.  This
+  is now fixed, and both prompts and the new default feature will be
+  preserved exactly as written.
+
+- It was previously possible to create a circular .include chain.
+  This is now explicitly checked for and prevented.
+
+- Previously, if you used the -t command line option to suppress
+  quoting and then reloaded a configuration file, quoting would go
+  back to its default behavior (quoting with the " character).  Now,
+  specifying -t suppresses quoting, even after a configuration reload.
+
+
+CHANGES
+
+- Changed the behavior of forced clearing with AFTERCLEAR option.
+  Previously this deselected all active selections AND repositioned
+  cursor to top of directory listing.  This was inconvenient with a
+  large directory list.  Behavior now is to only clear active
+  selections.  Cursor is left at approximately the same location in
+  the displayed list.
+
+- Variable references are now evaluated at command *execution* time.
+  (Previously they were evaluated at command definition time).  This
+  was done to make it possible to include variable references
+  within PROMPT and YESNO operations that would not be evaluated
+  until the command was actually run.
+
+- File lengths are now normalized for files > 1KB, 1MB, and 1GB.
+  Previously files less than 1MB were shown as actual length and files
+  greater than 1GB were expressed in MB.  These normalized lengths
+  are now more accurately rounded than they were previously.
+
+- A new option, ACTUALLENGTH (Default: False), can be set to display
+  actual rather than normalized file lengths.  This can be toggled
+  with a new key binding, TOGLENGTH (Default: Control-0).
+
+- File and drive (Win32 Drive List View) lengths are now displayed
+  right-justified within their respective fields.  This makes both
+  normalized and actual length displays easier to read.
+
+- The Wilcard Menu has been replaced with the Filter and Select
+  Menus to reflect the fact that wildcards can now be used in
+  two different ways: Filtering (new) and Selection (as before).
+
+- The MOUSEWILD key binding has been renamed to MOUSEWILDSEL.  This
+  will have no effect on configuration files since mouse bindings
+  cannot be changed.
+
+- Selection by wildcard is now case-insensitive on Win32 by
+  default.  This can be changed with the WILDNOCASE option.
+
+- Debug option Bit 8 (0x100) now dumps the content of both the
+  Filtering and Selection wildcard lists as they change.
+
+- The menu order on the toolbar was changed so that related menus
+  were grouped together.
+
+
+NEW FEATURES
+
+- Added ability to insert a default value for PROMPT and YESNO
+  builtins.  Syntax is: [BUILTIN:prompt text==>default text].  For
+  YESNO, the default text can only be "Yes" or "No" (case-
+  insensitive).  
+
+  The default separator string, "==>" can be changed by setting the
+  new DEFAULTSEP option variable.   Be careful to not use
+  any of the characters, []{}, in this delimiter string.  The
+  program will get confused since it sees these as variable/builtin
+  delimiters.
+
+- Added support for "Execution Variables".  These are similar to Unix
+  shell "backtick" references.  You do this in one of two forms:
+
+      var = [`command string`]
+
+         Sets var to string returned by executing "command string".
+         Any terminating newline is stripped off.
+
+
+      var = [`-command string`]
+
+         Sets var to string returned by executing "command string".
+         *All* newlines are replaced with spaces.
+
+- It is now possible to embed variable references inside PROMPT
+  and YESNO builtins. For example, you can do things like:
+
+       PROMPT = New File Name?
+       r rename mv [SELECTION] {PROMPT:[PROMPT]==>[SELECTION]}
+
+  This brings up a prompt with a default of the filename to
+  be renamed - this allows you to modify the existing name easily,
+  without having to type the whole name in.
+
+  You can embed references to  execution variables, builtin variables,
+  user variables, and environment variables anywhere within 
+  PROMPT or YESNO constructs.
+
+  Note that because variables are now resolved when the command is
+  actually run, execution variables are evaluated anew *each time*
+  a command is run:
+
+       c count echo [`ls | wc`]
+
+  To the keep the parser reasonably sane, the delimiters for PROMPT
+  and YESNO have changed from [] to {}
+
+  NOTE:  Existing configuration files will have to be changed.
+         The older [PROMPT ...] and [YESNO ...] forms are no
+         longer supported.
+
+- It is now possible to use a wildcard to "filter" which files are
+  displayed in a given directory.  This is helpful when a directory
+  contains many files, but you are only interested in a subset of
+  them.
+
+     The rules are the same as for selection wildcards.  By default,
+     the string you enter can appear anywhere in the displayed line
+     for the filter to declare a match.  You can escape this by
+     prepending a double-quote to your filter expression.  In that
+     case, your entry is treated literally as the wildcard
+     specification used for matching.
+
+     This feature is invoked with new key binding, FILTERWILD
+     (Control-=).
+
+     The filter is reset when directory is changed or on a REFRESH
+     (Control-l).
+
+     The filter is applied to entire line in detailed view or just the
+     filename otherwise.
+
+     Note that *selection* by wildcard scans the currently-displayed
+     list of files and selects them, but *filtering* by wildcard scans
+     the *entire list of files in the current directory*, displaying
+     only those that match.
+
+     The filter is never applied to the ".." entry.  That is, the the ".."
+     entry always appears regardless of the wildcard filter in effect.
+
+     The old Wildcard menu has been replaced by the Filter (Accel:
+     Alt-f) and Selection (Accel: Alt-t) menus that track wildcards
+     used for filtering and selection separately.
+
+     The WILDCARD= configuration statement has been replaced by the
+     WILDFILTER= and WILDSELECT= statements.  These are used to
+     preload the Filter and Selection menus respectively.
+
+     A new mouse binding, MOUSEWILDFILTER (Alt-Control-MiddleButton)
+     has been added to popup the Filter menu near the current mouse
+     position.
+
+     A new filter wildcard is always applied against the *entire* directory
+     list, not just what is currently displayed.
+
+     Filter logic can be inverted with TOGFILT (Control-minus) key.
+     Supported by INVERTFILTER (Default: False) option. Sets initial state.
+
+     Wildcard filters are case-insensitive on Win32 by default and
+     case- sensitive on all other systems.  This can be overriden with
+     the WILDNOCASE option.  Escaped wildcard specifications are
+     always treated literally regardless of this option's setting.
+     
+
+
+twander 3.160  (1-12-2005):
+===========================
+
+BUG FIXES
+
+- The keybinding definitions for the History and Wildcard mouse popup
+  menus were missing.  MOUSEHIST and MOUSEWILD are now defined.  Like
+  all other MOUSE bindings, these cannot be overriden by the user.
+
+- The program would lockup when browsing a piece of removeable media,
+  if the media was then removed.  The refresh logic now catches this
+  error and resets the view to the starting directory in this case.
+  This is not foolproof.  The program will still lockup in this case
+  if the starting directory itself is no longer readable - i.e., It to
+  is (was) on a piece of removed media, for example.
+
+- The copyright symbol that appears in the About menu and command line
+  help was not portable.  Changed to a textual equivalent "(c)".
+
+- Quite a bit of formatting cleanup in the documentation, especially
+  the HTML version.
+
+
+CHANGES
+
+- In previous versions, symbolic links were always treated as files
+  for purposes of sorting, if a "separated" sort (of directories and
+  files) was requested (the default).  Symbolic links that point to
+  directories are now sorted as directories in this case.  If you
+  prefer the old style behavior, set the new option, SYMDIR, to False.
+
+- Since version 3.146, 'twander' commands could be defined or entered
+  to force a refresh when the command completes (by placing a '+'
+  symbol as the first character of the command).  As of this release,
+  this feature also clears all active selections and repositions the
+  cursor under the first entry on the screen ("..").  This was done
+  because commands requesting screen refresh presumably do something
+  that changes the content of the currently viewed directory (such as
+  a file delete).  In this case, the active selections may not make
+  sense any longer.  A new option, AFTERCLEAR, can be set to False to
+  revert to the old behavior that just did the refresh and left the
+  active selections alone.
+
+- The internal variable that sets the GUI polling interval (POLLINT)
+  has been changed from a nominal 20ms to 250ms.  This is the interval
+  at which the program checks to see whether or not it is time to
+  reread the current directory if AUTOREFRESH is enabled.
+
+- In previous versions, if AUTOREFRESH was enabled, the program would
+  attempt to reread the current directory every REFRESHINT ms
+  (nominal).  This could be a problem on very large/slow directory
+  reads (such as optical media) because as soon as one refresh was
+  done, it would be time for another.  This effectively locked the
+  program up because it was constantly doing directory reads leaving
+  no time for user interaction.  With this release, the refresh
+  interval is "adaptive" by default.  Each directory refresh time is
+  measured and the refresh interval is dynamically adjusted to reflect
+  the actual amount of time needed to read a given directory.  The
+  refresh interval is then "stretched" a bit, to give you time to
+  interact with the directory before another refresh begins.  In no
+  case will this value ever be less than the value of REFRESHINT.  A
+  new option, ADAPTREFRESH, enables this feature by default.  If
+  ADAPTREFRESH is set to False, then the program reverts to its old
+  behavior of stictly observing the REFRESHINT interval.
+
+
+NEW FEATURES
+
+- Added the FORCEUNIXPATH option.  If set to True, it forces the use
+  of the Unix path separator character ("/") when substituting
+  Built-In Variable and Program Memory references in command
+  definitions.  This is handy when running Unix tools like cygwin
+  under Windows.  This option is only observed on Windows systems; it
+  is ignored on other OS platforms.
+
+- Previous versions primed the Directory menu with the user's
+  Directory Shortcut definition(s).  This behavior is no longer present.
+  Instead there is a separate Shortcut menu on the menubar that
+  displays these values as well as several other shortcuts to go to
+  up, back, home, and to the starting and root directories
+  respectively.  A new mouse popup keybinding, MOUSESC
+  has been defined as Control-Button3 so that this
+  menu can be popped up at the current pointer location.
+  On Windows systems using the Win32All extensions, an entry
+  for a Drive List also appears in the Shortcut menu.
+
+- Added ability to pop-up the Sorting Menu with Alt-Shift-Button3.
+  Added the MOUSESORT key binding to define this.
+
+
+twander 3.146  (3-11-2004):
+===========================
+
+BUG FIXES
+
+- In previous versions, a redefinition of a particular command key
+  would cause old and new versions of the definition to appear in the
+  Command Menu.  This has been fixed.  Now only the command defintion
+  that is actually active (the last one that appears in the
+  configuration file) appears in the Command Menu.
+
+- Entries in the Command Menu now appear strictly in the order of
+  their definition in the configuration file.  This was not always the
+  case in previous releases.
+
+- Help and Debug output is now consistently sorted.
+
+
+CHANGES
+
+- The title bar no longer has a separate entry to indicate reverse
+  sorts.  Instead, when sorting is reversed, the field name being used
+  as the sort key has a '-' appended to it.  This was done to make
+  the title bar less cluttered and of reasonable length.
+
+- The directory path displayed on the title bar is now limited to
+  60 characters.  Paths longer than this are truncated to the last
+  60 characters and "..." is prepended to the result to indicate
+  that a partial path is being displayed.  This was done because
+  some systems, notably Win32, have very long path names.  Moving
+  to these directories caused the other status information to the
+  right on the title bar to be lost.
+
+
+NEW FEATURES
+
+- The RUNCMD feature (default: Control-z) gives you to enter 
+  commands "on-the-fly".  It has always been possible to
+  make reference to built-in, user-defined, and environment
+  variables (via the "[vblname]" mechanism) when entering
+  commands manually.  The most common use of this feature is
+  to include a reference to the current directory or item(s)
+  selected in the GUI as a part of the manual command.  For
+  instance entering:
+
+    less [DSELECTIONS]
+
+  will let you page through all the files you currently have
+  selected.
+
+  Since this is used fairly often, "shortcut" forms for many of the
+  builtins have been implemented.  You can enter either the full
+  variable name reference or its shortcut when using RUNCMD.  This is
+  ***only*** for RUNCMD.  Configuration files still require the full
+  name to be used.  This was an intentional design choice to keep the
+  configurations consistent and readable.
+
+  Here are the new shortcuts you can use in RUNCMD:
+
+       [D]  for  [DIR]
+       [DN] for  [DSELECTION]
+       [DS] for  [DSELECTIONS]
+       [SN] for  [SELECTION]
+       [SS] for  [SELECTIONS]
+       [1]  for  [MEM1]
+       [2]  for  [MEM2]
+       [3]  for  [MEM3]
+       [4]  for  [MEM4]
+       [5]  for  [MEM5]
+       [6]  for  [MEM6]
+       [7]  for  [MEM7]
+       [8]  for  [MEM8]
+       [9]  for  [MEM9]
+       [10] for  [MEM10]
+       [11] for  [MEM11]
+       [12] for  [MEM12]
+
+              
+
+
+- The TOGAUTO Key (Default: Control-o) has been added to allow you to
+  toggle Autorefreshing on- and off.  When working with very
+  large/slow directory reads, it is handly to temporarily turn off
+  refreshing (and do it manually as needed with the Refresh - Default:
+  Control-l) key.  This is simpler than changing and reloading the
+  configuration file each time you want Autorefreshing disabled.
+
+- The current state of Autofreshing is now displayed on the main
+  window title bar.
+
+- You can now force a display refresh after a command is executed
+  by placing the REFRESHAFTER symbol (default: '+') at the beginning
+  of your command string in the configuration file.  This also
+  works when entered manually via RUNCMD (default: Control-z).
+  This will take place regardless the current AUTOREFRESH setting.
+
+- A new user-settable option variable, AFTERWAIT (default: 1) has
+  been added.  This tells 'twander' how long to wait before
+  initiating a display refresh requested by the REFRESHAFTER
+  construct.  This gives the system AFTERWAIT seconds to complete
+  the command before a display update is done.  See documentation
+  for subtleties of using this feature.
+
+- During actual refreshing - whether automatic, manual, because
+  of a directory change, or because of a REFRESHAFTER demand -
+  the Autorefresh state on the title bar has "*" appended to it.
+  Ordinarily, this happens so fast you do not see it.  But on
+  really long refreshes, the asterisk is a visual confirmation
+  that the program is busy and not hung.
+
+
+twander 3.135  (3-11-2003):
+===========================
+
+BUG FIXES
+
+- Found (and fixed) last-minute bug which caused [DESELECTION]
+  and [SELECTION] to be returned incorrectly when nothing was
+  selected in the UI.
+
+
+twander 3.134  (3-11-2003):
+===========================
+
+BUG FIXES
+
+- Fixed a problem which caused User-Defined Commands to be processed
+  with the CMDSHELL option when such commands were re-invoked via the
+  Command History.  The program now properly applies CMDSHELL
+  processing (if enabled) *only* to manually entered commands.
+
+- Previous version allowed FONTDECR to set font sizes to 0 or even
+  negative values.  Feature is now checked to make sure a font size is
+  never decremented below 1.
+
+
+CHANGES
+
+- USETHREADS is now False by default.  Thread implementations
+  vary so much from system to system it seemed smarter to
+  make their use a conscious decision.
+
+- The default for REFRESHINT is now 5000 (up from 3000) which
+  should make the program work a bit more smoothly "out of the
+  box" on slower systems and X connections.
+
+- The About box on the Help Menu now displays the 'twander'
+  web site information.
+
+- Quite a bit of new material added to the GOTCHAS section of
+  the documentation.
+
+- Boolean Options are now shown as "True" or "False" rather than
+  1 or 0 in the relevant Help Menu and Debug output.
+
+- Nothing pre-selected now when entering a new directory. Previously,
+  the first item ("..") was always selected.  This prevents accidental
+  navigation on slow/unresponsive systems or X-Windows connections
+  where you can type faster than the screen can update.
+
+- The MAXDIR, MAXDIRBUF, MAXHIST, and MAXHISTBUF options have been
+  removed.  These are replaced by the new MAXMENU and MAXMENUBUF
+  options which control the depth and display of *all* menus
+  with dynamic content.
+
+- User-Defined Variables, Directory Shortcuts, and Command Definitions
+  can now be redefined within the same Configuration File.  This was
+  done to better exploit the new conditional operators and the new
+  ".include" directive in the configuration language.  Now you
+  can maintain a "standard" configuration which everyone on the system 
+  can ".include", but anything in that configuration can be redefined
+  locally with your own configuration statements.
+
+- A blank Right Hand Side is now permitted for all Option Statements.
+  It means that the statement in question is simply ignored.  This was
+  done to make Option Statements consistent with Directory Shortcut
+  and User-Defined Variable Statements, both of which allow a blank
+  RHS.
+
+- Because the RHS of a String Option can now be blank, the ""
+  construct is no longer necessary to disable CMDSHELL.  An entry in
+  the form 'CMDSHELL = ' will do.  
+
+  VERY IMPORTANT: if for some reason you have a line like 'CMDSHELL =
+  ""' in your Configuration File, remove it!  Otherwise a pair of
+  double-quotes will be prepended to every RUNCMD you issue - almost
+  certainly not what you want.
+
+- The "escape" character to escape (defeat) CMDSHELL processing has
+  been changed from \ to ".  This was done for two reasons.
+  First, the backslash character may occasionally be necessary to
+  escape the first letter of a command string.  More importantly, the
+  " is used to escape for the new Wildcard feature.  CMDSHELL was
+  thus changed so both features which permit "escapes" would use the
+  same character for consistency.
+
+- The Free Space and Total Space of each drive in Drive List View
+  are now shown in separate columns to make sorting order clearer.
+
+- The FreeBSD port Makefile has been cleaned up and updated.
+
+
+NEW FEATURES
+
+- Wildcard-Based Selection
+
+  It is now possible to select items using a user-specified wildcard
+  with the SELWILD feature. (default: Control-\) This feature makes
+  the full power of Python regular expressions available for selecting
+  the items desired.  You may enter any literal text *or any
+  legitimate Python regular expression* in the SELWILD dialog and all
+  lines with matching expressions will be selected.  (Note that the
+  "wildcards" used here are *not* the same thing as the standard Unix
+  shell wildcard "globbing" used for naming files.)  For example, if
+  you enter: \.exe  all files or directories which have the string
+  ".exe" somewhere on their display line will be selected.  SELWILD
+  will never include ".." in any wildcard-based selection even if
+  that entry matches the regular expression.
+
+  By default, SELWILD will select an entry when your regular
+  expression matches *anything on the displayed line*.  This allows
+  you to make selections based on any visible column of information.
+  Of course, if you have details turned off, the check for matching
+  will be done only against the file or directory name (since that's
+  all that is visible).  
+
+  This "match anywhere on the line" semantic is possible because
+  SELWILD automatically massages the regular expression you provide to
+  make any match on the line true.  There may be times when you want
+  to provide very specific regular expression definitions which seek a
+  match at specific locations.  In that case, you can prevent SELWILD
+  from fiddling with your regular expression, by beginning it with the
+  " character.  SELWILD understands this to mean that your regular
+  expression is to be treated literally without modification. (It only
+  throws away this leading " escape character.)
+
+  Because regular expressions can get complicated and tedious to type
+  in, any such expression you use is saved in a history available via
+  the Wildcard Menu.  The menu can be invoked by clicking on its
+  button, pressing Alt-w, or Alt-Control-Right-Mouse-Button.  (Note
+  that on Win32 you *must* press Alt then Control then
+  Right-Mouse-Button for this to work.  Win32 appears to care deeply
+  about keystroke order.)
+
+  You can also preload that menu with commonly used wildcards by
+  placing multiple statements like this in your Configuration File:
+
+          WILDCARD = some-regular-expression
+
+  These will appear in the Wildcard Menu in the order they were
+  defined.  Bear in mind that only the first MAXMENU number of items
+  will actually appear in the Wildcard Menu.  Again, SELWILD will
+  check the first character of your regular expression and "escape" it
+  if that character is ".
+
+  There is a new debug bit which will display the Wildcard stack as it
+  changes.
+
+- Advanced Sorting Options
+
+  You can now sort by any of the detail columns *whether or not
+  details are currently displayed*. Shift-F1 sorts by the leftmost
+  column, Shift-F2 sorts by the second from left column, and so forth.
+  Shift-F10 selects no sorting which means items will be displayed in
+  the order they are reported by the operating system.  Shift-F11
+  reverses the sort order, and Shift-F12 toggles whether or not
+  directories and files should be separated when sorting and
+  displaying.  These sort options are also available via a new Sort
+  Menu which can be opened by clicking on its menu button or pressing
+  Alt-s.  There is no mouse shortcut for sorting options.
+
+  The current sort parameters are displayed on the Titlebar and
+  the name of the sort key field is automatically adjusted 
+  depending on whether you are in Normal or Drive List View.
+
+  You can set your desired default sorting order via three new
+  options in the Configuration File.
+
+    Option          Default       Possible Values
+
+    ---------------------------------------------
+
+    SORTBYFIELD     Name          No Sort, Permissions, Links,
+                                  Owner, Group, Length,
+                                  Time, Name
+
+    SORTREVERSE     False         True, False
+
+    SORTSEPARATE    True          True, False
+
+
+- Conditional Processing Of Configuration File Statements
+
+  It is now possible to include or exclude statements in the
+  Configuration File based on certain conditions.  This makes it easy
+  to maintain a single such file that works across all the different
+  operating systems and with many different users.
+
+  A Condition Block begins with a Condition Test Statement and ends
+  with '.endif'. If the Condition Test evaluates to be True, all the
+  lines up to the matching '.endif' are included in the configuration.
+  If False, all these lines are ignored.  Conditionals may be nested
+  without limit.  'twander' keeps track of which '.endif' matches which
+  Condition Test Statement.  Like all Configuration File entries,
+  whitespace is ignored when processing Conditional Statements and you
+  are free to indent (or not) as you see fit.
+
+  Condition Test Statements are one of three types:
+
+  #####
+  # Existential: True if FOO or $FOO are defined
+  #####
+
+  .if [FOO]
+     ...
+  .endif
+
+  .if [$FOO]
+     ...
+  .endif
+
+  #####
+  # Equality: True if FOO or $FOO are literally
+  # the same as the test-string
+  #####
+
+  .if [FOO] == test-string
+        ...
+  .endif
+
+  .if [$FOO] == test-string
+        ...
+  .endif
+
+  #####
+  # Inequality: True if FOO or $FOO are literally
+  # not the same as the test-string
+  #####
+
+  .if [FOO] != test-string
+        ...
+  .endif
+
+  .if [$FOO] != test-string
+        ...
+  .endif
+
+  
+  Note that the test always depends first on a *variable reference*
+  ([FOO], never just FOO), but that the Right Hand Side of
+  an in/equality test is just a string comparsion - no variable
+  expansion is done.  This will not work as you might expect:
+
+  .if [FOO] == string[BAR]
+
+  To make it easy to create conditional blocks based on the type of
+  system you're running, 'twander' now automatically pre-defines two
+  variables which provide information about your system:
+
+  Variable Name     Typical Values
+  --------------------------------
+
+   .OS              nt, posix
+   .PLATFORM        freebsd4, linux-i386, win32
+
+ Note that these predefined variables also begin with a period to
+ remind you of their intended role.  They will thus also sort first in
+ the User-Defined Variables section of the Help Menu.
+
+ See the example .twander file provided in the distribution for
+ some extended examples of using conditinals in your Configuration
+ File.
+
+- The New ".include" Directive
+ 
+  The configuration language now supports a means of including
+  other files in your configuration.  This makes it easy to, say,
+  have a "standard" configuration that everyone can use as a starting
+  point like this:
+
+
+  .include /usr/local/etc/.twander.global
+
+   # Your configuration lines go here
+
+
+   You may have as many ".include" directives in your Configuration File
+   as you like.  The only requirement is that there be whitespace between
+   the directive and the filename.
+
+
+ 
+
+
+twander 3.0  (2-17-2003):
+========================
+
+- The licensing terms have been clarified.  Non-Commercial use of the
+   program is free with a $20 US per user donation recommended.
+   This fee is mandatory for commercial users.
+
+- A Quick Start introduction to 'twander' is now included in the
+  distribution.  See 'READ-1ST.txt'.
+
+- *MANY* bug fixes and code cleanup including a nasty one with
+   RH linux that prevented 'twander' from opening the user's
+   home directory.
+
+- Most program features and options are now settable in the
+  configuration file AND you can set your default twander command line
+  arguments in an environment variable called TWANDER.
+
+  The priority of options processing, from lowest to highest is:
+
+             1) Defaults coded into program
+             2) Options set in configuration file
+             3) Options set in environment variable
+             4) Options set on command line.
+
+- The -b, -f, -n, -w, -s, -x, -y command line options have
+  been removed because these options are not settable as
+  options in the configuration file.
+
+- Width/Height now default to 800 and 600 pixels respectively.
+  Previous versions did not really count pixels correctly.
+  You can also specify the starting position on screen in pixels.
+
+- You can now include references to any of the variable types
+  in a manually entered command line.  Syntax is the same as for
+  command definitions in the configuration file.
+
+- Various help menus have been added. 
+
+- Command History has been implemented and is available via a new
+  menu.
+
+- There are now accelerator key and mouse shortcuts for each of the
+  menus.
+
+- A new "Directory Shortcuts" feature has been added. You can
+  specify up to 12 directories which will be preloaded into
+  the Directory Menu (as if you'd already visited them) AND
+  you can move to each of them via one of the Function keys.
+
+- twander debug facilities have been vastly improved. The -d
+  command line argument now takes a mandatory "debug level"
+  as an argument.  This is a bitfield (which can be expressed
+  in either decimal or hex) in which each bit indicates a
+  kind of degbug output you'd like.
+
+- There is a new Built-In variable called [YESNO:some text].  It
+  allows you to put a Yes/No popup during command execution.
+  If the user presses "No", the command is aborted.
+
+- Since Win32 file/directory names are case-insensitive,
+  twander now sorts them as such.  Previously, 'ZEBRA' would
+  appear before 'echo' in a twander display.
+
+- Most previous error conditions have been changed to warnings so
+  that the program is more forgiving and will keep running after
+  such a condition.
+
+- The various interactive popup dialogs allow intra-line editing
+  with both the local conventions as well as emacs-style key
+  editing.  This was true previously, but was not documented.
+
+- If you are running on Win32 and have Mark Hammond's 'win32all'
+  extensions installed, a number of Win32-specific features are
+  enabled:
+
+     a) You can now navigate ".." from root or use the Ctrl-k key to
+        get a Drive List View of all available Win32 drives.
+
+     b) The file/directory mode will be displayed showing Win32
+        attributes.
+
+     c) The Win32 user/group names will appear for each displayed
+        item, instead of "win32user" and "win32group".
+
+- You can now resize fonts while running 'twander' without having to
+  change the respective configuration file parameters.  Two new key
+  assignments have been defined to increment or decrement font size.
+
+- You can use the CMDSHELL option to define a string that will be
+  prepended to each manually entered command.  The feature is off
+  by default.  If enabled, it can be suppressed by entering "\"
+  as the first character in the manually entered command.  This makes
+  it easy to create a default visual/GUI context for each command you
+  enter manually.
+
+- A new "Program Memory" feature is implemented which allows 'twander'
+  to maintain up to 12 separate, simultaneous clipboard- like
+  memories.  These memories are used to compile names of files and
+  directories which you would like to subsequently processs.  There
+  are 12 new corresponding Built-In Variables ([MEM1]-[MEM12]) which
+  allow command definitions to access the contents of the memories
+
+- TundraWare Inc. is now running  a 'twander-users' mailing list.
+
+------------------------------------------------------------------------
+twander 2.34  (12-23-2002):    
+===========================
+
+Initial public release of program
