@@ -1,0 +1,41 @@
+Introduction
+============
+
+.. Note::
+   *Do not use this package with Plone 3.3.6 or better*. You don't need it!
+
+This package only fix the `#8463`__ Plone bug with Collection content type. The fix to this bug has already been
+released for Plone 3.3.6 and above, so you need this only for old version of Plone (Plone 3.0, 3.1...).
+Also you don't need this if you use `TinyMCE`__ instead of `kupu`__ WYSIWYG editor.
+
+__ http://dev.plone.org/plone/ticket/8463
+__ http://pypi.python.org/pypi/Products.TinyMCE
+__ http://pypi.python.org/pypi/Products.kupu
+
+This product give to your Plone 3 site fixed versions of the four templates where you can find the bug, applying
+changeset `r120628`__  (collective) and `r37779`__ (plone).
+
+__ http://dev.plone.org/collective/changeset/120628
+__ http://dev.plone.org/plone/changeset/37779
+
+Credits
+=======
+  
+Developed with the support of `Rete Civica Mo-Net - Comune di Modena`__;
+Rete Civica Mo-Net supports the `PloneGov initiative`__.
+
+.. image:: http://www.comune.modena.it/grafica/logoComune/logoComunexweb.jpg 
+   :alt: Comune di Modena - logo
+
+__ http://www.comune.modena.it/
+__ http://www.plonegov.it/
+
+Authors
+=======
+
+This product was developed by RedTurtle Technology team.
+
+.. image:: http://www.redturtle.net/redturtle_banner.png
+   :alt: RedTurtle Technology Site
+   :target: http://www.redturtle.net/
+
