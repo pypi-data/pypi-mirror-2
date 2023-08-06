@@ -1,0 +1,286 @@
+Metadata-Version: 1.0
+Name: HTSQL
+Version: 2.0.0b3
+Summary: Query language for the accidental programmer
+Home-page: http://htsql.org/
+Author: Clark C. Evans and Kirill Simonov; Prometheus Research, LLC
+Author-email: cce@clarkevans.com
+License: Free To Use But Restricted
+Description: =======================================================
+        HTSQL -- A Query Language for the Accidental Programmer
+        =======================================================
+        
+        HTSQL ("Hyper Text Structured Query Language") is a high-level query
+        language for relational databases.   The target audience for HTSQL is
+        the accidental programmer -- one who is not a SQL expert, yet needs a
+        usable, comprehensive query tool for data access and reporting.  
+        
+        HTSQL is also a web service which takes a request via HTTP, translates
+        it into a SQL query, executes the query against a relational database,
+        and returns the results in a format requested by the user agent (JSON,
+        CSV, HTML, etc.).
+        
+        Use of HTSQL with open source databases (PostgreSQL, MySQL, SQLite) is
+        royalty free under BSD-style conditions.  Use of HTSQL with proprietary
+        database systems (Oracle, Microsoft SQL) requires a commercial license.
+        See ``LICENSE`` for details.
+        
+        For installation instructions, see ``INSTALL``.  For list of new
+        features in this release, see ``NEWS``.  HTSQL documentation is in the
+        ``doc`` directory. 
+        
+            http://htsql.org/
+                The HTSQL homepage
+        
+            http://htsql.org/doc/tutorial.html
+                The HTSQL tutorial
+        
+            http://bitbucket.org/prometheus/htsql
+                HTSQL source code
+        
+            irc://irc.freenode.net#htsql
+                IRC chat in #htsql on freenode
+        
+            http://lists.htsql.org/mailman/listinfo/htsql-users
+                The mailing list for users of HTSQL
+        
+        Generous support for HTSQL was provided by Prometheus Research, LLC and
+        The Simons Foundation. This material is also based upon work supported
+        by the National Science Foundation under Grant #0944460. Any opinions,
+        findings, and conclusions or recommendations expressed in this material
+        are those of the author(s) and do not necessarily reflect the views of
+        the National Science Foundation. 
+        
+        HTSQL is copyright by Prometheus Research, LLC.  HTSQL is written by
+        Clark C. Evans <cce@clarkevans.com> and Kirill Simonov <xi@resolvent.net>.
+        
+        
+        Examples
+        ========
+        
+        HTSQL provides outstanding clarity without sacrificing rigor.  Not only
+        is working with HTSQL more productive than SQL, but things are possible
+        that may have otherwise exceeded a user's mental capacity. 
+        
+        Let's assume we have a data model, with schools, departments, programs
+        and courses.  Here it is::
+        
+                 +-------------+       +--------+
+            /---m| DEPARTMENT  |>-----o| SCHOOL |m----\
+            |.   +-------------+  .    +--------+    .|
+            | .                  .                  . |
+            |   department   department    a school   |
+            |   offers       may be part   has one or |
+            |   courses      of school     programs   |
+            |                                         |
+            |    +-------------+       +---------+    |
+            \---<| COURSE      |       | PROGRAM |>---/
+                 +-------------+       +---------+
+        
+        
+        List all schools
+        ----------------
+        
+        An HTSQL query::
+        
+            /school
+        
+        An equivalent SQL query::
+        
+            SELECT code, name
+            FROM ad.school
+            ORDER BY code;
+        
+        
+        Programs ordered by the title
+        -----------------------------
+        
+        HTSQL::
+        
+            /program{title+}
+        
+        SQL::
+        
+            SELECT title
+            FROM ad.program
+            ORDER BY title, school, code;
+        
+        
+        All courses missing a description
+        ---------------------------------
+        
+        HTSQL::
+        
+            /course?!description
+        
+        SQL::
+        
+            SELECT department, number, title, credits, description
+            FROM ad.course
+            WHERE NULLIF(description, '') IS NULL
+            ORDER BY 1, 2;
+        
+        
+        Departments in schools having "art" in its name
+        -----------------------------------------------
+        
+        HTSQL::
+        
+            /department?school.name~'art'
+        
+        SQL::
+        
+            SELECT d.code, d.name, d.school
+            FROM ad.department AS d
+            LEFT OUTER JOIN
+                 ad.school AS s ON (d.school = s.code)
+            WHERE s.name ILIKE '%art%'
+            ORDER BY 1;
+        
+        
+        The number of schools
+        ---------------------
+        
+        HTSQL::
+        
+            /count(school)
+        
+        SQL::
+        
+            SELECT COUNT(TRUE)
+            FROM ad.school;
+        
+        
+        Schools with programs
+        ---------------------
+        
+        HTSQL::
+        
+            /school?exists(program)
+        
+        SQL::
+        
+            SELECT s.code, s.name
+            FROM ad.school AS s
+            WHERE EXISTS(SELECT TRUE
+                         FROM ad.program AS p
+                         WHERE s.code = p.school)
+            ORDER BY 1;
+        
+        
+        The number of schools with programs
+        -----------------------------------
+        
+        HTSQL::
+        
+            /count(school?exists(program))
+        
+        SQL::
+        
+            SELECT COUNT(TRUE)
+            FROM ad.school AS s
+            WHERE EXISTS(SELECT TRUE
+                         FROM ad.program AS p
+                         WHERE (s.code = p.school));
+        
+        
+        Number of programs and departments per school
+        ---------------------------------------------
+        
+        HTSQL::
+        
+            /school{name, count(program), count(department)}
+        
+        SQL::
+        
+            SELECT s.name, COALESCE(p.cnt, 0), COALESCE(d.cnt, 0)
+            FROM ad.school AS s
+            LEFT OUTER JOIN
+                 (SELECT COUNT(TRUE) AS cnt, p.school
+                  FROM ad.program AS p
+                  GROUP BY 2) AS p ON (s.code = p.school)
+            LEFT OUTER JOIN
+                 (SELECT COUNT(TRUE) AS cnt, d.school
+                  FROM ad.department AS d
+                  GROUP BY 2) AS d ON (s.code = d.school)
+            ORDER BY s.code;
+        
+        
+        Average number of courses offered by departments in each school
+        ---------------------------------------------------------------
+        
+        HTSQL::
+        
+            /school{name, avg(department.count(course))}
+        
+        SQL::
+        
+            SELECT s.name, d.av
+            FROM ad.school AS s
+            LEFT OUTER JOIN
+                 (SELECT AVG(CAST(COALESCE(c.cnt, 0) AS NUMERIC)) AS av, d.school
+                  FROM ad.department AS d
+                  LEFT OUTER JOIN
+                       (SELECT COUNT(TRUE) AS cnt, c.department
+                       FROM ad.course AS c
+                       GROUP BY 2) AS c ON (d.code = c.department)
+                  GROUP BY 2) AS d ON (s.code = d.school)
+            ORDER BY s.code;
+        
+        
+        List of Changes
+        ===============
+        
+        
+        2.0.0 beta 3 (2010-11-09)
+        -------------------------
+        
+        * Refactored the translator from the term tree to the frame tree;
+          added a new translation step to collapse nested frames and reduce
+          SQL expressions.
+        * Added the HTRAF demo: use HTSQL with client-side javascript
+          to define complex dashboards.
+        * Added the SSI demo: using HTSQL for web without giving direct access
+          to the database.
+        * Updated the tutorial, minor bugfixes, regression test updates, etc.
+        
+        
+        2.0.0 beta 2 (2010-10-01)
+        -------------------------
+        
+        * Refactored the translator from the expression graph to the term tree.
+        * Added `Content-Disposition` header to `:json` and `:csv` renderers.
+        * Merged the tutorial to the repository.
+        
+        
+        2.0.0 beta 1 (2010-09-21)
+        -------------------------
+        
+        * Initial beta release.
+        * PostgreSQL and SQLite backends are (mostly) supported, the former
+          more than the latter.
+        * The SQL translator needs more work, in particular, the term tree,
+          the frame structure and the serializer.
+        * Lots of functions are either not implemented or missing a proper
+          serializer, especially in the SQLite backend.
+        * Other areas which need more work before the final release: rendering,
+          introspection, regression tests and documentation.
+        
+        
+Keywords: sql http uri relational database
+Platform: Any
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: Free To Use But Restricted
+Classifier: License :: Other/Proprietary License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: SQL
+Classifier: Topic :: Database :: Front-Ends
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI
+Classifier: Topic :: Software Development :: Libraries
