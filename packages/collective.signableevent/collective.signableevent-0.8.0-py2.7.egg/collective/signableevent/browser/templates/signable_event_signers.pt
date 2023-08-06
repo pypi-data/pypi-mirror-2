@@ -1,0 +1,101 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+<body>
+
+<div metal:fill-slot="main">
+    <tal:main-macro metal:define-macro="main">
+
+        <h1 tal:content="here/title_or_id" class="documentFirstHeading summary">
+            Title or id
+        </h1>
+
+
+        <p class="documentDescription description"
+           tal:content="here/Description"
+           tal:condition="here/Description">
+            Description
+        </p>
+
+        <tal:if tal:condition="python:'Manager' in user.getRolesInContext(context)">
+
+        
+        <form action="exportcsv"
+              tal:attributes="action string:${context/absolute_url}/signable_event_signers_csv"
+              method="post">
+          <input type="submit" name="exportcsv" value="Export signers to csv"
+                 class="standalone"
+                 i18n:attributes="value export_signers_to_csv" />
+        </form>        
+
+        <tal:def tal:define="brains here/getSigners;
+                             Batch python:modules['Products.CMFPlone'].Batch;
+                             b_start python:request.get('b_start',0);
+                             batch python:Batch(brains, 50, int(b_start));">
+        
+
+        <tal:batch>
+          <div metal:use-macro="here/batch_macros/macros/navigation" />
+        </tal:batch>
+
+        <table class="listing">
+          <thead>
+            <tr i18n:domain="signableevent">
+              <th i18n:translate="name_label">Name</th>
+              <th i18n:translate="email_label">E-mail</th>
+              <th i18n:translate="company_label">Company</th>
+              <th i18n:translate="registration_date_label">Registration date</th>
+              <th i18n:translate="comment_label">Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tal:loop tal:repeat="item batch">
+            <tr 
+                tal:attributes="class python:repeat['item'].odd() and 'even' or 'odd'">
+              <td>
+                <a href=""
+                   tal:attributes="href item/getURL">
+                  <span tal:content="item/getGender|nothing"
+                        i18n:translate="" i18n:domain="signableevent" />
+                  <span tal:replace="item/getFirstname|nothing" />
+                  <span tal:replace="item/getLastname|nothing" />
+                </a>
+              </td>
+              <td>
+                <a href="" tal:define="email item/getEmail|nothing"
+                   tal:condition="email"
+                   tal:content="email"
+                   tal:attributes="href string:mailto:${email}" />
+              </td>
+              <td>
+                <span tal:replace="item/getCompany|nothing" />
+              </td>
+              <td>
+                <span tal:replace="python:here.toLocalizedTime(item.CreationDate)" />
+              </td>
+              <td>
+                <span tal:replace="item/getComment|nothing" />
+              </td>
+            </tr>
+            </tal:loop>
+          </tbody>
+        </table>
+
+        <tal:batch>
+          <div metal:use-macro="here/batch_macros/macros/navigation" />
+        </tal:batch>
+
+        </tal:def>
+
+        </tal:if>
+
+        <tal:if tal:condition="python:not 'Manager' in user.getRolesInContext(context)">
+          Access denied.
+        </tal:if>
+
+    </tal:main-macro>
+</div>
+
+</body>
+</html>
