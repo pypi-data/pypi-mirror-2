@@ -1,0 +1,205 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+
+  <body>
+
+    <div metal:fill-slot="main">
+      <metal:main-macro define-macro="main">
+
+
+        <metal:listingmacro define-macro="listing">
+          <tal:foldercontents define="b_start request/b_start | python: 0;
+                                      b_size request/b_size | view/b_size;
+                                      all_keywords view/getAllKeywords;
+                                      folderContents python:here.queryCatalog();
+                                      use_view_action site_properties/typesUseViewActionInListings|python:();
+                                      batch folderContents;">
+            <tal:listing condition="folderContents">
+
+              <!-- Navigation -->
+              <div class="discreet">
+                <form method="get" action="smart-keyword-edit_form"
+                    tal:attributes="action string:${here/absolute_url}/@@smart-keyword-edit_form">
+                  <span i18n:translate="label_batch_size">Batch size</span> : 
+                  <input size="4" name="b_size:int" tal:attributes="value b_size" />
+                  &mdash;
+                  <span i18n:translate="label_batch_start">Start at</span> : 
+                  <input size="4" name="b_start:int" tal:attributes="value b_start" />
+                  &mdash;
+                  <input type="submit" value="Refresh" i18n:attributes="value"
+                         class="standalone" />
+                </form>
+              </div>
+                  
+
+              <form method="post" action="smart-keyword-edit"
+                    tal:attributes="action string:${here/absolute_url}/@@smart-keyword-edit-form">
+
+                <input type="hidden" name="b_start:int" tal:attributes="value b_start" />
+                <input type="hidden" name="b_size:int" tal:attributes="value b_size" />
+
+                <dl class="collapsible inline collapsedOnClick">
+                  <dt i18n:translate="label_all_keywords"
+                      class="collapsibleHeader">
+                    All keywords
+                  </dt>
+                  <dd class="collapsibleContent">
+                    <p>
+                      <span tal:repeat="kw all_keywords">
+                        <span tal:content="kw" />
+                        <span tal:condition="not:repeat/kw/end" tal:content="view/separator" />
+                      </span>
+                    </p>
+                    <p>
+                      <span i18n:translate="label_add_all">Add to all</span> :
+                      <input size="40" type="text" name="global_add:list" />
+                    </p>
+                    <p>
+                      <span i18n:translate="label_remove_all">Remove to all</span> :
+                      <input size="40" type="text" name="global_remove:list" />
+                    </p>
+                  </dd>
+                </dl>
+
+                <table class="listing"
+                       summary="Content listing"
+                       i18n:attributes="summary summary_content_listing;">
+                  <thead>
+                    <tr>
+                      <th class="nosort">&nbsp;<tal:title i18n:translate="listingheader_title"
+                      >Title</tal:title>&nbsp;</th>
+                      <th class="nosort">&nbsp;<tal:title i18n:translate="listingheader_type"
+                      >Type</tal:title>&nbsp;</th>
+                      <th class="nosort">&nbsp;<tal:modified i18n:translate="listingheader_date"
+                      >Date</tal:modified>&nbsp;</th>
+                      <th class="nosort">&nbsp;<tal:modified i18n:translate="listingheader_keywords"
+                      >Keywords</tal:modified>&nbsp;</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tal:items repeat="item batch">
+                      <tr metal:define-macro="listitem"
+                          tal:define="oddrow repeat/item/odd;"
+                          tal:attributes="class string:even">
+
+                        <tal:defs define="item_url item/getURL|item/absolute_url;
+                                          item_id item/getId|item/id;
+                                          item_title_or_id item/pretty_title_or_id;
+                                          item_description item/Description;
+                                          item_type item/portal_type;
+                                          item_type_title item/Type;
+                                          item_date item/EffectiveDate;
+                                          item_type_class python: 'visualIcon contenttype-' + item_type;
+                                          item_wf_state        item/review_state|python: wtool.getInfoFor(item, 'review_state', '');
+                                          item_wf_state_class python:'state-' + item_wf_state;
+                                          item_keywords item/Subject;
+                                          ">
+                          <td>
+                            <span tal:attributes="class item_type_class"
+                                  tal:condition="python:item_type != 'Link'">
+                              <a href="#"
+                                 tal:attributes="href python:item_url+'/';
+                                                 class string:$item_wf_state_class visualIconPadding;
+                                                 title item_description;"
+                                 tal:content="item_title_or_id">
+                                Item Title
+                              </a>
+                            </span>
+
+                            <tal:to_external condition="python:item_type == 'Link'">
+                              <span tal:attributes="class item_type_class">
+                                <a href="#"
+                                   tal:content="item_title_or_id"
+                                   tal:attributes="href item/getRemoteUrl;
+                                                   class string:${item_wf_state_class} visualIconPadding;
+                                                   title item_description;">
+                                  External Link
+                                </a>
+                              </span>
+                            </tal:to_external>
+                          </td>
+
+                          <td tal:content="item_type_title"
+                              i18n:translate="">
+                            Page
+                          </td>
+
+                          <td tal:content="python:here.toLocalizedTime(item_date,long_format=1)">
+                            August 16, 2001 at 23:35:59
+                          </td>
+
+                          <td>
+                            <input type="hidden" name="items.uid:records"
+                                   tal:attributes="value item/UID" />
+                            <p><span i18n:translate="label_remove">Remove</span> :
+                              <tal:loop tal:repeat="kw item_keywords">
+                                <input type="checkbox" name="items.delete:records:list"
+                                       tal:attributes="value kw"/>
+                                <span tal:replace="kw" />
+                              </tal:loop>
+                            </p>
+                            <p>
+                              <span i18n:translate="label_add">Add</span> :
+                              <input size="40" type="text" name="items.add:records" />
+                            </p>
+                          </td>
+
+                        </tal:defs>
+                      </tr>
+                    </tal:items>
+                  </tbody>
+                </table>
+
+                <dl class="collapsible inline collapsedOnClick">
+                  <dt i18n:translate="label_all_keywords"
+                      class="collapsibleHeader">
+                    All keywords
+                  </dt>
+                  <dd class="collapsibleContent">
+                    <p>
+                      <span tal:repeat="kw all_keywords">
+                        <span tal:content="kw" />
+                        <span tal:condition="not:repeat/kw/end" tal:content="view/separator" />
+                      </span>
+                    </p>
+                    <p>
+                      <span i18n:translate="label_add_all">Add to all</span> :
+                      <input size="40" type="text" name="global_add:list" />
+                    </p>
+                    <p>
+                      <span i18n:translate="label_remove_all">Remove to all</span> :
+                      <input size="40" type="text" name="global_remove:list" />
+                    </p>
+                  </dd>
+                </dl>
+
+                <p>
+                  <br />
+                  <input type="submit" class="standalone"
+                         value="Validate" i18n:attributes="value" />
+                </p>
+
+              </form>
+
+
+            </tal:listing>
+
+            <metal:empty metal:define-slot="no_items_in_listing">
+              <p class="discreet"
+                 tal:condition="not: folderContents"
+                 i18n:translate="description_no_items_in_folder">
+                There are currently no items in this folder.
+              </p>
+            </metal:empty>
+
+          </tal:foldercontents>
+        </metal:listingmacro>
+
+      </metal:main-macro>
+    </div>
+
+  </body>
+</html>
