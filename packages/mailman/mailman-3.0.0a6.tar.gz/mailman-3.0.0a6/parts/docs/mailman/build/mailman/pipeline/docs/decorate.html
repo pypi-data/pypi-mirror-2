@@ -1,0 +1,407 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Message decoration &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Digests" href="digests.html" />
+    <link rel="prev" title="Cooking headers" href="cook-headers.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="digests.html" title="Digests"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="cook-headers.html" title="Cooking headers"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="message-decoration">
+<h1>Message decoration<a class="headerlink" href="#message-decoration" title="Permalink to this headline">¶</a></h1>
+<p>Message decoration is the process of adding headers and footers to the
+original message.  A handler module takes care of this based on the settings
+of the mailing list and the type of message being processed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg_text</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is a message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">msg_text</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="short-circuiting">
+<h2>Short circuiting<a class="headerlink" href="#short-circuiting" title="Permalink to this headline">¶</a></h2>
+<p>Digest messages get decorated during the digest creation phase so no extra
+decorations are added for digest messages.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.decorate</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is a message.</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">nodecorate</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is a message.</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="decorating-simple-text-messages">
+<h2>Decorating simple text messages<a class="headerlink" href="#decorating-simple-text-messages" title="Permalink to this headline">¶</a></h2>
+<p>Text messages that have no declared content type character set are by default,
+encoded in us-ascii.  When the mailing list&#8217;s preferred language is <tt class="docutils literal"><span class="pre">en</span></tt>
+(i.e. English), the character set of the mailing list and of the message will
+match.  In this case, and when the header and footer have no interpolation
+placeholder variables, the message&#8217;s payload will be prepended by the verbatim
+header, and appended with the verbatim footer.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">msg_text</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;header</span><span class="se">\n</span><span class="s">&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">header</span>
+<span class="go">Here is a message.</span>
+<span class="go">footer</span>
+</pre></div>
+</div>
+<p>Mailman supports a number of interpolation variables, placeholders in the
+header and footer for information to be filled in with mailing list specific
+data.  An example of such information is the mailing list&#8217;s <cite>real name</cite> (a
+short descriptive name for the mailing list).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">msg_text</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;$real_name header</span><span class="se">\n</span><span class="s">&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;$real_name footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">real_name</span> <span class="o">=</span> <span class="s">&#39;XTest&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="gp">...</span>
+<span class="go">XTest header</span>
+<span class="go">Here is a message.</span>
+<span class="go">XTest footer</span>
+</pre></div>
+</div>
+<p>You can&#8217;t just pick any interpolation variable though; if you do, the variable
+will remain in the header or footer unchanged.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">msg_text</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;$dummy header</span><span class="se">\n</span><span class="s">&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;$dummy footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="gp">...</span>
+<span class="go">$dummy header</span>
+<span class="go">Here is a message.</span>
+<span class="go">$dummy footer</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="handling-rfc-3676-format-flowed-parameters">
+<h2>Handling RFC 3676 &#8216;format=flowed&#8217; parameters<a class="headerlink" href="#handling-rfc-3676-format-flowed-parameters" title="Permalink to this headline">¶</a></h2>
+<p>RFC 3676 describes a standard by which text/plain messages can marked by
+generating MUAs for better readability in compatible receiving MUAs.  The
+<tt class="docutils literal"><span class="pre">format</span></tt> parameter on the text/plain <tt class="docutils literal"><span class="pre">Content-Type</span></tt> header gives hints as
+to how the receiving MUA may flow and delete trailing whitespace for better
+display in a proportional font.</p>
+<p>When Mailman sees text/plain messages with such RFC 3676 parameters, it
+preserves these parameters when it concatenates headers and footers to the
+message payload.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;header&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain; format=flowed; delsp=no</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is a message</span><span class="se">\x20</span><span class="s"></span>
+<span class="gp">... </span><span class="s">with soft line breaks.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Don&#39;t use &#39;print&#39; here as above because it won&#39;t be obvious from the</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># output that the soft-line break space at the end of the &#39;Here is a</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># message&#39; line will be retained in the output.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;content-type&#39;</span><span class="p">]</span>
+<span class="go">text/plain; format=&quot;flowed&quot;; delsp=&quot;no&quot;; charset=&quot;us-ascii&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()]</span>
+<span class="go">[&#39;header&#39;, &#39;Here is a message &#39;, &#39;with soft line breaks.&#39;, &#39;footer&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="decorating-mixed-charset-messages">
+<h2>Decorating mixed-charset messages<a class="headerlink" href="#decorating-mixed-charset-messages" title="Permalink to this headline">¶</a></h2>
+<p>When a message has no explicit character set, it is assumed to be us-ascii.
+However, if the mailing list&#8217;s preferred language has a different character
+set, Mailman will still try to concatenate the header and footer, but it will
+convert the text to utf-8 and base-64 encode the message payload.</p>
+<div class="highlight-python"><pre># 'ja' = Japanese; charset = 'euc-jp'
+&gt;&gt;&gt; mlist.preferred_language = 'ja'
+&gt;&gt;&gt; mlist.msg_header = '$description header'
+&gt;&gt;&gt; mlist.msg_footer = '$description footer'
+&gt;&gt;&gt; mlist.description = '\u65e5\u672c\u8a9e'
+
+&gt;&gt;&gt; from email.message import Message
+&gt;&gt;&gt; msg = Message()
+&gt;&gt;&gt; msg.set_payload('Fran\xe7aise', 'iso-8859-1')
+&gt;&gt;&gt; print msg.as_string()
+MIME-Version: 1.0
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+&lt;BLANKLINE&gt;
+Fran=E7aise
+&gt;&gt;&gt; process(mlist, msg, {})
+&gt;&gt;&gt; print msg.as_string()
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+&lt;BLANKLINE&gt;
+5pel5pys6KqeIGhlYWRlcgpGcmFuw6dhaXNlCuaXpeacrOiqniBmb290ZXI=</pre>
+</div>
+<p>Sometimes the message even has an unknown character set.  In this case,
+Mailman has no choice but to decorate the original message with MIME
+attachments.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;header&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain; charset=unknown</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: 7bit</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is a message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="o">.</span><span class="n">set_boundary</span><span class="p">(</span><span class="s">&#39;BOUNDARY&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;BOUNDARY&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">header</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=unknown</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is a message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">footer</span>
+<span class="go">--BOUNDARY--</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="decorating-multipart-messages">
+<h2>Decorating multipart messages<a class="headerlink" href="#decorating-multipart-messages" title="Permalink to this headline">¶</a></h2>
+<p>Multipart messages have to be decorated differently.  The header and footer
+cannot be simply concatenated into the payload because that will break the
+MIME structure of the message.  Instead, the header and footer are attached as
+separate MIME subparts.</p>
+<p>When the outer part is <tt class="docutils literal"><span class="pre">multipart/mixed</span></tt>, the header and footer can have a
+<tt class="docutils literal"><span class="pre">Content-Disposition</span></tt> of <tt class="docutils literal"><span class="pre">inline</span></tt> so that MUAs can display these headers
+as if they were simply concatenated.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&#39;header&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;footer&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">part_1</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is the first message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">part_2</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is the second message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">email.mime.multipart</span> <span class="kn">import</span> <span class="n">MIMEMultipart</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">MIMEMultipart</span><span class="p">(</span><span class="s">&#39;mixed&#39;</span><span class="p">,</span> <span class="n">boundary</span><span class="o">=</span><span class="s">&#39;BOUNDARY&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">_subparts</span><span class="o">=</span><span class="p">(</span><span class="n">part_1</span><span class="p">,</span> <span class="n">part_2</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;BOUNDARY&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">header</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is the first message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">From: bperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is the second message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">footer</span>
+<span class="go">--BOUNDARY--</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="decorating-other-content-types">
+<h2>Decorating other content types<a class="headerlink" href="#decorating-other-content-types" title="Permalink to this headline">¶</a></h2>
+<p>Non-multipart non-text content types will get wrapped in a <tt class="docutils literal"><span class="pre">multipart/mixed</span></tt>
+so that the header and footer can be added as attachments.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">Content-Type: image/x-beautiful</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">IMAGEDATAIMAGEDATAIMAGEDATA</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="o">.</span><span class="n">set_boundary</span><span class="p">(</span><span class="s">&#39;BOUNDARY&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="gp">...</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">header</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: image/x-beautiful</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">IMAGEDATAIMAGEDATAIMAGEDATA</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Disposition: inline</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">footer</span>
+<span class="go">--BOUNDARY--</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Message decoration</a><ul>
+<li><a class="reference internal" href="#short-circuiting">Short circuiting</a></li>
+<li><a class="reference internal" href="#decorating-simple-text-messages">Decorating simple text messages</a></li>
+<li><a class="reference internal" href="#handling-rfc-3676-format-flowed-parameters">Handling RFC 3676 &#8216;format=flowed&#8217; parameters</a></li>
+<li><a class="reference internal" href="#decorating-mixed-charset-messages">Decorating mixed-charset messages</a></li>
+<li><a class="reference internal" href="#decorating-multipart-messages">Decorating multipart messages</a></li>
+<li><a class="reference internal" href="#decorating-other-content-types">Decorating other content types</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="cook-headers.html"
+                        title="previous chapter">Cooking headers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="digests.html"
+                        title="next chapter">Digests</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/decorate.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="digests.html" title="Digests"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="cook-headers.html" title="Cooking headers"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

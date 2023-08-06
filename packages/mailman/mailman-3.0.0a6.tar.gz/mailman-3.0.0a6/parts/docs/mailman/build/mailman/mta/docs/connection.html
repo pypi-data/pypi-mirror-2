@@ -1,0 +1,310 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>MTA connections &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Personalized decoration" href="decorating.html" />
+    <link rel="prev" title="Standard bulk delivery" href="bulk.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="decorating.html" title="Personalized decoration"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="bulk.html" title="Standard bulk delivery"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="mta-connections">
+<h1>MTA connections<a class="headerlink" href="#mta-connections" title="Permalink to this headline">¶</a></h1>
+<p>Outgoing connections to the outgoing mail transport agent (MTA) are mitigated
+through a <tt class="docutils literal"><span class="pre">Connection</span></tt> class, which can transparently manage multiple
+sessions in a single connection.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.mta.connection</span> <span class="kn">import</span> <span class="n">Connection</span>
+</pre></div>
+</div>
+<p>The number of sessions per connections is specified when the <tt class="docutils literal"><span class="pre">Connection</span></tt>
+object is created, as is the host and port number of the SMTP server.  Zero
+means there&#8217;s an unlimited number of sessions per connection.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span> <span class="o">=</span> <span class="n">Connection</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_host</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_port</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>At the start, there have been no connections to the server.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>By sending a message to the server, a connection is opened.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>We can reset the connection count back to zero.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">smtplib</span> <span class="kn">import</span> <span class="n">SMTP</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">reset</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">smtpd</span> <span class="o">=</span> <span class="n">SMTP</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">smtpd</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_host</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_port</span><span class="p">))</span>
+<span class="gp">... </span>    <span class="n">smtpd</span><span class="o">.</span><span class="n">docmd</span><span class="p">(</span><span class="s">&#39;RSET&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">reset</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="section" id="sessions-per-connection">
+<h2>Sessions per connection<a class="headerlink" href="#sessions-per-connection" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s say we specify a maximum number of sessions per connection of 2.  When
+the third message is sent, the connection is torn down and a new one is
+created.</p>
+<p>The connection count starts at zero.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span> <span class="o">=</span> <span class="n">Connection</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_host</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_port</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>We send two messages through the <tt class="docutils literal"><span class="pre">Connection</span></tt> object.  Only one connection
+is opened.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>The third message would cause a third session, exceeding the maximum.  So the
+current connection is closed and a new one opened.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">2</span>
+</pre></div>
+</div>
+<p>A fourth message does not cause a new connection to be made.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">2</span>
+</pre></div>
+</div>
+<p>But a fifth one does.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">3</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="no-maximum">
+<h2>No maximum<a class="headerlink" href="#no-maximum" title="Permalink to this headline">¶</a></h2>
+<p>A value of zero means that there is an unlimited number of sessions per
+connection.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span> <span class="o">=</span> <span class="n">Connection</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_host</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">mta</span><span class="o">.</span><span class="n">smtp_port</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">reset</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Even after ten messages are sent, there&#8217;s still been only one connection to
+the server.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">debug</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="c"># Ignore the results.</span>
+<span class="gp">... </span>    <span class="n">results</span> <span class="o">=</span> <span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>        <span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">get_connection_count</span><span class="p">()</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="development-mode">
+<h2>Development mode<a class="headerlink" href="#development-mode" title="Permalink to this headline">¶</a></h2>
+<p>By putting Mailman into development mode, you can force the recipients to a
+given hard-coded address.  This allows you to test Mailman without worrying
+about accidental deliveries to unintended recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;devmode&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[devmode]</span>
+<span class="gp">... </span><span class="s">enabled: yes</span>
+<span class="gp">... </span><span class="s">recipient: zperson@example.com</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smtpd</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">connection</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;cate@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne@example.com</span>
+<span class="gp">... </span><span class="s">To: bart@example.com</span>
+<span class="gp">... </span><span class="s">Subject: aardvarks</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: anne@example.com</span>
+<span class="go">To: bart@example.com</span>
+<span class="go">Subject: aardvarks</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: anne@example.com</span>
+<span class="go">X-RcptTo: zperson@example.com, zperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;devmode&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">MTA connections</a><ul>
+<li><a class="reference internal" href="#sessions-per-connection">Sessions per connection</a></li>
+<li><a class="reference internal" href="#no-maximum">No maximum</a></li>
+<li><a class="reference internal" href="#development-mode">Development mode</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="bulk.html"
+                        title="previous chapter">Standard bulk delivery</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="decorating.html"
+                        title="next chapter">Personalized decoration</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/mta/docs/connection.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="decorating.html" title="Personalized decoration"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="bulk.html" title="Standard bulk delivery"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The scrubber &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Subject munging" href="subject-munging.html" />
+    <link rel="prev" title="Automatic response handler" href="replybot.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="subject-munging.html" title="Subject munging"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="replybot.html" title="Automatic response handler"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-scrubber">
+<h1>The scrubber<a class="headerlink" href="#the-scrubber" title="Permalink to this headline">¶</a></h1>
+<p>The scrubber is an integral part of Mailman, both in the normal delivery of
+messages and in components such as the archiver.  Its primary purpose is to
+scrub attachments from messages so that binary goop doesn&#8217;t end up in an
+archive message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+</pre></div>
+</div>
+<p>Helper functions for getting the attachment data.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">re</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">read_attachment</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">remove</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">PRIVATE_ARCHIVE_FILE_DIR</span><span class="p">,</span>
+<span class="gp">... </span>                        <span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">fp</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">try</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">data</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="k">finally</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">fp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">remove</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">data</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">urlparse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">read_url_from_message</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">url</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+<span class="gp">... </span>        <span class="n">mo</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="s">&#39;URL: &lt;(?P&lt;url&gt;[^&gt;]+)&gt;&#39;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">if</span> <span class="n">mo</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="n">url</span> <span class="o">=</span> <span class="n">mo</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s">&#39;url&#39;</span><span class="p">)</span>
+<span class="gp">... </span>            <span class="k">break</span>
+<span class="gp">... </span>    <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)[</span><span class="mi">3</span><span class="p">:])</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">read_attachment</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="saving-attachments">
+<h2>Saving attachments<a class="headerlink" href="#saving-attachments" title="Permalink to this headline">¶</a></h2>
+<p>The Scrubber handler exposes a function called <tt class="docutils literal"><span class="pre">save_attachment()</span></tt> which can
+be used to strip various types of attachments and store them in the archive
+directory.  This is a public interface used by components outside the normal
+processing pipeline.</p>
+<p>Site administrators can decide whether the scrubber should use the attachment
+filename suggested in the message&#8217;s <tt class="docutils literal"><span class="pre">Content-Disposition:</span></tt> header or not.
+If enabled, the filename will be used when this header attribute is present
+(yes, this is an unfortunate double negative).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;test config&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[scrubber]</span>
+<span class="gp">... </span><span class="s">use_attachment_filename: yes</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif; name=&quot;xtest.gif&quot;</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: base64</span>
+<span class="gp">... </span><span class="s">Content-Disposition: attachment; filename=&quot;xtest.gif&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">R0lGODdhAQABAIAAAAAAAAAAACwAAAAAAQABAAACAQUAOw==</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.scrubber</span> <span class="kn">import</span> <span class="n">save_attachment</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">save_attachment</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="s">&#39;dir&#39;</span><span class="p">)</span>
+<span class="go">&lt;http://www.example.com/pipermail/_xtest@example.com/dir/xtest.gif&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">read_attachment</span><span class="p">(</span><span class="s">&#39;dir/xtest.gif&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">data</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span>
+<span class="go">GIF87a</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="go">34</span>
+</pre></div>
+</div>
+<p>Saving the attachment does not alter the original message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Content-Type: image/gif; name=&quot;xtest.gif&quot;</span>
+<span class="go">Content-Transfer-Encoding: base64</span>
+<span class="go">Content-Disposition: attachment; filename=&quot;xtest.gif&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">R0lGODdhAQABAIAAAAAAAAAAACwAAAAAAQABAAACAQUAOw==</span>
+</pre></div>
+</div>
+<p>The site administrator can also configure Mailman to ignore the
+<tt class="docutils literal"><span class="pre">Content-Disposition:</span></tt> filename.  This is the default.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;test config&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;test config&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[scrubber]</span>
+<span class="gp">... </span><span class="s">use_attachment_filename: no</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif; name=&quot;xtest.gif&quot;</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: base64</span>
+<span class="gp">... </span><span class="s">Content-Disposition: attachment; filename=&quot;xtest.gif&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">R0lGODdhAQABAIAAAAAAAAAAACwAAAAAAQABAAACAQUAOw==</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">save_attachment</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="s">&#39;dir&#39;</span><span class="p">)</span>
+<span class="go">&lt;http://www.example.com/pipermail/_xtest@example.com/dir/attachment.gif&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">read_attachment</span><span class="p">(</span><span class="s">&#39;dir/xtest.gif&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="nc">IOError</span>: <span class="n-Identifier">[Errno ...] No such file or directory:</span>
+<span class="go">    u&#39;.../archives/private/_xtest@example.com/dir/xtest.gif&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">read_attachment</span><span class="p">(</span><span class="s">&#39;dir/attachment.gif&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">data</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span>
+<span class="go">GIF87a</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="go">34</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="scrubbing-image-attachments">
+<h2>Scrubbing image attachments<a class="headerlink" href="#scrubbing-image-attachments" title="Permalink to this headline">¶</a></h2>
+<p>When scrubbing image attachments, the original message is modified to include
+a reference to the attachment file as available through the on-line archive.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;BOUNDARY&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-type: text/plain; charset=us-ascii</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a message.</span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif; name=&quot;xtest.gif&quot;</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: base64</span>
+<span class="gp">... </span><span class="s">Content-Disposition: attachment; filename=&quot;xtest.gif&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">R0lGODdhAQABAIAAAAAAAAAAACwAAAAAAQABAAACAQUAOw==</span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">Scrubber.process()</span></tt> function is different than other handler process
+functions in that it returns the scrubbed message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.scrubber</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scrubbed_msg</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scrubbed_msg</span> <span class="ow">is</span> <span class="n">msg</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">scrubbed_msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a message.</span>
+<span class="go">-------------- next part --------------</span>
+<span class="go">A non-text attachment was scrubbed...</span>
+<span class="go">Name: xtest.gif</span>
+<span class="go">Type: image/gif</span>
+<span class="go">Size: 34 bytes</span>
+<span class="go">Desc: not available</span>
+<span class="go">URL: &lt;http://www.example.com/pipermail/_xtest@example.com/attachments/.../attachment.gif&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>This is the same as the transformed message originally passed in.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a message.</span>
+<span class="go">-------------- next part --------------</span>
+<span class="go">A non-text attachment was scrubbed...</span>
+<span class="go">Name: xtest.gif</span>
+<span class="go">Type: image/gif</span>
+<span class="go">Size: 34 bytes</span>
+<span class="go">Desc: not available</span>
+<span class="go">URL: &lt;http://www.example.com/pipermail/_xtest@example.com/attachments/.../attachment.gif&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<p>The URL will point to the attachment sitting in the archive.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">read_url_from_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span>
+<span class="go">&#39;GIF87a&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="go">34</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="scrubbing-text-attachments">
+<h2>Scrubbing text attachments<a class="headerlink" href="#scrubbing-text-attachments" title="Permalink to this headline">¶</a></h2>
+<p>Similar to image attachments, text attachments will also be scrubbed, but the
+placeholder will be slightly different.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;BOUNDARY&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-type: text/plain; charset=us-ascii; format=flowed; delsp=no</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a message.</span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-type: text/plain; name=&quot;xtext.txt&quot;</span>
+<span class="gp">... </span><span class="s">Content-Disposition: attachment; filename=&quot;xtext.txt&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a text attachment.</span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scrubbed_msg</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">scrubbed_msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;; format=&quot;flowed&quot;; delsp=&quot;no&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a message.</span>
+<span class="go">-------------- next part --------------</span>
+<span class="go">An embedded and charset-unspecified text was scrubbed...</span>
+<span class="go">Name: xtext.txt</span>
+<span class="go">URL: &lt;http://www.example.com/pipermail/_xtest@example.com/attachments/.../attachment.txt&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">read_url_from_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">&#39;This is a text attachment.&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="clean-up">
+<h2>Clean up<a class="headerlink" href="#clean-up" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;test config&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The scrubber</a><ul>
+<li><a class="reference internal" href="#saving-attachments">Saving attachments</a></li>
+<li><a class="reference internal" href="#scrubbing-image-attachments">Scrubbing image attachments</a></li>
+<li><a class="reference internal" href="#scrubbing-text-attachments">Scrubbing text attachments</a></li>
+<li><a class="reference internal" href="#clean-up">Clean up</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="replybot.html"
+                        title="previous chapter">Automatic response handler</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="subject-munging.html"
+                        title="next chapter">Subject munging</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/scrubber.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="subject-munging.html" title="Subject munging"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="replybot.html" title="Automatic response handler"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

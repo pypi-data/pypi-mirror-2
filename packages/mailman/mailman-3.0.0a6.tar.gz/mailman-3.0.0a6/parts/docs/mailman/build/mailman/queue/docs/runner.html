@@ -1,0 +1,184 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Queue runners &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="The switchboard" href="switchboard.html" />
+    <link rel="prev" title="REST server" href="rest.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="switchboard.html" title="The switchboard"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="rest.html" title="REST server"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="queue-runners">
+<h1>Queue runners<a class="headerlink" href="#queue-runners" title="Permalink to this headline">¶</a></h1>
+<p>The queue runners (<em>qrunner</em>) are the processes that move messages around the
+Mailman system.  Each qrunner is responsible for a slice of the hash space in
+a queue directory.  It processes all the files in its slice, sleeps a little
+while, then wakes up and runs through its queue files again.</p>
+<div class="section" id="basic-architecture">
+<h2>Basic architecture<a class="headerlink" href="#basic-architecture" title="Permalink to this headline">¶</a></h2>
+<p>The basic architecture of qrunner is implemented in the base class that all
+runners inherit from.  This base class implements a <tt class="docutils literal"><span class="pre">.run()</span></tt> method that
+runs continuously in a loop until the <tt class="docutils literal"><span class="pre">.stop()</span></tt> method is called.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here is a very simple derived qrunner class.  Queue runners use a
+configuration section in the configuration files to determine run
+characteristics, such as the queue directory to use.  Here we push a
+configuration section for the test runner.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;test-runner&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[qrunner.test]</span>
+<span class="gp">... </span><span class="s">max_restarts: 1</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue</span> <span class="kn">import</span> <span class="n">Runner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">TestableRunner</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">_dispose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">msgdata</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="bp">False</span>
+<span class="gp">...</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">_do_periodic</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+<span class="gp">...</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">_snooze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filecnt</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">return</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span> <span class="o">=</span> <span class="n">TestableRunner</span><span class="p">(</span><span class="s">&#39;test&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This qrunner doesn&#8217;t do much except run once, storing the message and metadata
+on instance variables.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A test message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;test&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">,</span>
+<span class="gp">... </span>                               <span class="n">foo</span><span class="o">=</span><span class="s">&#39;yes&#39;</span><span class="p">,</span> <span class="n">bar</span><span class="o">=</span><span class="s">&#39;no&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">runner</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A test message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">runner</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">bar      : no</span>
+<span class="go">foo      : yes</span>
+<span class="go">lang     : en</span>
+<span class="go">listname : _xtest@example.com</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+<p>XXX More of the Runner API should be tested.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Queue runners</a><ul>
+<li><a class="reference internal" href="#basic-architecture">Basic architecture</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="rest.html"
+                        title="previous chapter">REST server</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="switchboard.html"
+                        title="next chapter">The switchboard</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/runner.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="switchboard.html" title="The switchboard"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="rest.html" title="REST server"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

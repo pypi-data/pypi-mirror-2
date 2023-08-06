@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Avoid duplicates &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Calculating recipients" href="calc-recips.html" />
+    <link rel="prev" title="Archives" href="archives.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="calc-recips.html" title="Calculating recipients"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="archives.html" title="Archives"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="avoid-duplicates">
+<h1>Avoid duplicates<a class="headerlink" href="#avoid-duplicates" title="Permalink to this headline">¶</a></h1>
+<p>This handler implements several strategies to reduce the reception of
+duplicate messages.  It does this by removing certain recipients from the list
+of recipients calculated earlier.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Create some members we&#8217;re going to use.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_a</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_b</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;bperson@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">MemberRole</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_a</span> <span class="o">=</span> <span class="n">address_a</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_b</span> <span class="o">=</span> <span class="n">address_b</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># This is the message metadata dictionary as it would be produced by</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># the CalcRecips handler.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recips</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">recipients</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;bperson@example.com&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+<div class="section" id="short-circuiting">
+<h2>Short circuiting<a class="headerlink" href="#short-circuiting" title="Permalink to this headline">¶</a></h2>
+<p>The module short-circuits if there are no recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: A message of great import</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;avoid-duplicates&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: A message of great import</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="suppressing-the-list-copy">
+<h2>Suppressing the list copy<a class="headerlink" href="#suppressing-the-list-copy" title="Permalink to this headline">¶</a></h2>
+<p>Members can elect not to receive a list copy of any message on which they are
+explicitly named as a recipient.  This is done by setting their
+<tt class="docutils literal"><span class="pre">receive_list_copy</span></tt> preference to <tt class="xref docutils literal"><span class="pre">False</span></tt>.  However, if they aren&#8217;t
+mentioned in one of the recipient headers (i.e. <tt class="docutils literal"><span class="pre">To</span></tt>, <tt class="docutils literal"><span class="pre">CC</span></tt>, <tt class="docutils literal"><span class="pre">Resent-To</span></tt>,
+or <tt class="docutils literal"><span class="pre">Resent-CC</span></tt>), then they will get a list copy.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_a</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">receive_list_copy</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>If they&#8217;re mentioned on the <tt class="docutils literal"><span class="pre">CC</span></tt> line, they won&#8217;t get a list copy.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">CC: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">CC: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>But if they&#8217;re mentioned on the <tt class="docutils literal"><span class="pre">CC</span></tt> line and have <tt class="docutils literal"><span class="pre">receive_list_copy</span></tt> set
+to <tt class="xref docutils literal"><span class="pre">True</span></tt> (the default), then they still get a list copy.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">CC: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">CC: bperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Other headers checked for recipients include the <tt class="docutils literal"><span class="pre">To</span></tt>...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">To: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">To: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>... <tt class="docutils literal"><span class="pre">Resent-To</span></tt> ...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">Resent-To: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">Resent-To: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>...and <tt class="docutils literal"><span class="pre">Resent-CC</span></tt> headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">Resent-Cc: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="n">recips</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;bperson@example.com&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="go">Resent-Cc: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Avoid duplicates</a><ul>
+<li><a class="reference internal" href="#short-circuiting">Short circuiting</a></li>
+<li><a class="reference internal" href="#suppressing-the-list-copy">Suppressing the list copy</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="archives.html"
+                        title="previous chapter">Archives</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="calc-recips.html"
+                        title="next chapter">Calculating recipients</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/avoid-duplicates.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="calc-recips.html" title="Calculating recipients"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="archives.html" title="Archives"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

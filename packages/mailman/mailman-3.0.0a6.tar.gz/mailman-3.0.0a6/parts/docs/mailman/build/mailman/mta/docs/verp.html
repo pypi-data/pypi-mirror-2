@@ -1,0 +1,228 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Standard VERP delivery &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="prev" title="Fully personalized delivery" href="personalized.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="personalized.html" title="Fully personalized delivery"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="standard-verp-delivery">
+<h1>Standard VERP delivery<a class="headerlink" href="#standard-verp-delivery" title="Permalink to this headline">¶</a></h1>
+<p>Variable Envelope Return Path (<a class="reference external" href="http://en.wikipedia.org/wiki/Variable_envelope_return_path">VERP</a>) delivery is an alternative to <a class="reference external" href="bulk.html">bulk</a>
+delivery, where an individual message is crafted uniquely for each recipient.</p>
+<p>The cost of enabling VERP is that Mailman must send to the upstream MTA, one
+message per recipient.  Under bulk delivery, an exact copy of one message can
+be sent to many recipients, greatly reducing the bandwidth for delivery.</p>
+<p>In Mailman, enabling VERP delivery for bounce detection brings with it a side
+benefit: the message which must be crafted uniquely for each recipient, can be
+further personalized to include all kinds of information unique to that
+recipient.  In the simplest case, the message can contain footer information,
+e.g.  pointing the user to their account URL or including a user-specific
+unsubscription link.  In theory, VERP delivery means we can do sophisticated
+<a class="reference external" href="http://en.wikipedia.org/wiki/Mail_merge">mail merge</a> operations.</p>
+<p>Mailman&#8217;s use of the term VERP really means <em>message personalization</em>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.mta.verp</span> <span class="kn">import</span> <span class="n">VERPDelivery</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verp</span> <span class="o">=</span> <span class="n">VERPDelivery</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Delivery strategies must implement the proper interface.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mta</span> <span class="kn">import</span> <span class="n">IMailTransportAgentDelivery</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IMailTransportAgentDelivery</span><span class="p">,</span> <span class="n">verp</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<div class="section" id="no-recipients">
+<h2>No recipients<a class="headerlink" href="#no-recipients" title="Permalink to this headline">¶</a></h2>
+<p>The message metadata specifies the set of recipients to send this message to.
+If there are no recipients, there&#8217;s nothing to do.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: test one</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a test.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verp</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">))</span>
+<span class="go">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verp</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="nb">set</span><span class="p">()))</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">))</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="individual-copy">
+<h2>Individual copy<a class="headerlink" href="#individual-copy" title="Permalink to this headline">¶</a></h2>
+<p>Each recipient of the message gets an individual, personalized copy of the
+message, with their email address encoded into the envelope sender.  This is
+so the return path will point back to Mailman but allow for decoding of the
+intended recipient&#8217;s delivery address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span>
+<span class="gp">... </span>    <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;bperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">])</span>
+</pre></div>
+</div>
+<p>VERPing is only actually done if the metadata requests it.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="n">recipients</span><span class="p">,</span> <span class="n">verp</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verp</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;----------&#39;</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces+aperson=example.com@example.com</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces+bperson=example.com@example.com</span>
+<span class="go">X-RcptTo: bperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces+cperson=example.com@example.com</span>
+<span class="go">X-RcptTo: cperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+</pre></div>
+</div>
+<p>The deliverer made a copy of the original message, so it wasn&#8217;t changed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Standard VERP delivery</a><ul>
+<li><a class="reference internal" href="#no-recipients">No recipients</a></li>
+<li><a class="reference internal" href="#individual-copy">Individual copy</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="personalized.html"
+                        title="previous chapter">Fully personalized delivery</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/mta/docs/verp.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="personalized.html" title="Fully personalized delivery"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

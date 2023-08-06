@@ -1,0 +1,313 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Personalized decoration &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Fully personalized delivery" href="personalized.html" />
+    <link rel="prev" title="MTA connections" href="connection.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="personalized.html" title="Fully personalized delivery"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="connection.html" title="MTA connections"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="personalized-decoration">
+<h1>Personalized decoration<a class="headerlink" href="#personalized-decoration" title="Permalink to this headline">¶</a></h1>
+<p>Personalized messages can be decorated by headers and footers containing
+information specific to the recipient.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.mta.decorating</span> <span class="kn">import</span> <span class="n">DecoratingDelivery</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">decorating</span> <span class="o">=</span> <span class="n">DecoratingDelivery</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Delivery strategies must implement the proper interface.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mta</span> <span class="kn">import</span> <span class="n">IMailTransportAgentDelivery</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IMailTransportAgentDelivery</span><span class="p">,</span> <span class="n">decorating</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<div class="section" id="decorations">
+<h2>Decorations<a class="headerlink" href="#decorations" title="Permalink to this headline">¶</a></h2>
+<p>Decorations are added when the mailing list had a header and/or footer
+defined, and the decoration handler is told to do personalized decorations.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_header</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Delivery address: $user_address</span>
+<span class="gp">... </span><span class="s">Subscribed address: $user_delivered_to</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">User name: $user_name</span>
+<span class="gp">... </span><span class="s">Password: $user_password</span>
+<span class="gp">... </span><span class="s">Language: $user_language</span>
+<span class="gp">... </span><span class="s">Options: $user_optionsurl</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: test one</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a test.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span>
+<span class="gp">... </span>    <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;bperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">])</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">recipients</span><span class="o">=</span><span class="n">recipients</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">personalize</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">)</span>
+</pre></div>
+</div>
+<p>More information is included when the recipient is a member of the mailing
+list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">MemberRole</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">anne</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Anne Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">anne</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="s">&#39;AAA&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">list</span><span class="p">(</span><span class="n">anne</span><span class="o">.</span><span class="n">addresses</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="go">&lt;Member: Anne Person &lt;aperson@example.com&gt; ...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bart</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="s">&#39;bperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Bart Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bart</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="s">&#39;BBB&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">list</span><span class="p">(</span><span class="n">bart</span><span class="o">.</span><span class="n">addresses</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="go">&lt;Member: Bart Person &lt;bperson@example.com&gt; ...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cris</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Cris Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cris</span><span class="o">.</span><span class="n">password</span> <span class="o">=</span> <span class="s">&#39;CCC&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">list</span><span class="p">(</span><span class="n">cris</span><span class="o">.</span><span class="n">addresses</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="go">&lt;Member: Cris Person &lt;cperson@example.com&gt; ...</span>
+</pre></div>
+</div>
+<p>The decorations happen when the message is delivered.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">decorating</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;----------&#39;</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Delivery address: aperson@example.com</span>
+<span class="go">Subscribed address: aperson@example.com</span>
+<span class="go">This is a test.</span>
+<span class="go">User name: Anne Person</span>
+<span class="go">Password: AAA</span>
+<span class="go">Language: English (USA)</span>
+<span class="go">Options: http://example.com/aperson@example.com</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: bperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Delivery address: bperson@example.com</span>
+<span class="go">Subscribed address: bperson@example.com</span>
+<span class="go">This is a test.</span>
+<span class="go">User name: Bart Person</span>
+<span class="go">Password: BBB</span>
+<span class="go">Language: English (USA)</span>
+<span class="go">Options: http://example.com/bperson@example.com</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: cperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Delivery address: cperson@example.com</span>
+<span class="go">Subscribed address: cperson@example.com</span>
+<span class="go">This is a test.</span>
+<span class="go">User name: Cris Person</span>
+<span class="go">Password: CCC</span>
+<span class="go">Language: English (USA)</span>
+<span class="go">Options: http://example.com/cperson@example.com</span>
+<span class="go">----------</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="decorate-only-once">
+<h2>Decorate only once<a class="headerlink" href="#decorate-only-once" title="Permalink to this headline">¶</a></h2>
+<p>Do not decorate a message twice.  Decorators must insert the <tt class="docutils literal"><span class="pre">decorated</span></tt> key
+into the message metadata.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;nodecorate&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">decorating</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">)):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;----------&#39;</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: bperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: cperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+<span class="go">----------</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Personalized decoration</a><ul>
+<li><a class="reference internal" href="#decorations">Decorations</a></li>
+<li><a class="reference internal" href="#decorate-only-once">Decorate only once</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="connection.html"
+                        title="previous chapter">MTA connections</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="personalized.html"
+                        title="next chapter">Fully personalized delivery</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/mta/docs/decorating.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="personalized.html" title="Fully personalized delivery"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="connection.html" title="MTA connections"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,294 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Domains &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="REST API helpers" href="helpers.html" />
+    <link rel="prev" title="Mailing list configuration" href="configuration.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="helpers.html" title="REST API helpers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="configuration.html" title="Mailing list configuration"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="domains">
+<h1>Domains<a class="headerlink" href="#domains" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference external" href="../../model/docs/domains.html">Domains</a> are how Mailman interacts with email host names and web host names.</p>
+<div class="highlight-python"><pre># The test framework starts out with an example domain, so let's delete
+# that first.
+&gt;&gt;&gt; from mailman.interfaces.domain import IDomainManager
+&gt;&gt;&gt; from zope.component import getUtility
+&gt;&gt;&gt; domain_manager = getUtility(IDomainManager)
+
+&gt;&gt;&gt; domain_manager.remove('example.com')
+&lt;Domain example.com...&gt;
+&gt;&gt;&gt; transaction.commit()</pre>
+</div>
+<p>The REST API can be queried for the set of known domains, of which there are
+initially none.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains&#39;</span><span class="p">)</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">start: 0</span>
+<span class="go">total_size: 0</span>
+</pre></div>
+</div>
+<p>Once a domain is added, it is accessible through the API.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">domain_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;example.com&#39;</span><span class="p">,</span> <span class="s">&#39;An example domain&#39;</span><span class="p">,</span> <span class="s">&#39;http://lists.example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;Domain example.com, An example domain,</span>
+<span class="go">        base_url: http://lists.example.com,</span>
+<span class="go">        contact_address: postmaster@example.com&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains&#39;</span><span class="p">)</span>
+<span class="go">entry 0:</span>
+<span class="go">    base_url: http://lists.example.com</span>
+<span class="go">    contact_address: postmaster@example.com</span>
+<span class="go">    description: An example domain</span>
+<span class="go">    email_host: example.com</span>
+<span class="go">    http_etag: &quot;...&quot;</span>
+<span class="go">    self_link: http://localhost:8001/3.0/domains/example.com</span>
+<span class="go">    url_host: lists.example.com</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">start: 0</span>
+<span class="go">total_size: 1</span>
+</pre></div>
+</div>
+<p>At the top level, all domains are returned as separate entries.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">domain_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">base_url</span><span class="o">=</span><span class="s">&#39;http://mail.example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">contact_address</span><span class="o">=</span><span class="s">&#39;listmaster@example.org&#39;</span><span class="p">)</span>
+<span class="go">&lt;Domain example.org, base_url: http://mail.example.org,</span>
+<span class="go">        contact_address: listmaster@example.org&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">domain_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;lists.example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;Porkmasters&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;http://example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;porkmaster@example.net&#39;</span><span class="p">)</span>
+<span class="go">&lt;Domain lists.example.net, Porkmasters,</span>
+<span class="go">        base_url: http://example.net,</span>
+<span class="go">        contact_address: porkmaster@example.net&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains&#39;</span><span class="p">)</span>
+<span class="go">entry 0:</span>
+<span class="go">    base_url: http://lists.example.com</span>
+<span class="go">    contact_address: postmaster@example.com</span>
+<span class="go">    description: An example domain</span>
+<span class="go">    email_host: example.com</span>
+<span class="go">    http_etag: &quot;...&quot;</span>
+<span class="go">    self_link: http://localhost:8001/3.0/domains/example.com</span>
+<span class="go">    url_host: lists.example.com</span>
+<span class="go">entry 1:</span>
+<span class="go">    base_url: http://mail.example.org</span>
+<span class="go">    contact_address: listmaster@example.org</span>
+<span class="go">    description: None</span>
+<span class="go">    email_host: example.org</span>
+<span class="go">    http_etag: &quot;...&quot;</span>
+<span class="go">    self_link: http://localhost:8001/3.0/domains/example.org</span>
+<span class="go">    url_host: mail.example.org</span>
+<span class="go">entry 2:</span>
+<span class="go">    base_url: http://example.net</span>
+<span class="go">    contact_address: porkmaster@example.net</span>
+<span class="go">    description: Porkmasters</span>
+<span class="go">    email_host: lists.example.net</span>
+<span class="go">    http_etag: &quot;...&quot;</span>
+<span class="go">    self_link: http://localhost:8001/3.0/domains/lists.example.net</span>
+<span class="go">    url_host: example.net</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">start: 0</span>
+<span class="go">total_size: 3</span>
+</pre></div>
+</div>
+<div class="section" id="individual-domains">
+<h2>Individual domains<a class="headerlink" href="#individual-domains" title="Permalink to this headline">¶</a></h2>
+<p>The information for a single domain is available by following one of the
+<tt class="docutils literal"><span class="pre">self_links</span></tt> from the above collection.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains/lists.example.net&#39;</span><span class="p">)</span>
+<span class="go">base_url: http://example.net</span>
+<span class="go">contact_address: porkmaster@example.net</span>
+<span class="go">description: Porkmasters</span>
+<span class="go">email_host: lists.example.net</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">self_link: http://localhost:8001/3.0/domains/lists.example.net</span>
+<span class="go">url_host: example.net</span>
+</pre></div>
+</div>
+<p>But we get a 404 for a non-existent domain.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains/does-not-exist&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">HTTPError: HTTP Error 404</span>: <span class="n-Identifier">404 Not Found</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="creating-new-domains">
+<h2>Creating new domains<a class="headerlink" href="#creating-new-domains" title="Permalink to this headline">¶</a></h2>
+<p>New domains can be created by posting to the <tt class="docutils literal"><span class="pre">domains</span></tt> url.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains&#39;</span><span class="p">,</span> <span class="p">{</span>
+<span class="gp">... </span>          <span class="s">&#39;email_host&#39;</span><span class="p">:</span> <span class="s">&#39;lists.example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="p">})</span>
+<span class="go">content-length: 0</span>
+<span class="go">date: ...</span>
+<span class="go">location: http://localhost:8001/3.0/domains/lists.example.com</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+<p>Now the web service knows about our new domain.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains/lists.example.com&#39;</span><span class="p">)</span>
+<span class="go">base_url: http://lists.example.com</span>
+<span class="go">contact_address: postmaster@lists.example.com</span>
+<span class="go">description: None</span>
+<span class="go">email_host: lists.example.com</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">self_link: http://localhost:8001/3.0/domains/lists.example.com</span>
+<span class="go">url_host: lists.example.com</span>
+</pre></div>
+</div>
+<p>And the new domain is in our database.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">domain_manager</span><span class="p">[</span><span class="s">&#39;lists.example.com&#39;</span><span class="p">]</span>
+<span class="go">&lt;Domain lists.example.com,</span>
+<span class="go">        base_url: http://lists.example.com,</span>
+<span class="go">        contact_address: postmaster@lists.example.com&gt;</span>
+
+<span class="go"># Unlock the database.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">abort</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>You can also create a new domain with a description, a base url, and a contact
+address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains&#39;</span><span class="p">,</span> <span class="p">{</span>
+<span class="gp">... </span>          <span class="s">&#39;email_host&#39;</span><span class="p">:</span> <span class="s">&#39;my.example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="s">&#39;description&#39;</span><span class="p">:</span> <span class="s">&#39;My new domain&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="s">&#39;base_url&#39;</span><span class="p">:</span> <span class="s">&#39;http://allmy.example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="s">&#39;contact_address&#39;</span><span class="p">:</span> <span class="s">&#39;helpme@example.com&#39;</span>
+<span class="gp">... </span>          <span class="p">})</span>
+<span class="go">content-length: 0</span>
+<span class="go">date: ...</span>
+<span class="go">location: http://localhost:8001/3.0/domains/my.example.com</span>
+<span class="gp">...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/domains/my.example.com&#39;</span><span class="p">)</span>
+<span class="go">base_url: http://allmy.example.com</span>
+<span class="go">contact_address: helpme@example.com</span>
+<span class="go">description: My new domain</span>
+<span class="go">email_host: my.example.com</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">self_link: http://localhost:8001/3.0/domains/my.example.com</span>
+<span class="go">url_host: allmy.example.com</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">domain_manager</span><span class="p">[</span><span class="s">&#39;my.example.com&#39;</span><span class="p">]</span>
+<span class="go">&lt;Domain my.example.com, My new domain,</span>
+<span class="go">        base_url: http://allmy.example.com,</span>
+<span class="go">        contact_address: helpme@example.com&gt;</span>
+
+<span class="go"># Unlock the database.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">abort</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Domains</a><ul>
+<li><a class="reference internal" href="#individual-domains">Individual domains</a></li>
+<li><a class="reference internal" href="#creating-new-domains">Creating new domains</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="configuration.html"
+                        title="previous chapter">Mailing list configuration</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="helpers.html"
+                        title="next chapter">REST API helpers</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/rest/docs/domains.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="helpers.html" title="REST API helpers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="configuration.html" title="Mailing list configuration"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

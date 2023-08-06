@@ -1,0 +1,343 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Subject munging &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Message tagger" href="tagger.html" />
+    <link rel="prev" title="The scrubber" href="scrubber.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="tagger.html" title="Message tagger"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="scrubber.html" title="The scrubber"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="subject-munging">
+<h1>Subject munging<a class="headerlink" href="#subject-munging" title="Permalink to this headline">¶</a></h1>
+<p>Messages that flow through the global pipeline get their headers <em>cooked</em>,
+which basically means that their headers go through several mostly unrelated
+transformations.  Some headers get added, others get changed.  Some of these
+changes depend on mailing list settings and others depend on how the message
+is getting sent through the system.  We&#8217;ll take things one-by-one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="inserting-a-prefix">
+<h2>Inserting a prefix<a class="headerlink" href="#inserting-a-prefix" title="Permalink to this headline">¶</a></h2>
+<p>Another thing header cooking does is <em>munge</em> the <tt class="docutils literal"><span class="pre">Subject</span></tt> header by
+inserting the subject prefix for the list at the front.  If there&#8217;s no subject
+header in the original message, Mailman uses a canned default.  In order to do
+subject munging, a mailing list must have a preferred language.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">subject_prefix</span> <span class="o">=</span> <span class="s">&#39;[XTest] &#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.cook_headers</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The original subject header is stored in the message metadata.  We must print
+the new <tt class="docutils literal"><span class="pre">Subject</span></tt> header because it gets converted from a string to an
+<tt class="docutils literal"><span class="pre">email.header.Header</span></tt> instance which has an unhelpful <tt class="docutils literal"><span class="pre">repr</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;origsubj&#39;</span><span class="p">]</span>
+<span class="go">u&#39;&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest] (no subject)</span>
+</pre></div>
+</div>
+<p>If the original message had a <tt class="docutils literal"><span class="pre">Subject</span></tt> header, then the prefix is inserted
+at the beginning of the header&#8217;s value.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;origsubj&#39;</span><span class="p">]</span>
+<span class="go">Something important</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest] Something important</span>
+</pre></div>
+</div>
+<p><tt class="docutils literal"><span class="pre">Subject</span></tt> headers are not munged for digest messages.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">Something important</span>
+</pre></div>
+</div>
+<p>Nor are they munged for <em>fast tracked</em> messages, which are generally defined
+as messages that Mailman crafts internally.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_fasttrack</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">Something important</span>
+</pre></div>
+</div>
+<p>If a <tt class="docutils literal"><span class="pre">Subject</span></tt> header already has a prefix, usually following a <tt class="docutils literal"><span class="pre">Re:</span></tt>
+marker, another one will not be added but the prefix will be moved to the
+front of the header text.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Re: [XTest] Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest] Re: Something important</span>
+</pre></div>
+</div>
+<p>If the <tt class="docutils literal"><span class="pre">Subject</span></tt> header has a prefix at the front of the header text, that&#8217;s
+where it will stay.  This is called <em>new style</em> prefixing and is the only
+option available in Mailman 3.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: [XTest] Re: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest] Re: Something important</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="internationalized-headers">
+<h2>Internationalized headers<a class="headerlink" href="#internationalized-headers" title="Permalink to this headline">¶</a></h2>
+<p>Internationalization adds some interesting twists to the handling of subject
+prefixes.  Part of what makes this interesting is the encoding of i18n headers
+using RFC 2047, and lists whose preferred language is in a different character
+set than the encoded header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest] =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">unicode</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">])</span>
+<span class="go">u&#39;[XTest] \u30e1\u30fc\u30eb\u30de\u30f3&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="prefix-numbers">
+<h2>Prefix numbers<a class="headerlink" href="#prefix-numbers" title="Permalink to this headline">¶</a></h2>
+<p>Subject prefixes support a placeholder for the numeric post id.  Every time a
+message is posted to the mailing list, a <em>post id</em> gets incremented.  This is
+a purely sequential integer that increases monotonically.  By added a <tt class="docutils literal"><span class="pre">%d</span></tt>
+placeholder to the subject prefix, this post id can be included in the prefix.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">subject_prefix</span> <span class="o">=</span> <span class="s">&#39;[XTest </span><span class="si">%d</span><span class="s">] &#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">post_id</span> <span class="o">=</span> <span class="mi">456</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] Something important</span>
+</pre></div>
+</div>
+<p>This works even when the message is a reply, except that in this case, the
+numeric post id in the generated subject prefix is updated with the new post
+id.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: [XTest 123] Re: Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] Re: Something important</span>
+</pre></div>
+</div>
+<p>If the <tt class="docutils literal"><span class="pre">Subject</span></tt> header had old style prefixing, the prefix is moved to the
+front of the header text.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: Re: [XTest 123] Something important</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] Re: Something important</span>
+</pre></div>
+</div>
+<p>And of course, the proper thing is done when posting id numbers are included
+in the subject prefix, and the subject is encoded non-ASCII.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">unicode</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">])</span>
+<span class="go">u&#39;[XTest 456] \u30e1\u30fc\u30eb\u30de\u30f3&#39;</span>
+</pre></div>
+</div>
+<p>Even more fun is when the internationalized <tt class="docutils literal"><span class="pre">Subject</span></tt> header already has a
+prefix, possibly with a different posting number.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: [XTest 123] Re: =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] Re: =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+</pre></div>
+</div>
+<p>As before, old style subject prefixes are re-ordered.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: Re: [XTest 123] =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest 456] Re:</span>
+<span class="go">  =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+</pre></div>
+</div>
+<p>In this test case, we get an extra space between the prefix and the original
+subject.  It&#8217;s because the original is <em>crooked</em>.  Note that a <tt class="docutils literal"><span class="pre">Subject</span></tt>
+starting with &#8216;n &#8216; is generated by some version of Eudora Japanese edition.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">subject_prefix</span> <span class="o">=</span> <span class="s">&#39;[XTest] &#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject:</span>
+<span class="gp">... </span><span class="s"> Important message</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">[XTest]  Important message</span>
+</pre></div>
+</div>
+<p>And again, with an RFC 2047 encoded header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject:</span>
+<span class="gp">... </span><span class="s"> =?iso-2022-jp?b?GyRCJWEhPCVrJV4lcxsoQg==?=</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Subject munging</a><ul>
+<li><a class="reference internal" href="#inserting-a-prefix">Inserting a prefix</a></li>
+<li><a class="reference internal" href="#internationalized-headers">Internationalized headers</a></li>
+<li><a class="reference internal" href="#prefix-numbers">Prefix numbers</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="scrubber.html"
+                        title="previous chapter">The scrubber</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="tagger.html"
+                        title="next chapter">Message tagger</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/subject-munging.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="tagger.html" title="Message tagger"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="scrubber.html" title="The scrubber"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

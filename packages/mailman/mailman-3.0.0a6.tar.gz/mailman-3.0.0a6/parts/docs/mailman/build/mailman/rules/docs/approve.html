@@ -1,0 +1,621 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Pre-approved postings &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Emergency" href="emergency.html" />
+    <link rel="prev" title="Administrivia" href="administrivia.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="emergency.html" title="Emergency"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="administrivia.html" title="Administrivia"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="pre-approved-postings">
+<h1>Pre-approved postings<a class="headerlink" href="#pre-approved-postings" title="Permalink to this headline">¶</a></h1>
+<p>Messages can contain a pre-approval, which is used to bypass the message
+approval queue.  This has several use cases:</p>
+<ul class="simple">
+<li>A list administrator can send an emergency message to the mailing list from
+an unregistered address, say if they are away from their normal email.</li>
+<li>An automated script can be programmed to send a message to an otherwise
+moderated list.</li>
+</ul>
+<p>In order to support this, a mailing list can be given a <em>moderator password</em>
+which is shared among all the administrators.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">moderator_password</span> <span class="o">=</span> <span class="s">&#39;abcxyz&#39;</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">approved</span></tt> rule determines whether the message contains the proper
+approval or not.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">rules</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">rule</span><span class="o">.</span><span class="n">name</span>
+<span class="go">approved</span>
+</pre></div>
+</div>
+<div class="section" id="no-approval">
+<h2>No approval<a class="headerlink" href="#no-approval" title="Permalink to this headline">¶</a></h2>
+<p>If the message has no <tt class="docutils literal"><span class="pre">Approve:</span></tt> or <tt class="docutils literal"><span class="pre">Approved:</span></tt> header (or their <tt class="docutils literal"><span class="pre">X-</span></tt>
+equivalents), then the rule does not match.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>If the message has an <tt class="docutils literal"><span class="pre">Approve:</span></tt>, <tt class="docutils literal"><span class="pre">Approved:</span></tt>, <tt class="docutils literal"><span class="pre">X-Approve:</span></tt>, or
+<tt class="docutils literal"><span class="pre">X-Approved:</span></tt> header with a value that does not match the moderator
+password, then the rule does not match.  However, the header is still removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;Approve&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;12345&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approve&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approve&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;Approved&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;12345&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;X-Approve&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;12345&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approve&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approve&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;X-Approved&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;12345&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approved&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approved&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="using-an-approval-header">
+<h2>Using an approval header<a class="headerlink" href="#using-an-approval-header" title="Permalink to this headline">¶</a></h2>
+<p>If the moderator password is given in an <tt class="docutils literal"><span class="pre">Approve:</span></tt> header, then the rule
+matches, and the <tt class="docutils literal"><span class="pre">Approve:</span></tt> header is stripped.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;Approve&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;abcxyz&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approve&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>Similarly, for the <tt class="docutils literal"><span class="pre">Approved:</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approve&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;Approved&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;abcxyz&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>The headers <tt class="docutils literal"><span class="pre">X-Approve:</span></tt> and <tt class="docutils literal"><span class="pre">X-Approved:</span></tt> are treated the same way.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;X-Approve&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;abcxyz&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approve&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approve&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;X-Approved&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;abcxyz&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approved&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-approved&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="using-a-pseudo-header">
+<h2>Using a pseudo-header<a class="headerlink" href="#using-a-pseudo-header" title="Permalink to this headline">¶</a></h2>
+<p>Different mail user agents have varying degrees to which they support custom
+headers like <tt class="docutils literal"><span class="pre">Approve:</span></tt> and <tt class="docutils literal"><span class="pre">Approved:</span></tt>.  For this reason, Mailman also
+supports using a <em>pseudo-header</em>, which is really just the first
+non-whitespace line in the payload of the message.  If this pseudo-header
+looks like a matching <tt class="docutils literal"><span class="pre">Approve:</span></tt> or <tt class="docutils literal"><span class="pre">Approved:</span></tt> header, the message is
+similarly allowed to pass.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: abcxyz</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The pseudo-header is removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Similarly for the <tt class="docutils literal"><span class="pre">Approved:</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: abcxyz</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>As before, a mismatch in the pseudo-header does not approve the message, but
+the pseudo-header line is still removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: 123456</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Similarly for the <tt class="docutils literal"><span class="pre">Approved:</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: 123456</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mime-multipart-support">
+<h2>MIME multipart support<a class="headerlink" href="#mime-multipart-support" title="Permalink to this headline">¶</a></h2>
+<p>Mailman searches for the pseudo-header as the first non-whitespace line in the
+first <tt class="docutils literal"><span class="pre">text/plain</span></tt> message part of the message.  This allows the feature to
+be used with MIME documents.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: application/x-ignore</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: 123456</span>
+<span class="gp">... </span><span class="s">The above line will be ignored.</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: abcxyz</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Like before, the pseudo-header is removed, but only from the text parts.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: application/x-ignore</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Approve: 123456</span>
+<span class="go">The above line will be ignored.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>The same goes for the <tt class="docutils literal"><span class="pre">Approved:</span></tt> message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: application/x-ignore</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: 123456</span>
+<span class="gp">... </span><span class="s">The above line will be ignored.</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: abcxyz</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>And the header is removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: application/x-ignore</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Approved: 123456</span>
+<span class="go">The above line will be ignored.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Here, the correct password is in the non-<tt class="docutils literal"><span class="pre">text/plain</span></tt> part, so it is ignored.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: application/x-ignore</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: abcxyz</span>
+<span class="gp">... </span><span class="s">The above line will be ignored.</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: 123456</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>And yet the pseudo-header is still stripped.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: application/x-ignore</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Approve: abcxyz</span>
+<span class="go">The above line will be ignored.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+</pre></div>
+</div>
+<p>As before, the same goes for the <tt class="docutils literal"><span class="pre">Approved:</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: application/x-ignore</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: abcxyz</span>
+<span class="gp">... </span><span class="s">The above line will be ignored.</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: 123456</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>And the pseudo-header is removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: application/x-ignore</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Approved: abcxyz</span>
+<span class="go">The above line will be ignored.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="stripping-text-html-parts">
+<h2>Stripping text/html parts<a class="headerlink" href="#stripping-text-html-parts" title="Permalink to this headline">¶</a></h2>
+<p>Because some mail readers will include both a <tt class="docutils literal"><span class="pre">text/plain</span></tt> part and a
+<tt class="docutils literal"><span class="pre">text/html</span></tt> alternative, the <tt class="docutils literal"><span class="pre">approved</span></tt> rule has to search the
+alternatives and strip anything that looks like an <tt class="docutils literal"><span class="pre">Approve:</span></tt> or
+<tt class="docutils literal"><span class="pre">Approved:</span></tt> headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/html</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&lt;html&gt;</span>
+<span class="gp">... </span><span class="s">&lt;head&gt;&lt;/head&gt;</span>
+<span class="gp">... </span><span class="s">&lt;body&gt;</span>
+<span class="gp">... </span><span class="s">&lt;b&gt;Approved: abcxyz&lt;/b&gt;</span>
+<span class="gp">... </span><span class="s">&lt;p&gt;The above line will be ignored.</span>
+<span class="gp">... </span><span class="s">&lt;/body&gt;</span>
+<span class="gp">... </span><span class="s">&lt;/html&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approved: abcxyz</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>And the header-like text in the <tt class="docutils literal"><span class="pre">text/html</span></tt> part was stripped.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/html; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;html&gt;</span>
+<span class="go">&lt;head&gt;&lt;/head&gt;</span>
+<span class="go">&lt;body&gt;</span>
+<span class="go">&lt;b&gt;&lt;/b&gt;</span>
+<span class="go">&lt;p&gt;The above line will be ignored.</span>
+<span class="go">&lt;/body&gt;</span>
+<span class="go">&lt;/html&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>This is true even if the rule does not match.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/html</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&lt;html&gt;</span>
+<span class="gp">... </span><span class="s">&lt;head&gt;&lt;/head&gt;</span>
+<span class="gp">... </span><span class="s">&lt;body&gt;</span>
+<span class="gp">... </span><span class="s">&lt;b&gt;Approve: 123456&lt;/b&gt;</span>
+<span class="gp">... </span><span class="s">&lt;p&gt;The above line will be ignored.</span>
+<span class="gp">... </span><span class="s">&lt;/body&gt;</span>
+<span class="gp">... </span><span class="s">&lt;/html&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Approve: 123456</span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;AAA&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/html; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;html&gt;</span>
+<span class="go">&lt;head&gt;&lt;/head&gt;</span>
+<span class="go">&lt;body&gt;</span>
+<span class="go">&lt;b&gt;&lt;/b&gt;</span>
+<span class="go">&lt;p&gt;The above line will be ignored.</span>
+<span class="go">&lt;/body&gt;</span>
+<span class="go">&lt;/html&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">--AAA--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Pre-approved postings</a><ul>
+<li><a class="reference internal" href="#no-approval">No approval</a></li>
+<li><a class="reference internal" href="#using-an-approval-header">Using an approval header</a></li>
+<li><a class="reference internal" href="#using-a-pseudo-header">Using a pseudo-header</a></li>
+<li><a class="reference internal" href="#mime-multipart-support">MIME multipart support</a></li>
+<li><a class="reference internal" href="#stripping-text-html-parts">Stripping text/html parts</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="administrivia.html"
+                        title="previous chapter">Administrivia</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="emergency.html"
+                        title="next chapter">Emergency</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/rules/docs/approve.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="emergency.html" title="Emergency"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="administrivia.html" title="Administrivia"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,307 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Command line message injection &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Command line list display" href="lists.html" />
+    <link rel="prev" title="Getting information" href="info.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="lists.html" title="Command line list display"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="info.html" title="Getting information"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="command-line-message-injection">
+<h1>Command line message injection<a class="headerlink" href="#command-line-message-injection" title="Permalink to this headline">¶</a></h1>
+<p>You can inject a message directly into a queue directory via the command
+line.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.commands.cli_inject</span> <span class="kn">import</span> <span class="n">Inject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span> <span class="o">=</span> <span class="n">Inject</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeArgs</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">queue</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">show</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">... </span>    <span class="n">filename</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">listname</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span> <span class="o">=</span> <span class="n">FakeArgs</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeParser</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="n">message</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">parser</span> <span class="o">=</span> <span class="n">FakeParser</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>It&#8217;s easy to find out which queues are available.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">show</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Available queues:</span>
+<span class="go">    archive</span>
+<span class="go">    bad</span>
+<span class="go">    bounces</span>
+<span class="go">    command</span>
+<span class="go">    digest</span>
+<span class="go">    in</span>
+<span class="go">    lmtp</span>
+<span class="go">    maildir</span>
+<span class="go">    news</span>
+<span class="go">    out</span>
+<span class="go">    pipeline</span>
+<span class="go">    rest</span>
+<span class="go">    retry</span>
+<span class="go">    shunt</span>
+<span class="go">    virgin</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">show</span> <span class="o">=</span> <span class="bp">False</span>
+</pre></div>
+</div>
+<p>Usually, the text of the message to inject is in a file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">tempfile</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fd</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: testing</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a test message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+</pre></div>
+</div>
+<p>However, the mailing list name is always required.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">List name is required</span>
+</pre></div>
+</div>
+<p>Let&#8217;s provide a list name and try again.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">in_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;in&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">in_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;test@example.com&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>By default, the incoming queue is used.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">in_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;in&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: testing</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Date: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : test@example.com</span>
+<span class="go">original_size: 90</span>
+<span class="go">version      : 3</span>
+</pre></div>
+</div>
+<p>But a different queue can be specified on the command line.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="s">&#39;virgin&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">in_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">virgin_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;virgin&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: testing</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Date: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : test@example.com</span>
+<span class="go">original_size: 90</span>
+<span class="go">version      : 3</span>
+
+<span class="go"># Clean up the tempfile.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="standard-input">
+<h2>Standard input<a class="headerlink" href="#standard-input" title="Permalink to this headline">¶</a></h2>
+<p>The message text can also be provided on standard input.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>
+
+<span class="go"># Remember: we&#39;ve got unicode literals turned on.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">standard_in</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: bperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: another test</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is another test message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">))</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="o">=</span> <span class="n">standard_in</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="s">&#39;-&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="bp">None</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">in_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;in&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: bperson@example.com</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: another test</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Date: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is another test message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : test@example.com</span>
+<span class="go">original_size: 100</span>
+<span class="go">version      : 3</span>
+
+<span class="go"># Clean up.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">__stdin__</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="errors">
+<h2>Errors<a class="headerlink" href="#errors" title="Permalink to this headline">¶</a></h2>
+<p>It is an error to specify a queue that doesn&#8217;t exist.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="s">&#39;xxbogusxx&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">No such queue: xxbogusxx</span>
+</pre></div>
+</div>
+<p>It is also an error to specify a mailing list that doesn&#8217;t exist.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;bogus&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">No such list: bogus</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Command line message injection</a><ul>
+<li><a class="reference internal" href="#standard-input">Standard input</a></li>
+<li><a class="reference internal" href="#errors">Errors</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="info.html"
+                        title="previous chapter">Getting information</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="lists.html"
+                        title="next chapter">Command line list display</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/commands/docs/inject.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="lists.html" title="Command line list display"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="info.html" title="Getting information"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

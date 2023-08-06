@@ -1,0 +1,235 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Operating on mailing lists &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Email addresses" href="../../model/docs/addresses.html" />
+    <link rel="prev" title="Printing the version" href="version.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../model/docs/addresses.html" title="Email addresses"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="version.html" title="Printing the version"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="operating-on-mailing-lists">
+<h1>Operating on mailing lists<a class="headerlink" href="#operating-on-mailing-lists" title="Permalink to this headline">¶</a></h1>
+<p>The <tt class="docutils literal"><span class="pre">withlist</span></tt> command is a pretty powerful way to operate on mailing lists
+from the command line.  This command allows you to interact with a list at a
+Python prompt, or process one or more mailing lists through custom made Python
+functions.</p>
+<p>XXX Test the interactive operation of withlist</p>
+<div class="section" id="getting-detailed-help">
+<h2>Getting detailed help<a class="headerlink" href="#getting-detailed-help" title="Permalink to this headline">¶</a></h2>
+<p>Because <tt class="docutils literal"><span class="pre">withlist</span></tt> is so complex, you need to request detailed help.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.commands.cli_withlist</span> <span class="kn">import</span> <span class="n">Withlist</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span> <span class="o">=</span> <span class="n">Withlist</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeArgs</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">interactive</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">... </span>    <span class="n">run</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">details</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">... </span>    <span class="n">listname</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeParser</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="n">message</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">parser</span> <span class="o">=</span> <span class="n">FakeParser</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span> <span class="o">=</span> <span class="n">FakeArgs</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">This script provides you with a general framework for interacting with a</span>
+<span class="go">mailing list.</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="running-a-command">
+<h2>Running a command<a class="headerlink" href="#running-a-command" title="Permalink to this headline">¶</a></h2>
+<p>By putting a Python function somewhere on your <tt class="docutils literal"><span class="pre">sys.path</span></tt>, you can have
+<tt class="docutils literal"><span class="pre">withlist</span></tt> call that function on a given mailing list.  The function takes a
+single argument, the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">old_path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">[:]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">VAR_DIR</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">VAR_DIR</span><span class="p">,</span> <span class="s">&#39;showme.py&#39;</span><span class="p">),</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">def showme(mailing_list):</span>
+<span class="gp">... </span><span class="s">    print &quot;The list&#39;s name is&quot;, mailing_list.fqdn_listname</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">def realname(mailing_list):</span>
+<span class="gp">... </span><span class="s">    print &quot;The list&#39;s real name is&quot;, mailing_list.real_name</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+</pre></div>
+</div>
+<p>If the name of the function is the same as the module, then you only need to
+name the function once.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;aardvark@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">details</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">run</span> <span class="o">=</span> <span class="s">&#39;showme&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="s">&#39;aardvark@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">The list&#39;s name is aardvark@example.com</span>
+</pre></div>
+</div>
+<p>The function&#8217;s name can also be different than the modules name.  In that
+case, just give the full module path name to the function you want to call.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">run</span> <span class="o">=</span> <span class="s">&#39;showme.realname&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">The list&#39;s real name is Aardvark</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="multiple-lists">
+<h2>Multiple lists<a class="headerlink" href="#multiple-lists" title="Permalink to this headline">¶</a></h2>
+<p>You can run a command over more than one list by using a regular expression in
+the <cite>listname</cite> argument.  To indicate a regular expression is used, the string
+must start with a caret.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_2</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;badger@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_3</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;badboys@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="s">&#39;^.*example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">The list&#39;s real name is Aardvark</span>
+<span class="go">The list&#39;s real name is Badger</span>
+<span class="go">The list&#39;s real name is Badboys</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="s">&#39;^bad.*&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">The list&#39;s real name is Badger</span>
+<span class="go">The list&#39;s real name is Badboys</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="s">&#39;^foo&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="error-handling">
+<h2>Error handling<a class="headerlink" href="#error-handling" title="Permalink to this headline">¶</a></h2>
+<p>You get an error if you try to run a function over a non-existent mailing
+list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="s">&#39;mystery@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">No such list: mystery@example.com</span>
+</pre></div>
+</div>
+<p>You also get an error if no mailing list is named.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">--run requires a mailing list name</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="clean-up">
+<h2>Clean up<a class="headerlink" href="#clean-up" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">old_path</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Operating on mailing lists</a><ul>
+<li><a class="reference internal" href="#getting-detailed-help">Getting detailed help</a></li>
+<li><a class="reference internal" href="#running-a-command">Running a command</a></li>
+<li><a class="reference internal" href="#multiple-lists">Multiple lists</a></li>
+<li><a class="reference internal" href="#error-handling">Error handling</a></li>
+<li><a class="reference internal" href="#clean-up">Clean up</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="version.html"
+                        title="previous chapter">Printing the version</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../../model/docs/addresses.html"
+                        title="next chapter">Email addresses</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/commands/docs/withlist.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../model/docs/addresses.html" title="Email addresses"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="version.html" title="Printing the version"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,221 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Calculating recipients &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Cleansing headers" href="cleanse.html" />
+    <link rel="prev" title="Avoid duplicates" href="avoid-duplicates.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="cleanse.html" title="Cleansing headers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="avoid-duplicates.html" title="Avoid duplicates"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="calculating-recipients">
+<h1>Calculating recipients<a class="headerlink" href="#calculating-recipients" title="Permalink to this headline">¶</a></h1>
+<p>Every message that makes it through to the list membership gets sent to a set
+of recipient addresses.  These addresses are calculated by one of the handler
+modules and depends on a host of factors.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Recipients are calculate from the list members, so add a bunch of members to
+start out with.  First, create a bunch of addresses...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_a</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_b</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;bperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_c</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_d</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;dperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_e</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;eperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address_f</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;fperson@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>...then subscribe these addresses to the mailing list as members...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">MemberRole</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_a</span> <span class="o">=</span> <span class="n">address_a</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_b</span> <span class="o">=</span> <span class="n">address_b</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_c</span> <span class="o">=</span> <span class="n">address_c</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_d</span> <span class="o">=</span> <span class="n">address_d</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_e</span> <span class="o">=</span> <span class="n">address_e</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_f</span> <span class="o">=</span> <span class="n">address_f</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>...then make some of the members digest members.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.core.constants</span> <span class="kn">import</span> <span class="n">DeliveryMode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_d</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">plaintext_digests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_e</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">mime_digests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_f</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">summary_digests</span>
+</pre></div>
+</div>
+<div class="section" id="short-circuiting">
+<h2>Short-circuiting<a class="headerlink" href="#short-circuiting" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes, the list of recipients already exists in the message metadata.
+This can happen for example, when a message was previously delivered to some
+but not all of the recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Xavier Person &lt;xperson@example.com&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">((</span><span class="s">&#39;qperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;zperson@example.com&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="n">recipients</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;calculate-recipients&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;qperson@example.com&#39;, u&#39;zperson@example.com&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="regular-delivery-recipients">
+<h2>Regular delivery recipients<a class="headerlink" href="#regular-delivery-recipients" title="Permalink to this headline">¶</a></h2>
+<p>Regular delivery recipients are those people who get messages from the list as
+soon as they are posted.  In other words, these folks are not digest members.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;, u&#39;cperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Members can elect not to receive a list copy of their own postings.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_c</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">receive_own_postings</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Claire Person &lt;cperson@example.com&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Members can also elect not to receive a list copy of any message on which they
+are explicitly named as a recipient.  However, see the <a class="reference external" href="avoid-duplicates.html">avoid duplicates</a>
+handler for details.</p>
+</div>
+<div class="section" id="digest-recipients">
+<h2>Digest recipients<a class="headerlink" href="#digest-recipients" title="Permalink to this headline">¶</a></h2>
+<p>XXX Test various digest deliveries.</p>
+</div>
+<div class="section" id="urgent-messages">
+<h2>Urgent messages<a class="headerlink" href="#urgent-messages" title="Permalink to this headline">¶</a></h2>
+<dl class="docutils">
+<dt>XXX Test various urgent deliveries:</dt>
+<dd><ul class="first last simple">
+<li>test_urgent_moderator()</li>
+<li>test_urgent_admin()</li>
+<li>test_urgent_reject()</li>
+</ul>
+</dd>
+</dl>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Calculating recipients</a><ul>
+<li><a class="reference internal" href="#short-circuiting">Short-circuiting</a></li>
+<li><a class="reference internal" href="#regular-delivery-recipients">Regular delivery recipients</a></li>
+<li><a class="reference internal" href="#digest-recipients">Digest recipients</a></li>
+<li><a class="reference internal" href="#urgent-messages">Urgent messages</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="avoid-duplicates.html"
+                        title="previous chapter">Avoid duplicates</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="cleanse.html"
+                        title="next chapter">Cleansing headers</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/calc-recips.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="cleanse.html" title="Cleansing headers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="avoid-duplicates.html" title="Avoid duplicates"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,319 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The incoming queue runner &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="LTMP server" href="lmtp.html" />
+    <link rel="prev" title="Digesting" href="digester.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="lmtp.html" title="LTMP server"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="digester.html" title="Digesting"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-incoming-queue-runner">
+<h1>The incoming queue runner<a class="headerlink" href="#the-incoming-queue-runner" title="Permalink to this headline">¶</a></h1>
+<p>This runner&#8217;s sole purpose in life is to decide the disposition of the
+message.  It can either be accepted for delivery, rejected (i.e. bounced),
+held for moderator approval, or discarded.</p>
+<p>The runner operates by processing chains on a message/metadata pair in the
+context of a mailing list.  Each mailing list may have a &#8216;start chain&#8217; where
+processing begins, with a global default.  This chain is processed with the
+message eventually ending up in one of the four disposition states described
+above.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist</span><span class="o">.</span><span class="n">start_chain</span>
+<span class="go">built-in</span>
+</pre></div>
+</div>
+<div class="section" id="accepted-messages">
+<h2>Accepted messages<a class="headerlink" href="#accepted-messages" title="Permalink to this headline">¶</a></h2>
+<p>We have a message that is going to be sent to the mailing list.  This message
+is so perfectly fine for posting that it will be accepted and forward to the
+pipeline queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Subject: My first post</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;first&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">First post!</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Normally, the upstream mail server would drop the message in the incoming
+queue, but this is an effective simulation.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.inject</span> <span class="kn">import</span> <span class="n">inject_message</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The incoming queue runner runs until it is empty.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue.incoming</span> <span class="kn">import</span> <span class="n">IncomingRunner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">make_testable_runner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">incoming</span> <span class="o">=</span> <span class="n">make_testable_runner</span><span class="p">(</span><span class="n">IncomingRunner</span><span class="p">,</span> <span class="s">&#39;in&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">incoming</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>And now the message is in the pipeline queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">pipeline_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;pipeline&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">pipeline_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">incoming_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;in&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">incoming_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;pipeline&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Date: ...</span>
+<span class="go">X-Mailman-Rule-Misses: approved; emergency; loop; administrivia;</span>
+<span class="go">    implicit-dest;</span>
+<span class="go">    max-recipients; max-size; news-moderation; no-subject;</span>
+<span class="go">    suspicious-header</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">envsender    : noreply@example.com</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="held-messages">
+<h2>Held messages<a class="headerlink" href="#held-messages" title="Permalink to this headline">¶</a></h2>
+<p>The list moderator sets the emergency flag on the mailing list.  The built-in
+chain will now hold all posted messages, so nothing will show up in the
+pipeline queue.
+::</p>
+<div class="highlight-python"><pre># XXX This checks the vette log file because there is no other evidence
+# that this chain has done anything.
+&gt;&gt;&gt; import os
+&gt;&gt;&gt; fp = open(os.path.join(config.LOG_DIR, 'vette'))
+&gt;&gt;&gt; fp.seek(0, 2)
+
+&gt;&gt;&gt; mlist.emergency = True
+&gt;&gt;&gt; inject_message(mlist, msg)
+&gt;&gt;&gt; file_pos = fp.tell()
+&gt;&gt;&gt; incoming.run()
+&gt;&gt;&gt; len(pipeline_queue.files)
+0
+&gt;&gt;&gt; len(incoming_queue.files)
+0
+&gt;&gt;&gt; fp.seek(file_pos)
+&gt;&gt;&gt; print 'LOG:', fp.read()
+LOG: ... HOLD: _xtest@example.com post from aperson@example.com held,
+message-id=&lt;first&gt;: n/a
+&lt;BLANKLINE&gt;
+
+&gt;&gt;&gt; mlist.emergency = False</pre>
+</div>
+</div>
+<div class="section" id="discarded-messages">
+<h2>Discarded messages<a class="headerlink" href="#discarded-messages" title="Permalink to this headline">¶</a></h2>
+<p>Another possibility is that the message would get immediately discarded.  The
+built-in chain does not have such a disposition by default, so let&#8217;s craft a
+new chain and set it as the mailing list&#8217;s start chain.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.chains.base</span> <span class="kn">import</span> <span class="n">Chain</span><span class="p">,</span> <span class="n">Link</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.chain</span> <span class="kn">import</span> <span class="n">LinkAction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">truth_rule</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">rules</span><span class="p">[</span><span class="s">&#39;truth&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">discard_chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;discard&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">test_chain</span> <span class="o">=</span> <span class="n">Chain</span><span class="p">(</span><span class="s">&#39;always-discard&#39;</span><span class="p">,</span> <span class="s">&#39;Testing discards&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">link</span> <span class="o">=</span> <span class="n">Link</span><span class="p">(</span><span class="n">truth_rule</span><span class="p">,</span> <span class="n">LinkAction</span><span class="o">.</span><span class="n">jump</span><span class="p">,</span> <span class="n">discard_chain</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">test_chain</span><span class="o">.</span><span class="n">append_link</span><span class="p">(</span><span class="n">link</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">start_chain</span> <span class="o">=</span> <span class="s">&#39;always-discard&#39;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">file_pos</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">incoming</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">pipeline_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">incoming_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">file_pos</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;LOG:&#39;</span><span class="p">,</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="go">LOG: ... DISCARD: &lt;first&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;always-discard&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="rejected-messages">
+<h2>Rejected messages<a class="headerlink" href="#rejected-messages" title="Permalink to this headline">¶</a></h2>
+<p>Similar to discarded messages, a message can be rejected, or bounced back to
+the original sender.  Again, the built-in chain doesn&#8217;t support this so we&#8217;ll
+just create a new chain that does.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">reject_chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;reject&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">test_chain</span> <span class="o">=</span> <span class="n">Chain</span><span class="p">(</span><span class="s">&#39;always-reject&#39;</span><span class="p">,</span> <span class="s">&#39;Testing rejections&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">link</span> <span class="o">=</span> <span class="n">Link</span><span class="p">(</span><span class="n">truth_rule</span><span class="p">,</span> <span class="n">LinkAction</span><span class="o">.</span><span class="n">jump</span><span class="p">,</span> <span class="n">reject_chain</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">test_chain</span><span class="o">.</span><span class="n">append_link</span><span class="p">(</span><span class="n">link</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">start_chain</span> <span class="o">=</span> <span class="s">&#39;always-reject&#39;</span>
+</pre></div>
+</div>
+<p>The virgin queue needs to be cleared out due to artifacts from the previous
+tests above.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">virgin_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;virgin&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">file_pos</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">incoming</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">pipeline_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">incoming_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: My first post</span>
+<span class="go">From: _xtest-owner@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">[No bounce details are available]</span>
+<span class="go">--===============...</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Date: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg           : False</span>
+<span class="gp">...</span>
+<span class="go">recipients          : [u&#39;aperson@example.com&#39;]</span>
+<span class="gp">...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">file_pos</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;LOG:&#39;</span><span class="p">,</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="go">LOG: ... REJECT: &lt;first&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;always-reject&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The incoming queue runner</a><ul>
+<li><a class="reference internal" href="#accepted-messages">Accepted messages</a></li>
+<li><a class="reference internal" href="#held-messages">Held messages</a></li>
+<li><a class="reference internal" href="#discarded-messages">Discarded messages</a></li>
+<li><a class="reference internal" href="#rejected-messages">Rejected messages</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="digester.html"
+                        title="previous chapter">Digesting</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="lmtp.html"
+                        title="next chapter">LTMP server</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/incoming.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="lmtp.html" title="LTMP server"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="digester.html" title="Digesting"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

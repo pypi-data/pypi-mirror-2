@@ -1,0 +1,351 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Message tagger &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="The outgoing handler" href="to-outgoing.html" />
+    <link rel="prev" title="Subject munging" href="subject-munging.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="to-outgoing.html" title="The outgoing handler"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="subject-munging.html" title="Subject munging"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="message-tagger">
+<h1>Message tagger<a class="headerlink" href="#message-tagger" title="Permalink to this headline">¶</a></h1>
+<p>Mailman has a topics system which works like this: a mailing list
+administrator sets up one or more topics, which is essentially a named regular
+expression.  The topic name can be any arbitrary string, and the name serves
+double duty as the <em>topic tag</em>.  Each message that flows the mailing list has
+its <tt class="docutils literal"><span class="pre">Subject:</span></tt> and <tt class="docutils literal"><span class="pre">Keywords:</span></tt> headers compared against these regular
+expressions.  The message then gets tagged with the topic names of each hit.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Topics must be enabled for Mailman to do any topic matching, even if topics
+are defined.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;bar fight&#39;</span><span class="p">,</span> <span class="s">&#39;.*bar.*&#39;</span><span class="p">,</span> <span class="s">&#39;catch any bars&#39;</span><span class="p">,</span> <span class="bp">False</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics_enabled</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics_bodylines_limit</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.tagger</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: foobar</span>
+<span class="go">Keywords: barbaz</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<p>However, once topics are enabled, message will be tagged.  There are two
+artifacts of tagging; an <tt class="docutils literal"><span class="pre">X-Topics:</span></tt> header is added with the topic name,
+and the message metadata gets a key with a list of matching topic names.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics_enabled</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: foobar</span>
+<span class="go">Keywords: barbaz</span>
+<span class="go">X-Topics: bar fight</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;topichits&#39;</span><span class="p">]</span>
+<span class="go">[u&#39;bar fight&#39;]</span>
+</pre></div>
+</div>
+<div class="section" id="scanning-body-lines">
+<h2>Scanning body lines<a class="headerlink" href="#scanning-body-lines" title="Permalink to this headline">¶</a></h2>
+<p>The tagger can also look at a certain number of body lines, but only for
+<tt class="docutils literal"><span class="pre">Subject:</span></tt> and <tt class="docutils literal"><span class="pre">Keyword:</span></tt> header-like lines.  When set to zero, no body
+lines are scanned.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: nothing</span>
+<span class="gp">... </span><span class="s">Keywords: at all</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">X-Ignore: something else</span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: nothing</span>
+<span class="go">Keywords: at all</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">X-Ignore: something else</span>
+<span class="go">Subject: foobar</span>
+<span class="go">Keywords: barbaz</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<p>But let the tagger scan a few body lines and the matching headers will be
+found.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics_bodylines_limit</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: nothing</span>
+<span class="gp">... </span><span class="s">Keywords: at all</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">X-Ignore: something else</span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: nothing</span>
+<span class="go">Keywords: at all</span>
+<span class="go">X-Topics: bar fight</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">X-Ignore: something else</span>
+<span class="go">Subject: foobar</span>
+<span class="go">Keywords: barbaz</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;topichits&#39;</span><span class="p">]</span>
+<span class="go">[u&#39;bar fight&#39;]</span>
+</pre></div>
+</div>
+<p>However, scanning stops at the first body line that doesn&#8217;t look like a
+header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: nothing</span>
+<span class="gp">... </span><span class="s">Keywords: at all</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is not a header</span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: nothing</span>
+<span class="go">Keywords: at all</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is not a header</span>
+<span class="go">Subject: foobar</span>
+<span class="go">Keywords: barbaz</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<p>When set to a negative number, all body lines will be scanned.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">topics_bodylines_limit</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lots_of_headers</span> <span class="o">=</span> <span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s">&#39;X-Ignore: zip&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: nothing</span>
+<span class="gp">... </span><span class="s">Keywords: at all</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="si">%s</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Subject: foobar</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span> <span class="o">%</span> <span class="n">lots_of_headers</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Rather than print out 100 X-Ignore: headers, let&#39;s just prove that</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># the X-Topics: header exists, meaning that the tagger did its job.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-topics&#39;</span><span class="p">]</span>
+<span class="go">bar fight</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;topichits&#39;</span><span class="p">]</span>
+<span class="go">[u&#39;bar fight&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="scanning-sub-parts">
+<h2>Scanning sub-parts<a class="headerlink" href="#scanning-sub-parts" title="Permalink to this headline">¶</a></h2>
+<p>The tagger will also scan the body lines of text subparts in a multipart
+message, using the same rules as if all those body lines lived in a single
+text payload.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: Was</span>
+<span class="gp">... </span><span class="s">Keywords: Raw</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/alternative; boundary=&quot;BOUNDARY&quot;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">From: sabo</span>
+<span class="gp">... </span><span class="s">To: obas</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Subject: farbaw</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: Was</span>
+<span class="go">Keywords: Raw</span>
+<span class="go">Content-Type: multipart/alternative; boundary=&quot;BOUNDARY&quot;</span>
+<span class="go">X-Topics: bar fight</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">From: sabo</span>
+<span class="go">To: obas</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Subject: farbaw</span>
+<span class="go">Keywords: barbaz</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;topichits&#39;</span><span class="p">]</span>
+<span class="go">[u&#39;bar fight&#39;]</span>
+</pre></div>
+</div>
+<p>But the tagger will not descend into non-text parts.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: Was</span>
+<span class="gp">... </span><span class="s">Keywords: Raw</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/alternative; boundary=BOUNDARY</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">From: sabo</span>
+<span class="gp">... </span><span class="s">To: obas</span>
+<span class="gp">... </span><span class="s">Content-Type: message/rfc822</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Subject: farbaw</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">From: sabo</span>
+<span class="gp">... </span><span class="s">To: obas</span>
+<span class="gp">... </span><span class="s">Content-Type: message/rfc822</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Subject: farbaw</span>
+<span class="gp">... </span><span class="s">Keywords: barbaz</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-topics&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Message tagger</a><ul>
+<li><a class="reference internal" href="#scanning-body-lines">Scanning body lines</a></li>
+<li><a class="reference internal" href="#scanning-sub-parts">Scanning sub-parts</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="subject-munging.html"
+                        title="previous chapter">Subject munging</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="to-outgoing.html"
+                        title="next chapter">The outgoing handler</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/tagger.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="to-outgoing.html" title="The outgoing handler"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="subject-munging.html" title="Subject munging"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

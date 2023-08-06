@@ -1,0 +1,239 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Archives &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Avoid duplicates" href="avoid-duplicates.html" />
+    <link rel="prev" title="After delivery" href="after-delivery.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="avoid-duplicates.html" title="Avoid duplicates"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="after-delivery.html" title="After delivery"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="archives">
+<h1>Archives<a class="headerlink" href="#archives" title="Permalink to this headline">¶</a></h1>
+<p>Updating the archives with posted messages is handled by a separate queue,
+which allows for better memory management and prevents blocking the main
+delivery processes while messages are archived.  This also allows external
+archivers to work in a separate process from the main Mailman delivery
+processes.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;to-archive&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;archive&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>A helper function.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">clear</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The purpose of this handler is to make a simple decision as to whether the
+message should get archived and if so, to drop the message in the archiving
+queue.  Really the most important things are to determine when a message
+should <em>not</em> get archived.</p>
+<p>For example, no digests should ever get archived.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">archive</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>If the mailing list is not configured to archive, then even regular deliveries
+won&#8217;t be archived.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">archive</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>There are two de-facto standards for a message to indicate that it does not
+want to be archived.  We&#8217;ve seen both in the wild so both are supported.  The
+<tt class="docutils literal"><span class="pre">X-No-Archive:</span></tt> header can be used to indicate that the message should not
+be archived.  Confusingly, this header&#8217;s value is actually ignored.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">archive</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">... </span><span class="s">X-No-Archive: YES</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>Even a <tt class="docutils literal"><span class="pre">no</span></tt> value will stop the archiving of the message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">... </span><span class="s">X-No-Archive: No</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>Another header that&#8217;s been observed is the <tt class="docutils literal"><span class="pre">X-Archive:</span></tt> header.  Here, the
+header&#8217;s case folded value must be <tt class="docutils literal"><span class="pre">no</span></tt> in order to prevent archiving.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">... </span><span class="s">X-Archive: No</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>But if the value is <tt class="docutils literal"><span class="pre">yes</span></tt>, then the message will be archived.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">... </span><span class="s">X-Archive: Yes</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qmsg</span><span class="p">,</span> <span class="n">qdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qmsg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: A sample message</span>
+<span class="go">X-Archive: Yes</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A message of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">qdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+<p>Without either archiving header, and all other things being the same, the
+message will get archived.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: A sample message</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qmsg</span><span class="p">,</span> <span class="n">qdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qmsg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: A sample message</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A message of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">qdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="after-delivery.html"
+                        title="previous chapter">After delivery</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="avoid-duplicates.html"
+                        title="next chapter">Avoid duplicates</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/archives.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="avoid-duplicates.html" title="Avoid duplicates"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="after-delivery.html" title="After delivery"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

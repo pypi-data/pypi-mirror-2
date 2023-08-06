@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Digests &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="File recipients" href="file-recips.html" />
+    <link rel="prev" title="Message decoration" href="decorate.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="file-recips.html" title="File recipients"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="decorate.html" title="Message decoration"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="digests">
+<h1>Digests<a class="headerlink" href="#digests" title="Permalink to this headline">¶</a></h1>
+<p>Digests are a way for a user to receive list traffic in collections instead of
+as individual messages when immediately posted.  There are several forms of
+digests, although only two are currently supported: MIME digests and RFC 1153
+(a.k.a. plain text) digests.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is a helper function used to iterate through all the accumulated digest
+messages, in the order in which they were posted.  This makes it easier to
+update the tests when we switch to a different mailbox format.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">digest_mbox</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">count</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">string</span> <span class="kn">import</span> <span class="n">Template</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">message_factory</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">count</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">text</span> <span class="o">=</span> <span class="n">Template</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: xtest@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Test message $i</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is message $i</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">substitute</span><span class="p">(</span><span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">yield</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">message_factory</span> <span class="o">=</span> <span class="n">message_factory</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="section" id="short-circuiting">
+<h2>Short circuiting<a class="headerlink" href="#short-circuiting" title="Permalink to this headline">¶</a></h2>
+<p>When a message is posted to the mailing list, it is generally added to a
+mailbox, unless the mailing list does not allow digests.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digestable</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">message_factory</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;to-digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">))</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;digest&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest_queue</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>...or they may allow digests but the message is already a digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digestable</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">isdigest</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">))</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest_queue</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="sending-a-digest">
+<h2>Sending a digest<a class="headerlink" href="#sending-a-digest" title="Permalink to this headline">¶</a></h2>
+<p>For messages which are not digests, but which are posted to a digesting
+mailing list, the messages will be stored until they reach a criteria
+triggering the sending of the digest.  If none of those criteria are met, then
+the message will just sit in the mailbox for a while.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest_queue</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest</span> <span class="o">=</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">digest</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">digest</span><span class="o">.</span><span class="n">_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>When the size of the digest mailbox reaches the maximum size threshold, a
+marker message is placed into the digest runner&#8217;s queue.  The digest is not
+actually crafted by the handler.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">volume</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">next_digest_number</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">size</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">message_factory</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">... </span>    <span class="n">size</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">msg</span><span class="p">))</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">size</span> <span class="o">&gt;=</span> <span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="k">break</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">))</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">digest_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>The digest has been moved to a unique file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.utilities.mailbox</span> <span class="kn">import</span> <span class="n">Mailbox</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;digest&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">Mailbox</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;digest_path&#39;</span><span class="p">]):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="go">Test message 2</span>
+<span class="go">Test message 3</span>
+<span class="go">Test message 4</span>
+<span class="go">Test message 5</span>
+<span class="go">Test message 6</span>
+<span class="go">Test message 7</span>
+<span class="go">Test message 8</span>
+<span class="go">Test message 9</span>
+</pre></div>
+</div>
+<p>Digests are actually crafted and sent by a separate digest queue runner.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Digests</a><ul>
+<li><a class="reference internal" href="#short-circuiting">Short circuiting</a></li>
+<li><a class="reference internal" href="#sending-a-digest">Sending a digest</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="decorate.html"
+                        title="previous chapter">Message decoration</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="file-recips.html"
+                        title="next chapter">File recipients</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/digests.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="file-recips.html" title="File recipients"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="decorate.html" title="Message decoration"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

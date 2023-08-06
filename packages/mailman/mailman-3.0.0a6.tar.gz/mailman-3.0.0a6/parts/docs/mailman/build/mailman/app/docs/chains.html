@@ -1,0 +1,449 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Chains &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Hooks" href="hooks.html" />
+    <link rel="prev" title="Bounces" href="bounces.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="hooks.html" title="Hooks"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="bounces.html" title="Bounces"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="chains">
+<h1>Chains<a class="headerlink" href="#chains" title="Permalink to this headline">¶</a></h1>
+<p>When a new message comes into the system, Mailman uses a set of rule chains to
+decide whether the message gets posted to the list, rejected, discarded, or
+held for moderator approval.</p>
+<p>There are a number of built-in chains available that act as end-points in the
+processing of messages.</p>
+<div class="section" id="the-discard-chain">
+<h2>The Discard chain<a class="headerlink" href="#the-discard-chain" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>discard</cite> chain simply throws the message away.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.chain</span> <span class="kn">import</span> <span class="n">IChain</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;discard&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IChain</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">name</span>
+<span class="go">discard</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">description</span>
+<span class="go">Discard a message and stop processing.</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Subject: My first post</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;first&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">print_msgid</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;{0}: {1}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+<span class="gp">... </span>        <span class="n">event</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">event</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;message-id&#39;</span><span class="p">,</span> <span class="s">&#39;n/a&#39;</span><span class="p">))</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.core.chains</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">event_subscribers</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">event_subscribers</span><span class="p">(</span><span class="n">print_msgid</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{},</span> <span class="s">&#39;discard&#39;</span><span class="p">)</span>
+<span class="go">DISCARD: &lt;first&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-reject-chain">
+<h2>The Reject chain<a class="headerlink" href="#the-reject-chain" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>reject</cite> chain bounces the message back to the original sender, and logs
+this action.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;reject&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IChain</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">name</span>
+<span class="go">reject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">description</span>
+<span class="go">Reject/bounce a message and stop processing.</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">event_subscribers</span><span class="p">(</span><span class="n">print_msgid</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{},</span> <span class="s">&#39;reject&#39;</span><span class="p">)</span>
+<span class="go">REJECT: &lt;first&gt;</span>
+</pre></div>
+</div>
+<p>The bounce message is now sitting in the <cite>virgin</cite> queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qfiles</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">qfiles</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: My first post</span>
+<span class="go">From: _xtest-owner@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">[No bounce details are available]</span>
+<span class="gp">...</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-hold-chain">
+<h2>The Hold Chain<a class="headerlink" href="#the-hold-chain" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>hold</cite> chain places the message into the admin request database and
+depending on the list&#8217;s settings, sends a notification to both the original
+sender and the list moderators.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;hold&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IChain</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">name</span>
+<span class="go">hold</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">description</span>
+<span class="go">Hold a message and stop processing.</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">event_subscribers</span><span class="p">(</span><span class="n">print_msgid</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{},</span> <span class="s">&#39;hold&#39;</span><span class="p">)</span>
+<span class="go">HOLD: &lt;first&gt;</span>
+</pre></div>
+</div>
+<p>There are now two messages in the Virgin queue, one to the list moderators and
+one to the original author.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">qfiles</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">,</span> <span class="n">sort_on</span><span class="o">=</span><span class="s">&#39;to&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">qfiles</span><span class="p">)</span>
+<span class="go">2</span>
+</pre></div>
+</div>
+<p>This message is addressed to the mailing list moderators.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: _xtest@example.com post from aperson@example.com requires approval</span>
+<span class="go">From: _xtest-owner@example.com</span>
+<span class="go">To: _xtest-owner@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="gp">...</span>
+<span class="go">As list administrator, your authorization is requested for the</span>
+<span class="go">following mailing list posting:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    List:    _xtest@example.com</span>
+<span class="go">    From:    aperson@example.com</span>
+<span class="go">    Subject: My first post</span>
+<span class="go">    Reason:  XXX</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">At your convenience, visit:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    http://lists.example.com/admindb/_xtest@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">to approve or deny the request.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">...</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">X-Message-ID-Hash: RXJU4JL6N2OUN3OYMXXPPSCR7P7JE2BW</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">...</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Subject: confirm ...</span>
+<span class="go">From: _xtest-request@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">If you reply to this message, keeping the Subject: header intact,</span>
+<span class="go">Mailman will discard the held message.  Do this if the message is</span>
+<span class="go">spam.  If you reply to this message and include an Approved: header</span>
+<span class="go">with the list password in it, the message will be approved for posting</span>
+<span class="go">to the list.  The Approved: header can also appear in the first line</span>
+<span class="go">of the body of the reply.</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+<p>This message is addressed to the sender of the message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Subject: Your message to _xtest@example.com awaits moderator approval</span>
+<span class="go">From: _xtest-bounces@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">Your mail to &#39;_xtest@example.com&#39; with the subject</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    My first post</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Is being held until the list moderator can review it for approval.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">The reason it is being held:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    XXX</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Either the message will get posted to the list, or you will receive</span>
+<span class="go">notification of the moderator&#39;s decision.  If you would like to cancel</span>
+<span class="go">this posting, please visit the following URL:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    http://lists.example.com/confirm/_xtest@example.com/...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>In addition, the pending database is holding the original messages, waiting
+for them to be disposed of by the original author or the list moderators.  The
+database is essentially a dictionary, with the keys being the randomly
+selected tokens included in the urls and the values being a 2-tuple where the
+first item is a type code and the second item is a message id.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">re</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cookie</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">mo</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s">&#39;confirm/[^/]+/(?P&lt;cookie&gt;.*)$&#39;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">mo</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">cookie</span> <span class="o">=</span> <span class="n">mo</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s">&#39;cookie&#39;</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">break</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">cookie</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">,</span> <span class="s">&#39;No confirmation token found&#39;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.pending</span> <span class="kn">import</span> <span class="n">IPendings</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IPendings</span><span class="p">)</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">cookie</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+<span class="go">[(u&#39;id&#39;, ...), (u&#39;type&#39;, u&#39;held message&#39;)]</span>
+</pre></div>
+</div>
+<p>The message itself is held in the message store.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.requests</span> <span class="kn">import</span> <span class="n">IRequests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_requests</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IRequests</span><span class="p">)</span><span class="o">.</span><span class="n">get_list_requests</span><span class="p">(</span><span class="n">mlist</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rkey</span><span class="p">,</span> <span class="n">rdata</span> <span class="o">=</span> <span class="n">list_requests</span><span class="o">.</span><span class="n">get_request</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s">&#39;id&#39;</span><span class="p">])</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.messages</span> <span class="kn">import</span> <span class="n">IMessageStore</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IMessageStore</span><span class="p">)</span><span class="o">.</span><span class="n">get_message_by_id</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">rdata</span><span class="p">[</span><span class="s">&#39;_mod_message_id&#39;</span><span class="p">])</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">X-Message-ID-Hash: RXJU4JL6N2OUN3OYMXXPPSCR7P7JE2BW</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-accept-chain">
+<h2>The Accept chain<a class="headerlink" href="#the-accept-chain" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>accept</cite> chain sends the message on the <cite>pipeline</cite> queue, where it will be
+processed and sent on to the list membership.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;accept&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IChain</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">name</span>
+<span class="go">accept</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">description</span>
+<span class="go">Accept a message.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">event_subscribers</span><span class="p">(</span><span class="n">print_msgid</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{},</span> <span class="s">&#39;accept&#39;</span><span class="p">)</span>
+<span class="go">ACCEPT: &lt;first&gt;</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">qfiles</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;pipeline&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">qfiles</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">X-Message-ID-Hash: RXJU4JL6N2OUN3OYMXXPPSCR7P7JE2BW</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="run-time-chains">
+<h2>Run-time chains<a class="headerlink" href="#run-time-chains" title="Permalink to this headline">¶</a></h2>
+<p>We can also define chains at run time, and these chains can be mutated.
+Run-time chains are made up of links where each link associates both a rule
+and a <cite>jump</cite>.  The rule is really a rule name, which is looked up when
+needed.  The jump names a chain which is jumped to if the rule matches.</p>
+<p>There is one built-in run-time chain, called appropriately <cite>built-in</cite>.  This
+is the default chain to use when no other input chain is defined for a mailing
+list.  It runs through the default rules, providing functionality similar to
+the Hold handler from previous versions of Mailman.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">chain</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">chains</span><span class="p">[</span><span class="s">&#39;built-in&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IChain</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">name</span>
+<span class="go">built-in</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">chain</span><span class="o">.</span><span class="n">description</span>
+<span class="go">The built-in moderation chain.</span>
+</pre></div>
+</div>
+<p>The previously created message is innocuous enough that it should pass through
+all default rules.  This message will end up in the <cite>pipeline</cite> queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">event_subscribers</span><span class="p">(</span><span class="n">print_msgid</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">ACCEPT: &lt;first&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qfiles</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;pipeline&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">qfiles</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">X-Message-ID-Hash: RXJU4JL6N2OUN3OYMXXPPSCR7P7JE2BW</span>
+<span class="go">X-Mailman-Rule-Misses: approved; emergency; loop; administrivia;</span>
+<span class="go">    implicit-dest;</span>
+<span class="go">    max-recipients; max-size; news-moderation; no-subject;</span>
+<span class="go">    suspicious-header</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">An important message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>In addition, the message metadata now contains lists of all rules that have
+hit and all rules that have missed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;rule_hits&#39;</span><span class="p">])</span>
+<span class="go">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">rule_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">qfiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;rule_misses&#39;</span><span class="p">]):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">rule_name</span>
+<span class="go">administrivia</span>
+<span class="go">approved</span>
+<span class="go">emergency</span>
+<span class="go">implicit-dest</span>
+<span class="go">loop</span>
+<span class="go">max-recipients</span>
+<span class="go">max-size</span>
+<span class="go">news-moderation</span>
+<span class="go">no-subject</span>
+<span class="go">suspicious-header</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Chains</a><ul>
+<li><a class="reference internal" href="#the-discard-chain">The Discard chain</a></li>
+<li><a class="reference internal" href="#the-reject-chain">The Reject chain</a></li>
+<li><a class="reference internal" href="#the-hold-chain">The Hold Chain</a></li>
+<li><a class="reference internal" href="#the-accept-chain">The Accept chain</a></li>
+<li><a class="reference internal" href="#run-time-chains">Run-time chains</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="bounces.html"
+                        title="previous chapter">Bounces</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="hooks.html"
+                        title="next chapter">Hooks</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/app/docs/chains.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="hooks.html" title="Hooks"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="bounces.html" title="Bounces"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

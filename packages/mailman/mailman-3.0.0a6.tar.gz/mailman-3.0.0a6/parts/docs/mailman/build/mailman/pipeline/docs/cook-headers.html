@@ -1,0 +1,445 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Cooking headers &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Message decoration" href="decorate.html" />
+    <link rel="prev" title="Cleansing headers" href="cleanse.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="decorate.html" title="Message decoration"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="cleanse.html" title="Cleansing headers"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="cooking-headers">
+<h1>Cooking headers<a class="headerlink" href="#cooking-headers" title="Permalink to this headline">¶</a></h1>
+<p>Messages that flow through the global pipeline get their headers &#8216;cooked&#8217;,
+which basically means that their headers go through several mostly unrelated
+transformations.  Some headers get added, others get changed.  Some of these
+changes depend on mailing list settings and others depend on how the message
+is getting sent through the system.  We&#8217;ll take things one-by-one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">subject_prefix</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_list_post_header</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">archive</span> <span class="o">=</span> <span class="bp">True</span>
+</pre></div>
+</div>
+<div class="section" id="saving-the-original-sender">
+<h2>Saving the original sender<a class="headerlink" href="#saving-the-original-sender" title="Permalink to this headline">¶</a></h2>
+<p>Because the original sender headers may get deleted or changed, this handler
+will place the sender in the message metadata for safe keeping.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.cook_headers</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;original_sender&#39;</span><span class="p">]</span>
+<span class="go">aperson@example.com</span>
+</pre></div>
+</div>
+<p>But if there was no original sender, then the empty string will be saved.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: No original sender</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;original_sender&#39;</span><span class="p">]</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mailman-version-header">
+<h2>Mailman version header<a class="headerlink" href="#mailman-version-header" title="Permalink to this headline">¶</a></h2>
+<p>Mailman will also insert an <tt class="docutils literal"><span class="pre">X-Mailman-Version</span></tt> header...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.version</span> <span class="kn">import</span> <span class="n">VERSION</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-mailman-version&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">VERSION</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>...but only if one doesn&#8217;t already exist.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">X-Mailman-Version: 3000</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;x-mailman-version&#39;</span><span class="p">]</span>
+<span class="go">3000</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="precedence-header">
+<h2>Precedence header<a class="headerlink" href="#precedence-header" title="Permalink to this headline">¶</a></h2>
+<p>Mailman will insert a <tt class="docutils literal"><span class="pre">Precedence</span></tt> header, which is a de-facto standard for
+telling automatic reply software (e.g. <tt class="docutils literal"><span class="pre">vacation(1)</span></tt>) not to respond to this
+message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;precedence&#39;</span><span class="p">]</span>
+<span class="go">list</span>
+</pre></div>
+</div>
+<p>But Mailman will only add that header if the original message doesn&#8217;t already
+have one of them.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Precedence: junk</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;precedence&#39;</span><span class="p">]</span>
+<span class="go">junk</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="rfc-2919-and-2369-headers">
+<h2>RFC 2919 and 2369 headers<a class="headerlink" href="#rfc-2919-and-2369-headers" title="Permalink to this headline">¶</a></h2>
+<p>This is a helper function for the following section.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;---start---&#39;</span>
+<span class="gp">... </span>    <span class="c"># Sort the List-* headers found in the message.  We need to do</span>
+<span class="gp">... </span>    <span class="c"># this because CookHeaders puts them in a dictionary which does</span>
+<span class="gp">... </span>    <span class="c"># not have a guaranteed sort order.</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+<span class="gp">... </span>        <span class="n">parts</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;-&#39;</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">if</span> <span class="s">&#39;list&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="k">continue</span>
+<span class="gp">... </span>        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="n">header</span><span class="p">):</span>
+<span class="gp">... </span>            <span class="k">print</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s">: </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;---end---&#39;</span>
+</pre></div>
+</div>
+<p>These RFCs define headers for mailing list actions.  A mailing list should
+generally add these headers, but not for messages that aren&#8217;t crafted for a
+specific list (e.g. password reminders in Mailman 2.x).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_nolist</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>Some people don&#8217;t like these headers because their mail readers aren&#8217;t good
+about hiding them.  A list owner can turn these headers off.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_rfc2369_headers</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>But normally, a list will include these headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_rfc2369_headers</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_list_post_header</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;12345&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/_xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Id: &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Post: &lt;mailto:_xtest@example.com&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>If the mailing list has a description, then it is included in the <tt class="docutils literal"><span class="pre">List-Id</span></tt>
+header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="s">&#39;My test mailing list&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/_xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Id: My test mailing list &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Post: &lt;mailto:_xtest@example.com&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>There are some circumstances when the list administrator wants to explicitly
+set the <tt class="docutils literal"><span class="pre">List-ID</span></tt> header.  Start by creating a new domain.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.domain</span> <span class="kn">import</span> <span class="n">IDomainManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">domain</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IDomainManager</span><span class="p">)</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;mail.example.net&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">host_name</span> <span class="o">=</span> <span class="s">&#39;mail.example.net&#39;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;list-id&#39;</span><span class="p">]</span>
+<span class="go">My test mailing list &lt;_xtest.example.com&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">list_id</span> <span class="o">=</span> <span class="s">&#39;_xtest.mail.example.net&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;list-id&#39;</span><span class="p">]</span>
+<span class="go">My test mailing list &lt;_xtest.mail.example.net&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">host_name</span> <span class="o">=</span> <span class="s">&#39;example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">list_id</span> <span class="o">=</span> <span class="s">&#39;_xtest.example.com&#39;</span>
+</pre></div>
+</div>
+<p>Any existing <tt class="docutils literal"><span class="pre">List-ID</span></tt> headers are removed from the original message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">List-ID: &lt;123.456.789&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;list-id&#39;</span><span class="p">))</span>
+<span class="go">[u&#39;My test mailing list &lt;_xtest.example.com&gt;&#39;]</span>
+</pre></div>
+</div>
+<p>Administrative messages crafted by Mailman will have a reduced set of headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">reduced_list_headers</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Id: My test mailing list &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">X-List-Administrivia: yes</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>With the normal set of <tt class="docutils literal"><span class="pre">List-*</span></tt> headers, it&#8217;s still possible to suppress the
+<tt class="docutils literal"><span class="pre">List-Post</span></tt> header, which is reasonable for an announce only mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_list_post_header</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/_xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Id: My test mailing list &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+<p>And if the list isn&#8217;t being archived, it makes no sense to add the
+<tt class="docutils literal"><span class="pre">List-Archive</span></tt> header either.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">include_list_post_header</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">archive</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_headers</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="go">---start---</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Id: My test mailing list &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Post: &lt;mailto:_xtest@example.com&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">---end---</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="archived-at">
+<h2>Archived-At<a class="headerlink" href="#archived-at" title="Permalink to this headline">¶</a></h2>
+<p>RFC 5064 (draft) defines a new <tt class="docutils literal"><span class="pre">Archived-At</span></tt> header which contains the url to
+the individual message in the archives.  The stock Pipermail archiver doesn&#8217;t
+support this because the url can&#8217;t be calculated until after the message is
+archived.  Because this is done by the archive runner, this information isn&#8217;t
+available to us now.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;archived-at&#39;</span><span class="p">]</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="personalization">
+<h2>Personalization<a class="headerlink" href="#personalization" title="Permalink to this headline">¶</a></h2>
+<p>The <tt class="docutils literal"><span class="pre">To</span></tt> field normally contains the list posting address.  However when
+messages are fully personalized, that header will get overwritten with the
+address of the recipient.  The list&#8217;s posting address will be added to one of
+the recipient headers so that users will be able to reply back to the list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mailinglist</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="gp">... </span>    <span class="n">Personalization</span><span class="p">,</span> <span class="n">ReplyToMunging</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">personalize</span> <span class="o">=</span> <span class="n">Personalization</span><span class="o">.</span><span class="n">full</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">reply_goes_to_list</span> <span class="o">=</span> <span class="n">ReplyToMunging</span><span class="o">.</span><span class="n">no_munging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">X-BeenThere: _xtest@example.com</span>
+<span class="go">X-Mailman-Version: ...</span>
+<span class="go">Precedence: list</span>
+<span class="go">Cc: My test mailing list &lt;_xtest@example.com&gt;</span>
+<span class="go">List-Id: My test mailing list &lt;_xtest.example.com&gt;</span>
+<span class="go">List-Unsubscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-leave@example.com&gt;</span>
+<span class="go">List-Post: &lt;mailto:_xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:_xtest-request@example.com?subject=help&gt;</span>
+<span class="go">List-Subscribe: &lt;http://lists.example.com/listinfo/_xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:_xtest-join@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Cooking headers</a><ul>
+<li><a class="reference internal" href="#saving-the-original-sender">Saving the original sender</a></li>
+<li><a class="reference internal" href="#mailman-version-header">Mailman version header</a></li>
+<li><a class="reference internal" href="#precedence-header">Precedence header</a></li>
+<li><a class="reference internal" href="#rfc-2919-and-2369-headers">RFC 2919 and 2369 headers</a></li>
+<li><a class="reference internal" href="#archived-at">Archived-At</a></li>
+<li><a class="reference internal" href="#personalization">Personalization</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="cleanse.html"
+                        title="previous chapter">Cleansing headers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="decorate.html"
+                        title="next chapter">Message decoration</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/cook-headers.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="decorate.html" title="Message decoration"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="cleanse.html" title="Cleansing headers"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

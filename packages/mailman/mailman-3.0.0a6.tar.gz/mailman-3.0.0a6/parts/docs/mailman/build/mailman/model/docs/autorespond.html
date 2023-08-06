@@ -1,0 +1,225 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Automatic responder &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Domains" href="domains.html" />
+    <link rel="prev" title="Email addresses" href="addresses.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="domains.html" title="Domains"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="addresses.html" title="Email addresses"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="automatic-responder">
+<h1>Automatic responder<a class="headerlink" href="#automatic-responder" title="Permalink to this headline">¶</a></h1>
+<p>In various situations, Mailman will send an automatic response to the author
+of an email message.  For example, if someone sends a command to the
+<tt class="docutils literal"><span class="pre">-request</span></tt> address, Mailman will send a response, but to cut down on third
+party spam, the sender will only get a certain number of responses per day.</p>
+<p>First, given a mailing list you need to adapt it to an <tt class="docutils literal"><span class="pre">IAutoResponseSet</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.autorespond</span> <span class="kn">import</span> <span class="n">IAutoResponseSet</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span> <span class="o">=</span> <span class="n">IAutoResponseSet</span><span class="p">(</span><span class="n">mlist</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IAutoResponseSet</span><span class="p">,</span> <span class="n">response_set</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>You can&#8217;t adapt other objects to an <tt class="docutils literal"><span class="pre">IAutoResponseSet</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">IAutoResponseSet</span><span class="p">(</span><span class="nb">object</span><span class="p">())</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">TypeError</span>: <span class="n-Identifier">(&#39;Could not adapt&#39;, ...</span>
+</pre></div>
+</div>
+<p>There are various kinds of response types.  For example, Mailman will send an
+automatic response when messages are held for approval, or when it receives an
+email command.  You can find out how many responses for a particular address
+have already been sent today.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.autorespond</span> <span class="kn">import</span> <span class="n">Response</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>Using the response set, we can record that a hold response is sent to the
+address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">response_sent</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>We can also record that a command response was sent.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">response_sent</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>Let&#8217;s send one more.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">response_sent</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">2</span>
+</pre></div>
+</div>
+<p>Now the day flips over and all the counts reset.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.utilities.datetime</span> <span class="kn">import</span> <span class="n">factory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">factory</span><span class="o">.</span><span class="n">fast_forward</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<div class="section" id="response-dates">
+<h2>Response dates<a class="headerlink" href="#response-dates" title="Permalink to this headline">¶</a></h2>
+<p>You can also use the response set to get the date of the last response sent.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">response</span> <span class="o">=</span> <span class="n">response_set</span><span class="o">.</span><span class="n">last_response</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">hold</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response</span><span class="o">.</span><span class="n">mailing_list</span>
+<span class="go">&lt;mailing list &quot;test@example.com&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response</span><span class="o">.</span><span class="n">address</span>
+<span class="go">&lt;Address: aperson@example.com [not verified] at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response</span><span class="o">.</span><span class="n">response_type</span>
+<span class="go">&lt;EnumValue: Response.hold [int=1]&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response</span><span class="o">.</span><span class="n">date_sent</span>
+<span class="go">datetime.date(2005, 8, 1)</span>
+</pre></div>
+</div>
+<p>When another response is sent today, that becomes the last one sent.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">response_sent</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">last_response</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span><span class="o">.</span><span class="n">date_sent</span>
+<span class="go">datetime.date(2005, 8, 2)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">factory</span><span class="o">.</span><span class="n">fast_forward</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">response_sent</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">last_response</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span><span class="o">.</span><span class="n">date_sent</span>
+<span class="go">datetime.date(2005, 8, 5)</span>
+</pre></div>
+</div>
+<p>If there&#8217;s been no response sent to a particular address, None is returned.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">address</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;bperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">response_set</span><span class="o">.</span><span class="n">todays_count</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">response_set</span><span class="o">.</span><span class="n">last_response</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Automatic responder</a><ul>
+<li><a class="reference internal" href="#response-dates">Response dates</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="addresses.html"
+                        title="previous chapter">Email addresses</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="domains.html"
+                        title="next chapter">Domains</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/model/docs/autorespond.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="domains.html" title="Domains"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="addresses.html" title="Email addresses"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

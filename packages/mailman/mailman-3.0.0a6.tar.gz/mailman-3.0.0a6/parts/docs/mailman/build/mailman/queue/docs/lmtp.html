@@ -1,0 +1,425 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>LTMP server &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="The news runner" href="news.html" />
+    <link rel="prev" title="The incoming queue runner" href="incoming.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="news.html" title="The news runner"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="incoming.html" title="The incoming queue runner"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="ltmp-server">
+<h1>LTMP server<a class="headerlink" href="#ltmp-server" title="Permalink to this headline">¶</a></h1>
+<p>Mailman can accept messages via LMTP (RFC 2033).  Most modern mail servers
+support LMTP local delivery, so this is a very portable way to connect Mailman
+with your mail server.</p>
+<p>Our LMTP server is fairly simple though; all it does is make sure that the
+message is destined for a valid endpoint, e.g. <tt class="docutils literal"><span class="pre">mylist-join&#64;example.com</span></tt>.</p>
+<p>Let&#8217;s start a testable LMTP queue runner.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing</span> <span class="kn">import</span> <span class="n">helpers</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span> <span class="o">=</span> <span class="n">helpers</span><span class="o">.</span><span class="n">TestableMaster</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s">&#39;lmtp&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It also helps to have a nice LMTP client.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span> <span class="o">=</span> <span class="n">helpers</span><span class="o">.</span><span class="n">get_lmtp_client</span><span class="p">()</span>
+<span class="go">(220, &#39;... Python LMTP queue runner 1.0&#39;)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">lhlo</span><span class="p">(</span><span class="s">&#39;remote.example.org&#39;</span><span class="p">)</span>
+<span class="go">(250, ...)</span>
+</pre></div>
+</div>
+<div class="section" id="posting-address">
+<h2>Posting address<a class="headerlink" href="#posting-address" title="Permalink to this headline">¶</a></h2>
+<p>If the mail server tries to send a message to a nonexistent mailing list, it
+will get a 550 error.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist@example.com</span>
+<span class="gp">... </span><span class="s">Subject: An interesting message</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is an interesting message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">SMTPDataError: (550, &#39;Requested action not taken</span>: <span class="n-Identifier">mailbox unavailable&#39;)</span>
+</pre></div>
+</div>
+<p>Once the mailing list is created, the posting address is valid.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">create_list</span><span class="p">(</span><span class="s">&#39;mylist@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;mailing list &quot;mylist@example.com&quot; at ...&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist@example.com</span>
+<span class="gp">... </span><span class="s">Subject: An interesting message</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;badger&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is an interesting message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;in&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: anne.person@example.com</span>
+<span class="go">To: mylist@example.com</span>
+<span class="go">Subject: An interesting message</span>
+<span class="go">Message-ID: &lt;badger&gt;</span>
+<span class="go">X-MailFrom: anne.person@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is an interesting message.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">to_list      : True</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="sub-addresses">
+<h2>Sub-addresses<a class="headerlink" href="#sub-addresses" title="Permalink to this headline">¶</a></h2>
+<p>The LMTP server understands each of the list&#8217;s sub-addreses, such as -join,
+-leave, -request and so on.  If the message is posted to an invalid
+sub-address though, it is rejected.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-bogus@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-bogus@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Help</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;cow&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Please help me.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">SMTPDataError: (550, &#39;Requested action not taken</span>: <span class="n-Identifier">mailbox unavailable&#39;)</span>
+</pre></div>
+</div>
+<p>But the message is accepted if posted to a valid sub-address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-request@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-request@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Help</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;dog&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Please help me.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<div class="section" id="request-subaddress">
+<h3>Request subaddress<a class="headerlink" href="#request-subaddress" title="Permalink to this headline">¶</a></h3>
+<p>Depending on the subaddress, there is a message in the appropriate queue for
+later processing.  For example, all -request messages are put into the command
+queue for processing.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: anne.person@example.com</span>
+<span class="go">To: mylist-request@example.com</span>
+<span class="go">Subject: Help</span>
+<span class="go">Message-ID: &lt;dog&gt;</span>
+<span class="go">X-MailFrom: anne.person@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Please help me.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : request</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="bounce-processor">
+<h3>Bounce processor<a class="headerlink" href="#bounce-processor" title="Permalink to this headline">¶</a></h3>
+<p>A message to the -bounces address goes to the bounce processor.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;mail-daemon@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-bounces@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: mail-daemon@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-bounces@example.com</span>
+<span class="gp">... </span><span class="s">Subject: A bounce</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;elephant&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Bouncy bouncy.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;bounces&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : bounces</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="command-processor">
+<h3>Command processor<a class="headerlink" href="#command-processor" title="Permalink to this headline">¶</a></h3>
+<p>Confirmation messages go to the command processor...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-confirm@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-confirm@example.com</span>
+<span class="gp">... </span><span class="s">Subject: A bounce</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;falcon&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">confirm 123</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : confirm</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+<p>...as do join messages...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-join@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-join@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;giraffe&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : join</span>
+<span class="go">version      : ...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-subscribe@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-subscribe@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;hippopotamus&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : join</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+<p>...and leave messages.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-leave@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-leave@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;iguana&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : leave</span>
+<span class="go">version      : ...</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-unsubscribe@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-unsubscribe@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;jackal&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : leave</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="incoming-processor">
+<h3>Incoming processor<a class="headerlink" href="#incoming-processor" title="Permalink to this headline">¶</a></h3>
+<p>Messages to the -owner address go to the incoming processor.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">lmtp</span><span class="o">.</span><span class="n">sendmail</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;anne.person@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">[</span><span class="s">&#39;mylist-owner@example.com&#39;</span><span class="p">],</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: anne.person@example.com</span>
+<span class="gp">... </span><span class="s">To: mylist-owner@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;kangaroo&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;in&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">envsender    : changeme@example.com</span>
+<span class="go">listname     : mylist@example.com</span>
+<span class="go">original_size: ...</span>
+<span class="go">subaddress   : owner</span>
+<span class="go">to_owner     : True</span>
+<span class="go">version      : ...</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="clean-up">
+<h2>Clean up<a class="headerlink" href="#clean-up" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">LTMP server</a><ul>
+<li><a class="reference internal" href="#posting-address">Posting address</a></li>
+<li><a class="reference internal" href="#sub-addresses">Sub-addresses</a><ul>
+<li><a class="reference internal" href="#request-subaddress">Request subaddress</a></li>
+<li><a class="reference internal" href="#bounce-processor">Bounce processor</a></li>
+<li><a class="reference internal" href="#command-processor">Command processor</a></li>
+<li><a class="reference internal" href="#incoming-processor">Incoming processor</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#clean-up">Clean up</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="incoming.html"
+                        title="previous chapter">The incoming queue runner</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="news.html"
+                        title="next chapter">The news runner</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/lmtp.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="news.html" title="The news runner"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="incoming.html" title="The incoming queue runner"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,412 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Managing members &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Membership changes via email" href="membership.html" />
+    <link rel="prev" title="Command line list display" href="lists.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="membership.html" title="Membership changes via email"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="lists.html" title="Command line list display"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="managing-members">
+<h1>Managing members<a class="headerlink" href="#managing-members" title="Permalink to this headline">¶</a></h1>
+<p>The <tt class="docutils literal"><span class="pre">bin/mailman</span> <span class="pre">members</span></tt> command allows a site administrator to display,
+add, and remove members from a mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist1</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test1@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeArgs</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">input_filename</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">output_filename</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">listname</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="gp">... </span>    <span class="n">regular</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">... </span>    <span class="n">digest</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">... </span>    <span class="n">nomail</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span> <span class="o">=</span> <span class="n">FakeArgs</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.commands.cli_members</span> <span class="kn">import</span> <span class="n">Members</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span> <span class="o">=</span> <span class="n">Members</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="section" id="listing-members">
+<h2>Listing members<a class="headerlink" href="#listing-members" title="Permalink to this headline">¶</a></h2>
+<p>You can list all the members of a mailing list by calling the command with no
+options.  To start with, there are no members of the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="p">[</span><span class="n">mlist1</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">test1@example.com has no members</span>
+</pre></div>
+</div>
+<p>Once the mailing list add some members, they will be displayed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">DeliveryMode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.app.membership</span> <span class="kn">import</span> <span class="n">add_member</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Anne Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="go">&lt;Member: Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">         on test1@example.com as MemberRole.member&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;bart@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Bart Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="go">&lt;Member: Bart Person &lt;bart@example.com&gt;</span>
+<span class="go">         on test1@example.com as MemberRole.member&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+</pre></div>
+</div>
+<p>Members are displayed in alphabetical order based on their address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;anne@aaaxample.com&#39;</span><span class="p">,</span> <span class="s">&#39;Anne Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="go">&lt;Member: Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">         on test1@example.com as MemberRole.member&gt;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+</pre></div>
+</div>
+<p>You can also output this list to a file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">mkstemp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fd</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">output_filename</span> <span class="o">=</span> <span class="n">mkstemp</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_filename</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">output_filename</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+</div>
+<p>The output file can also be standard out.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">output_filename</span> <span class="o">=</span> <span class="s">&#39;-&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">output_filename</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+</div>
+<div class="section" id="filtering-on-delivery-mode">
+<h3>Filtering on delivery mode<a class="headerlink" href="#filtering-on-delivery-mode" title="Permalink to this headline">¶</a></h3>
+<p>You can limit output to just the regular non-digest members...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">regular</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;anne@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">plaintext_digests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...or just the digest members.  Furthermore, you can either display all digest
+members...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;anne@aaaxample.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">mime_digests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">regular</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">digest</span> <span class="o">=</span> <span class="s">&#39;any&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...just plain text digest members...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">digest</span> <span class="o">=</span> <span class="s">&#39;plaintext&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...just MIME digest members.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">digest</span> <span class="o">=</span> <span class="s">&#39;mime&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+
+<span class="go"># Reset for following tests.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">digest</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="filtering-on-delivery-status">
+<h3>Filtering on delivery status<a class="headerlink" href="#filtering-on-delivery-status" title="Permalink to this headline">¶</a></h3>
+<p>You can also filter the display on the member&#8217;s delivery status.  By default,
+all members are displayed, but you can filter out only those whose delivery
+status is enabled...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">DeliveryStatus</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;anne@aaaxample.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_status</span> <span class="o">=</span> <span class="n">DeliveryStatus</span><span class="o">.</span><span class="n">by_moderator</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;bart@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_status</span> <span class="o">=</span> <span class="n">DeliveryStatus</span><span class="o">.</span><span class="n">by_user</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">add_member</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;cris@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Cris Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_status</span> <span class="o">=</span> <span class="n">DeliveryStatus</span><span class="o">.</span><span class="n">unknown</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">add_member</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;dave@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Dave Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_status</span> <span class="o">=</span> <span class="n">DeliveryStatus</span><span class="o">.</span><span class="n">enabled</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span> <span class="o">=</span> <span class="n">add_member</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">mlist1</span><span class="p">,</span> <span class="s">&#39;elly@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Elly Person&#39;</span><span class="p">,</span> <span class="s">&#39;xxx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="n">mlist1</span><span class="o">.</span><span class="n">preferred_language</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_status</span> <span class="o">=</span> <span class="n">DeliveryStatus</span><span class="o">.</span><span class="n">by_bounces</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;enabled&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@example.com&gt;</span>
+<span class="go">Dave Person &lt;dave@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...or disabled by the user...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;byuser&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...or disabled by the list administrator (or moderator)...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;byadmin&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+</pre></div>
+</div>
+<p>...or by the bounce processor...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;bybounces&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Elly Person &lt;elly@example.com&gt;</span>
+</pre></div>
+</div>
+<p>...or for unknown (legacy) reasons.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;unknown&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Cris Person &lt;cris@example.com&gt;</span>
+</pre></div>
+</div>
+<p>You can also display all members who have delivery disabled for any reason.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="s">&#39;any&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Anne Person &lt;anne@aaaxample.com&gt;</span>
+<span class="go">Bart Person &lt;bart@example.com&gt;</span>
+<span class="go">Cris Person &lt;cris@example.com&gt;</span>
+<span class="go">Elly Person &lt;elly@example.com&gt;</span>
+
+<span class="go"># Reset for following tests.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">nomail</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="adding-members">
+<h2>Adding members<a class="headerlink" href="#adding-members" title="Permalink to this headline">¶</a></h2>
+<p>You can add members to a mailing list from the command line.  To do so, you
+need a file containing email addresses and full names that can be parsed by
+<tt class="docutils literal"><span class="pre">email.utils.parseaddr()</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist2</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test2@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">addresses</span> <span class="o">=</span> <span class="p">[</span>
+<span class="gp">... </span>    <span class="p">]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">VAR_DIR</span><span class="p">,</span> <span class="s">&#39;addresses.txt&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;Bart Person &lt;bperson@example.com&gt;&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;cperson@example.com (Cate Person)&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="n">address</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">input_filename</span> <span class="o">=</span> <span class="n">path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">listname</span> <span class="o">=</span> <span class="p">[</span><span class="n">mlist2</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">address</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="n">mlist2</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;, u&#39;cperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>You can also specify <tt class="docutils literal"><span class="pre">-</span></tt> as the filename, in which case the addresses are
+taken from standard input.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="s">&#39;us-ascii&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;dperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                <span class="s">&#39;Elly Person &lt;eperson@example.com&gt;&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                <span class="s">&#39;fperson@example.com (Fred Person)&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                <span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="n">address</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="o">=</span> <span class="n">fp</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">input_filename</span> <span class="o">=</span> <span class="s">&#39;-&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">__stdin__</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">address</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="n">mlist2</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;, u&#39;cperson@example.com&#39;,</span>
+<span class="go"> u&#39;dperson@example.com&#39;, u&#39;eperson@example.com&#39;, u&#39;fperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Blank lines and lines that begin with &#8216;#&#8217; are ignored.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;gperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;# hperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;   &#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;iperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="n">address</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">input_filename</span> <span class="o">=</span> <span class="n">path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">address</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="n">mlist2</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;, u&#39;cperson@example.com&#39;,</span>
+<span class="go"> u&#39;dperson@example.com&#39;, u&#39;eperson@example.com&#39;, u&#39;fperson@example.com&#39;,</span>
+<span class="go"> u&#39;gperson@example.com&#39;, u&#39;iperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Addresses which are already subscribed are ignored, although a warning is
+printed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;gperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="s">&#39;jperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="n">address</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">Already subscribed (skipping): gperson@example.com</span>
+<span class="go">Already subscribed (skipping): aperson@example.com</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">address</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="n">mlist2</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;, u&#39;cperson@example.com&#39;,</span>
+<span class="go"> u&#39;dperson@example.com&#39;, u&#39;eperson@example.com&#39;, u&#39;fperson@example.com&#39;,</span>
+<span class="go"> u&#39;gperson@example.com&#39;, u&#39;iperson@example.com&#39;, u&#39;jperson@example.com&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="displaying-members">
+<h2>Displaying members<a class="headerlink" href="#displaying-members" title="Permalink to this headline">¶</a></h2>
+<p>With no arguments, the command displays all members of the list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">args</span><span class="o">.</span><span class="n">input_filename</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+<span class="go">aperson@example.com</span>
+<span class="go">Bart Person &lt;bperson@example.com&gt;</span>
+<span class="go">Cate Person &lt;cperson@example.com&gt;</span>
+<span class="go">dperson@example.com</span>
+<span class="go">Elly Person &lt;eperson@example.com&gt;</span>
+<span class="go">Fred Person &lt;fperson@example.com&gt;</span>
+<span class="go">gperson@example.com</span>
+<span class="go">iperson@example.com</span>
+<span class="go">jperson@example.com</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Managing members</a><ul>
+<li><a class="reference internal" href="#listing-members">Listing members</a><ul>
+<li><a class="reference internal" href="#filtering-on-delivery-mode">Filtering on delivery mode</a></li>
+<li><a class="reference internal" href="#filtering-on-delivery-status">Filtering on delivery status</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#adding-members">Adding members</a></li>
+<li><a class="reference internal" href="#displaying-members">Displaying members</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="lists.html"
+                        title="previous chapter">Command line list display</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="membership.html"
+                        title="next chapter">Membership changes via email</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/commands/docs/members.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="membership.html" title="Membership changes via email"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="lists.html" title="Command line list display"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

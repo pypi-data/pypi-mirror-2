@@ -1,0 +1,220 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Hooking up your mail server &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../index.html" />
+    <link rel="next" title="Mailman - The GNU Mailing List Management System" href="NEWS.html" />
+    <link rel="prev" title="GNU Mailman Acknowledgments" href="ACKNOWLEDGMENTS.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="NEWS.html" title="Mailman - The GNU Mailing List Management System"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="ACKNOWLEDGMENTS.html" title="GNU Mailman Acknowledgments"
+             accesskey="P">previous</a> |</li>
+        <li><a href="README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="hooking-up-your-mail-server">
+<h1>Hooking up your mail server<a class="headerlink" href="#hooking-up-your-mail-server" title="Permalink to this headline">¶</a></h1>
+<p>Mailman needs to be hooked up to your mail server both to accept incoming mail
+and to deliver outgoing mail.  Mailman itself never delivers messages to the
+end user; it lets its immediate upstream mail server do that.</p>
+<p>The preferred way to allow Mailman to accept incoming messages from your mail
+server is to use the <a class="reference external" href="http://en.wikipedia.org/wiki/Local_Mail_Transfer_Protocol">Local Mail Transfer Protocol</a> (<a class="reference external" href="http://www.faqs.org/rfcs/rfc2033.html">LMTP</a>) interface.  Most
+open source mail server support LMTP for local delivery, and this is much more
+efficient than spawning a process just to do the delivery.</p>
+<p>Your mail server should also accept <a class="reference external" href="http://en.wikipedia.org/wiki/Simple_Mail_Transfer_Protocol">Simple Mail Transfer Protocol</a> (<a class="reference external" href="http://www.faqs.org/rfcs/rfc5321.html">SMTP</a>)
+connections from Mailman, for all outgoing messages.</p>
+<p>The specific instructions for hooking your mail server up to Mailman differs
+depending on which mail server you&#8217;re using.  The following are instructions
+for the popular open source mail servers.</p>
+<p>Note that Mailman provides lots of configuration variables that you can use to
+tweak performance for your operating environment.  See the
+<cite>src/mailman/config/schema.cfg</cite> file for details.</p>
+<div class="section" id="exim">
+<h2>Exim<a class="headerlink" href="#exim" title="Permalink to this headline">¶</a></h2>
+<p>Contributions are welcome!</p>
+</div>
+<div class="section" id="postfix">
+<h2>Postfix<a class="headerlink" href="#postfix" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="mailman-settings">
+<h3>Mailman settings<a class="headerlink" href="#mailman-settings" title="Permalink to this headline">¶</a></h3>
+<p>You need to tell Mailman that you are using the Postfix mail server.  In your
+<cite>mailman.cfg</cite> file, add the following section:</p>
+<div class="highlight-python"><pre>[mta]
+incoming: mailman.mta.postfix.LMTP
+outgoing: mailman.mta.deliver.deliver
+lmtp_host: mail.example.com
+lmtp_port: 8024
+smtp_host: mail.example.com
+smtp_port: 25</pre>
+</div>
+<p>Some of these settings are already the default, so take a look at Mailman&#8217;s
+<cite>src/mailman/config/schema.cfg</cite> file for details.  You&#8217;ll need to change the
+<cite>lmtp_host</cite> and <cite>smtp_post</cite> to the appropriate host names of course.
+Generally, Postfix will listen for incoming SMTP connections on port 25.
+Postfix will deliver via LMTP over port 24 by default, however if you are not
+running Mailman as root, you&#8217;ll need to change this to a higher port number,
+as shown above.</p>
+</div>
+<div class="section" id="basic-postfix-connections">
+<h3>Basic Postfix connections<a class="headerlink" href="#basic-postfix-connections" title="Permalink to this headline">¶</a></h3>
+<p>There are several ways to hook <a class="reference external" href="http://www.postfix.org">Postfix</a> up to Mailman, so here are the
+simplest instructions.  The following settings should be added to Postfix&#8217;s
+<cite>main.cf</cite> file.</p>
+<p>Mailman supports a technique called <a class="reference external" href="http://en.wikipedia.org/wiki/Variable_envelope_return_path">Variable Envelope Return Path</a> (VERP) to
+disambiguate and accurately record bounces.  By default Mailman&#8217;s VERP
+delimiter is the <cite>+</cite> sign, so adding this setting allows Postfix to properly
+handle Mailman&#8217;s VERP&#8217;d messages:</p>
+<div class="highlight-python"><pre># Support the default VERP delimiter.
+recipient_delimiter = +</pre>
+</div>
+<p>In older versions of Postfix, unknown local recipients generated a temporary
+failure.  It&#8217;s much better (and the default in newer Postfix releases) to
+treat them as permanent failures.  You can add this to your <cite>main.cf</cite> file if
+needed (use the <a class="reference external" href="http://www.postfix.org/postconf.1.html">postconf</a> to check the defaults):</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">unknown_local_recipient_reject_code</span> <span class="o">=</span> <span class="mi">550</span>
+</pre></div>
+</div>
+<p>While generally not necessary if you set <cite>recipient_delimiter</cite> as described
+above, it&#8217;s better for Postfix to not treat <cite>owner-</cite> and <cite>-request</cite> addresses
+specially:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">owner_request_special</span> <span class="o">=</span> <span class="n">no</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="transport-maps">
+<h3>Transport maps<a class="headerlink" href="#transport-maps" title="Permalink to this headline">¶</a></h3>
+<p>By default, Mailman works well with Postfix transport maps as a way to deliver
+incoming messages to Mailman&#8217;s LMTP server.  Mailman will automatically write
+the correct transport map when its <cite>bin/mailman genaliases</cite> command is run, or
+whenever a mailing list is created or removed via other commands.  To connect
+Postfix to Mailman&#8217;s LMTP server, add the following to Postfix&#8217;s <cite>main.cf</cite>
+file:</p>
+<div class="highlight-python"><pre>transport_maps =
+    hash:/path-to-mailman/var/data/postfix_lmtp
+local_recipient_maps =
+    hash:/path-to-mailman/var/data/postfix_lmtp</pre>
+</div>
+<p>where <cite>path-to-mailman</cite> is replaced with the actual path that you&#8217;re running
+Mailman from.  Setting <cite>local_recipient_maps</cite> as well as <cite>transport_maps</cite>
+allows Postfix to properly reject all messages destined for non-existent local
+users.</p>
+</div>
+<div class="section" id="virtual-domains">
+<h3>Virtual domains<a class="headerlink" href="#virtual-domains" title="Permalink to this headline">¶</a></h3>
+<p>TBD: figure out how virtual domains interact with the transport maps.</p>
+</div>
+</div>
+<div class="section" id="sendmail">
+<h2>Sendmail<a class="headerlink" href="#sendmail" title="Permalink to this headline">¶</a></h2>
+<p>Contributions are welcome!</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Hooking up your mail server</a><ul>
+<li><a class="reference internal" href="#exim">Exim</a></li>
+<li><a class="reference internal" href="#postfix">Postfix</a><ul>
+<li><a class="reference internal" href="#mailman-settings">Mailman settings</a></li>
+<li><a class="reference internal" href="#basic-postfix-connections">Basic Postfix connections</a></li>
+<li><a class="reference internal" href="#transport-maps">Transport maps</a></li>
+<li><a class="reference internal" href="#virtual-domains">Virtual domains</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sendmail">Sendmail</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="ACKNOWLEDGMENTS.html"
+                        title="previous chapter">GNU Mailman Acknowledgments</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="NEWS.html"
+                        title="next chapter">Mailman - The GNU Mailing List Management System</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/docs/MTA.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="NEWS.html" title="Mailman - The GNU Mailing List Management System"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="ACKNOWLEDGMENTS.html" title="GNU Mailman Acknowledgments"
+             >previous</a> |</li>
+        <li><a href="README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

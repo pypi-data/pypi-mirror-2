@@ -1,0 +1,161 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Messages &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Pipelines" href="pipelines.html" />
+    <link rel="prev" title="Application level list life cycle" href="lifecycle.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="pipelines.html" title="Pipelines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="lifecycle.html" title="Application level list life cycle"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="messages">
+<h1>Messages<a class="headerlink" href="#messages" title="Permalink to this headline">¶</a></h1>
+<p>Mailman has its own Message classes, derived from the standard
+<tt class="docutils literal"><span class="pre">email.message.Message</span></tt> class, but providing additional useful methods.</p>
+<div class="section" id="user-notifications">
+<h2>User notifications<a class="headerlink" href="#user-notifications" title="Permalink to this headline">¶</a></h2>
+<p>When Mailman needs to send a message to a user, it creates a
+<tt class="docutils literal"><span class="pre">UserNotification</span></tt> instance, and then calls the <tt class="docutils literal"><span class="pre">.send()</span></tt> method on this
+object.  This method requires a mailing list instance.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">UserNotification</span></tt> constructor takes the recipient address, the sender
+address, an optional subject, optional body text, and optional language.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.email.message</span> <span class="kn">import</span> <span class="n">UserNotification</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">UserNotification</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;_xtest@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;Something you need to know&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;I needed to tell you this.&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">mlist</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The message will end up in the <cite>virgin</cite> queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;virgin&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qmsg</span><span class="p">,</span> <span class="n">qmsgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">qmsg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Subject: Something you need to know</span>
+<span class="go">From: _xtest@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Date: ...</span>
+<span class="go">Precedence: bulk</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">I needed to tell you this.</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Messages</a><ul>
+<li><a class="reference internal" href="#user-notifications">User notifications</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="lifecycle.html"
+                        title="previous chapter">Application level list life cycle</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="pipelines.html"
+                        title="next chapter">Pipelines</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/app/docs/message.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="pipelines.html" title="Pipelines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="lifecycle.html" title="Application level list life cycle"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

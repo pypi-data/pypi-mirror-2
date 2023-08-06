@@ -1,0 +1,301 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The switchboard &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="REST server" href="../../rest/docs/basic.html" />
+    <link rel="prev" title="Queue runners" href="runner.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../rest/docs/basic.html" title="REST server"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="runner.html" title="Queue runners"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-switchboard">
+<h1>The switchboard<a class="headerlink" href="#the-switchboard" title="Permalink to this headline">¶</a></h1>
+<p>The switchboard is subsystem that moves messages between queues.  Each
+instance of a switchboard is responsible for one queue directory.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A test message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Create a switchboard by giving its queue name and directory.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">queue_directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">QUEUE_DIR</span><span class="p">,</span> <span class="s">&#39;test&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue</span> <span class="kn">import</span> <span class="n">Switchboard</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span> <span class="o">=</span> <span class="n">Switchboard</span><span class="p">(</span><span class="s">&#39;test&#39;</span><span class="p">,</span> <span class="n">queue_directory</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">name</span>
+<span class="go">test</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">queue_directory</span> <span class="o">==</span> <span class="n">queue_directory</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Here&#8217;s a helper function for ensuring things work correctly.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">check_qfiles</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">directory</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="n">directory</span> <span class="o">=</span> <span class="n">queue_directory</span>
+<span class="gp">... </span>    <span class="n">files</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">qfile</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">root</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">qfile</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">files</span><span class="p">[</span><span class="n">ext</span><span class="p">]</span> <span class="o">=</span> <span class="n">files</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="s">&#39;empty&#39;</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">files</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="s">&#39;{0}: {1}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">files</span><span class="p">[</span><span class="n">ext</span><span class="p">])</span>
+</pre></div>
+</div>
+<div class="section" id="enqueing-and-dequeing">
+<h2>Enqueing and dequeing<a class="headerlink" href="#enqueing-and-dequeing" title="Permalink to this headline">¶</a></h2>
+<p>The message can be enqueued with metadata specified in the passed in
+dictionary.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.pck: 1</span>
+</pre></div>
+</div>
+<p>To read the contents of a queue file, dequeue it.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A test message.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">version  : 3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.bak: 1</span>
+</pre></div>
+</div>
+<p>To complete the dequeing process, removing all traces of the message file,
+finish it (without preservation).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">empty</span>
+</pre></div>
+</div>
+<p>When enqueing a file, you can provide additional metadata keys by using
+keyword arguments.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;foo&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="n">bar</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">bar      : 2</span>
+<span class="go">foo      : 1</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+<p>Keyword arguments override keys from the metadata dictionary.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;foo&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="n">foo</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">foo      : 2</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="iterating-over-files">
+<h2>Iterating over files<a class="headerlink" href="#iterating-over-files" title="Permalink to this headline">¶</a></h2>
+<p>There are two ways to iterate over all the files in a switchboard&#8217;s queue.
+Normally, queue files end in .pck (for &#8216;pickle&#8217;) and the easiest way to
+iterate over just these files is to use the .files attribute.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_1</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_2</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_3</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebases</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">((</span><span class="n">filebase_1</span><span class="p">,</span> <span class="n">filebase_2</span><span class="p">,</span> <span class="n">filebase_3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">)</span> <span class="o">==</span> <span class="n">filebases</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.pck: 3</span>
+</pre></div>
+</div>
+<p>You can also use the .get_files() method if you want to iterate over all the
+file bases for some other extension.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">get_files</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bakfiles</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">get_files</span><span class="p">(</span><span class="s">&#39;.bak&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bakfiles</span> <span class="o">==</span> <span class="n">filebases</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.bak: 3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">get_files</span><span class="p">(</span><span class="s">&#39;.bak&#39;</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">empty</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="recovering-files">
+<h2>Recovering files<a class="headerlink" href="#recovering-files" title="Permalink to this headline">¶</a></h2>
+<p>Calling .dequeue() without calling .finish() leaves .bak backup files in
+place.  These can be recovered when the switchboard is instantiated.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_1</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_2</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase_3</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">foo</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="c"># Don&#39;t call .finish()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.bak: 3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard_2</span> <span class="o">=</span> <span class="n">Switchboard</span><span class="p">(</span><span class="s">&#39;test&#39;</span><span class="p">,</span> <span class="n">queue_directory</span><span class="p">,</span> <span class="n">recover</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.pck: 3</span>
+</pre></div>
+</div>
+<p>The files can be recovered explicitly.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="c"># Don&#39;t call .finish()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.bak: 3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">recover_backup_files</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.pck: 3</span>
+</pre></div>
+</div>
+<p>But the files will only be recovered at most three times before they are
+considered defective.  In order to prevent mail bombs and loops, once this
+maximum is reached, the files will be preserved in the &#8216;bad&#8217; queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">filebase</span> <span class="ow">in</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="c"># Don&#39;t call .finish()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">.bak: 3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">recover_backup_files</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">()</span>
+<span class="go">empty</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bad</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;bad&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">(</span><span class="n">bad</span><span class="o">.</span><span class="n">queue_directory</span><span class="p">)</span>
+<span class="go">.psv: 3</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="clean-up">
+<h2>Clean up<a class="headerlink" href="#clean-up" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="nb">file</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">bad</span><span class="o">.</span><span class="n">queue_directory</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">bad</span><span class="o">.</span><span class="n">queue_directory</span><span class="p">,</span> <span class="nb">file</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_qfiles</span><span class="p">(</span><span class="n">bad</span><span class="o">.</span><span class="n">queue_directory</span><span class="p">)</span>
+<span class="go">empty</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="queue-slices">
+<h2>Queue slices<a class="headerlink" href="#queue-slices" title="Permalink to this headline">¶</a></h2>
+<p>XXX Add tests for queue slices.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The switchboard</a><ul>
+<li><a class="reference internal" href="#enqueing-and-dequeing">Enqueing and dequeing</a></li>
+<li><a class="reference internal" href="#iterating-over-files">Iterating over files</a></li>
+<li><a class="reference internal" href="#recovering-files">Recovering files</a></li>
+<li><a class="reference internal" href="#clean-up">Clean up</a></li>
+<li><a class="reference internal" href="#queue-slices">Queue slices</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="runner.html"
+                        title="previous chapter">Queue runners</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../../rest/docs/basic.html"
+                        title="next chapter">REST server</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/switchboard.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../rest/docs/basic.html" title="REST server"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="runner.html" title="Queue runners"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

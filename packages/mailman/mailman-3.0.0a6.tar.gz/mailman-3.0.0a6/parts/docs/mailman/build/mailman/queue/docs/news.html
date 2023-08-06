@@ -1,0 +1,271 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The news runner &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Outgoing queue runner" href="outgoing.html" />
+    <link rel="prev" title="LTMP server" href="lmtp.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="outgoing.html" title="Outgoing queue runner"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="lmtp.html" title="LTMP server"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-news-runner">
+<h1>The news runner<a class="headerlink" href="#the-news-runner" title="Permalink to this headline">¶</a></h1>
+<p>The news runner is the queue runner that gateways mailing list messages to an
+NNTP newsgroup.  One of the most important things this runner does is prepare
+the message for Usenet (yes, I know that NNTP is not Usenet, but this runner
+was originally written to gate to Usenet, which has its own rules).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">linked_newsgroup</span> <span class="o">=</span> <span class="s">&#39;comp.lang.python&#39;</span>
+</pre></div>
+</div>
+<p>Some NNTP servers such as INN reject messages containing a set of prohibited
+headers, so one of the things that the news runner does is remove these
+prohibited headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">NNTP-Posting-Host: news.example.com</span>
+<span class="gp">... </span><span class="s">NNTP-Posting-Date: today</span>
+<span class="gp">... </span><span class="s">X-Trace: blah blah</span>
+<span class="gp">... </span><span class="s">X-Complaints-To: abuse@dom.ain</span>
+<span class="gp">... </span><span class="s">Xref: blah blah</span>
+<span class="gp">... </span><span class="s">Xref: blah blah</span>
+<span class="gp">... </span><span class="s">Date-Received: yesterday</span>
+<span class="gp">... </span><span class="s">Posted: tomorrow</span>
+<span class="gp">... </span><span class="s">Posting-Version: 99.99</span>
+<span class="gp">... </span><span class="s">Relay-Version: 88.88</span>
+<span class="gp">... </span><span class="s">Received: blah blah</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue.news</span> <span class="kn">import</span> <span class="n">prepare_message</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;prepped&#39;</span><span class="p">]</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Newsgroups: comp.lang.python</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Lines: 1</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A message</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Some NNTP servers will reject messages where certain headers are duplicated,
+so the news runner must collapse or move these duplicate headers to an
+<tt class="docutils literal"><span class="pre">X-Original-*</span></tt> header that the news server doesn&#8217;t care about.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">To: two@example.com</span>
+<span class="gp">... </span><span class="s">Cc: three@example.com</span>
+<span class="gp">... </span><span class="s">Cc: four@example.com</span>
+<span class="gp">... </span><span class="s">Cc: five@example.com</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: yes</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: no</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: maybe</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;prepped&#39;</span><span class="p">]</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Newsgroups: comp.lang.python</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Lines: 1</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">X-Original-To: two@example.com</span>
+<span class="go">CC: three@example.com</span>
+<span class="go">X-Original-CC: four@example.com</span>
+<span class="go">X-Original-CC: five@example.com</span>
+<span class="go">Content-Transfer-Encoding: yes</span>
+<span class="go">X-Original-Content-Transfer-Encoding: no</span>
+<span class="go">X-Original-Content-Transfer-Encoding: maybe</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A message</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>But if no headers are duplicated, then the news runner doesn&#8217;t need to modify
+the message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Cc: someother@example.com</span>
+<span class="gp">... </span><span class="s">Content-Transfer-Encoding: yes</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A message</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;prepped&#39;</span><span class="p">]</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: _xtest@example.com</span>
+<span class="go">Cc: someother@example.com</span>
+<span class="go">Content-Transfer-Encoding: yes</span>
+<span class="go">Newsgroups: comp.lang.python</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">Lines: 1</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">A message</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<div class="section" id="newsgroup-moderation">
+<h2>Newsgroup moderation<a class="headerlink" href="#newsgroup-moderation" title="Permalink to this headline">¶</a></h2>
+<p>When the newsgroup is moderated, an <tt class="docutils literal"><span class="pre">Approved:</span></tt> header with the list&#8217;s
+posting address is added for the benefit of the Usenet system.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.nntp</span> <span class="kn">import</span> <span class="n">NewsModeration</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">news_moderation</span> <span class="o">=</span> <span class="n">NewsModeration</span><span class="o">.</span><span class="n">open_moderated</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Approved: this gets deleted</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="go">_xtest@example.com</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">news_moderation</span> <span class="o">=</span> <span class="n">NewsModeration</span><span class="o">.</span><span class="n">moderated</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Approved: this gets deleted</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="go">_xtest@example.com</span>
+</pre></div>
+</div>
+<p>But if the newsgroup is not moderated, the <tt class="docutils literal"><span class="pre">Approved:</span></tt> header is not changed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">news_moderation</span> <span class="o">=</span> <span class="n">NewsModeration</span><span class="o">.</span><span class="n">none</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: _xtest@example.com</span>
+<span class="gp">... </span><span class="s">Approved: this doesn&#39;t get deleted</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">prepare_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;approved&#39;</span><span class="p">]</span>
+<span class="go">u&quot;this doesn&#39;t get deleted&quot;</span>
+</pre></div>
+</div>
+<p>XXX More of the NewsRunner should be tested.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The news runner</a><ul>
+<li><a class="reference internal" href="#newsgroup-moderation">Newsgroup moderation</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="lmtp.html"
+                        title="previous chapter">LTMP server</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="outgoing.html"
+                        title="next chapter">Outgoing queue runner</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/news.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="outgoing.html" title="Outgoing queue runner"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="lmtp.html" title="LTMP server"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

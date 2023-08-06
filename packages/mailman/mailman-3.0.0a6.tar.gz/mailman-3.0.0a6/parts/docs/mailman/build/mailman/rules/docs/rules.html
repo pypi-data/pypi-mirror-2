@@ -1,0 +1,183 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Rules &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Suspicious headers" href="suspicious.html" />
+    <link rel="prev" title="Maximum number of recipients" href="recipients.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="suspicious.html" title="Suspicious headers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="recipients.html" title="Maximum number of recipients"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="rules">
+<h1>Rules<a class="headerlink" href="#rules" title="Permalink to this headline">¶</a></h1>
+<p>Rules are applied to each message as part of a rule chain.  Individual rules
+simply return a boolean specifying whether the rule matches or not.  Chain
+links determine what happens when a rule matches.</p>
+<div class="section" id="all-rules">
+<h2>All rules<a class="headerlink" href="#all-rules" title="Permalink to this headline">¶</a></h2>
+<p>Rules are maintained in the configuration object as a dictionary mapping rule
+names to rule objects.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.rules</span> <span class="kn">import</span> <span class="n">IRule</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">rule_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">rules</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">rule</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">rules</span><span class="p">[</span><span class="n">rule_name</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">rule_name</span><span class="p">,</span> <span class="n">verifyObject</span><span class="p">(</span><span class="n">IRule</span><span class="p">,</span> <span class="n">rule</span><span class="p">)</span>
+<span class="go">administrivia True</span>
+<span class="go">any True</span>
+<span class="go">approved True</span>
+<span class="go">emergency True</span>
+<span class="go">implicit-dest True</span>
+<span class="go">loop True</span>
+<span class="go">max-recipients True</span>
+<span class="go">max-size True</span>
+<span class="go">moderation True</span>
+<span class="go">news-moderation True</span>
+<span class="go">no-subject True</span>
+<span class="go">non-member True</span>
+<span class="go">suspicious-header True</span>
+<span class="go">truth True</span>
+</pre></div>
+</div>
+<p>You can get a rule by name.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">rules</span><span class="p">[</span><span class="s">&#39;emergency&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IRule</span><span class="p">,</span> <span class="n">rule</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="rule-checks">
+<h2>Rule checks<a class="headerlink" href="#rule-checks" title="Permalink to this headline">¶</a></h2>
+<p>Individual rules can be checked to see if they match, by running the rule&#8217;s
+<tt class="docutils literal"><span class="pre">check()</span></tt> method.  This returns a boolean indicating whether the rule was
+matched or not.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">An important message.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For example, the <tt class="docutils literal"><span class="pre">emergency</span></tt> rule just checks to see if the emergency flag
+is set on the mailing list, and the message has not been pre-approved by the
+list administrator.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">rule</span><span class="o">.</span><span class="n">name</span>
+<span class="go">emergency</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">emergency</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">emergency</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rule</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">moderator_approved</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Rules</a><ul>
+<li><a class="reference internal" href="#all-rules">All rules</a></li>
+<li><a class="reference internal" href="#rule-checks">Rule checks</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="recipients.html"
+                        title="previous chapter">Maximum number of recipients</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="suspicious.html"
+                        title="next chapter">Suspicious headers</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/rules/docs/rules.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="suspicious.html" title="Suspicious headers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="recipients.html" title="Maximum number of recipients"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

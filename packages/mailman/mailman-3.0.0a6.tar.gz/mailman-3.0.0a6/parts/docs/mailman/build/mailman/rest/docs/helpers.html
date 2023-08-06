@@ -1,0 +1,311 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>REST API helpers &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Mailing lists" href="lists.html" />
+    <link rel="prev" title="Domains" href="domains.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="lists.html" title="Mailing lists"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="domains.html" title="Domains"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="rest-api-helpers">
+<h1>REST API helpers<a class="headerlink" href="#rest-api-helpers" title="Permalink to this headline">¶</a></h1>
+<p>There are a number of helpers that make building out the REST API easier.</p>
+<div class="section" id="resource-paths">
+<h2>Resource paths<a class="headerlink" href="#resource-paths" title="Permalink to this headline">¶</a></h2>
+<p>For example, most resources don&#8217;t have to worry about where they are rooted.
+They only need to know where they are relative to the root URI, and this
+function can return them the full path to the resource.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.rest.helpers</span> <span class="kn">import</span> <span class="n">path_to</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">path_to</span><span class="p">(</span><span class="s">&#39;system&#39;</span><span class="p">)</span>
+<span class="go">http://localhost:8001/3.0/system</span>
+</pre></div>
+</div>
+<p>Parameters like the <tt class="docutils literal"><span class="pre">scheme</span></tt>, <tt class="docutils literal"><span class="pre">host</span></tt>, <tt class="docutils literal"><span class="pre">port</span></tt>, and API version number can
+be set in the configuration file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;helpers&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[webservice]</span>
+<span class="gp">... </span><span class="s">hostname: geddy</span>
+<span class="gp">... </span><span class="s">port: 2112</span>
+<span class="gp">... </span><span class="s">use_https: yes</span>
+<span class="gp">... </span><span class="s">api_version: 4.2</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">path_to</span><span class="p">(</span><span class="s">&#39;system&#39;</span><span class="p">)</span>
+<span class="go">https://geddy:2112/4.2/system</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="etags">
+<h2>Etags<a class="headerlink" href="#etags" title="Permalink to this headline">¶</a></h2>
+<p>HTTP <em>etags</em> are a way for clients to decide whether their copy of a resource
+has changed or not.  Mailman&#8217;s REST API calculates this in a cheap and dirty
+way.  Pass in the dictionary representing the resource and that dictionary
+gets modified to contain the etag under the <tt class="docutils literal"><span class="pre">http_etag</span></tt> key.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.rest.helpers</span> <span class="kn">import</span> <span class="n">etag</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">resource</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">geddy</span><span class="o">=</span><span class="s">&#39;bass&#39;</span><span class="p">,</span> <span class="n">alex</span><span class="o">=</span><span class="s">&#39;guitar&#39;</span><span class="p">,</span> <span class="n">neil</span><span class="o">=</span><span class="s">&#39;drums&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">json_data</span> <span class="o">=</span> <span class="n">etag</span><span class="p">(</span><span class="n">resource</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">resource</span><span class="p">[</span><span class="s">&#39;http_etag&#39;</span><span class="p">]</span>
+<span class="go">&quot;43942176d8d5bb4414ccf35e2720ccd5251e66da&quot;</span>
+</pre></div>
+</div>
+<p>For convenience, the etag function also returns the JSON representation of the
+dictionary after tagging, since that&#8217;s almost always what you want.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+
+<span class="go"># This is pretty close to what we want, so it&#39;s convenient to use.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="go">alex     : guitar</span>
+<span class="go">geddy    : bass</span>
+<span class="go">http_etag: &quot;43942176d8d5bb4414ccf35e2720ccd5251e66da&quot;</span>
+<span class="go">neil     : drums</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="post-unpacking">
+<h2>POST unpacking<a class="headerlink" href="#post-unpacking" title="Permalink to this headline">¶</a></h2>
+<p>Another helper unpacks <tt class="docutils literal"><span class="pre">POST</span></tt> request variables, validating and converting
+their values.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.rest.validator</span> <span class="kn">import</span> <span class="n">Validator</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">validator</span> <span class="o">=</span> <span class="n">Validator</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="nb">unicode</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">FakeRequest</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">POST</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="s">&#39;two&#39;</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="s">&#39;yes&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>On valid input, the validator can be used as a <tt class="docutils literal"><span class="pre">**keyword</span></tt> argument.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">print_request</span><span class="p">(</span><span class="n">one</span><span class="p">,</span> <span class="n">two</span><span class="p">,</span> <span class="n">three</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">one</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">two</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">three</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="go">1 u&#39;two&#39; True</span>
+</pre></div>
+</div>
+<p>On invalid input, an exception is raised.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span><span class="p">[</span><span class="s">&#39;one&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;hello&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">ValueError: Cannot convert parameters</span>: <span class="n-Identifier">one</span>
+</pre></div>
+</div>
+<p>On missing input, an exception is raised.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span><span class="p">[</span><span class="s">&#39;one&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">ValueError: Missing parameters</span>: <span class="n-Identifier">one</span>
+</pre></div>
+</div>
+<p>If more than one key is missing, it will be reflected in the error message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span><span class="p">[</span><span class="s">&#39;two&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">ValueError: Missing parameters</span>: <span class="n-Identifier">one, two</span>
+</pre></div>
+</div>
+<p>Extra keys are also not allowed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="s">&#39;two&#39;</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="s">&#39;yes&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                        <span class="n">four</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">five</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">ValueError: Unexpected parameters</span>: <span class="n-Identifier">five, four</span>
+</pre></div>
+</div>
+<p>However, if optional keys are missing, it&#8217;s okay.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">validator</span> <span class="o">=</span> <span class="n">Validator</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="nb">unicode</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span>
+<span class="gp">... </span>                      <span class="n">four</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">five</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+<span class="gp">... </span>                      <span class="n">_optional</span><span class="o">=</span><span class="p">(</span><span class="s">&#39;four&#39;</span><span class="p">,</span> <span class="s">&#39;five&#39;</span><span class="p">))</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="s">&#39;two&#39;</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="s">&#39;yes&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                        <span class="n">four</span><span class="o">=</span><span class="s">&#39;4&#39;</span><span class="p">,</span> <span class="n">five</span><span class="o">=</span><span class="s">&#39;5&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">print_request</span><span class="p">(</span><span class="n">one</span><span class="p">,</span> <span class="n">two</span><span class="p">,</span> <span class="n">three</span><span class="p">,</span> <span class="n">four</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">five</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">one</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">two</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">three</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">four</span><span class="p">),</span> <span class="nb">repr</span><span class="p">(</span><span class="n">five</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="go">1 u&#39;two&#39; True 4 5</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span><span class="p">[</span><span class="s">&#39;four&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="go">1 u&#39;two&#39; True None 5</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span><span class="p">[</span><span class="s">&#39;five&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="go">1 u&#39;two&#39; True None None</span>
+</pre></div>
+</div>
+<p>But if the optional values are present, they must of course also be valid.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="n">two</span><span class="o">=</span><span class="s">&#39;two&#39;</span><span class="p">,</span> <span class="n">three</span><span class="o">=</span><span class="s">&#39;yes&#39;</span><span class="p">,</span>
+<span class="gp">... </span>                        <span class="n">four</span><span class="o">=</span><span class="s">&#39;no&#39;</span><span class="p">,</span> <span class="n">five</span><span class="o">=</span><span class="s">&#39;maybe&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">print_request</span><span class="p">(</span><span class="o">**</span><span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">))</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">ValueError: Cannot convert parameters</span>: <span class="n-Identifier">five, four</span>
+</pre></div>
+</div>
+<div class="section" id="arrays">
+<h3>Arrays<a class="headerlink" href="#arrays" title="Permalink to this headline">¶</a></h3>
+<p>Some <tt class="docutils literal"><span class="pre">POST</span></tt> forms include more than one value for a particular key.  This is
+how lists and arrays are modeled.  The validator does the right thing with
+such form data.  Specifically, when a key shows up multiple times in the form
+data, a list is given to the validator.</p>
+<div class="highlight-python"><pre># Of course we can't use a normal dictionary, but webob has a useful data
+# type we can use.
+&gt;&gt;&gt; from webob.multidict import MultiDict
+&gt;&gt;&gt; form_data = MultiDict(one='1', many='3')
+&gt;&gt;&gt; form_data.add('many', '4')
+&gt;&gt;&gt; form_data.add('many', '5')</pre>
+</div>
+<p>This is a validation function that ensures the value is a list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">must_be_list</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;not a list&#39;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>This is a validation function that ensure the value is <em>not</em> a list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">must_be_scalar</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;is a list&#39;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And a validator to pull it all together.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">validator</span> <span class="o">=</span> <span class="n">Validator</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="n">must_be_scalar</span><span class="p">,</span> <span class="n">many</span><span class="o">=</span><span class="n">must_be_list</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="n">form_data</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">values</span> <span class="o">=</span> <span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">values</span><span class="p">[</span><span class="s">&#39;one&#39;</span><span class="p">]</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">values</span><span class="p">[</span><span class="s">&#39;many&#39;</span><span class="p">]</span>
+<span class="go">[3, 4, 5]</span>
+</pre></div>
+</div>
+<p>The list values are guaranteed to be in the same order they show up in the
+form data.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">webob.multidict</span> <span class="kn">import</span> <span class="n">MultiDict</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">form_data</span> <span class="o">=</span> <span class="n">MultiDict</span><span class="p">(</span><span class="n">one</span><span class="o">=</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="n">many</span><span class="o">=</span><span class="s">&#39;3&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">form_data</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;many&#39;</span><span class="p">,</span> <span class="s">&#39;5&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">form_data</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;many&#39;</span><span class="p">,</span> <span class="s">&#39;4&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">FakeRequest</span><span class="o">.</span><span class="n">POST</span> <span class="o">=</span> <span class="n">form_data</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">values</span> <span class="o">=</span> <span class="n">validator</span><span class="p">(</span><span class="n">FakeRequest</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">values</span><span class="p">[</span><span class="s">&#39;one&#39;</span><span class="p">]</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">values</span><span class="p">[</span><span class="s">&#39;many&#39;</span><span class="p">]</span>
+<span class="go">[3, 5, 4]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">REST API helpers</a><ul>
+<li><a class="reference internal" href="#resource-paths">Resource paths</a></li>
+<li><a class="reference internal" href="#etags">Etags</a></li>
+<li><a class="reference internal" href="#post-unpacking">POST unpacking</a><ul>
+<li><a class="reference internal" href="#arrays">Arrays</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="domains.html"
+                        title="previous chapter">Domains</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="lists.html"
+                        title="next chapter">Mailing lists</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/rest/docs/helpers.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="lists.html" title="Mailing lists"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="domains.html" title="Domains"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,213 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Cleansing headers &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Cooking headers" href="cook-headers.html" />
+    <link rel="prev" title="Calculating recipients" href="calc-recips.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="cook-headers.html" title="Cooking headers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="calc-recips.html" title="Calculating recipients"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="cleansing-headers">
+<h1>Cleansing headers<a class="headerlink" href="#cleansing-headers" title="Permalink to this headline">¶</a></h1>
+<p>All messages posted to a list get their headers cleansed.  Some headers are
+related to additional permissions that can be granted to the message and other
+headers can be used to fish for membership.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Headers such as <tt class="docutils literal"><span class="pre">Approved</span></tt>, <tt class="docutils literal"><span class="pre">Approve</span></tt>, (as well as their <tt class="docutils literal"><span class="pre">X-</span></tt> variants)
+and <tt class="docutils literal"><span class="pre">Urgent</span></tt> are used to grant special permissions to individual messages.
+All may contain a password; the first two headers are used by list
+administrators to pre-approve a message normal held for approval.  The latter
+header is used to send a regular message to all members, regardless of whether
+they get digests or not.  Because all three headers contain passwords, they
+must be removed from any posted message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Approved: foobar</span>
+<span class="gp">... </span><span class="s">Approve: barfoo</span>
+<span class="gp">... </span><span class="s">X-Approved: bazbar</span>
+<span class="gp">... </span><span class="s">X-Approve: barbaz</span>
+<span class="gp">... </span><span class="s">Urgent: notreally</span>
+<span class="gp">... </span><span class="s">Subject: A message of great import</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Blah blah blah</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;cleanse&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: A message of great import</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Blah blah blah</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>Other headers can be used by list members to fish the list for membership, so
+we don&#8217;t let them go through.  These are a mix of standard headers and custom
+headers supported by some mail readers.  For example, <tt class="docutils literal"><span class="pre">X-PMRC</span></tt> is supported
+by Pegasus mail.  I don&#8217;t remember what program uses <tt class="docutils literal"><span class="pre">X-Confirm-Reading-To</span></tt>
+though (Some Microsoft product perhaps?).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: bperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.org</span>
+<span class="gp">... </span><span class="s">Sender: asystem@example.net</span>
+<span class="gp">... </span><span class="s">Return-Receipt-To: another@example.com</span>
+<span class="gp">... </span><span class="s">Disposition-Notification-To: athird@example.com</span>
+<span class="gp">... </span><span class="s">X-Confirm-Reading-To: afourth@example.com</span>
+<span class="gp">... </span><span class="s">X-PMRQC: afifth@example.com</span>
+<span class="gp">... </span><span class="s">Subject: a message to you</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">How are you doing?</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: bperson@example.com</span>
+<span class="go">Reply-To: bperson@example.org</span>
+<span class="go">Sender: asystem@example.net</span>
+<span class="go">Subject: a message to you</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">How are you doing?</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<div class="section" id="anonymous-lists">
+<h2>Anonymous lists<a class="headerlink" href="#anonymous-lists" title="Permalink to this headline">¶</a></h2>
+<p>Anonymous mailing lists also try to cleanse certain identifying headers from
+the original posting, so that it is at least a bit more difficult to determine
+who sent the message.  This isn&#8217;t perfect though, for example, the body of the
+messages are never scrubbed (though that might not be a bad idea).  The
+<tt class="docutils literal"><span class="pre">From</span></tt> and <tt class="docutils literal"><span class="pre">Reply-To</span></tt> headers in the posted message are taken from list
+attributes.</p>
+<p>Hotmail apparently sets <tt class="docutils literal"><span class="pre">X-Originating-Email</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">anonymous_list</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="s">&#39;A Test Mailing List&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: bperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.org</span>
+<span class="gp">... </span><span class="s">Sender: asystem@example.net</span>
+<span class="gp">... </span><span class="s">X-Originating-Email: cperson@example.com</span>
+<span class="gp">... </span><span class="s">Subject: a message to you</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">How are you doing?</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: a message to you</span>
+<span class="go">From: A Test Mailing List &lt;_xtest@example.com&gt;</span>
+<span class="go">Reply-To: _xtest@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">How are you doing?</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Cleansing headers</a><ul>
+<li><a class="reference internal" href="#anonymous-lists">Anonymous lists</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="calc-recips.html"
+                        title="previous chapter">Calculating recipients</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="cook-headers.html"
+                        title="next chapter">Cooking headers</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/cleanse.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="cook-headers.html" title="Cooking headers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="calc-recips.html" title="Calculating recipients"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

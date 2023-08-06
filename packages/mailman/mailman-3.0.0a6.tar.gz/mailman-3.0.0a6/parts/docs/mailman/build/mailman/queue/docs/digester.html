@@ -1,0 +1,703 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Digesting &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="The incoming queue runner" href="incoming.html" />
+    <link rel="prev" title="The command queue runner" href="command.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="incoming.html" title="The incoming queue runner"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="command.html" title="The command queue runner"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="digesting">
+<h1>Digesting<a class="headerlink" href="#digesting" title="Permalink to this headline">¶</a></h1>
+<p>Mailman crafts and sends digests by a separate digest queue runner process.
+This starts by a number of messages being posted to the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">=</span> <span class="mf">0.6</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">volume</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">next_digest_number</span> <span class="o">=</span> <span class="mi">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">string</span> <span class="kn">import</span> <span class="n">Template</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;to-digest&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">process</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">fill_digest</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">text</span> <span class="o">=</span> <span class="n">Template</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: xtest@example.com</span>
+<span class="gp">... </span><span class="s">Subject: Test message $i</span>
+<span class="gp">... </span><span class="s">List-Post: &lt;test@example.com&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Here is message $i</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">substitute</span><span class="p">(</span><span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">... </span>        <span class="n">size</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">if</span> <span class="n">size</span> <span class="o">&gt;=</span> <span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="k">break</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fill_digest</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The queue runner gets kicked off when a marker message gets dropped into the
+digest queue.  The message metadata points to the mailbox file containing the
+messages to put in the digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">digestq</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;digest&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">digestq</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">entry</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;digest&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The marker message is empty.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">entry</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>But the message metadata has a reference to the digest file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">digest_number: 1</span>
+<span class="go">digest_path  : .../lists/test@example.com/digest.1.1.mmdf</span>
+<span class="go">listname     : test@example.com</span>
+<span class="go">version      : 3</span>
+<span class="go">volume       : 1</span>
+
+<span class="go"># Put the messages back in the queue for the runner to handle.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">digestq</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">msg</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>There are 4 messages in the digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.utilities.mailbox</span> <span class="kn">import</span> <span class="n">Mailbox</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">Mailbox</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;digest_path&#39;</span><span class="p">]))</span>
+<span class="go">4</span>
+</pre></div>
+</div>
+<p>When the queue runner runs, it processes the digest mailbox, crafting both the
+plain text (RFC 1153) digest and the MIME digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue.digest</span> <span class="kn">import</span> <span class="n">DigestRunner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">make_testable_runner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span> <span class="o">=</span> <span class="n">make_testable_runner</span><span class="p">(</span><span class="n">DigestRunner</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The digest runner places both digests into the virgin queue for final
+delivery.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">2</span>
+</pre></div>
+</div>
+<p>The MIME digest is a multipart, and the RFC 1153 digest is the other one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">is_multipart</span><span class="p">():</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">messages</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">messages</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The MIME digest has lots of good stuff, all contained in the multipart.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mime</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;===============...==&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">From: test-request@example.com</span>
+<span class="go">Subject: Test Digest, Vol 1, Issue 1</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Reply-To: test@example.com</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Description: Test Digest, Vol 1, Issue 1</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Send Test mailing list submissions to</span>
+<span class="go">    test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">To subscribe or unsubscribe via the World Wide Web, visit</span>
+<span class="go">    http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">or, via email, send a message with subject or body &#39;help&#39; to</span>
+<span class="go">    test-request@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">You can reach the person managing the list at</span>
+<span class="go">    test-owner@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">When replying, please edit your Subject line so it is more specific</span>
+<span class="go">than &quot;Re: Contents of Test digest...&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Description: Today&#39;s Topics (4 messages)</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Today&#39;s Topics:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">   1. Test message 1 (aperson@example.com)</span>
+<span class="go">   2. Test message 2 (aperson@example.com)</span>
+<span class="go">   3. Test message 3 (aperson@example.com)</span>
+<span class="go">   4. Test message 4 (aperson@example.com)</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Subject: Test message 1</span>
+<span class="go">List-Post: &lt;test@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 1</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Subject: Test message 2</span>
+<span class="go">List-Post: &lt;test@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 2</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Subject: Test message 3</span>
+<span class="go">List-Post: &lt;test@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 3</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Subject: Test message 4</span>
+<span class="go">List-Post: &lt;test@example.com&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 4</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">Content-Description: Digest Footer</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">_______________________________________________</span>
+<span class="go">Test mailing list</span>
+<span class="go">test@example.com</span>
+<span class="go">http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==--</span>
+</pre></div>
+</div>
+<p>The RFC 1153 contains the digest in a single plain text message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">rfc1153</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: test-request@example.com</span>
+<span class="go">Subject: Test Digest, Vol 1, Issue 1</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Reply-To: test@example.com</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;us-ascii&quot;</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Send Test mailing list submissions to</span>
+<span class="go">    test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">To subscribe or unsubscribe via the World Wide Web, visit</span>
+<span class="go">    http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">or, via email, send a message with subject or body &#39;help&#39; to</span>
+<span class="go">    test-request@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">You can reach the person managing the list at</span>
+<span class="go">    test-owner@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">When replying, please edit your Subject line so it is more specific</span>
+<span class="go">than &quot;Re: Contents of Test digest...&quot;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Today&#39;s Topics:</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">   1. Test message 1 (aperson@example.com)</span>
+<span class="go">   2. Test message 2 (aperson@example.com)</span>
+<span class="go">   3. Test message 3 (aperson@example.com)</span>
+<span class="go">   4. Test message 4 (aperson@example.com)</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">----------------------------------------------------------------------</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: Test message 1</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 1</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">------------------------------</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: Test message 2</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 2</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">------------------------------</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: Test message 3</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 3</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">------------------------------</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Subject: Test message 4</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Here is message 4</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">------------------------------</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">_______________________________________________</span>
+<span class="go">Test mailing list</span>
+<span class="go">test@example.com</span>
+<span class="go">http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">End of Test Digest, Vol 1, Issue 1</span>
+<span class="go">**********************************</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<div class="section" id="internationalized-digests">
+<h2>Internationalized digests<a class="headerlink" href="#internationalized-digests" title="Permalink to this headline">¶</a></h2>
+<p>When messages come in with a content-type character set different than that of
+the list&#8217;s preferred language, recipients will get an internationalized
+digest.  French is not enabled by default site-wide, so enable that now.</p>
+<div class="highlight-python"><pre># Simulate the site administrator setting the default server language to
+# French in the configuration file.  Without this, the English template
+# will be found and the masthead won't be translated.
+&gt;&gt;&gt; config.push('french', """
+... [mailman]
+... default_language: fr
+... """)
+
+&gt;&gt;&gt; mlist.preferred_language =  'fr'
+&gt;&gt;&gt; msg = message_from_string("""\
+... From: aperson@example.org
+... To: test@example.com
+... Subject: =?iso-2022-jp?b?GyRCMGxIVhsoQg==?=
+... MIME-Version: 1.0
+... Content-Type: text/plain; charset=iso-2022-jp
+... Content-Transfer-Encoding: 7bit
+...
+... \x1b$B0lHV\x1b(B
+... """)</pre>
+</div>
+<p>Set the digest threshold to zero so that the digests will be sent immediately.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+</pre></div>
+</div>
+<p>The marker message is sitting in the digest queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">digestq</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">entry</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;digest&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg    : False</span>
+<span class="go">digest_number: 2</span>
+<span class="go">digest_path  : .../lists/test@example.com/digest.1.2.mmdf</span>
+<span class="go">listname     : test@example.com</span>
+<span class="go">version      : 3</span>
+<span class="go">volume       : 1</span>
+</pre></div>
+</div>
+<p>The digest queue runner runs a loop, placing the two digests into the virgin
+queue.</p>
+<div class="highlight-python"><pre># Put the messages back in the queue for the runner to handle.
+&gt;&gt;&gt; filebase = digestq.enqueue(entry.msg, entry.msgdata)
+&gt;&gt;&gt; runner.run()
+&gt;&gt;&gt; messages = get_queue_messages('virgin')
+&gt;&gt;&gt; len(messages)
+2</pre>
+</div>
+<p>One of which is the MIME digest and the other of which is the RFC 1153 digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can see that the digests contain a mix of French and Japanese.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mime</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Content-Type: multipart/mixed; boundary=&quot;===============...==&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">From: test-request@example.com</span>
+<span class="go">Subject: Groupe Test, Vol. 1, Parution 2</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Reply-To: test@example.com</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;iso-8859-1&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: quoted-printable</span>
+<span class="go">Content-Description: Groupe Test, Vol. 1, Parution 2</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Envoyez vos messages pour la liste Test =E0</span>
+<span class="go">    test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Pour vous (d=E9s)abonner par le web, consultez</span>
+<span class="go">    http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">ou, par courriel, envoyez un message avec =AB=A0help=A0=BB dans le corps ou</span>
+<span class="go">dans le sujet =E0</span>
+<span class="go">    test-request@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Vous pouvez contacter l&#39;administrateur de la liste =E0 l&#39;adresse</span>
+<span class="go">    test-owner@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Si vous r=E9pondez, n&#39;oubliez pas de changer l&#39;objet du message afin</span>
+<span class="go">qu&#39;il soit plus sp=E9cifique que =AB=A0Re: Contenu du groupe de Test...=A0=</span>
+<span class="go">=BB</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;utf-8&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: base64</span>
+<span class="go">Content-Description: Today&#39;s Topics (1 messages)</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">VGjDqG1lcyBkdSBqb3VyIDoKCiAgIDEuIOS4gOeVqiAoYXBlcnNvbkBleGFtcGxlLm9yZykK</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: message/rfc822</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: =?iso-2022-jp?b?GyRCMGxIVhsoQg==?=</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=iso-2022-jp</span>
+<span class="go">Content-Transfer-Encoding: 7bit</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">$B0lHV(B</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==</span>
+<span class="go">Content-Type: text/plain; charset=&quot;iso-8859-1&quot;</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Transfer-Encoding: quoted-printable</span>
+<span class="go">Content-Description: =?utf-8?q?Pied_de_page_des_remises_group=C3=A9es?=</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">_______________________________________________</span>
+<span class="go">Test mailing list</span>
+<span class="go">test@example.com</span>
+<span class="go">http://lists.example.com/listinfo/test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--===============...==--</span>
+</pre></div>
+</div>
+<p>The RFC 1153 digest will be encoded in UTF-8 since it contains a mixture of
+French and Japanese characters.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">rfc1153</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: test-request@example.com</span>
+<span class="go">Subject: Groupe Test, Vol. 1, Parution 2</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Reply-To: test@example.com</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain; charset=&quot;utf-8&quot;</span>
+<span class="go">Content-Transfer-Encoding: base64</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">RW52b...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>The content can be decoded to see the actual digest text.</p>
+<div class="highlight-python"><pre># We must display the repr of the decoded value because doctests cannot
+# handle the non-ascii characters.
+&gt;&gt;&gt; [repr(line)
+...  for line in rfc1153.msg.get_payload(decode=True).splitlines()]
+["'Envoyez vos messages pour la liste Test \\xc3\\xa0'",
+"'\\ttest@example.com'",
+"''",
+"'Pour vous (d\\xc3\\xa9s)abonner par le web, consultez'",
+"'\\thttp://lists.example.com/listinfo/test@example.com'",
+"''",
+"'ou, par courriel, envoyez un message avec \\xc2\\xab\\xc2\\xa0...
+"'dans le sujet \\xc3\\xa0'",
+"'\\ttest-request@example.com'",
+"''",
+'"Vous pouvez contacter l\'administrateur de la liste \\xc3\\xa0 ...
+"'\\ttest-owner@example.com'",
+"''",
+'"Si vous r\\xc3\\xa9pondez, n\'oubliez pas de changer l\'objet du ...
+'"qu\'il soit plus sp\\xc3\\xa9cifique que \\xc2\\xab\\xc2\\xa0Re: ...
+"''",
+"'Th\\xc3\\xa8mes du jour :'",
+"''",
+"'   1. \\xe4\\xb8\\x80\\xe7\\x95\\xaa (aperson@example.org)'",
+"''",
+"''",
+"'---------------------------------------------------------------------...
+"''",
+"'From: aperson@example.org'",
+"'Subject: \\xe4\\xb8\\x80\\xe7\\x95\\xaa'",
+"'To: test@example.com'",
+"'Message-ID: ...
+"'Content-Type: text/plain; charset=iso-2022-jp'",
+"''",
+"'\\xe4\\xb8\\x80\\xe7\\x95\\xaa'",
+"''",
+"'------------------------------'",
+"''",
+"'_______________________________________________'",
+"'Test mailing list'",
+"'test@example.com'",
+"'http://lists.example.com/listinfo/test@example.com'",
+"''",
+"''",
+"'Fin de Groupe Test, Vol. 1, Parution 2'",
+"'**************************************'"]
+
+ &gt;&gt;&gt; config.pop('french')</pre>
+</div>
+</div>
+<div class="section" id="digest-delivery">
+<h2>Digest delivery<a class="headerlink" href="#digest-delivery" title="Permalink to this headline">¶</a></h2>
+<p>A mailing list&#8217;s members can choose to receive normal delivery, plain text
+digests, or MIME digests.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">))</span>
+<span class="go">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">DeliveryMode</span><span class="p">,</span> <span class="n">MemberRole</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">subscribe</span><span class="p">(</span><span class="n">email</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">address</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="n">email</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">member</span> <span class="o">=</span> <span class="n">address</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">MemberRole</span><span class="o">.</span><span class="n">member</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">member</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">mode</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">member</span>
+</pre></div>
+</div>
+<p>Two regular delivery members subscribe to the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_1</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span><span class="s">&#39;uperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_2</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span><span class="s">&#39;vperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Two MIME digest members subscribe to the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_3</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span><span class="s">&#39;wperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">mime_digests</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_4</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span><span class="s">&#39;xperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">mime_digests</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>One RFC 1153 digest member subscribes to the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_5</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;yperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">plaintext_digests</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_6</span> <span class="o">=</span> <span class="n">subscribe</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;zperson@example.com&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">plaintext_digests</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>When a digest gets sent, the appropriate recipient list is chosen.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">digest_size_threshold</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fill_digest</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The digests are sitting in the virgin queue.  One of them is the MIME digest
+and the other is the RFC 1153 digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">2</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Only wperson and xperson get the MIME digests.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">mime</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;wperson@example.com&#39;, u&#39;xperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Only yperson and zperson get the RFC 1153 digests.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">rfc1153</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;yperson@example.com&#39;, u&#39;zperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Now uperson decides that they would like to start receiving digests too.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">member_1</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">mime_digests</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fill_digest</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">2</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">mime</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;uperson@example.com&#39;, u&#39;wperson@example.com&#39;, u&#39;xperson@example.com&#39;]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">rfc1153</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;yperson@example.com&#39;, u&#39;zperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>At this point, both uperson and wperson decide that they&#8217;d rather receive
+regular deliveries instead of digests.  uperson would like to get any last
+digest that may be sent so that she doesn&#8217;t miss anything.  wperson does care
+as much and does not want to receive one last digest.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">send_one_last_digest_to</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">member_1</span><span class="o">.</span><span class="n">address</span><span class="p">,</span> <span class="n">member_1</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_1</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">member_3</span><span class="o">.</span><span class="n">preferences</span><span class="o">.</span><span class="n">delivery_mode</span> <span class="o">=</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fill_digest</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">mime</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;uperson@example.com&#39;, u&#39;xperson@example.com&#39;]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">rfc1153</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;yperson@example.com&#39;, u&#39;zperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>Since uperson has received their last digest, they will not get any more of
+them.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fill_digest</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">2</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mime</span><span class="p">,</span> <span class="n">rfc1153</span> <span class="o">=</span> <span class="n">mime_rfc1153</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">mime</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;xperson@example.com&#39;]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">rfc1153</span><span class="o">.</span><span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;recipients&#39;</span><span class="p">])</span>
+<span class="go">[u&#39;yperson@example.com&#39;, u&#39;zperson@example.com&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Digesting</a><ul>
+<li><a class="reference internal" href="#internationalized-digests">Internationalized digests</a></li>
+<li><a class="reference internal" href="#digest-delivery">Digest delivery</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="command.html"
+                        title="previous chapter">The command queue runner</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="incoming.html"
+                        title="next chapter">The incoming queue runner</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/digester.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="incoming.html" title="The incoming queue runner"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="command.html" title="The command queue runner"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

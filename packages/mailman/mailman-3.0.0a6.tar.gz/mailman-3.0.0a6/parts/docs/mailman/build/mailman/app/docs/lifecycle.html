@@ -1,0 +1,256 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Application level list life cycle &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Messages" href="message.html" />
+    <link rel="prev" title="Hooks" href="hooks.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="message.html" title="Messages"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="hooks.html" title="Hooks"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="application-level-list-life-cycle">
+<h1>Application level list life cycle<a class="headerlink" href="#application-level-list-life-cycle" title="Permalink to this headline">¶</a></h1>
+<p>The low-level way to create and delete a mailing list is to use the
+<tt class="docutils literal"><span class="pre">IListManager</span></tt> interface.  This interface simply adds or removes the
+appropriate database entries to record the list&#8217;s creation.</p>
+<p>There is a higher level interface for creating and deleting mailing lists
+which performs additional tasks such as:</p>
+<blockquote>
+<ul class="simple">
+<li>validating the list&#8217;s posting address (which also serves as the list&#8217;s
+fully qualified name);</li>
+<li>ensuring that the list&#8217;s domain is registered;</li>
+<li>applying all matching styles to the new list;</li>
+<li>creating and assigning list owners;</li>
+<li>notifying watchers of list creation;</li>
+<li>creating ancillary artifacts (such as the list&#8217;s on-disk directory)</li>
+</ul>
+</blockquote>
+<div class="section" id="posting-address-validation">
+<h2>Posting address validation<a class="headerlink" href="#posting-address-validation" title="Permalink to this headline">¶</a></h2>
+<p>If you try to use the higher-level interface to create a mailing list with a
+bogus posting address, you get an exception.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">create_list</span><span class="p">(</span><span class="s">&#39;not a valid address&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;not a valid address&#39;</span>
+</pre></div>
+</div>
+<p>If the posting address is valid, but the domain has not been registered with
+Mailman yet, you get an exception.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.org&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">BadDomainSpecificationError</span>: <span class="n-Identifier">example.org</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="creating-a-list-applies-its-styles">
+<h2>Creating a list applies its styles<a class="headerlink" href="#creating-a-list-applies-its-styles" title="Permalink to this headline">¶</a></h2>
+<p>Start by registering a test style.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface</span> <span class="kn">import</span> <span class="n">implements</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.styles</span> <span class="kn">import</span> <span class="n">IStyle</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">TestStyle</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">implements</span><span class="p">(</span><span class="n">IStyle</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">name</span> <span class="o">=</span> <span class="s">&#39;test&#39;</span>
+<span class="gp">... </span>    <span class="n">priority</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mailing_list</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="c"># Just does something very simple.</span>
+<span class="gp">... </span>        <span class="n">mailing_list</span><span class="o">.</span><span class="n">msg_footer</span> <span class="o">=</span> <span class="s">&#39;test footer&#39;</span>
+<span class="gp">... </span>    <span class="k">def</span> <span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mailing_list</span><span class="p">,</span> <span class="n">styles</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="c"># Applies to any test list</span>
+<span class="gp">... </span>        <span class="k">if</span> <span class="s">&#39;test&#39;</span> <span class="ow">in</span> <span class="n">mailing_list</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">:</span>
+<span class="gp">... </span>            <span class="n">styles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">style_manager</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">TestStyle</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>Using the higher level interface for creating a list, applies all matching
+list styles.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_1</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test_1@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist_1</span><span class="o">.</span><span class="n">fqdn_listname</span>
+<span class="go">test_1@example.com</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist_1</span><span class="o">.</span><span class="n">msg_footer</span>
+<span class="go">test footer</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="creating-a-list-with-owners">
+<h2>Creating a list with owners<a class="headerlink" href="#creating-a-list-with-owners" title="Permalink to this headline">¶</a></h2>
+<p>You can also specify a list of owner email addresses.  If these addresses are
+not yet known, they will be registered, and new users will be linked to them.
+However the addresses are not verified.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">owners</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;bperson@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;dperson@example.com&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_2</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test_2@example.com&#39;</span><span class="p">,</span> <span class="n">owners</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist_2</span><span class="o">.</span><span class="n">fqdn_listname</span>
+<span class="go">test_2@example.com</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist_2</span><span class="o">.</span><span class="n">msg_footer</span>
+<span class="go">test footer</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">addr</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">mlist_2</span><span class="o">.</span><span class="n">owners</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;,</span>
+<span class="go"> u&#39;cperson@example.com&#39;, u&#39;dperson@example.com&#39;]</span>
+</pre></div>
+</div>
+<p>None of the owner addresses are verified.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">any</span><span class="p">(</span><span class="n">addr</span><span class="o">.</span><span class="n">verified_on</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">mlist_2</span><span class="o">.</span><span class="n">owners</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>However, all addresses are linked to users.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="c"># The owners have no names yet</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">mlist_2</span><span class="o">.</span><span class="n">owners</span><span class="o">.</span><span class="n">users</span><span class="p">))</span>
+<span class="go">4</span>
+</pre></div>
+</div>
+<p>If you create a mailing list with owner addresses that are already known to
+the system, they won&#8217;t be created again.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_a</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_b</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;bperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_c</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_d</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;dperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_a</span><span class="o">.</span><span class="n">real_name</span> <span class="o">=</span> <span class="s">&#39;Anne Person&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_b</span><span class="o">.</span><span class="n">real_name</span> <span class="o">=</span> <span class="s">&#39;Bart Person&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_c</span><span class="o">.</span><span class="n">real_name</span> <span class="o">=</span> <span class="s">&#39;Caty Person&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_d</span><span class="o">.</span><span class="n">real_name</span> <span class="o">=</span> <span class="s">&#39;Dirk Person&#39;</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_3</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test_3@example.com&#39;</span><span class="p">,</span> <span class="n">owners</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">real_name</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">mlist_3</span><span class="o">.</span><span class="n">owners</span><span class="o">.</span><span class="n">users</span><span class="p">)</span>
+<span class="go">[u&#39;Anne Person&#39;, u&#39;Bart Person&#39;, u&#39;Caty Person&#39;, u&#39;Dirk Person&#39;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="deleting-a-list">
+<h2>Deleting a list<a class="headerlink" href="#deleting-a-list" title="Permalink to this headline">¶</a></h2>
+<p>Removing a mailing list deletes the list, all its subscribers, and any related
+artifacts.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.app.lifecycle</span> <span class="kn">import</span> <span class="n">remove_list</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">remove_list</span><span class="p">(</span><span class="n">mlist_2</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">,</span> <span class="n">mlist_2</span><span class="p">,</span> <span class="bp">True</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.listmanager</span> <span class="kn">import</span> <span class="n">IListManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IListManager</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;test_2@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>We should now be able to completely recreate the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist_2a</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test_2@example.com&#39;</span><span class="p">,</span> <span class="n">owners</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">(</span><span class="n">addr</span><span class="o">.</span><span class="n">address</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">mlist_2a</span><span class="o">.</span><span class="n">owners</span><span class="o">.</span><span class="n">addresses</span><span class="p">)</span>
+<span class="go">[u&#39;aperson@example.com&#39;, u&#39;bperson@example.com&#39;,</span>
+<span class="go"> u&#39;cperson@example.com&#39;, u&#39;dperson@example.com&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Application level list life cycle</a><ul>
+<li><a class="reference internal" href="#posting-address-validation">Posting address validation</a></li>
+<li><a class="reference internal" href="#creating-a-list-applies-its-styles">Creating a list applies its styles</a></li>
+<li><a class="reference internal" href="#creating-a-list-with-owners">Creating a list with owners</a></li>
+<li><a class="reference internal" href="#deleting-a-list">Deleting a list</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="hooks.html"
+                        title="previous chapter">Hooks</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="message.html"
+                        title="next chapter">Messages</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/app/docs/lifecycle.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="message.html" title="Messages"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="hooks.html" title="Hooks"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

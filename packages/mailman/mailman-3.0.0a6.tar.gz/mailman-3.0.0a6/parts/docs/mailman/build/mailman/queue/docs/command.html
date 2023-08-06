@@ -1,0 +1,395 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The command queue runner &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Digesting" href="digester.html" />
+    <link rel="prev" title="Archiving" href="archiver.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="digester.html" title="Digesting"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="archiver.html" title="Archiving"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-command-queue-runner">
+<h1>The command queue runner<a class="headerlink" href="#the-command-queue-runner" title="Permalink to this headline">¶</a></h1>
+<p>This queue runner&#8217;s purpose is to process and respond to email commands.
+Commands are extensible using the Mailman plug-in system, but Mailman comes
+with a number of email commands out of the box.  These are processed when a
+message is sent to the list&#8217;s <tt class="docutils literal"><span class="pre">-request</span></tt> address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="a-command-in-the-subject">
+<h2>A command in the Subject<a class="headerlink" href="#a-command-in-the-subject" title="Permalink to this headline">¶</a></h2>
+<p>For example, the <tt class="docutils literal"><span class="pre">echo</span></tt> command simply echoes the original command back to
+the sender.  The command can be in the <tt class="docutils literal"><span class="pre">Subject</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-request@example.com</span>
+<span class="gp">... </span><span class="s">Subject: echo hello</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.inject</span> <span class="kn">import</span> <span class="n">inject_message</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue.command</span> <span class="kn">import</span> <span class="n">CommandRunner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">make_testable_runner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span> <span class="o">=</span> <span class="n">make_testable_runner</span><span class="p">(</span><span class="n">CommandRunner</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>And now the response is in the <tt class="docutils literal"><span class="pre">virgin</span></tt> queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue</span> <span class="kn">import</span> <span class="n">Switchboard</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">virgin_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;virgin&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="go">From: test-bounces@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">The results of your email command are provided below.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Original message details:</span>
+<span class="go">    From: aperson@example.com</span>
+<span class="go">    Subject: echo hello</span>
+<span class="go">    Date: ...</span>
+<span class="go">    Message-ID: &lt;aardvark&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">echo hello</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg           : False</span>
+<span class="go">listname            : test@example.com</span>
+<span class="go">nodecorate          : True</span>
+<span class="go">recipients          : [u&#39;aperson@example.com&#39;]</span>
+<span class="go">reduced_list_headers: True</span>
+<span class="go">version             : ...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="a-command-in-the-body">
+<h2>A command in the body<a class="headerlink" href="#a-command-in-the-body" title="Permalink to this headline">¶</a></h2>
+<p>The command can also be found in the body of the message, as long as the
+message is plain text.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: bperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-request@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;bobcat&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">echo foo bar</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="go">From: test-bounces@example.com</span>
+<span class="go">To: bperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">Precedence: bulk</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">The results of your email command are provided below.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Original message details:</span>
+<span class="go">    From: bperson@example.com</span>
+<span class="go">    Subject: n/a</span>
+<span class="go">    Date: ...</span>
+<span class="go">    Message-ID: &lt;bobcat&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">echo foo bar</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="implicit-commands">
+<h2>Implicit commands<a class="headerlink" href="#implicit-commands" title="Permalink to this headline">¶</a></h2>
+<p>For some commands, specifically for joining and leaving a mailing list, there
+are email aliases that act like commands, even when there&#8217;s nothing else in
+the <tt class="docutils literal"><span class="pre">Subject</span></tt> or body.  For example, to join a mailing list, a user need
+only email the <tt class="docutils literal"><span class="pre">-join</span></tt> address or <tt class="docutils literal"><span class="pre">-subscribe</span></tt> address (the latter is
+deprecated).</p>
+<p>Because Dirk has never registered with Mailman before, he gets two responses.
+The first is a confirmation message so that Dirk can validate his email
+address, and the other is the results of his email command.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: Dirk Person &lt;dperson@example.com&gt;</span>
+<span class="gp">... </span><span class="s">To: test-join@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">,</span> <span class="n">subaddress</span><span class="o">=</span><span class="s">&#39;join&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">2</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">sortkey</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="n">sortkey</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.registrar</span> <span class="kn">import</span> <span class="n">IRegistrar</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IRegistrar</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">subject</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;Subject:&#39;</span><span class="p">,</span> <span class="n">subject</span>
+<span class="gp">... </span>    <span class="k">if</span> <span class="s">&#39;confirm&#39;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">subject</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">token</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">subject</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<span class="gp">... </span>        <span class="n">status</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="k">assert</span> <span class="n">status</span><span class="p">,</span> <span class="s">&#39;Confirmation failed&#39;</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="go">Subject: confirm ...</span>
+</pre></div>
+</div>
+<p>Similarly, to leave a mailing list, the user need only email the <tt class="docutils literal"><span class="pre">-leave</span></tt> or
+<tt class="docutils literal"><span class="pre">-unsubscribe</span></tt> address (the latter is deprecated).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: dperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-leave@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">,</span> <span class="n">subaddress</span><span class="o">=</span><span class="s">&#39;leave&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="go">From: test-bounces@example.com</span>
+<span class="go">To: dperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">The results of your email command are provided below.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Original message details:</span>
+<span class="go">From: dperson@example.com</span>
+<span class="go">Subject: n/a</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">Dirk Person &lt;dperson@example.com&gt; left test@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">-confirm</span></tt> address is also available as an implicit command.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: dperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-confirm+123@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">,</span> <span class="n">subaddress</span><span class="o">=</span><span class="s">&#39;confirm&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="go">From: test-bounces@example.com</span>
+<span class="go">To: dperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">The results of your email command are provided below.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Original message details:</span>
+<span class="go">From: dperson@example.com</span>
+<span class="go">Subject: n/a</span>
+<span class="go">Date: ...</span>
+<span class="go">Message-ID: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">Confirmation token did not match</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="stopping-command-processing">
+<h2>Stopping command processing<a class="headerlink" href="#stopping-command-processing" title="Permalink to this headline">¶</a></h2>
+<p>The <tt class="docutils literal"><span class="pre">end</span></tt> command stops email processing, so that nothing following is
+looked at by the command queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: cperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-request@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;caribou&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">echo foo bar</span>
+<span class="gp">... </span><span class="s">end ignored</span>
+<span class="gp">... </span><span class="s">echo baz qux</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">echo foo bar</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Unprocessed:</span>
+<span class="go">echo baz qux</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">stop</span></tt> command is an alias for <tt class="docutils literal"><span class="pre">end</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: cperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test-request@example.com</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;caribou&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">echo foo bar</span>
+<span class="gp">... </span><span class="s">stop ignored</span>
+<span class="gp">... </span><span class="s">echo baz qux</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inject_message</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">switchboard</span><span class="o">=</span><span class="s">&#39;command&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">command</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">virgin_queue</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">item</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">item</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: The results of your email commands</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Results:</span>
+<span class="go">echo foo bar</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Unprocessed:</span>
+<span class="go">echo baz qux</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">- Done.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">The command queue runner</a><ul>
+<li><a class="reference internal" href="#a-command-in-the-subject">A command in the Subject</a></li>
+<li><a class="reference internal" href="#a-command-in-the-body">A command in the body</a></li>
+<li><a class="reference internal" href="#implicit-commands">Implicit commands</a></li>
+<li><a class="reference internal" href="#stopping-command-processing">Stopping command processing</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="archiver.html"
+                        title="previous chapter">Archiving</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="digester.html"
+                        title="next chapter">Digesting</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/command.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="digester.html" title="Digesting"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="archiver.html" title="Archiving"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

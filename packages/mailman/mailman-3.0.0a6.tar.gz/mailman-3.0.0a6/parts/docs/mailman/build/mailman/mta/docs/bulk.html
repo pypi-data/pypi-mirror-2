@@ -1,0 +1,464 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Standard bulk delivery &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="MTA connections" href="connection.html" />
+    <link rel="prev" title="Archivers" href="../../archiving/docs/common.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="connection.html" title="MTA connections"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../../archiving/docs/common.html" title="Archivers"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="standard-bulk-delivery">
+<h1>Standard bulk delivery<a class="headerlink" href="#standard-bulk-delivery" title="Permalink to this headline">¶</a></h1>
+<p>Mailman has several built in strategies for completing the actual delivery of
+messages to the immediate upstream mail transport agent, which completes the
+actual final delivery to recipients.</p>
+<p>Bulk delivery attempts to deliver as few copies of the identical message as
+possible to as many recipients as possible.  By grouping recipients this way,
+bandwidth between Mailman and the MTA, and consequently between the MTA and
+remote mail servers, can be greatly reduced.  The downside is the messages
+cannot be personalized.  See <a class="reference external" href="verp.html">verp.txt</a> for an alternative strategy.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.mta.bulk</span> <span class="kn">import</span> <span class="n">BulkDelivery</span>
+</pre></div>
+</div>
+<p>The standard bulk deliverer takes as an argument the maximum number of
+recipients per session.  The default is to deliver the message in one chunk,
+containing all recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Delivery strategies must implement the proper interface.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mta</span> <span class="kn">import</span> <span class="n">IMailTransportAgentDelivery</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface.verify</span> <span class="kn">import</span> <span class="n">verifyObject</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">verifyObject</span><span class="p">(</span><span class="n">IMailTransportAgentDelivery</span><span class="p">,</span> <span class="n">bulk</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<div class="section" id="chunking-recipients">
+<h2>Chunking recipients<a class="headerlink" href="#chunking-recipients" title="Permalink to this headline">¶</a></h2>
+<p>The set of final recipients is contained in the <tt class="docutils literal"><span class="pre">recipients</span></tt> key in the
+message metadata.  When <tt class="docutils literal"><span class="pre">max_recipients</span></tt> is specified as zero, then the bulk
+deliverer puts all recipients into one big chunk.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">string</span> <span class="kn">import</span> <span class="n">ascii_letters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">letter</span> <span class="o">+</span> <span class="s">&#39;person@example.com&#39;</span>
+<span class="gp">... </span>                 <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="n">ascii_letters</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">chunks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">bulk</span><span class="o">.</span><span class="n">chunkify</span><span class="p">(</span><span class="n">recipients</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="go">52</span>
+</pre></div>
+</div>
+<p>Let say the maximum number of recipients allowed is 4, then no chunk will have
+more than 4 recipients, though they can have fewer (but still not zero).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">chunks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">bulk</span><span class="o">.</span><span class="n">chunkify</span><span class="p">(</span><span class="n">recipients</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
+<span class="go">13</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">all</span><span class="p">(</span><span class="mi">0</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">4</span> <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The chunking algorithm sorts recipients by top level domain by length.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span>
+<span class="gp">... </span>    <span class="s">&#39;anne@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;bart@example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;cate@example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;dave@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;elle@example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;fred@example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;gwen@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;herb@example.us&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;ione@example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;john@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;kate@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;liam@example.ca&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;mary@example.us&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;neil@example.net&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;ocho@example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;paco@example.xx&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s">&#39;quaq@example.zz&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">])</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">chunks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">bulk</span><span class="o">.</span><span class="n">chunkify</span><span class="p">(</span><span class="n">recipients</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
+<span class="go">6</span>
+</pre></div>
+</div>
+<p>We can&#8217;t make any guarantees about sorting within each chunk, but we can tell
+a few things.  For example, the first two chunks will be composed of <tt class="docutils literal"><span class="pre">.net</span></tt>
+(4) and <tt class="docutils literal"><span class="pre">.org</span></tt> (3) domains (for a total of 7).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="go">4</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">1</span><span class="p">])):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">address</span>
+<span class="go">bart@example.org</span>
+<span class="go">cate@example.net</span>
+<span class="go">elle@example.org</span>
+<span class="go">fred@example.net</span>
+<span class="go">ione@example.net</span>
+<span class="go">neil@example.net</span>
+<span class="go">ocho@example.org</span>
+</pre></div>
+</div>
+<p>We also know that the next two chunks will contain <tt class="docutils literal"><span class="pre">.com</span></tt> (5) addresses.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="go">4</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">3</span><span class="p">])):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">address</span>
+<span class="go">anne@example.com</span>
+<span class="go">dave@example.com</span>
+<span class="go">gwen@example.com</span>
+<span class="go">john@example.com</span>
+<span class="go">kate@example.com</span>
+</pre></div>
+</div>
+<p>The next chunk will contain the <tt class="docutils literal"><span class="pre">.us</span></tt> (2) and <tt class="docutils literal"><span class="pre">.ca</span></tt> (1) domains.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+<span class="go">3</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">4</span><span class="p">]):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">address</span>
+<span class="go">herb@example.us</span>
+<span class="go">liam@example.ca</span>
+<span class="go">mary@example.us</span>
+</pre></div>
+</div>
+<p>The final chunk will contain the outliers, <tt class="docutils literal"><span class="pre">.xx</span></tt> (1) and <tt class="docutils literal"><span class="pre">.zz</span></tt> (2).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+<span class="go">2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">address</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">chunks</span><span class="p">[</span><span class="mi">5</span><span class="p">]):</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="n">address</span>
+<span class="go">paco@example.xx</span>
+<span class="go">quaq@example.zz</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="bulk-delivery">
+<h2>Bulk delivery<a class="headerlink" href="#bulk-delivery" title="Permalink to this headline">¶</a></h2>
+<p>The set of recipients for bulk delivery comes from the message metadata.  If
+there are no calculated recipients, nothing gets sent.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.org</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: test one</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is a test.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">))</span>
+<span class="go">0</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="nb">set</span><span class="p">()))</span>
+<span class="go">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">))</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>With bulk delivery and no maximum number of recipients, there will be just one
+message sent, with all the recipients packed into the envelope recipients
+(i.e. <tt class="docutils literal"><span class="pre">RCTP</span> <span class="pre">TO</span></tt>).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="s">&#39;person_{0:02d}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="n">recipients</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="gp">...</span>
+<span class="go">X-RcptTo: person_...</span>
+<span class="go">    person_...</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">X-RcptTo:</span></tt> header contains the set of recipients, in random order.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;,&#39;</span><span class="p">))</span>
+<span class="go">100</span>
+</pre></div>
+</div>
+<p>When the maximum number of recipients is set to 20, 5 messages will be sent,
+each with 20 addresses in the <tt class="docutils literal"><span class="pre">RCPT</span> <span class="pre">TO</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">x_rcptto</span> <span class="o">=</span> <span class="n">message</span><span class="p">[</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;Number of recipients:&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">x_rcptto</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;,&#39;</span><span class="p">))</span>
+<span class="go">Number of recipients: 20</span>
+<span class="go">Number of recipients: 20</span>
+<span class="go">Number of recipients: 20</span>
+<span class="go">Number of recipients: 20</span>
+<span class="go">Number of recipients: 20</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="delivery-headers">
+<h2>Delivery headers<a class="headerlink" href="#delivery-headers" title="Permalink to this headline">¶</a></h2>
+<p>The sending agent shows up in the RFC 5321 <tt class="docutils literal"><span class="pre">MAIL</span> <span class="pre">FROM</span></tt>, which shows up in
+the <tt class="docutils literal"><span class="pre">X-MailFrom:</span></tt> header in the sample message.</p>
+<p>The bulk delivery module calculates the sending agent address first from the
+message metadata...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span> <span class="o">=</span> <span class="n">BulkDelivery</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">recipients</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">recipients</span><span class="o">=</span><span class="n">recipients</span><span class="p">,</span>
+<span class="gp">... </span>               <span class="n">sender</span><span class="o">=</span><span class="s">&#39;asender@example.org&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">message</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: asender@example.org</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+</pre></div>
+</div>
+<p>...followed by the mailing list&#8217;s bounces robot address...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">del</span> <span class="n">msgdata</span><span class="p">[</span><span class="s">&#39;sender&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">message</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+</pre></div>
+</div>
+<p>...and finally the site owner, if there is no mailing list target for this
+message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;site-owner&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">[mailman]</span>
+<span class="gp">... </span><span class="s">site_owner: site-owner@example.com</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bulk</span><span class="o">.</span><span class="n">deliver</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="go">{}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">message</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">message</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.org</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: test one</span>
+<span class="go">Message-ID: &lt;aardvark&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: site-owner@example.com</span>
+<span class="go">X-RcptTo: aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is a test.</span>
+
+<span class="go"># Remove test configuration.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;site-owner&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="delivery-failures">
+<h2>Delivery failures<a class="headerlink" href="#delivery-failures" title="Permalink to this headline">¶</a></h2>
+<p>Mailman does not do final delivery.  Instead, it sends mail through a site
+local mail server which manages queuing and final delivery.  However, even
+this local mail server can produce delivery failures visible to Mailman in
+certain situations.</p>
+<p>For example, there could be a problem delivering to any of the specified
+recipients.</p>
+<div class="highlight-python"><pre># Tell the mail server to fail on the next 3 RCPT TO commands, one for
+# each recipient in the following message.
+&gt;&gt;&gt; smtpd.err_queue.put(('rcpt', 500))
+&gt;&gt;&gt; smtpd.err_queue.put(('rcpt', 500))
+&gt;&gt;&gt; smtpd.err_queue.put(('rcpt', 500))
+
+&gt;&gt;&gt; recipients = set([
+...     'aperson@example.org',
+...     'bperson@example.org',
+...     'cperson@example.org',
+...     ])
+&gt;&gt;&gt; msgdata = dict(recipients=recipients)
+
+&gt;&gt;&gt; msg = message_from_string("""\
+... From: aperson@example.org
+... To: test@example.com
+... Subject: test three
+... Message-ID: &lt;camel&gt;
+...
+... This is a test.
+... """)
+
+&gt;&gt;&gt; failures = bulk.deliver(mlist, msg, msgdata)
+&gt;&gt;&gt; for address in sorted(failures):
+...     print address, failures[address][0], failures[address][1]
+aperson@example.org 500 Error: SMTPRecipientsRefused
+bperson@example.org 500 Error: SMTPRecipientsRefused
+cperson@example.org 500 Error: SMTPRecipientsRefused
+
+&gt;&gt;&gt; messages = list(smtpd.messages)
+&gt;&gt;&gt; len(messages)
+0</pre>
+</div>
+<p>Or there could be some other problem causing an SMTP response failure.</p>
+<div class="highlight-python"><pre># Tell the mail server to register a temporary failure on the next MAIL
+# FROM command.
+&gt;&gt;&gt; smtpd.err_queue.put(('mail', 450))
+
+&gt;&gt;&gt; failures = bulk.deliver(mlist, msg, msgdata)
+&gt;&gt;&gt; for address in sorted(failures):
+...     print address, failures[address][0], failures[address][1]
+aperson@example.org 450 Error: SMTPResponseException
+bperson@example.org 450 Error: SMTPResponseException
+cperson@example.org 450 Error: SMTPResponseException
+
+# Tell the mail server to register a permanent failure on the next MAIL
+# FROM command.
+&gt;&gt;&gt; smtpd.err_queue.put(('mail', 500))
+
+&gt;&gt;&gt; failures = bulk.deliver(mlist, msg, msgdata)
+&gt;&gt;&gt; for address in sorted(failures):
+...     print address, failures[address][0], failures[address][1]
+aperson@example.org 500 Error: SMTPResponseException
+bperson@example.org 500 Error: SMTPResponseException
+cperson@example.org 500 Error: SMTPResponseException</pre>
+</div>
+<p>XXX Untested: socket.error, IOError, smtplib.SMTPException.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Standard bulk delivery</a><ul>
+<li><a class="reference internal" href="#chunking-recipients">Chunking recipients</a></li>
+<li><a class="reference internal" href="#bulk-delivery">Bulk delivery</a></li>
+<li><a class="reference internal" href="#delivery-headers">Delivery headers</a></li>
+<li><a class="reference internal" href="#delivery-failures">Delivery failures</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="../../archiving/docs/common.html"
+                        title="previous chapter">Archivers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="connection.html"
+                        title="next chapter">MTA connections</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/mta/docs/bulk.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="connection.html" title="MTA connections"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../../archiving/docs/common.html" title="Archivers"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

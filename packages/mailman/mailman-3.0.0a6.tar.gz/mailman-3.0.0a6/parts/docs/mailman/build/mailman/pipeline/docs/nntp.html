@@ -1,0 +1,173 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>NNTP Gateway &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Reply-to munging" href="reply-to.html" />
+    <link rel="prev" title="Content filtering" href="filtering.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="reply-to.html" title="Reply-to munging"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="filtering.html" title="Content filtering"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="nntp-gateway">
+<h1>NNTP Gateway<a class="headerlink" href="#nntp-gateway" title="Permalink to this headline">¶</a></h1>
+<p>Mailman has an NNTP gateway, whereby messages posted to the mailing list can
+be forwarded onto an NNTP newsgroup.  Typically this means Usenet, but since
+NNTP is to Usenet as IP is to the web, it&#8217;s more general than that.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Gatewaying from the mailing list to the newsgroup happens through a separate
+<tt class="docutils literal"><span class="pre">nntp</span></tt> queue and happen immediately when the message is posted through to
+the list.  Note that gatewaying from the newsgroup to the list happens via a
+cronjob (currently not shown).</p>
+<p>There are several situations which prevent a message from being gatewayed to
+the newsgroup.  The feature could be disabled, as is the default.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">gateway_to_news</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">Subject: An important message</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">Something of great import.</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;to-usenet&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;news&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>Even if enabled, messages that came from the newsgroup are never gated back to
+the newsgroup.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">gateway_to_news</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;fromusenet&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>Neither are digests ever gated to the newsgroup.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;isdigest&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span>
+<span class="go">[]</span>
+</pre></div>
+</div>
+<p>However, other posted messages get gated to the newsgroup via the nntp queue.
+The list owner can set the linked newsgroup and the nntp host that its
+messages are gated to.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">linked_newsgroup</span> <span class="o">=</span> <span class="s">&#39;comp.lang.thing&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">nntp_host</span> <span class="o">=</span> <span class="s">&#39;news.example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filebase</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span> <span class="o">=</span> <span class="n">switchboard</span><span class="o">.</span><span class="n">dequeue</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">switchboard</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">filebase</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">Subject: An important message</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Something of great import.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg: False</span>
+<span class="go">listname : _xtest@example.com</span>
+<span class="go">version  : 3</span>
+</pre></div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="filtering.html"
+                        title="previous chapter">Content filtering</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="reply-to.html"
+                        title="next chapter">Reply-to munging</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/nntp.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="reply-to.html" title="Reply-to munging"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="filtering.html" title="Content filtering"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

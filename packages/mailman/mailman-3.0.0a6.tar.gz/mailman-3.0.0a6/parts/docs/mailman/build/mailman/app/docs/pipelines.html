@@ -1,0 +1,308 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Pipelines &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="List styles" href="styles.html" />
+    <link rel="prev" title="Messages" href="message.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="styles.html" title="List styles"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="message.html" title="Messages"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="pipelines">
+<h1>Pipelines<a class="headerlink" href="#pipelines" title="Permalink to this headline">¶</a></h1>
+<p>This runner&#8217;s purpose in life is to process messages that have been accepted
+for posting, applying any modifications and also sending copies of the message
+to the archives, digests, nntp, and outgoing queues.  Pipelines are named and
+consist of a sequence of handlers, each of which is applied in turn.  Unlike
+rules and chains, there is no way to stop a pipeline from processing the
+message once it&#8217;s started.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;xtest@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist</span><span class="o">.</span><span class="n">pipeline</span>
+<span class="go">built-in</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.core.pipelines</span> <span class="kn">import</span> <span class="n">process</span>
+</pre></div>
+</div>
+<div class="section" id="processing-a-message">
+<h2>Processing a message<a class="headerlink" href="#processing-a-message" title="Permalink to this headline">¶</a></h2>
+<p>Messages hit the pipeline after they&#8217;ve been accepted for posting.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: xtest@example.com</span>
+<span class="gp">... </span><span class="s">Subject: My first post</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;first&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">First post!</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span> <span class="n">mlist</span><span class="o">.</span><span class="n">pipeline</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The message has been modified with additional headers, footer decorations,
+etc.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Subject: [Xtest] My first post</span>
+<span class="go">X-BeenThere: xtest@example.com</span>
+<span class="go">X-Mailman-Version: ...</span>
+<span class="go">Precedence: list</span>
+<span class="go">List-Id: &lt;xtest.example.com&gt;</span>
+<span class="go">X-Message-ID-Hash: 4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Post: &lt;mailto:xtest@example.com&gt;</span>
+<span class="go">List-Subscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-join@example.com&gt;</span>
+<span class="go">Archived-At:</span>
+<span class="go">    http://lists.example.com/archives/4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Unsubscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-leave@example.com&gt;</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:xtest-request@example.com?subject=help&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>And the message metadata has information about recipients and other stuff.
+However there are currently no recipients for this message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">original_sender : aperson@example.com</span>
+<span class="go">origsubj        : My first post</span>
+<span class="go">recipients      : set([])</span>
+<span class="go">stripped_subject: My first post</span>
+</pre></div>
+</div>
+<p>And the message is now sitting in various other processing queues.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;archive&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Subject: [Xtest] My first post</span>
+<span class="go">X-BeenThere: xtest@example.com</span>
+<span class="go">X-Mailman-Version: ...</span>
+<span class="go">Precedence: list</span>
+<span class="go">List-Id: &lt;xtest.example.com&gt;</span>
+<span class="go">X-Message-ID-Hash: 4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Post: &lt;mailto:xtest@example.com&gt;</span>
+<span class="go">List-Subscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-join@example.com&gt;</span>
+<span class="go">Archived-At:</span>
+<span class="go">    http://lists.example.com/archives/4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Unsubscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-leave@example.com&gt;</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:xtest-request@example.com?subject=help&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg       : False</span>
+<span class="go">original_sender : aperson@example.com</span>
+<span class="go">origsubj        : My first post</span>
+<span class="go">recipients      : set([])</span>
+<span class="go">stripped_subject: My first post</span>
+<span class="go">version         : 3</span>
+</pre></div>
+</div>
+<p>This mailing list is not linked to an NNTP newsgroup, so there&#8217;s nothing in
+the outgoing nntp queue.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;news&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>This is the message that will actually get delivered to end recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;out&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Subject: [Xtest] My first post</span>
+<span class="go">X-BeenThere: xtest@example.com</span>
+<span class="go">X-Mailman-Version: ...</span>
+<span class="go">Precedence: list</span>
+<span class="go">List-Id: &lt;xtest.example.com&gt;</span>
+<span class="go">X-Message-ID-Hash: 4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Post: &lt;mailto:xtest@example.com&gt;</span>
+<span class="go">List-Subscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-join@example.com&gt;</span>
+<span class="go">Archived-At:</span>
+<span class="go">    http://lists.example.com/archives/4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Unsubscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-leave@example.com&gt;</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:xtest-request@example.com?subject=help&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg       : False</span>
+<span class="go">listname        : xtest@example.com</span>
+<span class="go">original_sender : aperson@example.com</span>
+<span class="go">origsubj        : My first post</span>
+<span class="go">recipients      : set([])</span>
+<span class="go">stripped_subject: My first post</span>
+<span class="go">version         : 3</span>
+</pre></div>
+</div>
+<p>There&#8217;s now one message in the digest mailbox, getting ready to be sent.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">digest_mbox</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest</span> <span class="o">=</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">mboxmsg</span> <span class="ow">in</span> <span class="n">digest</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="nb">list</span><span class="p">(</span><span class="n">digest</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: xtest@example.com</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">Subject: [Xtest] My first post</span>
+<span class="go">X-BeenThere: xtest@example.com</span>
+<span class="go">X-Mailman-Version: ...</span>
+<span class="go">Precedence: list</span>
+<span class="go">List-Id: &lt;xtest.example.com&gt;</span>
+<span class="go">X-Message-ID-Hash: 4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Post: &lt;mailto:xtest@example.com&gt;</span>
+<span class="go">List-Subscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-join@example.com&gt;</span>
+<span class="go">Archived-At:</span>
+<span class="go">    http://lists.example.com/archives/4CMWUN6BHVCMHMDAOSJZ2Q72G5M32MWB</span>
+<span class="go">List-Unsubscribe:</span>
+<span class="go">    &lt;http://lists.example.com/listinfo/xtest@example.com&gt;,</span>
+<span class="go">    &lt;mailto:xtest-leave@example.com&gt;</span>
+<span class="go">List-Archive: &lt;http://lists.example.com/archives/xtest@example.com&gt;</span>
+<span class="go">List-Help: &lt;mailto:xtest-request@example.com?subject=help&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="clean-up-the-digests">
+<h2>Clean up the digests<a class="headerlink" href="#clean-up-the-digests" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">digest</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">digest</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">digest_mbox</span><span class="p">(</span><span class="n">mlist</span><span class="p">))</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Pipelines</a><ul>
+<li><a class="reference internal" href="#processing-a-message">Processing a message</a></li>
+<li><a class="reference internal" href="#clean-up-the-digests">Clean up the digests</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="message.html"
+                        title="previous chapter">Messages</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="styles.html"
+                        title="next chapter">List styles</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/app/docs/pipelines.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="styles.html" title="List styles"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="message.html" title="Messages"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

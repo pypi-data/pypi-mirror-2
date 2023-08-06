@@ -1,0 +1,466 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Address registration &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Moderator requests" href="requests.html" />
+    <link rel="prev" title="The pending database" href="pending.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="requests.html" title="Moderator requests"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="pending.html" title="The pending database"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="address-registration">
+<h1>Address registration<a class="headerlink" href="#address-registration" title="Permalink to this headline">¶</a></h1>
+<p>Before users can join a mailing list, they must first register with Mailman.
+The only thing they must supply is an email address, although there is
+additional information they may supply.  All registered email addresses must
+be verified before Mailman will send them any list traffic.</p>
+<p>The <tt class="docutils literal"><span class="pre">IUserManager</span></tt> manages users, but it does so at a fairly low level.
+Specifically, it does not handle verifications, email address syntax validity
+checks, etc.  The <tt class="docutils literal"><span class="pre">IRegistrar</span></tt> is the interface to the object handling all
+this stuff.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.registrar</span> <span class="kn">import</span> <span class="n">IRegistrar</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IRegistrar</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here is a helper function to check the token strings.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">check_token</span><span class="p">(</span><span class="n">token</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="nb">basestring</span><span class="p">),</span> <span class="s">&#39;Not a string&#39;</span>
+<span class="gp">... </span>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">token</span><span class="p">)</span> <span class="o">==</span> <span class="mi">40</span><span class="p">,</span> <span class="s">&#39;Unexpected length: </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">assert</span> <span class="n">token</span><span class="o">.</span><span class="n">isalnum</span><span class="p">(),</span> <span class="s">&#39;Not alphanumeric&#39;</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="s">&#39;ok&#39;</span>
+</pre></div>
+</div>
+<p>Here is a helper function to extract tokens from confirmation messages.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">re</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cre</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&#39;http://lists.example.com/confirm/(.*)&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">extract_token</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">mo</span> <span class="o">=</span> <span class="n">cre</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_payload</span><span class="p">())</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">mo</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="invalid-email-addresses">
+<h2>Invalid email addresses<a class="headerlink" href="#invalid-email-addresses" title="Permalink to this headline">¶</a></h2>
+<p>Addresses are registered within the context of a mailing list, mostly so that
+confirmation emails can come from some place.  You also need the email
+address of the user who is registering.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;alpha@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Some amount of sanity checks are performed on the email address, although
+honestly, not as much as probably should be done.  Still, some patently bad
+addresses are rejected outright.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;some name@example.com&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;some name@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;&lt;script&gt;@example.com&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;&lt;script&gt;@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;</span><span class="se">\xa0</span><span class="s">@example.com&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;\xa0@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;noatsign&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;noatsign&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;nodom@ain&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">InvalidEmailAddressError</span>: <span class="n-Identifier">u&#39;nodom@ain&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="register-an-email-address">
+<h2>Register an email address<a class="headerlink" href="#register-an-email-address" title="Permalink to this headline">¶</a></h2>
+<p>Registration of an unknown address creates nothing until the confirmation step
+is complete.  No <tt class="docutils literal"><span class="pre">IUser</span></tt> or <tt class="docutils literal"><span class="pre">IAddress</span></tt> is created at registration time,
+but a record is added to the pending database, and the token for that record
+is returned.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Anne Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_token</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">ok</span>
+</pre></div>
+</div>
+<p>There should be no records in the user manager for this address yet.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.usermanager</span> <span class="kn">import</span> <span class="n">IUserManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IUserManager</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_address</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>But this address is waiting for confirmation.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.pending</span> <span class="kn">import</span> <span class="n">IPendings</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pendingdb</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IPendings</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">pendingdb</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">expunge</span><span class="o">=</span><span class="bp">False</span><span class="p">))</span>
+<span class="go">address  : aperson@example.com</span>
+<span class="go">list_name: alpha@example.com</span>
+<span class="go">real_name: Anne Person</span>
+<span class="go">type     : registration</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="verification-by-email">
+<h2>Verification by email<a class="headerlink" href="#verification-by-email" title="Permalink to this headline">¶</a></h2>
+<p>There is also a verification email sitting in the virgin queue now.  This
+message is sent to the user in order to verify the registered address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">get_queue_messages</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">items</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="gp">...</span>
+<span class="go">Subject: confirm ...</span>
+<span class="go">From: alpha-confirm+...@example.com</span>
+<span class="go">To: aperson@example.com</span>
+<span class="gp">...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Email Address Registration Confirmation</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Hello, this is the GNU Mailman server at example.com.</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">We have received a registration request for the email address</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Before you can start using GNU Mailman at this site, you must first</span>
+<span class="go">confirm that this is your email address.  You can do this by replying to</span>
+<span class="go">this message, keeping the Subject header intact.  Or you can visit this</span>
+<span class="go">web page</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    http://lists.example.com/confirm/...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">If you do not wish to register this email address simply disregard this</span>
+<span class="go">message.  If you think you are being maliciously subscribed to the list,</span>
+<span class="go">or have any other questions, you may contact</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">    postmaster@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_msgdata</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msgdata</span><span class="p">)</span>
+<span class="go">_parsemsg           : False</span>
+<span class="go">listname            : alpha@example.com</span>
+<span class="go">nodecorate          : True</span>
+<span class="go">recipients          : [u&#39;aperson@example.com&#39;]</span>
+<span class="go">reduced_list_headers: True</span>
+<span class="go">version             : 3</span>
+</pre></div>
+</div>
+<p>The confirmation token shows up in several places, each of which provides an
+easy way for the user to complete the confirmation.  The token will always
+appear in a URL in the body of the message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">sent_token</span> <span class="o">=</span> <span class="n">extract_token</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sent_token</span> <span class="o">==</span> <span class="n">token</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The same token will appear in the <tt class="docutils literal"><span class="pre">From</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;from&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;alpha-confirm+&#39;</span> <span class="o">+</span> <span class="n">token</span> <span class="o">+</span> <span class="s">&#39;@example.com&#39;</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>It will also appear in the <tt class="docutils literal"><span class="pre">Subject</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">[</span><span class="s">&#39;subject&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;confirm &#39;</span> <span class="o">+</span> <span class="n">token</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The user would then validate their registered address by clicking on a url or
+responding to the message.  Either way, the confirmation process extracts the
+token and uses that to confirm the pending registration.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Now, there is an <tt class="docutils literal"><span class="pre">IAddress</span></tt> in the database matching the address, as well as
+an <tt class="docutils literal"><span class="pre">IUser</span></tt> linked to this address.  The <tt class="docutils literal"><span class="pre">IAddress</span></tt> is verified.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">found_address</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_address</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">found_address</span>
+<span class="go">&lt;Address: Anne Person &lt;aperson@example.com&gt; [verified] at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">found_user</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;aperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">found_user</span>
+<span class="go">&lt;User &quot;Anne Person&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">found_user</span><span class="o">.</span><span class="n">controls</span><span class="p">(</span><span class="n">found_address</span><span class="o">.</span><span class="n">address</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">isinstance</span><span class="p">(</span><span class="n">found_address</span><span class="o">.</span><span class="n">verified_on</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="non-standard-registrations">
+<h2>Non-standard registrations<a class="headerlink" href="#non-standard-registrations" title="Permalink to this headline">¶</a></h2>
+<p>If you try to confirm a registration token twice, of course only the first one
+will work.  The second one is ignored.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;bperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_token</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">ok</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">items</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sent_token</span> <span class="o">=</span> <span class="n">extract_token</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">==</span> <span class="n">sent_token</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>If an address is in the system, but that address is not linked to a user yet
+and the address is not yet validated, then no user is created until the
+confirmation step is completed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span><span class="o">.</span><span class="n">create_address</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;Address: cperson@example.com [not verified] at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Claire Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">items</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sent_token</span> <span class="o">=</span> <span class="n">extract_token</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">sent_token</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;User &quot;Claire Person&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user_manager</span><span class="o">.</span><span class="n">get_address</span><span class="p">(</span><span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;Address: cperson@example.com [verified] at ...&gt;</span>
+</pre></div>
+</div>
+<p>Even if the address being registered has already been verified, the
+registration sends a confirmation.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;cperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="discarding">
+<h2>Discarding<a class="headerlink" href="#discarding" title="Permalink to this headline">¶</a></h2>
+<p>A confirmation token can also be discarded, say if the user changes his or her
+mind about registering.  When discarded, no <tt class="docutils literal"><span class="pre">IAddress</span></tt> or <tt class="docutils literal"><span class="pre">IUser</span></tt> is
+created.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;eperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Elly Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">check_token</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">ok</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">pendingdb</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_address</span><span class="p">(</span><span class="s">&#39;eperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;eperson@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+
+<span class="go"># Clear the virgin queue of all the preceding confirmation messages.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="registering-a-new-address-for-an-existing-user">
+<h2>Registering a new address for an existing user<a class="headerlink" href="#registering-a-new-address-for-an-existing-user" title="Permalink to this headline">¶</a></h2>
+<p>When a new address for an existing user is registered, there isn&#8217;t too much
+different except that the new address will still need to be verified before it
+can be used.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dperson</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">create_user</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s">&#39;dperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Dave Person&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dperson</span>
+<span class="go">&lt;User &quot;Dave Person&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_address</span><span class="p">(</span><span class="s">&#39;dperson@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">address</span><span class="o">.</span><span class="n">verified_on</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">attrgetter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">((</span><span class="n">addr</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">dperson</span><span class="o">.</span><span class="n">addresses</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="n">attrgetter</span><span class="p">(</span><span class="s">&#39;address&#39;</span><span class="p">))</span>
+<span class="go">[&lt;Address: Dave Person &lt;dperson@example.com&gt; [verified] at ...&gt;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dperson</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s">&#39;david.person@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;David Person&#39;</span><span class="p">)</span>
+<span class="go">&lt;Address: David Person &lt;david.person@example.com&gt; [not verified] at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;david.person@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">items</span> <span class="o">=</span> <span class="n">get_queue_messages</span><span class="p">(</span><span class="s">&#39;virgin&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sent_token</span> <span class="o">=</span> <span class="n">extract_token</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">sent_token</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user</span> <span class="o">=</span> <span class="n">user_manager</span><span class="o">.</span><span class="n">get_user</span><span class="p">(</span><span class="s">&#39;david.person@example.com&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user</span> <span class="ow">is</span> <span class="n">dperson</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">user</span>
+<span class="go">&lt;User &quot;Dave Person&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">sorted</span><span class="p">((</span><span class="n">addr</span> <span class="k">for</span> <span class="n">addr</span> <span class="ow">in</span> <span class="n">user</span><span class="o">.</span><span class="n">addresses</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="n">attrgetter</span><span class="p">(</span><span class="s">&#39;address&#39;</span><span class="p">))</span>
+<span class="go">[&lt;Address: David Person &lt;david.person@example.com&gt; [verified] at ...&gt;,</span>
+<span class="go"> &lt;Address: Dave Person &lt;dperson@example.com&gt; [verified] at ...&gt;]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="corner-cases">
+<h2>Corner cases<a class="headerlink" href="#corner-cases" title="Permalink to this headline">¶</a></h2>
+<p>If you try to confirm a token that doesn&#8217;t exist in the pending database, the
+confirm method will just return False.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="s">&#39;no token&#39;</span><span class="p">))</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>Likewise, if you try to confirm, through the <tt class="docutils literal"><span class="pre">IUserRegistrar</span></tt> interface, a
+token that doesn&#8217;t match a registration event, you will get <tt class="xref docutils literal"><span class="pre">None</span></tt>.
+However, the pending event matched with that token will still be removed.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.pending</span> <span class="kn">import</span> <span class="n">IPendable</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.interface</span> <span class="kn">import</span> <span class="n">implements</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">SimplePendable</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">implements</span><span class="p">(</span><span class="n">IPendable</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pendable</span> <span class="o">=</span> <span class="n">SimplePendable</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s">&#39;foo&#39;</span><span class="p">,</span> <span class="n">bar</span><span class="o">=</span><span class="s">&#39;baz&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">pendingdb</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">pendable</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">pendingdb</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="registration-and-subscription">
+<h2>Registration and subscription<a class="headerlink" href="#registration-and-subscription" title="Permalink to this headline">¶</a></h2>
+<p>Fred registers with Mailman at the same time that he subscribes to a mailing
+list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">token</span> <span class="o">=</span> <span class="n">registrar</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;fred.person@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Fred Person&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Before confirmation, Fred is not a member of the mailing list.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;fred.person@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>But after confirmation, he is.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">registrar</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">mlist</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">get_member</span><span class="p">(</span><span class="s">&#39;fred.person@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;Member: Fred Person &lt;fred.person@example.com&gt;</span>
+<span class="go">         on alpha@example.com as MemberRole.member&gt;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Address registration</a><ul>
+<li><a class="reference internal" href="#invalid-email-addresses">Invalid email addresses</a></li>
+<li><a class="reference internal" href="#register-an-email-address">Register an email address</a></li>
+<li><a class="reference internal" href="#verification-by-email">Verification by email</a></li>
+<li><a class="reference internal" href="#non-standard-registrations">Non-standard registrations</a></li>
+<li><a class="reference internal" href="#discarding">Discarding</a></li>
+<li><a class="reference internal" href="#registering-a-new-address-for-an-existing-user">Registering a new address for an existing user</a></li>
+<li><a class="reference internal" href="#corner-cases">Corner cases</a></li>
+<li><a class="reference internal" href="#registration-and-subscription">Registration and subscription</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="pending.html"
+                        title="previous chapter">The pending database</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="requests.html"
+                        title="next chapter">Moderator requests</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/model/docs/registration.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="requests.html" title="Moderator requests"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="pending.html" title="The pending database"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

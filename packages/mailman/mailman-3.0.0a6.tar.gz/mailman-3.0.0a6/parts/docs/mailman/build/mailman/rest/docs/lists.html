@@ -1,0 +1,239 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Mailing lists &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Membership" href="membership.html" />
+    <link rel="prev" title="REST API helpers" href="helpers.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="membership.html" title="Membership"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="helpers.html" title="REST API helpers"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="mailing-lists">
+<h1>Mailing lists<a class="headerlink" href="#mailing-lists" title="Permalink to this headline">¶</a></h1>
+<p>The REST API can be queried for the set of known mailing lists.  There is a
+top level collection that can return all the mailing lists.  There aren&#8217;t any
+yet though.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists&#39;</span><span class="p">)</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">start: 0</span>
+<span class="go">total_size: 0</span>
+</pre></div>
+</div>
+<p>Create a mailing list in a domain and it&#8217;s accessible via the API.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test-one@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;mailing list &quot;test-one@example.com&quot; at ...&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists&#39;</span><span class="p">)</span>
+<span class="go">entry 0:</span>
+<span class="go">    fqdn_listname: test-one@example.com</span>
+<span class="go">    host_name: example.com</span>
+<span class="go">    http_etag: &quot;...&quot;</span>
+<span class="go">    list_name: test-one</span>
+<span class="go">    real_name: Test-one</span>
+<span class="go">    self_link: http://localhost:8001/3.0/lists/test-one@example.com</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">start: 0</span>
+<span class="go">total_size: 1</span>
+</pre></div>
+</div>
+<div class="section" id="creating-lists-via-the-api">
+<h2>Creating lists via the API<a class="headerlink" href="#creating-lists-via-the-api" title="Permalink to this headline">¶</a></h2>
+<p>New mailing lists can also be created through the API, by posting to the
+<tt class="docutils literal"><span class="pre">lists</span></tt> URL.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists&#39;</span><span class="p">,</span> <span class="p">{</span>
+<span class="gp">... </span>          <span class="s">&#39;fqdn_listname&#39;</span><span class="p">:</span> <span class="s">&#39;test-two@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="p">})</span>
+<span class="go">content-length: 0</span>
+<span class="go">date: ...</span>
+<span class="go">location: http://localhost:8001/3.0/lists/test-two@example.com</span>
+<span class="gp">...</span>
+</pre></div>
+</div>
+<p>The mailing list exists in the database.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.listmanager</span> <span class="kn">import</span> <span class="n">IListManager</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">zope.component</span> <span class="kn">import</span> <span class="n">getUtility</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_manager</span> <span class="o">=</span> <span class="n">getUtility</span><span class="p">(</span><span class="n">IListManager</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_manager</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;test-two@example.com&#39;</span><span class="p">)</span>
+<span class="go">&lt;mailing list &quot;test-two@example.com&quot; at ...&gt;</span>
+
+<span class="go"># The above starts a Storm transaction, which will lock the database</span>
+<span class="go"># unless we abort it.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">abort</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>It is also available via the location given in the response.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists/test-two@example.com&#39;</span><span class="p">)</span>
+<span class="go">fqdn_listname: test-two@example.com</span>
+<span class="go">host_name: example.com</span>
+<span class="go">http_etag: &quot;...&quot;</span>
+<span class="go">list_name: test-two</span>
+<span class="go">real_name: Test-two</span>
+<span class="go">self_link: http://localhost:8001/3.0/lists/test-two@example.com</span>
+</pre></div>
+</div>
+<p>However, you are not allowed to create a mailing list in a domain that does
+not exist.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists&#39;</span><span class="p">,</span> <span class="p">{</span>
+<span class="gp">... </span>          <span class="s">&#39;fqdn_listname&#39;</span><span class="p">:</span> <span class="s">&#39;test-three@example.org&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="p">})</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">HTTPError: HTTP Error 400</span>: <span class="n-Identifier">Domain does not exist example.org</span>
+</pre></div>
+</div>
+<p>Nor can you create a mailing list that already exists.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists&#39;</span><span class="p">,</span> <span class="p">{</span>
+<span class="gp">... </span>          <span class="s">&#39;fqdn_listname&#39;</span><span class="p">:</span> <span class="s">&#39;test-one@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="p">})</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">HTTPError: HTTP Error 400</span>: <span class="n-Identifier">Mailing list exists</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="deleting-lists-via-the-api">
+<h2>Deleting lists via the API<a class="headerlink" href="#deleting-lists-via-the-api" title="Permalink to this headline">¶</a></h2>
+<p>Existing mailing lists can be deleted through the API, by doing an HTTP
+<tt class="docutils literal"><span class="pre">DELETE</span></tt> on the mailing list URL.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists/test-two@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="n">method</span><span class="o">=</span><span class="s">&#39;DELETE&#39;</span><span class="p">)</span>
+<span class="go">content-length: 0</span>
+<span class="go">date: ...</span>
+<span class="go">server: ...</span>
+<span class="go">status: 204</span>
+
+<span class="go"># The above starts a Storm transaction, which will lock the database</span>
+<span class="go"># unless we abort it.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">abort</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The mailing list does not exist.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">list_manager</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;test-two@example.com&#39;</span><span class="p">)</span>
+<span class="go">None</span>
+</pre></div>
+</div>
+<p>You cannot delete a mailing list that does not exist or has already been
+deleted.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists/test-two@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="n">method</span><span class="o">=</span><span class="s">&#39;DELETE&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">HTTPError: HTTP Error 404</span>: <span class="n-Identifier">404 Not Found</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dump_json</span><span class="p">(</span><span class="s">&#39;http://localhost:8001/3.0/lists/test-ten@example.com&#39;</span><span class="p">,</span>
+<span class="gp">... </span>          <span class="n">method</span><span class="o">=</span><span class="s">&#39;DELETE&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">HTTPError: HTTP Error 404</span>: <span class="n-Identifier">404 Not Found</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Mailing lists</a><ul>
+<li><a class="reference internal" href="#creating-lists-via-the-api">Creating lists via the API</a></li>
+<li><a class="reference internal" href="#deleting-lists-via-the-api">Deleting lists via the API</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="helpers.html"
+                        title="previous chapter">REST API helpers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="membership.html"
+                        title="next chapter">Membership</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/rest/docs/lists.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="membership.html" title="Membership"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="helpers.html" title="REST API helpers"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

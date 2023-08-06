@@ -1,0 +1,507 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Outgoing queue runner &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="REST server" href="rest.html" />
+    <link rel="prev" title="The news runner" href="news.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="rest.html" title="REST server"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="news.html" title="The news runner"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="outgoing-queue-runner">
+<h1>Outgoing queue runner<a class="headerlink" href="#outgoing-queue-runner" title="Permalink to this headline">¶</a></h1>
+<p>The outgoing queue runner is the process that delivers messages to the
+directly upstream SMTP server.  It is this upstream SMTP server that performs
+final delivery to the intended recipients.</p>
+<p>Messages that appear in the outgoing queue are processed individually through
+a <em>delivery module</em>, essentially a pluggable interface for determining how the
+recipient set will be batched, whether messages will be personalized and
+VERP&#8217;d, etc.  The outgoing runner doesn&#8217;t itself support retrying but it can
+move messages to the &#8216;retry queue&#8217; for handling delivery failures.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.app.membership</span> <span class="kn">import</span> <span class="n">add_member</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.member</span> <span class="kn">import</span> <span class="n">DeliveryMode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;aperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Anne Person&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="s">&#39;password&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="s">&#39;en&#39;</span><span class="p">)</span>
+<span class="go">&lt;Member: Anne Person &lt;aperson@example.com&gt;</span>
+<span class="go">         on test@example.com as MemberRole.member&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;bperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Bart Person&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="s">&#39;password&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="s">&#39;en&#39;</span><span class="p">)</span>
+<span class="go">&lt;Member: Bart Person &lt;bperson@example.com&gt;</span>
+<span class="go">         on test@example.com as MemberRole.member&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">add_member</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="s">&#39;cperson@example.com&#39;</span><span class="p">,</span> <span class="s">&#39;Cris Person&#39;</span><span class="p">,</span>
+<span class="gp">... </span>           <span class="s">&#39;password&#39;</span><span class="p">,</span> <span class="n">DeliveryMode</span><span class="o">.</span><span class="n">regular</span><span class="p">,</span> <span class="s">&#39;en&#39;</span><span class="p">)</span>
+<span class="go">&lt;Member: Cris Person &lt;cperson@example.com&gt;</span>
+<span class="go">         on test@example.com as MemberRole.member&gt;</span>
+</pre></div>
+</div>
+<p>Normally, messages would show up in the outgoing queue after the message has
+been processed by the rule set and pipeline.  But we can simulate that here by
+injecting a message directly into the outgoing queue.  First though, we must
+call the <tt class="docutils literal"><span class="pre">calculate-recipients</span></tt> handler so that the message metadata will be
+populated with the list of addresses to deliver the message to.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">To: test@example.com</span>
+<span class="gp">... </span><span class="s">Subject: My first post</span>
+<span class="gp">... </span><span class="s">Message-ID: &lt;first&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">First post!</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;calculate-recipients&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">handler</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing_queue</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">switchboards</span><span class="p">[</span><span class="s">&#39;out&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">to-outgoing</span></tt> handler populates the message metadata with the
+destination mailing list name.  Simulate that here too.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">tolist</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Running the outgoing queue runner processes the message, delivering it to the
+upstream SMTP.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.queue.outgoing</span> <span class="kn">import</span> <span class="n">OutgoingRunner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.testing.helpers</span> <span class="kn">import</span> <span class="n">make_testable_runner</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span> <span class="o">=</span> <span class="n">make_testable_runner</span><span class="p">(</span><span class="n">OutgoingRunner</span><span class="p">,</span> <span class="s">&#39;out&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Every recipient got the same copy of the message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">To: test@example.com</span>
+<span class="go">Subject: My first post</span>
+<span class="go">Message-ID: &lt;first&gt;</span>
+<span class="go">X-Peer: ...</span>
+<span class="go">X-MailFrom: test-bounces@example.com</span>
+<span class="go">X-RcptTo: cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">First post!</span>
+</pre></div>
+</div>
+<div class="section" id="personalization">
+<h2>Personalization<a class="headerlink" href="#personalization" title="Permalink to this headline">¶</a></h2>
+<p>Mailman supports sending individual messages to each recipient by
+personalizing delivery.  This increases the bandwidth between Mailman and the
+upstream mail server, and between the upstream mail server and the remote
+recipient mail servers.  The benefit is that personalization provides for a
+much better user experience, because the messages can be tailored for each
+recipient.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mailinglist</span> <span class="kn">import</span> <span class="n">Personalization</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">personalize</span> <span class="o">=</span> <span class="n">Personalization</span><span class="o">.</span><span class="n">individual</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Now when we send the message, our mail server will get three copies instead of
+just one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+</pre></div>
+</div>
+<p>Since we&#8217;ve done no other configuration, the only difference in the messages
+is the recipient address.  Specifically, the Sender header is the same for all
+recipients.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="s">&#39;x-rcptto&#39;</span><span class="p">)):</span>
+<span class="gp">... </span>        <span class="k">print</span> <span class="n">message</span><span class="p">[</span><span class="s">&#39;X-RcptTo&#39;</span><span class="p">],</span> <span class="n">message</span><span class="p">[</span><span class="s">&#39;X-MailFrom&#39;</span><span class="p">]</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces@example.com</span>
+<span class="go">bperson@example.com   test-bounces@example.com</span>
+<span class="go">cperson@example.com   test-bounces@example.com</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="verp">
+<h2>VERP<a class="headerlink" href="#verp" title="Permalink to this headline">¶</a></h2>
+<p>An even more interesting personalization opportunity arises if <a class="reference external" href="../../mta/docs/verp.html">VERP</a> is
+enabled.  Here, Mailman takes advantage of the fact that it&#8217;s sending
+individualized messages anyway, so it also encodes the recipients address in
+the Sender header.</p>
+<div class="section" id="forcing-verp">
+<h3>Forcing VERP<a class="headerlink" href="#forcing-verp" title="Permalink to this headline">¶</a></h3>
+<p>A handler can force VERP by setting the <tt class="docutils literal"><span class="pre">verp</span></tt> key in the message metadata.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">verp</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="verp-personalized-deliveries">
+<h3>VERP personalized deliveries<a class="headerlink" href="#verp-personalized-deliveries" title="Permalink to this headline">¶</a></h3>
+<p>The site administrator can enable VERP whenever messages are personalized.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;verp&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[mta]</span>
+<span class="gp">... </span><span class="s">verp_personalized_deliveries: yes</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Again, we get three individual messages, with VERP&#8217;d <tt class="docutils literal"><span class="pre">Sender</span></tt> headers.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;verp&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">personalize</span> <span class="o">=</span> <span class="n">Personalization</span><span class="o">.</span><span class="n">none</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="verp-every-once-in-a-while">
+<h3>VERP every once in a while<a class="headerlink" href="#verp-every-once-in-a-while" title="Permalink to this headline">¶</a></h3>
+<p>Perhaps personalization is too much of an overhead, but the list owners would
+still like to occasionally get the benefits of VERP.  The site administrator
+can enable occasional VERPing of messages every so often, by setting a
+delivery interval.  Every N non-personalized deliveries turns on VERP for just
+the next one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;verp occasionally&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[mta]</span>
+<span class="gp">... </span><span class="s">verp_delivery_interval: 3</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="go"># Reset the list&#39;s post_id, which is used to calculate the intervals.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">post_id</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The first message is sent to the list, and it is neither personalized nor
+VERP&#8217;d.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">test-bounces@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;after-delivery&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The second message sent to the list is also not VERP&#8217;d.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">test-bounces@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The third message though is VERP&#8217;d.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The next one is back to bulk delivery.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">test-bounces@example.com</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;verp occasionally&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="verp-every-time">
+<h3>VERP every time<a class="headerlink" href="#verp-every-time" title="Permalink to this headline">¶</a></h3>
+<p>If the site administrator wants to enable VERP for every delivery, even if no
+personalization is going on, they can set the interval to 1.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;always verp&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[mta]</span>
+<span class="gp">... </span><span class="s">verp_delivery_interval: 1</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="go"># Reset the list&#39;s post_id, which is used to calculate the intervals.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">post_id</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The first message is VERP&#8217;d.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>As is the second message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>And the third message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">3</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">aperson@example.com   test-bounces+aperson=example.com@example.com</span>
+<span class="go">bperson@example.com   test-bounces+bperson=example.com@example.com</span>
+<span class="go">cperson@example.com   test-bounces+cperson=example.com@example.com</span>
+
+<span class="go"># Perform post-delivery bookkeeping.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">after</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;always verp&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="never-verp">
+<h3>Never VERP<a class="headerlink" href="#never-verp" title="Permalink to this headline">¶</a></h3>
+<p>Similarly, the site administrator can disable occasional VERP&#8217;ing of
+non-personalized messages by setting the interval to zero.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="s">&#39;never verp&#39;</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="s">[mta]</span>
+<span class="gp">... </span><span class="s">verp_delivery_interval: 0</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="go"># Reset the list&#39;s post_id, which is used to calculate the intervals.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">post_id</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Neither the first message...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">test-bounces@example.com</span>
+</pre></div>
+</div>
+<p>...nor the second message is VERP&#8217;d.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">ignore</span> <span class="o">=</span> <span class="n">outgoing_queue</span><span class="o">.</span><span class="n">enqueue</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">listname</span><span class="o">=</span><span class="n">mlist</span><span class="o">.</span><span class="n">fqdn_listname</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outgoing</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">messages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">smtpd</span><span class="o">.</span><span class="n">messages</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">1</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_headers</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="go">cperson@example.com, bperson@example.com, aperson@example.com</span>
+<span class="go">test-bounces@example.com</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Outgoing queue runner</a><ul>
+<li><a class="reference internal" href="#personalization">Personalization</a></li>
+<li><a class="reference internal" href="#verp">VERP</a><ul>
+<li><a class="reference internal" href="#forcing-verp">Forcing VERP</a></li>
+<li><a class="reference internal" href="#verp-personalized-deliveries">VERP personalized deliveries</a></li>
+<li><a class="reference internal" href="#verp-every-once-in-a-while">VERP every once in a while</a></li>
+<li><a class="reference internal" href="#verp-every-time">VERP every time</a></li>
+<li><a class="reference internal" href="#never-verp">Never VERP</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="news.html"
+                        title="previous chapter">The news runner</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="rest.html"
+                        title="next chapter">REST server</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/queue/docs/outgoing.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="rest.html" title="REST server"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="news.html" title="The news runner"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

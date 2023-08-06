@@ -1,0 +1,455 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Content filtering &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="NNTP Gateway" href="nntp.html" />
+    <link rel="prev" title="File recipients" href="file-recips.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="nntp.html" title="NNTP Gateway"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="file-recips.html" title="File recipients"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="content-filtering">
+<h1>Content filtering<a class="headerlink" href="#content-filtering" title="Permalink to this headline">¶</a></h1>
+<p>Mailman can filter the content of messages posted to a mailing list by
+stripping MIME subparts, and possibly reorganizing the MIME structure of a
+message.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;test@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Several mailing list options control content filtering.  First, the feature
+must be enabled, then there are two options that control which MIME types get
+filtered and which get passed.  Finally, there is an option to control whether
+<tt class="docutils literal"><span class="pre">text/html</span></tt> parts will get converted to plain text.  Let&#8217;s set up some
+defaults for these variables, then we&#8217;ll explain them in more detail below.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_content</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_types</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">pass_types</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">convert_html_to_plaintext</span> <span class="o">=</span> <span class="bp">False</span>
+</pre></div>
+</div>
+<div class="section" id="filtering-the-outer-content-type">
+<h2>Filtering the outer content type<a class="headerlink" href="#filtering-the-outer-content-type" title="Permalink to this headline">¶</a></h2>
+<p>A simple filtering setting will just search the content types of the messages
+parts, discarding all parts with a matching MIME type.  If the message&#8217;s outer
+content type matches the filter, the entire message will be discarded.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mime</span> <span class="kn">import</span> <span class="n">FilterAction</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_types</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;image/jpeg&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_action</span> <span class="o">=</span> <span class="n">FilterAction</span><span class="o">.</span><span class="n">discard</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: image/jpeg</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">xxxxx</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="s">&#39;mime-delete&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="c">...</span>
+<span class="nc">DiscardMessage</span>
+</pre></div>
+</div>
+<p>However, if we turn off content filtering altogether, then the handler
+short-circuits.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_content</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: image/jpeg</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">xxxxx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{}</span>
+</pre></div>
+</div>
+<p>Similarly, no content filtering is performed on digest messages, which are
+crafted internally by Mailman.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_content</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;isdigest&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">msgdata</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: image/jpeg</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">xxxxx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msgdata</span>
+<span class="go">{u&#39;isdigest&#39;: True}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="simple-multipart-filtering">
+<h2>Simple multipart filtering<a class="headerlink" href="#simple-multipart-filtering" title="Permalink to this headline">¶</a></h2>
+<p>If one of the subparts in a multipart message matches the filter type, then
+just that subpart will be stripped.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=BOUNDARY</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-Type: image/jpeg</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">xxx</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">yyy</span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: multipart/mixed; boundary=BOUNDARY</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">X-Content-Filtered-By: Mailman/MimeDel ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: image/gif</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">yyy</span>
+<span class="go">--BOUNDARY--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="collapsing-multipart-alternative-messages">
+<h2>Collapsing multipart/alternative messages<a class="headerlink" href="#collapsing-multipart-alternative-messages" title="Permalink to this headline">¶</a></h2>
+<p>When content filtering encounters a <tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> part, and the
+results of filtering leave only one of the subparts, then the
+<tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> may be collapsed.  For example, in the following
+message, the outer content type is a <tt class="docutils literal"><span class="pre">multipart/mixed</span></tt>.  Inside this part is
+just a single subpart that has a content type of <tt class="docutils literal"><span class="pre">multipart/alternative</span></tt>.
+This inner multipart has two subparts, a jpeg and a gif.</p>
+<p>Content filtering will remove the jpeg part, leaving the
+<tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> with only a single gif subpart.  Because there&#8217;s
+only one subpart left, the MIME structure of the message will be reorganized,
+removing the inner <tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> so that the outer
+<tt class="docutils literal"><span class="pre">multipart/mixed</span></tt> has just a single gif subpart.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">collapse_alternatives</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=BOUNDARY</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/alternative; boundary=BOUND2</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUND2</span>
+<span class="gp">... </span><span class="s">Content-Type: image/jpeg</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">xxx</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUND2</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">yyy</span>
+<span class="gp">... </span><span class="s">--BOUND2--</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BOUNDARY--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: multipart/mixed; boundary=BOUNDARY</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">X-Content-Filtered-By: Mailman/MimeDel ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--BOUNDARY</span>
+<span class="go">Content-Type: image/gif</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">yyy</span>
+<span class="go">--BOUNDARY--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+<p>When the outer part is a <tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> and filtering leaves this
+outer part with just one subpart, the entire message is converted to the left
+over part&#8217;s content type.  In other words, the left over inner part is
+promoted to being the outer part.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_types</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;image/jpeg&#39;</span><span class="p">,</span> <span class="s">&#39;text/html&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/alternative; boundary=AAA</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/html</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&lt;b&gt;This is some html&lt;/b&gt;</span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">This is plain text</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: text/plain</span>
+<span class="go">X-Content-Filtered-By: Mailman/MimeDel ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">This is plain text</span>
+</pre></div>
+</div>
+<p>Clean up.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">filter_types</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;image/jpeg&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="conversion-to-plain-text">
+<h2>Conversion to plain text<a class="headerlink" href="#conversion-to-plain-text" title="Permalink to this headline">¶</a></h2>
+<p>Many mailing lists prohibit HTML email, and in fact, such email can be a
+phishing or spam vector.  However, many mail readers will send HTML email by
+default because users think it looks pretty.  One approach to handling this
+would be to filter out <tt class="docutils literal"><span class="pre">text/html</span></tt> parts and rely on
+<tt class="docutils literal"><span class="pre">multipart/alternative</span></tt> collapsing to leave just a plain text part.  This
+works because many mail readers that send HTML email actually send a plain
+text part in the second subpart of such <tt class="docutils literal"><span class="pre">multipart/alternatives</span></tt>.</p>
+<p>While this is a good suggestion for plain text-only mailing lists, often a
+mail reader will send only a <tt class="docutils literal"><span class="pre">text/html</span></tt> part with no plain text
+alternative.  in this case, the site administer can enable <tt class="docutils literal"><span class="pre">text/html</span></tt> to
+<tt class="docutils literal"><span class="pre">text/plain</span></tt> conversion by defining a conversion command.  A list
+administrator still needs to enable such conversion for their list though.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">convert_html_to_plaintext</span> <span class="o">=</span> <span class="bp">True</span>
+</pre></div>
+</div>
+<p>By default, Mailman sends the message through lynx, but since this program is
+not guaranteed to exist, we&#8217;ll craft a simple, but stupid script to simulate
+the conversion process.  The script expects a single argument, which is the
+name of the file containing the message payload to filter.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="s">&#39;filter.py&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fp</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">try</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">fp</span><span class="p">,</span> <span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">import sys</span>
+<span class="gp">... </span><span class="s">print &#39;Converted text/html to text/plain&#39;</span>
+<span class="gp">... </span><span class="s">print &#39;Filename:&#39;, sys.argv[1]</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span>
+<span class="gp">... </span><span class="k">finally</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">fp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">config</span><span class="o">.</span><span class="n">HTML_TO_PLAIN_TEXT_COMMAND</span> <span class="o">=</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s"> </span><span class="si">%s</span><span class="s"> </span><span class="si">%%</span><span class="s">(filename)s&#39;</span> <span class="o">%</span> <span class="p">(</span>
+<span class="gp">... </span>    <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="n">script_path</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: text/html</span>
+<span class="gp">... </span><span class="s">MIME-Version: 1.0</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&lt;html&gt;&lt;head&gt;&lt;/head&gt;</span>
+<span class="gp">... </span><span class="s">&lt;body&gt;&lt;/body&gt;&lt;/html&gt;</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain</span>
+<span class="go">X-Content-Filtered-By: Mailman/MimeDel ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Converted text/html to text/plain</span>
+<span class="go">Filename: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="discarding-empty-parts">
+<h2>Discarding empty parts<a class="headerlink" href="#discarding-empty-parts" title="Permalink to this headline">¶</a></h2>
+<p>Similarly, if after filtering a multipart section ends up empty, then the
+entire multipart is discarded.  For example, here&#8217;s a message where an inner
+<tt class="docutils literal"><span class="pre">multipart/mixed</span></tt> contains two jpeg subparts.  Both jpegs are filtered out,
+so the entire inner <tt class="docutils literal"><span class="pre">multipart/mixed</span></tt> is discarded.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=AAA</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/mixed; boundary=BBB</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--BBB</span>
+<span class="gp">... </span><span class="s">Content-Type: image/jpeg</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">xxx</span>
+<span class="gp">... </span><span class="s">--BBB</span>
+<span class="gp">... </span><span class="s">Content-Type: image/jpeg</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">yyy</span>
+<span class="gp">... </span><span class="s">--BBB---</span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: multipart/alternative; boundary=CCC</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--CCC</span>
+<span class="gp">... </span><span class="s">Content-Type: text/html</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&lt;h2&gt;This is a header&lt;/h2&gt;</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">--CCC</span>
+<span class="gp">... </span><span class="s">Content-Type: text/plain</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">A different message</span>
+<span class="gp">... </span><span class="s">--CCC--</span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">zzz</span>
+<span class="gp">... </span><span class="s">--AAA</span>
+<span class="gp">... </span><span class="s">Content-Type: image/gif</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">aaa</span>
+<span class="gp">... </span><span class="s">--AAA--</span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="o">.</span><span class="n">as_string</span><span class="p">()</span>
+<span class="go">From: aperson@example.com</span>
+<span class="go">Content-Type: multipart/mixed; boundary=AAA</span>
+<span class="go">X-Content-Filtered-By: Mailman/MimeDel ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">MIME-Version: 1.0</span>
+<span class="go">Content-Type: text/plain</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">Converted text/html to text/plain</span>
+<span class="go">Filename: ...</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: image/gif</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">zzz</span>
+<span class="go">--AAA</span>
+<span class="go">Content-Type: image/gif</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+<span class="go">aaa</span>
+<span class="go">--AAA--</span>
+<span class="go">&lt;BLANKLINE&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="passing-mime-types">
+<h2>Passing MIME types<a class="headerlink" href="#passing-mime-types" title="Permalink to this headline">¶</a></h2>
+<p>XXX Describe the pass_mime_types setting and how it interacts with
+<tt class="docutils literal"><span class="pre">filter_mime_types</span></tt>.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Content filtering</a><ul>
+<li><a class="reference internal" href="#filtering-the-outer-content-type">Filtering the outer content type</a></li>
+<li><a class="reference internal" href="#simple-multipart-filtering">Simple multipart filtering</a></li>
+<li><a class="reference internal" href="#collapsing-multipart-alternative-messages">Collapsing multipart/alternative messages</a></li>
+<li><a class="reference internal" href="#conversion-to-plain-text">Conversion to plain text</a></li>
+<li><a class="reference internal" href="#discarding-empty-parts">Discarding empty parts</a></li>
+<li><a class="reference internal" href="#passing-mime-types">Passing MIME types</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="file-recips.html"
+                        title="previous chapter">File recipients</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="nntp.html"
+                        title="next chapter">NNTP Gateway</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/filtering.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="nntp.html" title="NNTP Gateway"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="file-recips.html" title="File recipients"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>

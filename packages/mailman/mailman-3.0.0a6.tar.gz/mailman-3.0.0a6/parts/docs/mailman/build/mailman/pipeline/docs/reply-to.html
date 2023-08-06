@@ -1,0 +1,241 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Reply-to munging &mdash; mailman v3.0.0a6 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.0.0a6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="mailman v3.0.0a6 documentation" href="../../index.html" />
+    <link rel="next" title="Automatic response handler" href="replybot.html" />
+    <link rel="prev" title="NNTP Gateway" href="nntp.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="replybot.html" title="Automatic response handler"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="nntp.html" title="NNTP Gateway"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="reply-to-munging">
+<h1>Reply-to munging<a class="headerlink" href="#reply-to-munging" title="Permalink to this headline">¶</a></h1>
+<p>Messages that flow through the global pipeline get their headers <em>cooked</em>,
+which basically means that their headers go through several mostly unrelated
+transformations.  Some headers get added, others get changed.  Some of these
+changes depend on mailing list settings and others depend on how the message
+is getting sent through the system.  We&#8217;ll take things one-by-one.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span> <span class="o">=</span> <span class="n">create_list</span><span class="p">(</span><span class="s">&#39;_xtest@example.com&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><em>Reply-to munging</em> refers to the behavior where a mailing list can be
+configured to change or augment an existing <tt class="docutils literal"><span class="pre">Reply-To</span></tt> header in a message
+posted to the list.  Reply-to munging is fairly controversial, with arguments
+made either for or against munging.</p>
+<p>The Mailman developers, and I believe the majority consensus is to do no
+reply-to munging, under several principles.  Primarily, most reply-to munging
+is requested by people who do not have both a <cite>Reply</cite> and <cite>Reply All</cite> button
+on their mail reader.  If you do not munge <tt class="docutils literal"><span class="pre">Reply-To</span></tt>, then these buttons
+will work properly, but if you munge the header, it is impossible for these
+buttons to work right, because both will reply to the list.  This leads to
+unfortunate accidents where a private message is accidentally posted to the
+entire list.</p>
+<p>However, Mailman gives list owners the option to do reply-To munging anyway,
+mostly as a way to shut up the really vocal minority who seem to insist on
+this mis-feature.</p>
+<div class="section" id="reply-to-list">
+<h2>Reply to list<a class="headerlink" href="#reply-to-list" title="Permalink to this headline">¶</a></h2>
+<p>A list can be configured to add a <tt class="docutils literal"><span class="pre">Reply-To</span></tt> header pointing back to the
+mailing list&#8217;s posting address.  If there&#8217;s no <tt class="docutils literal"><span class="pre">Reply-To</span></tt> header in the
+original message, the list&#8217;s posting address simply gets inserted.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.interfaces.mailinglist</span> <span class="kn">import</span> <span class="n">ReplyToMunging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">reply_goes_to_list</span> <span class="o">=</span> <span class="n">ReplyToMunging</span><span class="o">.</span><span class="n">point_to_list</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">preferred_language</span> <span class="o">=</span> <span class="s">&#39;en&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">mailman.pipeline.cook_headers</span> <span class="kn">import</span> <span class="n">process</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">_xtest@example.com</span>
+</pre></div>
+</div>
+<p>It&#8217;s also possible to strip any existing <tt class="docutils literal"><span class="pre">Reply-To</span></tt> header first, before
+adding the list&#8217;s posting address.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">first_strip_reply_to</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">_xtest@example.com</span>
+</pre></div>
+</div>
+<p>If you don&#8217;t first strip the header, then the list&#8217;s posting address will just
+get appended to whatever the original version was.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">first_strip_reply_to</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">bperson@example.com, _xtest@example.com</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="explicit-reply-to">
+<h2>Explicit Reply-To<a class="headerlink" href="#explicit-reply-to" title="Permalink to this headline">¶</a></h2>
+<p>The list can also be configured to have an explicit <tt class="docutils literal"><span class="pre">Reply-To</span></tt> header.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">reply_goes_to_list</span> <span class="o">=</span> <span class="n">ReplyToMunging</span><span class="o">.</span><span class="n">explicit_header</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">reply_to_address</span> <span class="o">=</span> <span class="s">&#39;my-list@example.com&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">my-list@example.com</span>
+</pre></div>
+</div>
+<p>And as before, it&#8217;s possible to either strip any existing <tt class="docutils literal"><span class="pre">Reply-To</span></tt>
+header...</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">first_strip_reply_to</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">my-list@example.com</span>
+</pre></div>
+</div>
+<p>...or not.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">mlist</span><span class="o">.</span><span class="n">first_strip_reply_to</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">msg</span> <span class="o">=</span> <span class="n">message_from_string</span><span class="p">(</span><span class="s">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="gp">... </span><span class="s">From: aperson@example.com</span>
+<span class="gp">... </span><span class="s">Reply-To: bperson@example.com</span>
+<span class="gp">...</span><span class="s"></span>
+<span class="gp">... </span><span class="s">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">process</span><span class="p">(</span><span class="n">mlist</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="p">{})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="s">&#39;reply-to&#39;</span><span class="p">))</span>
+<span class="go">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">msg</span><span class="p">[</span><span class="s">&#39;reply-to&#39;</span><span class="p">]</span>
+<span class="go">my-list@example.com, bperson@example.com</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../docs/README.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Reply-to munging</a><ul>
+<li><a class="reference internal" href="#reply-to-list">Reply to list</a></li>
+<li><a class="reference internal" href="#explicit-reply-to">Explicit Reply-To</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="nntp.html"
+                        title="previous chapter">NNTP Gateway</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="replybot.html"
+                        title="next chapter">Automatic response handler</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/pipeline/docs/reply-to.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="replybot.html" title="Automatic response handler"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="nntp.html" title="NNTP Gateway"
+             >previous</a> |</li>
+        <li><a href="../../docs/README.html">mailman v3.0.0a6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright The Mailman Developers.
+      Last updated on Sep 20, 2010.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>
