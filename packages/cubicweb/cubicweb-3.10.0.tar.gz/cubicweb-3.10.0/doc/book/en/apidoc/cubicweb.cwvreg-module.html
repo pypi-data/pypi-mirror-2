@@ -1,0 +1,508 @@
+<?xml version="1.0" encoding="ascii"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>cubicweb.cwvreg</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+  <script type="text/javascript" src="epydoc.js"></script>
+</head>
+
+<body bgcolor="white" text="black" link="blue" vlink="#204080"
+      alink="#204080">
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="cubicweb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Project homepage -->
+      <th class="navbar" align="right" width="100%">
+        <table border="0" cellpadding="0" cellspacing="0">
+          <tr><th class="navbar" align="center"
+            >cubicweb</th>
+          </tr></table></th>
+  </tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr valign="top">
+    <td width="100%">
+      <span class="breadcrumbs">
+        <a href="cubicweb-module.html">Package&nbsp;cubicweb</a> ::
+        Module&nbsp;cwvreg
+      </span>
+    </td>
+    <td>
+      <table cellpadding="0" cellspacing="0">
+        <!-- hide/show private -->
+        <tr><td align="right"><span class="options">[<a href="javascript:void(0);" class="privatelink"
+    onclick="toggle_private();">hide&nbsp;private</a>]</span></td></tr>
+        <tr><td align="right"><span class="options"
+            >[<a href="frames.html" target="_top">frames</a
+            >]&nbsp;|&nbsp;<a href="cubicweb.cwvreg-module.html"
+            target="_top">no&nbsp;frames</a>]</span></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ==================== MODULE DESCRIPTION ==================== -->
+<h1 class="epydoc">Module cwvreg</h1><p class="nomargin-top"><span class="codelink"><a href="cubicweb.cwvreg-pysrc.html">source&nbsp;code</a></span></p>
+<pre class="literalblock">
+.. VRegistry:
+
+The `VRegistry`
+---------------
+
+The `VRegistry` can be seen as a two-level dictionary. It contains
+all dynamically loaded objects (subclasses of :ref:`appobject`) to
+build a |cubicweb| application. Basically:
+
+* the first level key returns a *registry*. This key corresponds to the
+  `__registry__` attribute of application object classes
+
+* the second level key returns a list of application objects which
+  share the same identifier. This key corresponds to the `__regid__`
+  attribute of application object classes.
+
+A *registry* holds a specific kind of application objects. There is
+for instance a registry for entity classes, another for views, etc...
+
+The `VRegistry` has two main responsibilities:
+
+- being the access point to all registries
+
+- handling the registration process at startup time, and during automatic
+  reloading in debug mode.
+
+.. _AppObjectRecording:
+
+Details of the recording process
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. index::
+   vregistry: registration_callback
+
+On startup, |cubicweb| loads application objects defined in its library
+and in cubes used by the instance. Application objects from the
+library are loaded first, then those provided by cubes are loaded in
+dependency order (e.g. if your cube depends on an other, objects from
+the dependency will be loaded first). The layout of the modules or packages
+in a cube  is explained in :ref:`cubelayout`.
+
+For each module:
+
+* by default all objects are registered automatically
+
+* if some objects have to replace other objects, or have to be
+  included only if some condition is met, you'll have to define a
+  `registration_callback(vreg)` function in your module and explicitly
+  register **all objects** in this module, using the api defined
+  below.
+
+.. Note::
+    Once the function `registration_callback(vreg)` is implemented in a module,
+    all the objects from this module have to be explicitly registered as it
+    disables the automatic objects registration.
+
+
+API for objects registration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here are the registration methods that you can use in the `registration_callback`
+to register your objects to the `VRegistry` instance given as argument (usually
+named `vreg`):
+
+.. automethod:: cubicweb.cwvreg.CubicWebVRegistry.register_all
+.. automethod:: cubicweb.cwvreg.CubicWebVRegistry.register_and_replace
+.. automethod:: cubicweb.cwvreg.CubicWebVRegistry.register
+.. automethod:: cubicweb.cwvreg.CubicWebVRegistry.unregister
+
+Examples:
+
+.. sourcecode:: python
+
+   # web/views/basecomponents.py
+   def registration_callback(vreg):
+      # register everything in the module except SeeAlsoComponent
+      vreg.register_all(globals().values(), __name__, (SeeAlsoVComponent,))
+      # conditionally register SeeAlsoVComponent
+      if 'see_also' in vreg.schema:
+          vreg.register(SeeAlsoVComponent)
+
+In this example, we register all application object classes defined in the module
+except `SeeAlsoVComponent`. This class is then registered only if the 'see_also'
+relation type is defined in the instance'schema.
+
+.. sourcecode:: python
+
+   # goa/appobjects/sessions.py
+   def registration_callback(vreg):
+      vreg.register(SessionsCleaner)
+      # replace AuthenticationManager by GAEAuthenticationManager
+      vreg.register_and_replace(GAEAuthenticationManager, AuthenticationManager)
+      # replace PersistentSessionManager by GAEPersistentSessionManager
+      vreg.register_and_replace(GAEPersistentSessionManager, PersistentSessionManager)
+
+In this example, we explicitly register classes one by one:
+
+* the `SessionCleaner` class
+* the `GAEAuthenticationManager` to replace the `AuthenticationManager`
+* the `GAEPersistentSessionManager` to replace the `PersistentSessionManager`
+
+If at some point we register a new appobject class in this module, it won't be
+registered at all without modification to the `registration_callback`
+implementation. The previous example will register it though, thanks to the call
+to the `register_all` method.
+
+
+.. _Selection:
+
+Runtime objects selection
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Now that we have all application objects loaded, the question is : when
+I want some specific object, for instance the primary view for a given
+entity, how do I get the proper object ? This is what we call the
+**selection mechanism**.
+
+As explained in the :ref:`Concepts` section:
+
+* each application object has a **selector**, defined by its
+  `__select__` class attribute
+
+* this selector is responsible to return a **score** for a given context
+
+  - 0 score means the object doesn't apply to this context
+
+  - else, the higher the score, the better the object suits the context
+
+* the object with the highest score is selected.
+
+.. Note::
+
+  When no single object has the highest score, an exception is raised in development
+  mode to let you know that the engine was not able to identify the view to
+  apply. This error is silenced in production mode and one of the objects with
+  the highest score is picked.
+
+  In such cases you would need to review your design and make sure
+  your selectors or appobjects are properly defined. Such an error is
+  typically caused by either forgetting to change the __regid__ in a
+  derived class, or by having copy-pasted some code.
+
+For instance, if you are selecting the primary (`__regid__ =
+'primary'`) view (`__registry__ = 'views'`) for a result set
+containing a `Card` entity, two objects will probably be selectable:
+
+* the default primary view (`__select__ = is_instance('Any')`), meaning
+  that the object is selectable for any kind of entity type
+
+* the specific `Card` primary view (`__select__ = is_instance('Card')`,
+  meaning that the object is selectable for Card entities
+
+Other primary views specific to other entity types won't be selectable in this
+case. Among selectable objects, the `is_instance('Card')` selector will return a higher
+score since it's more specific, so the correct view will be selected as expected.
+
+.. _SelectionAPI:
+
+API for objects selections
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here is the selection API you'll get on every registry. Some of them, as the
+'etypes' registry, containing entity classes, extend it. In those methods,
+`*args, **kwargs` is what we call the **context**. Those arguments are given to
+selectors that will inspect their content and return a score accordingly.
+
+.. automethod:: cubicweb.vregistry.Registry.select
+
+.. automethod:: cubicweb.vregistry.Registry.select_or_none
+
+.. automethod:: cubicweb.vregistry.Registry.possible_objects
+
+.. automethod:: cubicweb.vregistry.Registry.object_by_id
+
+</pre>
+
+<!-- ==================== CLASSES ==================== -->
+<a name="section-Classes"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Classes</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Classes"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.CWRegistry-class.html" class="summary-name">CWRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.ETypeRegistry-class.html" class="summary-name">ETypeRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.ViewsRegistry-class.html" class="summary-name">ViewsRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.ActionsRegistry-class.html" class="summary-name">ActionsRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.CtxComponentsRegistry-class.html" class="summary-name">CtxComponentsRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.BwCompatCWRegistry-class.html" class="summary-name">BwCompatCWRegistry</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg.CubicWebVRegistry-class.html" class="summary-name">CubicWebVRegistry</a><br />
+      Central registry for the cubicweb instance, extending the generic
+VRegistry with some cubicweb specific stuff.
+    </td>
+  </tr>
+</table>
+<!-- ==================== FUNCTIONS ==================== -->
+<a name="section-Functions"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Functions</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Functions"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="clear_rtag_objects"></a><span class="summary-sig-name">clear_rtag_objects</span>()</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="cubicweb.cwvreg-pysrc.html#clear_rtag_objects">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="use_interfaces"></a><span class="summary-sig-name">use_interfaces</span>(<span class="summary-sig-arg">obj</span>)</span><br />
+      return interfaces used by the given object by searching for implements
+selectors</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="cubicweb.cwvreg-pysrc.html#use_interfaces">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="require_appobject"></a><span class="summary-sig-name">require_appobject</span>(<span class="summary-sig-arg">obj</span>)</span><br />
+      return interfaces used by the given object by searching for implements
+selectors</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="cubicweb.cwvreg-pysrc.html#require_appobject">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
+<!-- ==================== VARIABLES ==================== -->
+<a name="section-Variables"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Variables</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Variables"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="cubicweb.cwvreg-module.html#YAMS_TO_PY" class="summary-name">YAMS_TO_PY</a> = <code title="{'Boolean': &lt;type 'bool'&gt;,
+ 'Bytes': &lt;class cubicweb.Binary at 0x2b9d1d0&gt;,
+ 'Date': &lt;type 'datetime.date'&gt;,
+ 'Datetime': &lt;type 'datetime.datetime'&gt;,
+ 'Float': &lt;type 'float'&gt;,
+ 'Int': &lt;type 'int'&gt;,
+ 'Interval': &lt;type 'datetime.timedelta'&gt;,
+ 'Password': &lt;type 'str'&gt;,
+..."><code class="variable-group">{</code><code class="variable-quote">'</code><code class="variable-string">Boolean</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'bool'&gt;<code class="variable-op">, </code><code class="variable-quote">'</code><code class="variable-string">Bytes</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;class cubicw<code class="variable-ellipsis">...</code></code>
+    </td>
+  </tr>
+</table>
+<!-- ==================== VARIABLES DETAILS ==================== -->
+<a name="section-VariablesDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Variables Details</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-VariablesDetails"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+</table>
+<a name="YAMS_TO_PY"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">YAMS_TO_PY</h3>
+  
+  <dl class="fields">
+  </dl>
+  <dl class="fields">
+    <dt>Value:</dt>
+      <dd><table><tr><td><pre class="variable">
+<code class="variable-group">{</code><code class="variable-quote">'</code><code class="variable-string">Boolean</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'bool'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Bytes</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;class cubicweb.Binary at 0x2b9d1d0&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Date</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'datetime.date'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Datetime</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'datetime.datetime'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Float</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'float'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Int</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'int'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Interval</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'datetime.timedelta'&gt;<code class="variable-op">,</code>
+ <code class="variable-quote">'</code><code class="variable-string">Password</code><code class="variable-quote">'</code><code class="variable-op">: </code>&lt;type 'str'&gt;<code class="variable-op">,</code>
+<code class="variable-ellipsis">...</code>
+</pre></td></tr></table>
+</dd>
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="cubicweb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Project homepage -->
+      <th class="navbar" align="right" width="100%">
+        <table border="0" cellpadding="0" cellspacing="0">
+          <tr><th class="navbar" align="center"
+            >cubicweb</th>
+          </tr></table></th>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%%">
+  <tr>
+    <td align="left" class="footer">
+    Generated by Epydoc 3.0.1 on Wed Oct 13 19:49:23 2010
+    </td>
+    <td align="right" class="footer">
+      <a target="mainFrame" href="http://epydoc.sourceforge.net"
+        >http://epydoc.sourceforge.net</a>
+    </td>
+  </tr>
+</table>
+
+<script type="text/javascript">
+  <!--
+  // Private objects are initially displayed (because if
+  // javascript is turned off then we want them to be
+  // visible); but by default, we want to hide them.  So hide
+  // them unless we have a cookie that says to show them.
+  checkCookie();
+  // -->
+</script>
+</body>
+</html>
