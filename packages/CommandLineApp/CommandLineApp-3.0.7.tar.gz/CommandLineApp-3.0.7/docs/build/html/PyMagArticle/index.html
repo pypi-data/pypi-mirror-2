@@ -1,0 +1,2136 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Command line programs are classes, too! &mdash; CommandLineApp v3.0.7 documentation</title>
+    <link rel="stylesheet" href="../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '3.0.7',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="CommandLineApp v3.0.7 documentation" href="../index.html" />
+    <link rel="next" title="History" href="../history.html" />
+    <link rel="prev" title="commandlineapp – Command line application builder" href="../commandlineapp.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../history.html" title="History"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../commandlineapp.html" title="commandlineapp – Command line application builder"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">CommandLineApp v3.0.7 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="command-line-programs-are-classes-too">
+<h1>Command line programs are classes, too!<a class="headerlink" href="#command-line-programs-are-classes-too" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This article was originally published in the November 2007 issue of <a class="reference external" href="http://www.pythonmagazine.com/">Python Magazine</a>.  It has been updated to match the more recent versions of <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>.</p>
+</div>
+<p><em>Most OOP discussions focus on GUI or domain-specific development areas, completely ignoring the workhorse of computing: command line programs. This article examines CommandLineApp, a base class for creating command line programs as objects, with option and argument validation, help text generation, and more.</em></p>
+<p>Although many of the hot new development topics are centered on web technologies like AJAX, regular command line programs are still an important part of most systems.  Many system administration tasks still depend on command line programs, for example.  Often, a problem is simple enough that there is no reason to build a graphical or web user interface when a straightforward command line interface will do the job.  Command line programs are less glamorous than programs with fancy graphics, but they are still the workhorses of modern computing.</p>
+<p>The Python standard library includes two modules for working with command line options.  The <strong>getopt</strong> module presents an API that has been in use for decades on some platforms and is commonly available in many programming languages, from C to bash. The <strong>optparse</strong> module is more modern than <strong>getopt</strong>, and offers features such as type validation, callbacks, and automatic help generation.  Both modules elect to use a procedural-style interface, though, and as a result neither has direct support for treating your command line application as a first class object.  There is no facility for sharing common options between related programs using <strong>getopt</strong>.  And, while it is possible to reuse <tt class="docutils literal"><span class="pre">optparse.OptionParser</span></tt> instances in different programs, it is not as natural as inheritance.</p>
+<p><a class="reference external" href="http://www.doughellmann.com/projects/CommandLineApp/">CommandLineApp</a> is a base class for command line programs.  It handles the repetitive aspects of interacting with the user on the command line such as parsing options and arguments, generating help messages, error handling, and printing status messages.  To create your application, just make a subclass of <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> and concentrate on your own code.  All of the information about switches, arguments, and help text necessary for your program to run is derived through introspection.  Common options and behavior can be shared by applications through inheritance.</p>
+<div class="section" id="csvcat-requirements">
+<h2>csvcat Requirements<a class="headerlink" href="#csvcat-requirements" title="Permalink to this headline">¶</a></h2>
+<p>Recently, I needed to combine data from a few different sources, including a database and a spreadsheet, to summarize the results. I wanted to import the merged data into a spreadsheet where I could perform the analysis.  All of the sources were able to save data to comma-separated-value (CSV) files; the challenge was merging the files together.  Using the <strong>csv</strong> module in the Python standard library, and <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>, I wrote a small program to read multiple CSV files and concatenate them into a single output file.  The program, <a class="reference external" href="http://www.doughellmann.com/projects/csvcat/">csvcat</a>, is a good illustration of how to create applications with <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>.</p>
+<p>The requirements for <strong>csvcat</strong> were fairly simple.  It needed to read one or more CSV files and combine them, without repeating the column headers that appeared in each input source.  In some cases, the input data included columns I did not want, so I needed to be able to select the columns to include in the output.  No sort feature was needed, since I was going to import it into a spreadsheet when I was done and I could sort the data after importing it.  To make the program more generally useful, I also included the ability to select the output format using a <strong>csv</strong> module feature called &#8220;dialects&#8221;.</p>
+</div>
+<div class="section" id="analyzing-the-help">
+<h2>Analyzing the Help<a class="headerlink" href="#analyzing-the-help" title="Permalink to this headline">¶</a></h2>
+<p>Listing 1 shows the help output for the final version of <strong>csvcat</strong>, produced by running <tt class="docutils literal"><span class="pre">csvcat</span> <span class="pre">--help</span></tt>.  Listing 2 shows the source for the program.  All of the information in the help output is derived from the <strong>csvcat</strong> class through introspection.  The help text follows a fairly standard layout.  It begins with a description of the application, followed by increasingly more detailed descriptions of the syntax, arguments, and options.  Application-specific help such as examples and argument ranges appears at the end.</p>
+<div class="section" id="listing-1">
+<h3>Listing 1<a class="headerlink" href="#listing-1" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><pre>$ python docs/source/PyMagArticle/Listing2.py --help
+Concatenate comma separated value files.
+
+
+SYNTAX:
+
+  csvcat [&lt;options&gt;] filename [filename...]
+
+    -c col[,col...], --columns=col[,col...]
+    -d name, --dialect=name
+    --debug
+    -h
+    --help
+    --quiet
+    --skip-headers
+    -v
+    --verbose=level
+
+
+ARGUMENTS:
+
+    The names of comma separated value files, such as might be
+    exported from a spreadsheet or database program.
+
+
+OPTIONS:
+
+    -c col[,col...], --columns=col[,col...]
+        Limit the output to the specified columns. Columns are
+        identified by number, starting with 0.
+
+    -d name, --dialect=name
+        Specify the output dialect name. Defaults to "excel".
+
+    --debug
+        Set debug mode to see tracebacks.
+
+    -h
+        Displays abbreviated help message.
+
+    --help
+        Displays verbose help message.
+
+    --quiet
+        Turn on quiet mode.
+
+    --skip-headers
+        Treat the first line of each file as a header, and only
+        include one copy in the output.
+
+    -v
+        Increment the verbose level.
+
+        Higher levels are more verbose. The default is 1.
+
+    --verbose=level
+        Set the verbose level.
+
+EXAMPLES:
+
+
+To concatenate 2 files, including all columns and headers:
+
+  $ csvcat file1.csv file2.csv
+
+To concatenate 2 files, skipping the headers in the second file:
+
+  $ csvcat --skip-headers file1.csv file2.csv
+
+To concatenate 2 files, including only the first and third columns:
+
+  $ csvcat --col 0,2 file1.csv file2.csv</pre>
+</div>
+</div>
+<div class="section" id="listing-2">
+<h3>Listing 2<a class="headerlink" href="#listing-2" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="sd">&quot;&quot;&quot;Concatenate csv files.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">commandlineapp</span>
+
+<span class="k">class</span> <span class="nc">csvcat</span><span class="p">(</span><span class="n">commandlineapp</span><span class="o">.</span><span class="n">CommandLineApp</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Concatenate comma separated value files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">_app_name</span> <span class="o">=</span> <span class="s">&#39;csvcat&#39;</span>
+
+    <span class="n">EXAMPLES_DESCRIPTION</span> <span class="o">=</span> <span class="s">&#39;&#39;&#39;</span>
+<span class="s">To concatenate 2 files, including all columns and headers:</span>
+
+<span class="s">  $ csvcat file1.csv file2.csv</span>
+
+<span class="s">To concatenate 2 files, skipping the headers in the second file:</span>
+
+<span class="s">  $ csvcat --skip-headers file1.csv file2.csv</span>
+
+<span class="s">To concatenate 2 files, including only the first and third columns:</span>
+
+<span class="s">  $ csvcat --col 0,2 file1.csv file2.csv</span>
+<span class="s">&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">showVerboseHelp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">commandlineapp</span><span class="o">.</span><span class="n">CommandLineApp</span><span class="o">.</span><span class="n">showVerboseHelp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">print</span>
+        <span class="k">print</span> <span class="s">&#39;OUTPUT DIALECTS:&#39;</span>
+        <span class="k">print</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">csv</span><span class="o">.</span><span class="n">list_dialects</span><span class="p">():</span>
+            <span class="k">print</span> <span class="s">&#39;</span><span class="se">\t</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">name</span>
+        <span class="k">print</span>
+        <span class="k">return</span>
+
+    <span class="n">skip_headers</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">def</span> <span class="nf">option_handler_skip_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Treat the first line of each file as a header,</span>
+<span class="sd">        and only include one copy in the output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">skip_headers</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">return</span>
+
+    <span class="n">dialect</span> <span class="o">=</span> <span class="s">&quot;excel&quot;</span>
+    <span class="k">def</span> <span class="nf">option_handler_dialect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Specify the output dialect name.</span>
+<span class="sd">        Defaults to &quot;excel&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dialect</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="k">return</span>
+    <span class="n">option_handler_d</span> <span class="o">=</span> <span class="n">option_handler_dialect</span>
+
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">def</span> <span class="nf">option_handler_columns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">col</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Limit the output to the specified columns.</span>
+<span class="sd">        Columns are identified by number, starting with 0.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">col</span><span class="p">])</span>
+        <span class="k">return</span>
+    <span class="n">option_handler_c</span> <span class="o">=</span> <span class="n">option_handler_columns</span>
+
+    <span class="k">def</span> <span class="nf">getPrintableColumns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return only the part of the row which should be printed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">row</span>
+
+        <span class="c"># Extract the column values, in the order specified.</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">+=</span> <span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">c</span><span class="p">],)</span>
+        <span class="k">return</span> <span class="n">response</span>
+
+    <span class="k">def</span> <span class="nf">getWriter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">dialect</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dialect</span><span class="p">)</span>
+        
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The names of comma separated value files, such as might be</span>
+<span class="sd">        exported from a spreadsheet or database program.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">headers_written</span> <span class="o">=</span> <span class="bp">False</span>
+
+        <span class="n">writer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getWriter</span><span class="p">()</span>
+
+        <span class="c"># process the files in order</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">filename</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s">&#39;rt&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">reader</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">skip_headers</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">headers_written</span><span class="p">:</span>
+                        <span class="c"># This row must include the headers for the output</span>
+                        <span class="n">headers</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+                        <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">getPrintableColumns</span><span class="p">(</span><span class="n">headers</span><span class="p">))</span>
+                        <span class="n">headers_written</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c"># We have seen headers before, and are skipping,</span>
+                        <span class="c"># so do not write the first row of this file.</span>
+                        <span class="n">ignore</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+
+                <span class="c"># Process the rest of the file</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">:</span>
+                    <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">getPrintableColumns</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">return</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">csvcat</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</td></tr></table></div>
+<p>The program description is taken from the docstring of the <strong>csvcat</strong> class.  Before it is printed, the text is split into paragraphs and reformatted using <strong>textwrap</strong>, to ensure that it is no wider than 80 columns of text.</p>
+<p>The program description is followed by a syntax summary for the program.  The options listed in the syntax section correspond to methods with names that begin with <tt class="docutils literal"><span class="pre">option_handler_</span></tt>.  For example, <tt class="docutils literal"><span class="pre">option_handler_skip_headers()</span></tt> indicates that <strong>csvcat</strong> should accept a <tt class="docutils literal"><span class="pre">--skip-headers</span></tt> option on the command line.</p>
+<p>The names of any non-optional arguments to the program appear in the syntax summary.  In this case, <strong>csvcat</strong> needs the names of the files containing the input data.  At least one file name is necessary, and multiple names can be given, as indicated by the fact that the <tt class="docutils literal"><span class="pre">filename</span></tt> argument to <tt class="docutils literal"><span class="pre">main()</span></tt> uses the variable argument notation: <tt class="docutils literal"><span class="pre">*filename</span></tt>.  A longer description of the arguments, taken from the docstring of the <tt class="docutils literal"><span class="pre">main()</span></tt> method (lines 79-82), follows the syntax summary.  As with the general program summary, the description of the arguments is reformatted with <strong>textwrap</strong> to fit the screen.</p>
+</div>
+</div>
+<div class="section" id="options-and-their-arguments">
+<h2>Options and Their Arguments<a class="headerlink" href="#options-and-their-arguments" title="Permalink to this headline">¶</a></h2>
+<p>Following the argument description is a detailed explanation of all of the options to the program.  <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> examines each option handler method to build the option description, including the name of the option, alternative names for the same option, and the name and description of any arguments the option accepts.  There are three variations of option handlers, based on the arguments used by the option.</p>
+<p>The simplest kind of option does not take an argument at all, and is used as a &#8220;switch&#8221; to turn a feature on or off.  The method <tt class="docutils literal"><span class="pre">option_handler_skip_headers</span></tt> (lines 38-43) is an example of such a switch.  The method takes no argument, so <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> recognizes that the option being defined does not take an argument either.  To create the option name, the prefix is stripped from the method name, and the underscore is converted to a dash (<tt class="docutils literal"><span class="pre">-</span></tt>); <tt class="docutils literal"><span class="pre">option_handler_skip_headers</span></tt> becomes <tt class="docutils literal"><span class="pre">--skip-headers</span></tt>.</p>
+<p>Other options accept a single argument.  For example, the <tt class="docutils literal"><span class="pre">--dialect</span></tt> option requires the name of the CSV output dialect.  The method <tt class="docutils literal"><span class="pre">option_handler_dialect</span></tt> (lines 46-51) takes one argument, called <tt class="docutils literal"><span class="pre">name</span></tt>.  The suggested syntax for the option, as seen in Listing 1, is <tt class="docutils literal"><span class="pre">--dialect=name</span></tt>.  The name of the method&#8217;s argument is used as the name of the argument to the option in the help text.</p>
+<p>The <tt class="docutils literal"><span class="pre">-d</span></tt> option has the same meaning as <tt class="docutils literal"><span class="pre">--dialect</span></tt>, because <tt class="docutils literal"><span class="pre">option_handler_d</span></tt> is an alias for <tt class="docutils literal"><span class="pre">option_handler_dialect</span></tt>.  <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> recognizes aliases, and combines the forms in the documentation so the alternative forms <tt class="docutils literal"><span class="pre">-d</span> <span class="pre">name</span></tt> and <tt class="docutils literal"><span class="pre">--dialect=name</span></tt> are described together.</p>
+<p>It is often useful for an option to take multiple arguments, as with <tt class="docutils literal"><span class="pre">--columns</span></tt>.  The user could repeat the option on the command line, but it is more compact to allow them to list multiple values in one argument list.  When <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> sees an option handler method that takes a variable argument list, it treats the corresponding option as accepting a list of arguments.  When the option appears on the command line, the string argument is split on any commas and the resulting list of strings is passed to the option handler method.</p>
+<p>For example, <tt class="docutils literal"><span class="pre">option_handler_columns</span></tt> (lines 55-60) takes a variable length argument named <tt class="docutils literal"><span class="pre">col</span></tt>.  The option <tt class="docutils literal"><span class="pre">--columns</span></tt> can be followed by several column numbers, separated by commas.  The option handler is called with the list of values pre-parsed.  In the syntax description, the argument is shown repeating: <tt class="docutils literal"><span class="pre">--columns=col[,col...]</span></tt>.</p>
+<p>For all cases, the docstring from the option handler method serves as the help text for the option.  The text of the docstring is reformatted using <strong>textwrap</strong> so both the code and help output are easy to read without extra effort on the part of the developer.</p>
+</div>
+<div class="section" id="application-specific-detailed-help">
+<h2>Application-specific Detailed Help<a class="headerlink" href="#application-specific-detailed-help" title="Permalink to this headline">¶</a></h2>
+<p>The general syntax and option description information is produced in the same way for all <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> programs.  There are times when an application needs to include additional information in the help output, though, and there are two ways to add such information.</p>
+<p>The first way is by providing examples of how to use the program on the command line.  Although it is optional, including examples of how to apply different combinations of arguments to your program to achieve various results enhances the usefulness of the help as a reference manual.  When the <tt class="docutils literal"><span class="pre">EXAMPLES_DESCRIPTION</span></tt> class attribute is set, it is used as the source for the examples.  Unlike the other documentation strings, the <tt class="docutils literal"><span class="pre">EXAMPLES_DESCRIPTION</span></tt> is printed directly without being reformatted. This preserves the indentation and other formatting of the examples, so the user sees an accurate representation of the program&#8217;s inputs and outputs.</p>
+<p>Occasionally, a program may need to include information in its help output which cannot be statically defined in a docstring or derived by <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>.  At the very end of its help, <strong>csvcat</strong> includes a list of available CSV dialects which can be used with the <tt class="docutils literal"><span class="pre">--dialect</span></tt> option.  Since the list of dialects must be constructed at runtime based on what dialects have been registered with the <strong>csv</strong> module, <strong>csvcat</strong> overrides <tt class="docutils literal"><span class="pre">showVerboseHelp()</span></tt> to print the list itself (lines 27-35).</p>
+</div>
+<div class="section" id="using-csvcat">
+<h2>Using csvcat<a class="headerlink" href="#using-csvcat" title="Permalink to this headline">¶</a></h2>
+<p>The inputs to <strong>csvcat</strong> are any number of CSV files, and the output is CSV data printed to standard output.  To test <strong>csvcat</strong> during development, I created two small files with test data.  Each file contains three columns of data: a number, a string, and a date.</p>
+<div class="highlight-python"><pre>$ cat testdata1.csv
+"Title 1","Title 2","Title 3"
+1,"a",08/18/07
+2,"b",08/19/07
+3,"c",08/20/07</pre>
+</div>
+<p>The second file does not include quotes around any of the string fields.  I chose to include this variation because <strong>csvcat</strong> does not quote its output, so using unquoted test data simulates re-processing the output of <strong>csvcat</strong>.</p>
+<div class="highlight-python"><pre>$ cat testdata2.csv
+Title 1,Title 2,Title 3
+40,D,08/21/07
+50,E,08/22/07
+60,F,08/23/07</pre>
+</div>
+<p>The simplest use of <strong>csvcat</strong> is to print the contents of an input file to standard output.  Notice that the output does not include quotes around the string fields.</p>
+<div class="highlight-python"><pre>$ csvcat testdata1.csv
+Title 1,Title 2,Title 3
+1,a,08/18/07
+2,b,08/19/07
+3,c,08/20/07</pre>
+</div>
+<p>It is also possible to select which columns should be included in the output using the <tt class="docutils literal"><span class="pre">--columns</span></tt> option.  Columns are identified by their number, beginning with <tt class="docutils literal"><span class="pre">0</span></tt>.  Column numbers can be listed in any order, so it is possible to reorder the columns of the input data, if needed.</p>
+<div class="highlight-python"><pre>$ csvcat --columns 2,0 testdata1.csv
+Title 3,Title 1
+08/18/07,1
+08/19/07,2
+08/20/07,3</pre>
+</div>
+<p>Switching to tab-separated columns instead of comma-separated is easily accomplished by using the <tt class="docutils literal"><span class="pre">--dialect</span></tt> option.  There are only two dialects available by default, but the the <strong>csv</strong> module API supports registering additional dialects.</p>
+<div class="highlight-python"><pre>$ csvcat --dialect excel-tab testdata1.csv
+Title 1 Title 2 Title 3
+1       a       08/18/07
+2       b       08/19/07
+3       c       08/20/07</pre>
+</div>
+<p>For my project, there were input files with several columns, but only two of them needed to be included in the output.  Each file had a single row of column headers. I only wanted one set of headers in the output, so the headers from subsequent files needed to be skipped.  And the output had to be in a format I could import into a spreadsheet, for which the default &#8220;excel&#8221; dialect worked fine.  The data was merged with a command like this:</p>
+<div class="highlight-python"><pre>$ csvcat --skip-headers --columns 2,0 testdata1.csv testdata2.csv
+Title 3,Title 1
+08/18/07,1
+08/19/07,2
+08/20/07,3
+08/21/07,40
+08/22/07,50
+08/23/07,60</pre>
+</div>
+</div>
+<div class="section" id="running-a-commandlineapp-program">
+<h2>Running a CommandLineApp Program<a class="headerlink" href="#running-a-commandlineapp-program" title="Permalink to this headline">¶</a></h2>
+<p>Most of the work for <strong>csvcat</strong> is being done in the <tt class="docutils literal"><span class="pre">main()</span></tt> method.  To invoke the application, however, the caller does not invoke <tt class="docutils literal"><span class="pre">main()</span></tt> directly.  The program should be started by calling <tt class="docutils literal"><span class="pre">run()</span></tt>, so the options are validated and exceptions from <tt class="docutils literal"><span class="pre">main()</span></tt> are handled.  The <tt class="docutils literal"><span class="pre">run()</span></tt> method is one of several methods that are not intended to be overridden by derived classes, since they implement the core features of a command line program.  The source for <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> appears in Listing 3.</p>
+<div class="section" id="listing-3">
+<h3>Listing 3<a class="headerlink" href="#listing-3" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+540
+541
+542
+543
+544
+545
+546
+547
+548
+549
+550
+551
+552
+553
+554
+555
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+575
+576
+577
+578</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="c">#</span>
+<span class="c"># Copyright 2007 Doug Hellmann.</span>
+<span class="c">#</span>
+<span class="c">#</span>
+<span class="c">#                         All Rights Reserved</span>
+<span class="c">#</span>
+<span class="c"># Permission to use, copy, modify, and distribute this software and</span>
+<span class="c"># its documentation for any purpose and without fee is hereby</span>
+<span class="c"># granted, provided that the above copyright notice appear in all</span>
+<span class="c"># copies and that both that copyright notice and this permission</span>
+<span class="c"># notice appear in supporting documentation, and that the name of Doug</span>
+<span class="c"># Hellmann not be used in advertising or publicity pertaining to</span>
+<span class="c"># distribution of the software without specific, written prior</span>
+<span class="c"># permission.</span>
+<span class="c">#</span>
+<span class="c"># DOUG HELLMANN DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,</span>
+<span class="c"># INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN</span>
+<span class="c"># NO EVENT SHALL DOUG HELLMANN BE LIABLE FOR ANY SPECIAL, INDIRECT OR</span>
+<span class="c"># CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS</span>
+<span class="c"># OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,</span>
+<span class="c"># NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN</span>
+<span class="c"># CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</span>
+<span class="c">#</span>
+
+<span class="sd">&quot;&quot;&quot;Base class for building command line applications.</span>
+
+<span class="sd">:class:`CommandLineApp` makes creating command line applications as</span>
+<span class="sd">simple as defining callbacks to handle options when they appear in</span>
+<span class="sd">``sys.argv``.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c">#</span>
+<span class="c"># Import system modules</span>
+<span class="c">#</span>
+<span class="kn">import</span> <span class="nn">getopt</span>
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">cStringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>
+<span class="k">except</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">textwrap</span>
+
+<span class="c">#</span>
+<span class="c"># Import Local modules</span>
+<span class="c">#</span>
+
+<span class="c">#</span>
+<span class="c"># Module</span>
+<span class="c">#</span>
+
+<span class="k">class</span> <span class="nc">OptionDef</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Definition for a command line option.</span>
+
+<span class="sd">    Attributes:</span>
+
+<span class="sd">      method_name - The name of the option handler method.</span>
+<span class="sd">      option_name - The name of the option.</span>
+<span class="sd">      switch      - Switch to be used on the command line.</span>
+<span class="sd">      arg_name    - The name of the argument to the option handler.</span>
+<span class="sd">      is_variable - Is the argument expected to be a sequence?</span>
+<span class="sd">      default     - The default value of the option handler argument.</span>
+<span class="sd">      help        - Help text for the option.</span>
+<span class="sd">      is_long     - Is the option a long value (--) or short (-)?</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c"># Option handler method names start with this value</span>
+    <span class="n">OPTION_HANDLER_PREFIX</span> <span class="o">=</span> <span class="s">&#39;option_handler_&#39;</span>
+
+    <span class="c"># For *args arguments to option handlers, how to split the argument values</span>
+    <span class="n">SPLIT_PARAM_CHAR</span> <span class="o">=</span> <span class="s">&#39;,&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">method_name</span> <span class="o">=</span> <span class="n">method_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">option_name</span> <span class="o">=</span> <span class="n">method_name</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">OPTION_HANDLER_PREFIX</span><span class="p">):]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_long</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">option_name</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">switch_base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">option_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;_&#39;</span><span class="p">,</span> <span class="s">&#39;-&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">switch_base</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">switch</span> <span class="o">=</span> <span class="s">&#39;-&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">switch_base</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">switch</span> <span class="o">=</span> <span class="s">&#39;--&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">switch_base</span>
+
+        <span class="n">argspec</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_variable</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span> <span class="o">=</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">is_variable</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">if</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">3</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">default</span> <span class="o">=</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">default</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">help</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getdoc</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">get_switch_text</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the description of the option switch.</span>
+
+<span class="sd">        For example: --switch=arg or -s arg or --switch=arg[,arg]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span> <span class="bp">self</span><span class="o">.</span><span class="n">switch</span> <span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_long</span><span class="p">:</span>
+                <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;=&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39; &#39;</span><span class="p">)</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_variable</span><span class="p">:</span>
+                <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;[</span><span class="si">%s%s</span><span class="s">...]&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SPLIT_PARAM_CHAR</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">invoke</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Invoke the option handler.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">method_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_name</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_variable</span><span class="p">:</span>
+                <span class="n">opt_args</span> <span class="o">=</span> <span class="n">arg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SPLIT_PARAM_CHAR</span><span class="p">)</span>
+                <span class="n">method</span><span class="p">(</span><span class="o">*</span><span class="n">opt_args</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">method</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">method</span><span class="p">()</span>
+        <span class="k">return</span>
+
+
+<span class="k">class</span> <span class="nc">CommandLineApp</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base class for building command line applications.</span>
+
+<span class="sd">    Define a docstring for the class to explain what the program does.</span>
+
+<span class="sd">    Include descriptions of the command arguments in the docstring for</span>
+<span class="sd">    ``main()``.</span>
+
+<span class="sd">    When the ``EXAMPLES_DESCRIPTION`` class attribute is not empty, it</span>
+<span class="sd">    will be printed last in the help message when the user asks for</span>
+<span class="sd">    help.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">EXAMPLES_DESCRIPTION</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+
+    <span class="c"># If true, always ends run() with sys.exit()</span>
+    <span class="n">force_exit</span> <span class="o">=</span> <span class="bp">True</span>
+
+    <span class="c"># The name of this application</span>
+    <span class="n">_app_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="n">_app_version</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command_line_options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">&quot;Initialize CommandLineApp.&quot;</span>
+        <span class="k">if</span> <span class="n">command_line_options</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">command_line_options</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">command_line_options</span> <span class="o">=</span> <span class="n">command_line_options</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">before_options_hook</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">supported_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scan_for_options</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">after_options_hook</span><span class="p">()</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">before_options_hook</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Hook to initialize the app before the options are processed.</span>
+
+<span class="sd">        Overriding __init__() requires special handling to make sure the</span>
+<span class="sd">        arguments are still passed to the base class.  Override this method</span>
+<span class="sd">        instead to create local attributes or do other initialization before</span>
+<span class="sd">        the command line options are processed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">after_options_hook</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Hook to initialize the app after the options are processed.</span>
+
+<span class="sd">        Overriding __init__() requires special handling to make sure the</span>
+<span class="sd">        arguments are still passed to the base class.  Override this method</span>
+<span class="sd">        instead to create local attributes or do other initialization after</span>
+<span class="sd">        the command line options are processed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Main body of your application.</span>
+
+<span class="sd">        This is the main portion of the app, and is run after all of</span>
+<span class="sd">        the arguments are processed.  Override this method to implment</span>
+<span class="sd">        the primary processing section of your application.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">handle_interrupt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Called when the program is interrupted via Control-C</span>
+<span class="sd">        or SIGINT.  Returns exit code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;Canceled by user.</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="nf">handle_main_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">err</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Invoked when there is an error in the main() method.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debugging</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">traceback</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">error_message</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">err</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="c">## HELP</span>
+
+    <span class="k">def</span> <span class="nf">show_help</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error_message</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">&quot;Display help message when error occurs.&quot;</span>
+        <span class="k">print</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_app_version</span><span class="p">:</span>
+            <span class="k">print</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s"> version </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_app_version</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">print</span> <span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span>
+        <span class="k">print</span>
+
+        <span class="c">#</span>
+        <span class="c"># If they made a syntax mistake, just</span>
+        <span class="c"># show them how to use the program.  Otherwise,</span>
+        <span class="c"># show the full help message.</span>
+        <span class="c">#</span>
+        <span class="k">if</span> <span class="n">error_message</span><span class="p">:</span>
+            <span class="k">print</span> <span class="s">&#39;&#39;</span>
+            <span class="k">print</span> <span class="s">&#39;ERROR: &#39;</span><span class="p">,</span> <span class="n">error_message</span>
+            <span class="k">print</span> <span class="s">&#39;&#39;</span>
+            <span class="k">print</span> <span class="s">&#39;&#39;</span>
+            <span class="k">print</span> <span class="s">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span>
+            <span class="k">print</span> <span class="s">&#39;&#39;</span>
+
+        <span class="n">txt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_simple_syntax_help_string</span><span class="p">()</span>
+        <span class="k">print</span> <span class="n">txt</span>
+        <span class="k">print</span> <span class="s">&#39;For more details, use --help.&#39;</span>
+        <span class="k">print</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">show_verbose_help</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&quot;Display the full help text for the command.&quot;</span>
+        <span class="n">txt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_verbose_syntax_help_string</span><span class="p">()</span>
+        <span class="k">print</span> <span class="n">txt</span>
+        <span class="k">return</span>
+
+    <span class="c">## STATUS MESSAGES</span>
+
+    <span class="k">def</span> <span class="nf">_status_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">output</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">):</span>
+            <span class="n">to_print</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">&#39;ascii&#39;</span><span class="p">,</span> <span class="s">&#39;replace&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">to_print</span> <span class="o">=</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="s">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">&#39;ascii&#39;</span><span class="p">,</span> <span class="s">&#39;replace&#39;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">to_print</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">status_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">verbose_level</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Print a status message to output.</span>
+
+<span class="sd">        msg</span>
+<span class="sd">            The status message string to be printed.</span>
+<span class="sd">        verbose_level</span>
+<span class="sd">            The verbose level to use.  The message</span>
+<span class="sd">            will only be printed if the current verbose</span>
+<span class="sd">            level is &gt;= this number.</span>
+<span class="sd">        error</span>
+<span class="sd">            If true, the message is considered an error and</span>
+<span class="sd">            printed as such.</span>
+<span class="sd">        newline</span>
+<span class="sd">            If true, print a newline after the message.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span> <span class="o">&gt;=</span> <span class="n">verbose_level</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_message</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">newline</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span>
+            <span class="c"># some log mechanisms don&#39;t have a flush method</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="s">&#39;flush&#39;</span><span class="p">):</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">error_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">):</span>
+        <span class="s">&#39;Print a message as an error.&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_message</span><span class="p">(</span><span class="s">&#39;ERROR: </span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">msg</span><span class="p">,</span> <span class="n">verbose_level</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c">## DEFAULT OPTIONS</span>
+
+    <span class="n">debugging</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">def</span> <span class="nf">option_handler_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&quot;Set debug mode to see tracebacks.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">debugging</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">return</span>
+
+    <span class="n">_run_main</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">def</span> <span class="nf">option_handler_h</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&quot;Displays abbreviated help message.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_help</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_main</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">option_handler_help</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&quot;Displays verbose help message.&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_verbose_help</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_main</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">option_handler_quiet</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&#39;Turn on quiet mode.&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span>
+
+    <span class="n">verbose_level</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">def</span> <span class="nf">option_handler_v</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Increment the verbose level.</span>
+<span class="sd">        </span>
+<span class="sd">        Higher levels are more verbose.</span>
+<span class="sd">        The default is 1.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_message</span><span class="p">(</span><span class="s">&#39;New verbose level is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span><span class="p">,</span>
+                           <span class="mi">3</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">option_handler_verbose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set the verbose level.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_message</span><span class="p">(</span><span class="s">&#39;New verbose level is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose_level</span><span class="p">,</span>
+                           <span class="mi">3</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c">## INTERNALS (Subclasses should not need to override these methods)</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Entry point.</span>
+
+<span class="sd">        Process options and execute callback functions as needed.</span>
+<span class="sd">        This method should not need to be overridden, if the main()</span>
+<span class="sd">        method is defined.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Process the options supported and given</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">info</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">supported_options</span><span class="p">:</span>
+            <span class="n">options</span><span class="p">[</span> <span class="n">info</span><span class="o">.</span><span class="n">switch</span> <span class="p">]</span> <span class="o">=</span> <span class="n">info</span>
+        <span class="n">parsed_options</span><span class="p">,</span> <span class="n">remaining_args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">call_getopt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">command_line_options</span><span class="p">,</span>
+                                                         <span class="bp">self</span><span class="o">.</span><span class="n">supported_options</span><span class="p">)</span>
+        <span class="n">exit_code</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">switch</span><span class="p">,</span> <span class="n">option_value</span> <span class="ow">in</span> <span class="n">parsed_options</span><span class="p">:</span>
+                <span class="n">opt_def</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="n">switch</span><span class="p">]</span>
+                <span class="n">opt_def</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option_value</span><span class="p">)</span>
+
+            <span class="c"># Perform the primary action for this application,</span>
+            <span class="c"># unless one of the options has disabled it.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_main</span><span class="p">:</span>
+                <span class="n">main_args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">remaining_args</span><span class="p">)</span>
+
+                <span class="c"># We could just call main() and catch a TypeError,</span>
+                <span class="c"># but that would not let us differentiate between</span>
+                <span class="c"># application errors and a case where the user</span>
+                <span class="c"># has not passed us enough arguments.  So, we check</span>
+                <span class="c"># the argument count ourself.</span>
+                <span class="n">num_args_ok</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="n">argspec</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">)</span>
+                <span class="n">defaults</span> <span class="o">=</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+                <span class="c"># Arguments with defaults are not required, so subtract them</span>
+                <span class="n">expected_arg_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">argspec</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">defaults</span> <span class="ow">or</span> <span class="p">[])</span>
+
+                <span class="k">if</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="n">num_args_ok</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">argspec</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">num_args_ok</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">main_args</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">expected_arg_count</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">main_args</span><span class="p">)</span> <span class="o">==</span> <span class="n">expected_arg_count</span><span class="p">:</span>
+                    <span class="n">num_args_ok</span> <span class="o">=</span> <span class="bp">True</span>
+
+                <span class="k">if</span> <span class="n">num_args_ok</span><span class="p">:</span>
+                    <span class="n">exit_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">(</span><span class="o">*</span><span class="n">main_args</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">show_help</span><span class="p">(</span><span class="s">&#39;Incorrect arguments.&#39;</span><span class="p">)</span>
+                    <span class="n">exit_code</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="n">exit_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_interrupt</span><span class="p">()</span>
+
+        <span class="k">except</span> <span class="ne">SystemExit</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span>
+            <span class="n">exit_code</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">exit_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">handle_main_exception</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">force_exit</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">exit_code</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">exit_code</span>
+
+    <span class="k">def</span> <span class="nf">scan_for_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&quot;Scan through the inheritence hierarchy to find option handlers.&quot;</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">methods</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getmembers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="p">,</span> <span class="n">inspect</span><span class="o">.</span><span class="n">ismethod</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">method_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">OptionDef</span><span class="o">.</span><span class="n">OPTION_HANDLER_PREFIX</span><span class="p">):</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">OptionDef</span><span class="p">(</span><span class="n">method_name</span><span class="p">,</span> <span class="n">method</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">options</span>
+
+    <span class="k">def</span> <span class="nf">call_getopt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command_line_options</span><span class="p">,</span> <span class="n">supported_options</span><span class="p">):</span>
+        <span class="s">&quot;Parse the command line options.&quot;</span>
+        <span class="n">short_options</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">long_options</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">supported_options</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">option_name</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">short_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">option_name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">o</span><span class="o">.</span><span class="n">arg_name</span><span class="p">:</span>
+                    <span class="n">short_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;:&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">o</span><span class="o">.</span><span class="n">arg_name</span><span class="p">:</span>
+                <span class="n">long_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">=&#39;</span> <span class="o">%</span> <span class="n">o</span><span class="o">.</span><span class="n">switch_base</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">long_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">switch_base</span><span class="p">)</span>
+
+        <span class="n">short_option_string</span> <span class="o">=</span> <span class="s">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">short_options</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed_options</span><span class="p">,</span> <span class="n">remaining_args</span> <span class="o">=</span> <span class="n">getopt</span><span class="o">.</span><span class="n">getopt</span><span class="p">(</span>
+                <span class="n">command_line_options</span><span class="p">,</span>
+                <span class="n">short_option_string</span><span class="p">,</span>
+                <span class="n">long_options</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">getopt</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">show_help</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">force_exit</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">parsed_options</span><span class="p">,</span> <span class="n">remaining_args</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_group_option_aliases</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a sequence of tuples containing</span>
+<span class="sd">        (option_names, option_defs)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Figure out which options are aliases</span>
+        <span class="n">option_aliases</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">supported_options</span><span class="p">:</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">method_name</span><span class="p">)</span>
+            <span class="n">existing_aliases</span> <span class="o">=</span> <span class="n">option_aliases</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">existing_aliases</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">option</span><span class="p">)</span>
+
+        <span class="c"># Sort the groups in order</span>
+        <span class="n">grouped_options</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">option_aliases</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="p">[</span> <span class="n">o</span><span class="o">.</span><span class="n">option_name</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">options</span> <span class="p">]</span>
+            <span class="n">grouped_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span> <span class="p">)</span>
+        <span class="n">grouped_options</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">grouped_options</span>
+
+    <span class="k">def</span> <span class="nf">_get_option_identifier_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the option identifier text.</span>
+
+<span class="sd">        For example:</span>
+
+<span class="sd">        -h</span>
+
+<span class="sd">        -v, --verbose</span>
+
+<span class="sd">        -f bar, --foo bar</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">option_texts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">option_texts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">option</span><span class="o">.</span><span class="n">get_switch_text</span><span class="p">())</span>
+        <span class="k">return</span> <span class="s">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">option_texts</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_arguments_syntax_string</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Look at the arguments to main to see what the program accepts,</span>
+<span class="sd">        and build a syntax string explaining how to pass those arguments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">syntax_parts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">argspec</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">)</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                <span class="n">syntax_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">syntax_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">syntax_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;[&#39;</span> <span class="o">+</span> <span class="n">argspec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;...]&#39;</span><span class="p">)</span>
+        <span class="n">syntax</span> <span class="o">=</span> <span class="s">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">syntax_parts</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">syntax</span>
+
+    <span class="k">def</span> <span class="nf">get_simple_syntax_help_string</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return syntax statement.</span>
+
+<span class="sd">        Return a simplified form of help including only the</span>
+<span class="sd">        syntax of the command.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">buffer</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+
+        <span class="c"># Show the name of the command and basic syntax.</span>
+        <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> [&lt;options&gt;] </span><span class="si">%s</span><span class="se">\n\n</span><span class="s">&#39;</span> <span class="o">%</span> \
+                         <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_arguments_syntax_string</span><span class="p">())</span>
+                     <span class="p">)</span>
+
+        <span class="n">grouped_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_group_option_aliases</span><span class="p">()</span>
+
+        <span class="c"># Assemble the text for the options</span>
+        <span class="k">for</span> <span class="n">names</span><span class="p">,</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">grouped_options</span><span class="p">:</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;    </span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_option_identifier_text</span><span class="p">(</span><span class="n">options</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="nb">buffer</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_format_help_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">prefix</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&#39;&#39;</span>
+        <span class="nb">buffer</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">textwrap</span><span class="o">.</span><span class="n">dedent</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">para</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n\n</span><span class="s">&#39;</span><span class="p">):</span>
+            <span class="n">formatted_para</span> <span class="o">=</span> <span class="n">textwrap</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">para</span><span class="p">,</span>
+                                           <span class="n">initial_indent</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+                                           <span class="n">subsequent_indent</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+                                           <span class="p">)</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">formatted_para</span><span class="p">)</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n\n</span><span class="s">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">buffer</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">get_verbose_syntax_help_string</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the full description of the options and arguments.</span>
+
+<span class="sd">        Show a full description of the options and arguments to the</span>
+<span class="sd">        command in something like UNIX man page format. This includes</span>
+
+<span class="sd">          - a description of each option and argument, taken from the</span>
+<span class="sd">            __doc__ string for the option_handler method for</span>
+<span class="sd">            the option</span>
+
+<span class="sd">          - a description of what additional arguments will be processed,</span>
+<span class="sd">            taken from the arguments to main()</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">buffer</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+
+        <span class="n">class_help_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_help_text</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getdoc</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="p">),</span>
+                                               <span class="s">&#39;&#39;</span><span class="p">)</span>
+        <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">class_help_text</span><span class="p">)</span>
+
+        <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">SYNTAX:</span><span class="se">\n\n</span><span class="s">  &#39;</span><span class="p">)</span>
+        <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_simple_syntax_help_string</span><span class="p">())</span>
+
+        <span class="n">main_help_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_help_text</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getdoc</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">),</span> <span class="s">&#39;    &#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">main_help_text</span><span class="p">:</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n\n</span><span class="s">ARGUMENTS:</span><span class="se">\n\n</span><span class="s">&#39;</span><span class="p">)</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">main_help_text</span><span class="p">)</span>
+
+        <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">OPTIONS:</span><span class="se">\n\n</span><span class="s">&#39;</span><span class="p">)</span>
+
+        <span class="n">grouped_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_group_option_aliases</span><span class="p">()</span>
+
+        <span class="c"># Describe all options, grouping aliases together</span>
+        <span class="k">for</span> <span class="n">names</span><span class="p">,</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">grouped_options</span><span class="p">:</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;    </span><span class="si">%s</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_option_identifier_text</span><span class="p">(</span><span class="n">options</span><span class="p">))</span>
+
+            <span class="n">help</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_help_text</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">help</span><span class="p">,</span> <span class="s">&#39;        &#39;</span><span class="p">)</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">help</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">EXAMPLES_DESCRIPTION</span><span class="p">:</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;EXAMPLES:</span><span class="se">\n\n</span><span class="s">&#39;</span><span class="p">)</span>
+            <span class="nb">buffer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">EXAMPLES_DESCRIPTION</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">buffer</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">CommandLineApp</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</td></tr></table></div>
+<p>The available and supported options are examined when the instance is initialized.  By default, the contents of <tt class="docutils literal"><span class="pre">sys.argv</span></tt> are used as the options and arguments passed in from the command line to the program.  It is easy to pass a different list of options when writing automated tests for your program, by passing a list of strings to <tt class="docutils literal"><span class="pre">__init__()</span></tt> as <tt class="docutils literal"><span class="pre">command_line_options</span></tt>.  The options supported by the program are determined by scanning the class for option handler methods.  No options are actually evaluated until <tt class="docutils literal"><span class="pre">run()</span></tt> is called.</p>
+<p>When the program is run, the first thing it does is use <strong>getopt</strong> to validate the options it has been given.  In <tt class="docutils literal"><span class="pre">callGetopt()</span></tt>, the arguments needed by <strong>getopt</strong> are constructed based on the option handlers discovered for the class.  Options are processed in the order they are passed on the command line, and the option handler method for each option encountered is called.  When an option handler requires an argument that is not provided on the command line, <strong>getopt</strong> detects the error.  When an argument is provided, the option handler is responsible for determining whether the value is the correct type or otherwise valid.  When the argument is not valid, the option handler can raise an exception with an error message to be printed for the user.</p>
+<p>After all of the options are handled, the remaining arguments to the program are checked to be sure there are enough to satisfy the requirements, based on the argspec of the <tt class="docutils literal"><span class="pre">main()</span></tt> function.  The number of arguments is checked explicitly to avoid having to handle a <tt class="docutils literal"><span class="pre">TypeError</span></tt> if the user does not pass the right number of arguments on the command line.  If <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> depended on catching a <tt class="docutils literal"><span class="pre">TypeError</span></tt> when it passed too few arguments to <tt class="docutils literal"><span class="pre">main()</span></tt>, it could not tell the difference between a coding error and a user error.  If a mistake inside <tt class="docutils literal"><span class="pre">main()</span></tt> caused a <tt class="docutils literal"><span class="pre">TypeError</span></tt> to occur, it might look like the user had passed an incorrect number of arguments to the program.</p>
+</div>
+</div>
+<div class="section" id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Permalink to this headline">¶</a></h2>
+<p>When an exception is raised during option processing or inside <tt class="docutils literal"><span class="pre">main()</span></tt>, the exception is caught by one of the <tt class="docutils literal"><span class="pre">except</span></tt> clauses and given to an error handling method.  Subclasses can change the error handling behavior by overriding these methods.</p>
+<p><tt class="docutils literal"><span class="pre">KeyboardInterrupt</span></tt> exceptions are handled by calling <tt class="docutils literal"><span class="pre">handleInterrupt()</span></tt>.  The default behavior is to print a message that the program has been interrupted and cause the program to exit with an error code.  A subclass could override the method to clean up an in-progress task, background thread, or other operation which otherwise might not be automatically stopped when the <tt class="docutils literal"><span class="pre">KeyboardInterrupt</span></tt> is received.</p>
+<p>When a lower level library tries to exit the program, <tt class="docutils literal"><span class="pre">SystemExit</span></tt> may be raised.  <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> traps the <tt class="docutils literal"><span class="pre">SystemExit</span></tt> exception and exits normally, using the exit status taken from the exception.  If the <tt class="docutils literal"><span class="pre">force_exit</span></tt> attribute of the application is false, <tt class="docutils literal"><span class="pre">run()</span></tt> returns instead of exiting.  Trapping attempts to exit makes it easier to integrate <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> programs with <tt class="docutils literal"><span class="pre">unittest</span></tt> or other testing frameworks.  The test can instantiate the application, set <tt class="docutils literal"><span class="pre">force_exit</span></tt> to a false value, then run it.  If any errors occur, a status code is returned but the test process does not exit.</p>
+<p>All other types of exceptions are handled by calling <tt class="docutils literal"><span class="pre">handleMainException()</span></tt> and passing the exception as an argument.  The default implementation of <tt class="docutils literal"><span class="pre">handleMainException()</span></tt> (lines 62-70) prints a simple error message based on the exception, unless debugging mode is turned on.  Debugging mode prints the entire traceback for the exception.</p>
+<div class="highlight-python"><pre>$ csvcat file_does_not_exist.csv
+ERROR: [Errno 2] No such file or directory:
+'file_does_not_exist.csv'</pre>
+</div>
+</div>
+<div class="section" id="option-definitions">
+<h2>Option Definitions<a class="headerlink" href="#option-definitions" title="Permalink to this headline">¶</a></h2>
+<p>The standard library module <strong>inspect</strong> provides functions for performing introspection operations on classes and objects at runtime.  The API supports basic querying and type checking so it is possible, for example, to get a list of the methods of a class, including all inherited methods.</p>
+<p><tt class="docutils literal"><span class="pre">CommandLineApp.scan_for_options()</span></tt> uses <strong>inspect</strong> to scan an application class for option handler methods.  All of the methods of the class are retrieved with <tt class="docutils literal"><span class="pre">inspect.getmembers()</span></tt>, and those whose name starts with <tt class="docutils literal"><span class="pre">option_handler_</span></tt> are added to the list of supported options.  Since most command line options use dashes instead of underscores, but method names cannot contain dashes, the underscores in the option handler method names are converted to dashes when creating the option name.</p>
+<p>The <tt class="docutils literal"><span class="pre">__init__()</span></tt> method of the <strong>OptionDef</strong> class does all of the work of determining the command line switch name and what type of arguments the switch takes.  The option handler method is examined with <tt class="docutils literal"><span class="pre">inspect.getargspec()</span></tt>, and the result is used to initialize the <strong>OptionDef</strong>.</p>
+<p>An &#8220;argspec&#8221; for a function is a tuple made up of four values: a list of the names of all regular arguments to the function, including <tt class="docutils literal"><span class="pre">self</span></tt> if the function is a method; the name of the argument to receive the variable argument values, if any; the name of the argument to receive the keyword arguments, if any; and a list of the default values for the arguments, in they order they appear in the list of option names.</p>
+<p>The argspecs for the option handlers in <strong>csvcat</strong> illustrate the variations of interest to <strong>OptionDef</strong>.  First, <tt class="docutils literal"><span class="pre">option_handler_skip_headers</span></tt>:</p>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1
+2
+3
+4
+5</pre></div></td><td class="code"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">Listing2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">inspect</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span>
+<span class="gp">... </span><span class="n">Listing2</span><span class="o">.</span><span class="n">csvcat</span><span class="o">.</span><span class="n">option_handler_skip_headers</span><span class="p">)</span>
+<span class="go">([&#39;self&#39;], None, None, None)</span>
+</pre></div>
+</td></tr></table></div>
+<p>Since the only positional argument to the method is <tt class="docutils literal"><span class="pre">self</span></tt>, and there is no variable argument name given, the option handler is treated as a simple command line switch without any arguments.</p>
+<p>The <tt class="docutils literal"><span class="pre">option_handler_dialect</span></tt>, on the other hand, does include an additional argument:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span>
+<span class="gp">... </span><span class="n">Listing2</span><span class="o">.</span><span class="n">csvcat</span><span class="o">.</span><span class="n">option_handler_dialect</span><span class="p">)</span>
+<span class="go">([&#39;self&#39;, &#39;name&#39;], None, None, None)</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">name</span></tt> argument is listed in the argspec as a single regular argument.  The result, when a program is run, is that while the options are being processed by <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> and <strong>OptionDef</strong>, the value for <tt class="docutils literal"><span class="pre">name</span></tt> is passed directly to the option handler method.</p>
+<p>The <tt class="docutils literal"><span class="pre">option_handler_columns</span></tt> method illustrates variable argument handling:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span>
+<span class="gp">... </span><span class="n">Listing2</span><span class="o">.</span><span class="n">csvcat</span><span class="o">.</span><span class="n">option_handler_columns</span><span class="p">)</span>
+<span class="go">([&#39;self&#39;], &#39;col&#39;, None, None)</span>
+</pre></div>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">col</span></tt> argument from <tt class="docutils literal"><span class="pre">option_handler_columns</span></tt> is named in the argspec as the variable argument identifier.  Since <tt class="docutils literal"><span class="pre">option_handler_columns</span></tt> accepts variable arguments, the <strong>OptionDef</strong> splits the argument value into a list of strings, and the list is passed to the option handler method using the variable argument syntax.</p>
+<p>The other variable argument configuration, using unidentified keyword arguments, does not make sense for an option handler.  The user of the command line program has no standard way to specify named arguments to options, so they are not supported by <strong>OptionDef</strong>.</p>
+</div>
+<div class="section" id="status-messages">
+<h2>Status Messages<a class="headerlink" href="#status-messages" title="Permalink to this headline">¶</a></h2>
+<p>In addition to command line option and argument parsing, and error handling, <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> provides a &#8220;status message&#8221; interface for giving varying levels of feedback to the user.  Status messages are printed by calling <tt class="docutils literal"><span class="pre">self.status_message()</span></tt>.  Each message must indicate the verbose level setting at which the message should be printed.  If the current verbose level is at or higher than the desired level, the message is printed.  Otherwise, it is ignored.  The <tt class="docutils literal"><span class="pre">-v</span></tt>, <tt class="docutils literal"><span class="pre">--verbose</span></tt>, and <tt class="docutils literal"><span class="pre">--quiet</span></tt> flags let the user control the <tt class="docutils literal"><span class="pre">verbose_level</span></tt> setting for the application, and are defined in the <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> so that all subclasses inherit them.</p>
+<div class="section" id="listing-4">
+<h3>Listing 4<a class="headerlink" href="#listing-4" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="c"># Illustrate verbose level controls.</span>
+
+<span class="kn">import</span> <span class="nn">commandlineapp</span>
+
+<span class="k">class</span> <span class="nc">verbose_app</span><span class="p">(</span><span class="n">commandlineapp</span><span class="o">.</span><span class="n">CommandLineApp</span><span class="p">):</span>
+    <span class="s">&quot;Demonstrate verbose level controls.&quot;</span>
+
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status_message</span><span class="p">(</span><span class="s">&#39;Level </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">verbose_app</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</td></tr></table></div>
+<p>Listing 4 contains another sample application which uses <tt class="docutils literal"><span class="pre">status_message()</span></tt> to illustrate how the verbose level setting is applied.  The default verbose level is 1, so when the program is run without any additional arguments only a single message is printed:</p>
+<div class="highlight-python"><pre>$ python Listing4.py
+Level 1
+$</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">--quiet</span></tt> option silences all status messages by setting the verbose level to <tt class="docutils literal"><span class="pre">0</span></tt>:</p>
+<div class="highlight-python"><pre>$ python Listing4.py --quiet
+$</pre>
+</div>
+<p>Using the <tt class="docutils literal"><span class="pre">-v</span></tt> option increases the verbose setting, one level at a time.  The option can be repeated on the command line:</p>
+<div class="highlight-python"><pre>$ python Listing4.py -v
+Level 1
+Level 2
+$ python Listing4.py -vv
+New verbose level is 3
+Level 1
+Level 2
+Level 3
+$</pre>
+</div>
+<p>And the <tt class="docutils literal"><span class="pre">--verbose</span></tt> option sets the verbose level directly to the desired value:</p>
+<div class="highlight-python"><pre>$ python Listing4.py --verbose 4
+New verbose level is 4
+Level 1
+Level 2
+Level 3
+Level 4
+$</pre>
+</div>
+<p>Error messages can be printed to the standard error stream using the <tt class="docutils literal"><span class="pre">error_message()</span></tt> method.  The message is prefixed with the word &#8220;ERROR&#8221;, and error messages are always printed, no matter what verbose level is set.  Most programs will not need to use <tt class="docutils literal"><span class="pre">errorMessage()</span></tt> directly, because raising an exception is sufficient to have an error message displayed for the user.</p>
+</div>
+</div>
+<div class="section" id="commandlineapp-and-inheritance">
+<h2>CommandLineApp and Inheritance<a class="headerlink" href="#commandlineapp-and-inheritance" title="Permalink to this headline">¶</a></h2>
+<p>When creating a suite of related programs, it is usually desirable for all of the programs to use the same options and, in many cases, share other common behavior.  For example, when working with a database the connection and transaction must be managed reliably.  Rather than re-implementing the same database handling code in each program, by using <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>, you can create an intermediate base class for your programs and share a single implementation.  Listing 5 includes a skeleton base class called <strong>SQLiteAppBase</strong> for working with an <tt class="docutils literal"><span class="pre">sqlite3</span></tt> database in this way.</p>
+<div class="section" id="listing-5">
+<h3>Listing 5<a class="headerlink" href="#listing-5" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env</span>
+<span class="c"># Base class for sqlite programs.</span>
+
+<span class="kn">import</span> <span class="nn">sqlite3</span>
+<span class="kn">import</span> <span class="nn">commandlineapp</span>
+
+<span class="k">class</span> <span class="nc">SQLiteAppBase</span><span class="p">(</span><span class="n">commandlineapp</span><span class="o">.</span><span class="n">CommandLineApp</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base class for accessing sqlite databases.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dbname</span> <span class="o">=</span> <span class="s">&#39;sqlite.db&#39;</span>
+    <span class="k">def</span> <span class="nf">optionHandler_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Specify the database filename.</span>
+<span class="sd">        Defaults to &#39;sqlite.db&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dbname</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c"># Subclasses can override this to control the arguments</span>
+        <span class="c"># used by the program.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+            <span class="n">exit_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">takeAction</span><span class="p">()</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="c"># throw away changes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">raise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c"># save changes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">exit_code</span>
+
+    <span class="k">def</span> <span class="nf">takeAction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Override this in the actual application.</span>
+<span class="sd">        Return the exit code for the application</span>
+<span class="sd">        if no exception is raised.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s">&#39;Not implemented!&#39;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">SQLiteAppBase</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</td></tr></table></div>
+<p><strong>SQLiteAppBase</strong> defines a single option handler for the <tt class="docutils literal"><span class="pre">--db</span></tt> option to let the user choose the database file.  The default database is a file in the current directory called &#8220;sqlite.db&#8221;.  The <tt class="docutils literal"><span class="pre">main()</span></tt> method establishes a connection to the database, opens a cursor for working with the connection, then calls <tt class="docutils literal"><span class="pre">takeAction()</span></tt> to do the work.  When <tt class="docutils literal"><span class="pre">takeAction()</span></tt> raises an exception, all database changes it may have made are discarded and the transaction is rolled back.  When there is no error, the transaction is committed and the changes are saved.</p>
+</div>
+<div class="section" id="listing-6">
+<h3>Listing 6<a class="headerlink" href="#listing-6" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="c"># Initialize the database</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">Listing5</span> <span class="kn">import</span> <span class="n">SQLiteAppBase</span>
+
+<span class="k">class</span> <span class="nc">initdb</span><span class="p">(</span><span class="n">SQLiteAppBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Initialize a database.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">takeAction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">statusMessage</span><span class="p">(</span><span class="s">&#39;Initializing database </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">dbname</span><span class="p">)</span>
+        <span class="c"># Create the table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">&quot;CREATE TABLE log (date text, message text)&quot;</span><span class="p">)</span>
+        <span class="c"># Log the actions taken</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s">&quot;INSERT INTO log (date, message) VALUES (?, ?)&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">ctime</span><span class="p">(),</span> <span class="s">&#39;Created database&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s">&quot;INSERT INTO log (date, message) VALUES (?, ?)&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">ctime</span><span class="p">(),</span> <span class="s">&#39;Created log table&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">initdb</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        
+</pre></div>
+</td></tr></table></div>
+<p>A subclass of <strong>SQLiteAppBase</strong> can override <tt class="docutils literal"><span class="pre">takeAction()</span></tt> to do some actual work using the database connection and cursor created in <tt class="docutils literal"><span class="pre">main()</span></tt>.  Listing 6 contains one such program, called <tt class="docutils literal"><span class="pre">initdb</span></tt>.  In <tt class="docutils literal"><span class="pre">initdb</span></tt>, the <tt class="docutils literal"><span class="pre">takeAction()</span></tt> method creates a &#8220;log&#8221; table using the database cursor established in the base class.  It then inserts two rows into the new table, using the same cursor.  There is no need for <tt class="docutils literal"><span class="pre">initdb</span></tt> to commit the transaction, since the base class will do that after <tt class="docutils literal"><span class="pre">takeAction()</span></tt> returns without raising an exception.</p>
+<div class="highlight-python"><pre>$ python Listing6.py
+Initializing database sqlite.db</pre>
+</div>
+</div>
+<div class="section" id="listing-7">
+<h3>Listing 7<a class="headerlink" href="#listing-7" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="c"># Initialize the database</span>
+
+<span class="kn">from</span> <span class="nn">Listing5</span> <span class="kn">import</span> <span class="n">SQLiteAppBase</span>
+
+<span class="k">class</span> <span class="nc">showlog</span><span class="p">(</span><span class="n">SQLiteAppBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Show the contents of the log.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">substring</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">def</span> <span class="nf">optionHandler_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">substring</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Look for messages with the substring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">substring</span> <span class="o">=</span> <span class="n">substring</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span> <span class="nf">takeAction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">substring</span><span class="p">:</span>
+            <span class="n">pattern</span> <span class="o">=</span> <span class="s">&#39;%&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">substring</span> <span class="o">+</span> <span class="s">&#39;%&#39;</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s">&quot;SELECT * FROM log WHERE message LIKE ?;&quot;</span><span class="p">,</span> 
+                <span class="p">(</span><span class="n">pattern</span><span class="p">,))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">&quot;SELECT * FROM log;&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">c</span><span class="p">:</span>
+            <span class="k">print</span> <span class="s">&#39;</span><span class="si">%-30s</span><span class="s"> </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">row</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">showlog</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        
+</pre></div>
+</td></tr></table></div>
+<p>The <tt class="docutils literal"><span class="pre">showlog</span></tt> program in Listing 7 also uses <strong>SQLiteAppBase</strong>.  It reads records from the log table and prints them out to the screen.  When no options are given, it uses the cursor opened by the base class to find all of the records in the &#8220;log&#8221; table, and print them:</p>
+<div class="highlight-python"><pre>$ python Listing7.py
+Sat Aug 25 19:09:41 2007       Created database
+Sat Aug 25 19:09:41 2007       Created log table</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">--message</span></tt> option to <tt class="docutils literal"><span class="pre">showlog</span></tt> can be used to filter the output to include only records whose message column matches the pattern given.  When a message substring is specified, the select statement is altered to include only messages containing the substring.  In this example, only log messages with the word &#8220;table&#8221; in the message are printed:</p>
+<div class="highlight-python"><pre>$ python Listing7.py --message table
+Sat Aug 25 19:09:41 2007       Created log table</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">updatelog</span></tt> program in Listing 8 inserts new records into the database.  Each time <tt class="docutils literal"><span class="pre">updatelog</span></tt> is called, the message passed on the command line is saved as an instance attribute by <tt class="docutils literal"><span class="pre">main()</span></tt> so it can be used later when a new row is inserted into the <tt class="docutils literal"><span class="pre">log</span></tt> table by <tt class="docutils literal"><span class="pre">takeAction()</span></tt>.</p>
+</div>
+<div class="section" id="listing-8">
+<h3>Listing 8<a class="headerlink" href="#listing-8" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27</pre></div></td><td class="code"><div class="highlight"><pre><span class="c">#!/usr/bin/env python</span>
+<span class="c"># Initialize the database</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">Listing5</span> <span class="kn">import</span> <span class="n">SQLiteAppBase</span>
+
+<span class="k">class</span> <span class="nc">updatelog</span><span class="p">(</span><span class="n">SQLiteAppBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Add to the contents of the log.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Provide the new message to add to the log.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Save the message for use in takeAction()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="n">message</span>
+        <span class="k">return</span> <span class="n">SQLiteAppBase</span><span class="o">.</span><span class="n">main</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">takeAction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s">&quot;INSERT INTO log (date, message) VALUES (?, ?)&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">ctime</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">updatelog</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        
+</pre></div>
+</td></tr></table></div>
+<div class="highlight-python"><pre>$ python Listing8.py "another new message"
+$ python Listing7.py
+Sat Aug 25 19:09:41 2007       Created database
+Sat Aug 25 19:09:41 2007       Created log table
+Sat Aug 25 19:10:29 2007       another new message</pre>
+</div>
+<p>As with <tt class="docutils literal"><span class="pre">initdb</span></tt>, because the base class commits changes to the database after <tt class="docutils literal"><span class="pre">takeAction()</span></tt> returns, <tt class="docutils literal"><span class="pre">updatelog</span></tt> does not need to manage the database connection in any way.  Since all of the example programs use the database connection and cursor created by their base class, they could be updated to use a Postgresql or MySQL database by modifying the base class, without having to make those changes to each program separately.</p>
+</div>
+</div>
+<div class="section" id="future-work">
+<h2>Future Work<a class="headerlink" href="#future-work" title="Permalink to this headline">¶</a></h2>
+<p>I have been using <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> in my own work for several years now, and continue to find ways to enhance it. The two primary features I would still like to add are the ability to print the help for a command in formats other than plain text, and automatic type conversion for arguments.</p>
+<p>It is difficult to prepare attractive printed documentation from plain text help output like what is produced by the current version of <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt>.  Parsing the text output directly is not necessarily straightforward, since the embedded help may contain characters or patterns that would confuse a simple parser.  A better solution is to use the option data gathered by introspection to generate output in a format such as DocBook, which could then be converted to PDF or HTML using other tool sets specifically designed for that purpose.  There is a prototype of a program to create DocBook output from an application class, but it is not robust enough to be released - yet.</p>
+<p><tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> is based on the older option parsing module, <strong>getopt</strong>, rather than the new <strong>optparse</strong>.  This means it does not support some of the newer features available in <strong>optparse</strong>, such as type conversion for arguments.  Type conversion could be added to <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> by inferring the types from default values for arguments.  The <strong>OptionDef</strong> already discovers default values, but they are not used.  The <tt class="docutils literal"><span class="pre">OptionDef.invoke()</span></tt> method needs to be updated to look at the default for an option before calling the option handler.  If the default is a type object, it can be used to convert the incoming argument.  If the default is a regular object, the type of the object can be determined using <tt class="docutils literal"><span class="pre">type()</span></tt>.  Then, once the type is known, the argument can be converted.</p>
+<div class="section" id="conclusion">
+<h3>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h3>
+<p>I hope this article encourages you to think about your command line programs in a different light, and to treat them as first class objects.  Using inheritance to share code is so common in other areas of development that it is hardly given a second thought in most cases.  As has been shown with the <strong>SQLiteAppBase</strong> programs, the same technique can be just as powerful when applied to building command line programs, saving development time and testing effort as a result.  <tt class="xref py py-class docutils literal"><span class="pre">CommandLineApp</span></tt> has been used as the foundation for dozens of types of programs, and could be just what you need the next time you have to write a new command line program.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Command line programs are classes, too!</a><ul>
+<li><a class="reference internal" href="#csvcat-requirements">csvcat Requirements</a></li>
+<li><a class="reference internal" href="#analyzing-the-help">Analyzing the Help</a><ul>
+<li><a class="reference internal" href="#listing-1">Listing 1</a></li>
+<li><a class="reference internal" href="#listing-2">Listing 2</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#options-and-their-arguments">Options and Their Arguments</a></li>
+<li><a class="reference internal" href="#application-specific-detailed-help">Application-specific Detailed Help</a></li>
+<li><a class="reference internal" href="#using-csvcat">Using csvcat</a></li>
+<li><a class="reference internal" href="#running-a-commandlineapp-program">Running a CommandLineApp Program</a><ul>
+<li><a class="reference internal" href="#listing-3">Listing 3</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li><a class="reference internal" href="#option-definitions">Option Definitions</a></li>
+<li><a class="reference internal" href="#status-messages">Status Messages</a><ul>
+<li><a class="reference internal" href="#listing-4">Listing 4</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#commandlineapp-and-inheritance">CommandLineApp and Inheritance</a><ul>
+<li><a class="reference internal" href="#listing-5">Listing 5</a></li>
+<li><a class="reference internal" href="#listing-6">Listing 6</a></li>
+<li><a class="reference internal" href="#listing-7">Listing 7</a></li>
+<li><a class="reference internal" href="#listing-8">Listing 8</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#future-work">Future Work</a><ul>
+<li><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="../commandlineapp.html"
+                        title="previous chapter"><tt class="docutils literal"><span class="pre">commandlineapp</span></tt> &#8211; Command line application builder</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../history.html"
+                        title="next chapter">History</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/PyMagArticle/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../history.html" title="History"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../commandlineapp.html" title="commandlineapp – Command line application builder"
+             >previous</a> |</li>
+        <li><a href="../index.html">CommandLineApp v3.0.7 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2009-2011, Doug Hellmann.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
