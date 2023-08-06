@@ -1,0 +1,154 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+
+
+  <metal:cssslot fill-slot="css_slot">
+      <style type="text/css">
+       <!--
+       table.listing input {height:12px; line-height: 11px; font-size: 9px; padding:0; margin:0}
+       .listing td {vertical-align: top}
+       .listing.even .listing table,
+       .listing.even .listing td,
+       .listing.even .listing tr,
+       .listing.even .listing tbody,
+       .listing.even .listing th {border-color:#FFFFFF}
+       .listing td.subList  {width: 310px}
+       .listing table.listing {width: 300px}         
+       .listing .listing th {text-align: left}         
+       .listing h2.documentTopTitle {display:none;}
+       .invisible {display:none;}
+       .showButton {padding-left: 50px}
+       .hideButton {padding-left: 50px; display:none;}
+       -->
+      </style>                      
+  </metal:cssslot>
+  <metal:js fill-slot="javascript_head_slot">
+      <script type="text/javascript" tal:content="structure string:            
+        function hideSubscriptions(subscriber) {
+          var subToHide = document.getElementById(subscriber);
+          var buttonToHide = document.getElementById('hideButton'+subscriber);
+          var buttonToShow = document.getElementById('showButton'+subscriber);
+          subToHide.style.display = 'none';
+          buttonToHide.style.display = 'none';            
+          buttonToShow.style.display = 'inline';
+          }
+          
+        function showSubscriptions(subscriber, replyUrl, b_start) {
+          var subToShow = document.getElementById(subscriber);
+          var buttonToHide = document.getElementById('showButton'+subscriber);
+          var buttonToShow = document.getElementById('hideButton'+subscriber);
+          subToShow.style.display = 'block';
+          buttonToHide.style.display = 'none';            
+          buttonToShow.style.display = 'inline';
+          var startURI = '$portal_url/subscriptions_list?subscriber=';
+          var endURI = '&replyUrl=' + encodeURI(replyUrl + '?b_start:int=' + b_start);
+          showSubReq = new XMLHttpRequest();
+          showSubReq.onreadystatechange = function(){
+            if ( showSubReq.readyState == 4 ){
+               	if ( showSubReq.status == 200 ) {
+                   data = showSubReq.responseText;
+                   subToShow.innerHTML = data;
+                   }
+                else alert( 'XML request error: ' + showSubReq.status + '' ) ;
+               }                   
+            }
+          showSubReq.open('GET', startURI + encodeURI(subscriber) + endURI );
+          showSubReq.send( null ) ;
+          };">
+      </script>                  
+  </metal:js>    
+
+  <body>
+    <metal:main fill-slot="main" tal:condition="python: checkPermission('Manage portal', portal)"
+                                 tal:define="replyUrl string:$portal_url/portal_subscription/subscribers_management;
+                                             b_size b_size|request/b_size|python:50;
+                                             b_start request/b_start|python:0;
+                                             subscribers here/getSubscribers;
+                                             batch batch|python:here.getSubscribers(batch=True, b_size=b_size);">
+    
+        <h1 i18n:translate="heading_manage_subscribers">Subscribers Management</h1>
+        
+        <a href=""
+           class="link-parent"
+           tal:attributes="href string: $portal_url/plone_control_panel"
+           i18n:translate="label_up_to_plone_setup">
+          Up to Site Setup
+        </a>
+        
+        <p class="documentDescription"
+           i18n:translate="description_manage_subscribers">
+        </p>
+    
+        <!-- Navigation -->
+        <div metal:use-macro="here/batch_macros/macros/navigation" />     
+    
+        <table id="subscribers_management"
+               border="1"
+               class="listing">
+          <tr>    
+            <th i18n:translate="label_subscriber_name">Subscriber Name</th>    
+            <th i18n:translate="label_subscriber_email">Subscriber Email</th>    
+            <th i18n:translate="label_subscriptions_list">Subscriptions List</th>                         
+          </tr>   
+          <tbody>
+          <tal:subscribers tal:repeat="dictSub batch">      
+             <tr tal:define="oddrow repeat/dictSub/odd;
+                             subscriber dictSub/id;
+                             subscriberName dictSub/fullname;
+                             subscriberMail dictSub/email;
+                             sub_tool nocall:portal/portal_subscription;                        
+                             items python:sub_tool.getSubscriptions(subscriber_id=subscriber)"
+                 tal:attributes="class python:test(oddrow, 'even', 'odd')">
+                 
+               <td>
+                 <a tal:attributes="href string:${portal_url}/author/${subscriber}"
+                    tal:content="subscriberName">subscriberName</a>
+               </td>
+               <td>
+                 <a tal:attributes="href string:mailto:$subscriberMail"
+                    tal:content="subscriberMail">
+                     subscriberMail
+                 </a>
+               </td>
+               <td class="subList">
+                 <tal:showSubscriptions  condition="items">
+                   <strong tal:content="python:len(items)" />
+                   &nbsp;
+                   <span i18n:translate="">subscriptions</span>
+                   <span class="showButton"
+                         tal:attributes="id string:showButton$subscriber">
+                     <a tal:attributes="href string:javascript:showSubscriptions('$subscriber','$replyUrl','$b_start')"
+                        i18n:translate="label_subscriber_show_subscriptions">
+                         show subscriptions
+                     </a>
+                   </span>
+                   <span class="hideButton"
+                         tal:attributes="id string:hideButton$subscriber">
+                     <a tal:attributes="href string:javascript:hideSubscriptions('$subscriber')"
+                        i18n:translate="label_subscriber_hide_subscriptions">
+                         hide subscriptions
+                     </a>
+                   </span>               
+                   <div class="invisible"
+                        tal:attributes="id string:$subscriber"> 
+                   </div>   
+                 </tal:showSubscriptions>    
+               </td>                         
+             </tr>                            
+          
+          
+          </tal:subscribers>
+          </tbody>
+          
+        </table>
+        <!-- Navigation -->
+        <div metal:use-macro="here/batch_macros/macros/navigation" />    
+    
+    
+    </metal:main>
+    
+  </body>
+
+</html>
