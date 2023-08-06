@@ -1,0 +1,37 @@
+Installation
+------------
+
+Install *django-photos* via `pip` from the repository::
+
+	pip install -e hg+http://bitbucket.org/feuervogel/django-photos#egg=django-photos
+
+It comes with `django-pagination`, `easy_thumbnails` and `django-taggit`. 
+	
+Add all apps to your INSTALLED_APPS in your `settings.py`::
+
+	INSTALLED_APPS = (
+		# ...,
+		'photos',
+		'taggit',
+		'pagination',
+		'easy_thumbnails',        
+		# ...,
+	)
+	
+Add `pagination.middleware.PaginationMiddleware` to your MIDDLEWARE_CLASSES and make sure that `django.core.context_processors.request` is in the list of TEMPLATE_CONTEXT_PROCESSORS.
+
+Run `python manage.py syncdb` to sync the database::
+
+	python manage.py syncdb
+	
+Take care that MEDIA_ROOT and MEDIA_URL are set and the files are served.
+
+Finally add `photos.urls` to your *urls.py*::
+
+	urlpatterns = patterns('',
+		# ...,
+		(r'^photos/', 'photos.urls'),
+		# ...,
+	)
+	
+For more information read the (not yet available) docs.
