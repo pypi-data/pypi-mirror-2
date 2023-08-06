@@ -1,0 +1,109 @@
+Phone contact info
+========================
+
+Implementation of a behavior providing phone and mobile fields
+
+Test Phone Contact Info
+---------------------------
+
+When we create a dexterity content type::
+
+    >>> app = layer['app']
+    >>> portal = layer['portal']
+    >>> portalURL = portal.absolute_url()
+    >>> from plone.dexterity.fti import DexterityFTI
+    >>> from collective.behavior.contactinfo.behavior.contactinfo import IPhoneContactInfo
+    >>> fti = DexterityFTI('phone_type')
+    >>> fti.behaviors = ('collective.behavior.contactinfo.behavior.contactinfo.IPhoneContactInfo',)
+    >>> portal.portal_types._setObject('phone_type', fti)
+    'phone_type'
+    >>> schema = fti.lookupSchema()
+
+If we access the site as an admin TTW::
+
+    >>> from plone.app.testing import TEST_USER_ID, TEST_USER_PASSWORD, setRoles
+    >>> setRoles(portal, TEST_USER_ID, ['Manager'])
+    >>> import transaction; transaction.commit()
+    >>> from plone.testing.z2 import Browser
+    >>> browser = Browser(app)
+    >>> browser.addHeader('Authorization', 'Basic %s:%s' % (TEST_USER_ID, TEST_USER_PASSWORD,))
+
+We can see this type in the addable types at the root of the site::
+
+    >>> browser.open("http://nohost/plone/folder_factories")
+    >>> "phone_type" in browser.contents
+    True
+    >>> browser.getControl("phone_type").click()
+    >>> browser.getControl("Add").click()
+    >>> browser.getControl(name="form.widgets.title").value = "Foo"
+    >>> browser.getControl(name="form.widgets.IPhoneContactInfo.phone").value = "551138982121"
+    >>> browser.getControl(name="form.widgets.IPhoneContactInfo.mobile").value = "551138982121"
+    >>> browser.getControl(name="form.buttons.save").click()
+    >>> browser.url
+    'http://nohost/plone/phone_type/view'
+
+We can now access our type and its values::
+
+    >>> md = portal.phone_type
+    >>> md.phone
+    u'551138982121'
+    >>> md.mobile
+    u'551138982121'
+
+Test Behavior selection
+----------------------------
+
+This will test adding a behavior to an existing content type.
+
+When we create a dexterity content type::
+
+    >>> fti = DexterityFTI('new_simple_type')
+    >>> portal.portal_types._setObject('new_simple_type', fti)
+    'new_simple_type'
+    >>> schema = fti.lookupSchema()
+    >>> import transaction; transaction.commit()
+
+We can see this type in the addable types at the root of the site::
+
+
+    >>> browser.open("http://nohost/plone/folder_factories")
+    >>> "new_simple_type" in browser.contents
+    True
+    >>> browser.getControl("new_simple_type").click()
+    >>> browser.getControl("Add").click()
+    >>> browser.getControl(name="form.widgets.title").value = "Foo"
+    >>> browser.getControl(name="form.buttons.save").click()
+    >>> browser.url
+    'http://nohost/plone/new_simple_type/view'
+
+We will add a value to a non-existing field::
+    
+    >>> portal.new_simple_type.mobile = u'551138982121'
+
+Now we add the behavior to this new content type::
+
+    >>> portal.portal_types['new_simple_type'].behaviors = ('collective.behavior.contactinfo.behavior.contactinfo.IPhoneContactInfo',)
+    >>> import transaction; transaction.commit()
+
+And visit an existing content::
+
+    >>> browser.open("http://nohost/plone/new_simple_type/view")
+    >>> "mobile" in browser.contents
+    True
+    >>> "551138982121" in browser.contents
+    True
+    >>> md = portal.new_simple_type
+    >>> md.mobile
+    u'551138982121'
+
+
+Edit an existing content::
+    
+    >>> browser.open("http://nohost/plone/new_simple_type/edit")
+    >>> browser.getControl(name="form.widgets.title").value = "Foo"
+    >>> browser.getControl(name="form.widgets.IPhoneContactInfo.phone").value = "551138982121"
+    >>> browser.getControl(name="form.widgets.IPhoneContactInfo.mobile").value = "551138982121"
+    >>> browser.getControl(name="form.buttons.save").click()
+    >>> browser.url    
+    'http://nohost/plone/new_simple_type'
+    
