@@ -1,0 +1,517 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>helpers &mdash; django-uni-form v0.8.0 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.8.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="django-uni-form v0.8.0 documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">django-uni-form v0.8.0 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for helpers</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Utilities for helping developers use python for adding various attributes,</span>
+<span class="sd">    elements, and UI elements to forms generated via the uni_form template tag.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">from</span> <span class="nn">django.conf</span> <span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span> <span class="nn">django.core.urlresolvers</span> <span class="kn">import</span> <span class="n">reverse</span><span class="p">,</span> <span class="n">NoReverseMatch</span>
+<span class="kn">from</span> <span class="nn">django.forms.forms</span> <span class="kn">import</span> <span class="n">BoundField</span>
+<span class="kn">from</span> <span class="nn">django.template</span> <span class="kn">import</span> <span class="n">Context</span><span class="p">,</span> <span class="n">Template</span>
+<span class="kn">from</span> <span class="nn">django.template.loader</span> <span class="kn">import</span> <span class="n">render_to_string</span>
+<span class="kn">from</span> <span class="nn">django.utils.safestring</span> <span class="kn">import</span> <span class="n">mark_safe</span>
+
+
+<div class="viewcode-block" id="FormHelpersException"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelpersException">[docs]</a><span class="k">class</span> <span class="nc">FormHelpersException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">    This is raised when building a form via helpers throws an error.</span>
+<span class="sd">    We want to catch form helper errors as soon as possible because</span>
+<span class="sd">    debugging templatetags is never fun.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+</div>
+<div class="viewcode-block" id="BaseInput"><a class="viewcode-back" href="../api_helpers.html#helpers.BaseInput">[docs]</a><span class="k">class</span> <span class="nc">BaseInput</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A base class to reduce the amount of code in the Input classes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">value</span>
+
+</div>
+<div class="viewcode-block" id="Submit"><a class="viewcode-back" href="../api_helpers.html#helpers.Submit">[docs]</a><span class="k">class</span> <span class="nc">Submit</span><span class="p">(</span><span class="n">BaseInput</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to create a Submit button descriptor for the uni_form template tag:</span>
+<span class="sd">        submit = Submit(&#39;Search the Site&#39;, &#39;search this site&#39;)</span>
+<span class="sd">    </span>
+<span class="sd">    Note: The first argument is also slugified and turned into the id for the submit button.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_type</span> <span class="o">=</span> <span class="s">&#39;submit&#39;</span>
+    <span class="n">field_classes</span> <span class="o">=</span> <span class="s">&#39;submit submitButton&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">has_key</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field_classes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">field_classes</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="Button"><a class="viewcode-back" href="../api_helpers.html#helpers.Button">[docs]</a><span class="k">class</span> <span class="nc">Button</span><span class="p">(</span><span class="n">BaseInput</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to create a Submit input descriptor for the uni_form template tag:</span>
+<span class="sd">        button = Button(&#39;Button 1&#39;, &#39;Press Me!&#39;)</span>
+<span class="sd">    </span>
+<span class="sd">    Note: The first argument is also slugified and turned into the id for the button.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_type</span> <span class="o">=</span> <span class="s">&#39;button&#39;</span>
+    <span class="n">field_classes</span> <span class="o">=</span> <span class="s">&#39;button&#39;</span>
+
+</div>
+<div class="viewcode-block" id="Hidden"><a class="viewcode-back" href="../api_helpers.html#helpers.Hidden">[docs]</a><span class="k">class</span> <span class="nc">Hidden</span><span class="p">(</span><span class="n">BaseInput</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to create a Hidden input descriptor for the uni_form template tag.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_type</span> <span class="o">=</span> <span class="s">&#39;hidden&#39;</span>
+    <span class="n">field_classes</span> <span class="o">=</span> <span class="s">&#39;hidden&#39;</span>
+
+</div>
+<div class="viewcode-block" id="Reset"><a class="viewcode-back" href="../api_helpers.html#helpers.Reset">[docs]</a><span class="k">class</span> <span class="nc">Reset</span><span class="p">(</span><span class="n">BaseInput</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to create a Hidden input descriptor for the uni_form template tag.</span>
+<span class="sd">        reset = Reset(&#39;Reset This Form&#39;, &#39;Revert Me!&#39;)</span>
+<span class="sd">    </span>
+<span class="sd">    Note: The first argument is also slugified and turned into the id for the reset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_type</span> <span class="o">=</span> <span class="s">&#39;reset&#39;</span>
+    <span class="n">field_classes</span> <span class="o">=</span> <span class="s">&#39;reset resetButton&#39;</span>
+
+</div>
+<div class="viewcode-block" id="render_field"><a class="viewcode-back" href="../api_helpers.html#helpers.render_field">[docs]</a><span class="k">def</span> <span class="nf">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="s">&quot;uni_form/field.html&quot;</span><span class="p">,</span> <span class="n">labelclass</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Renders a field, if the field is a django-uni-form object like a `Row` or a </span>
+<span class="sd">    `Fieldset`, calls its render method. The field is added to a list that the form </span>
+<span class="sd">    holds called `rendered_fields` to avoid double rendering fields. Finally a Django </span>
+<span class="sd">    form `BoundField` is instantiated, rendered and its html returned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">FAIL_SILENTLY</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="s">&#39;UNIFORM_FAIL_SILENTLY&#39;</span><span class="p">,</span> <span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="s">&#39;render&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">Fieldset</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">field</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">field</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">form</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># This allows fields to be unicode strings, always they don&#39;t use non ASCII</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="nb">unicode</span><span class="p">):</span>
+                <span class="n">field</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+            <span class="c"># If `field` is not unicode then we turn it into a unicode string, otherwise doing</span>
+            <span class="c"># str(field) would give no error and the field would not be resolved, causing confusion </span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">field</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">unicode</span><span class="p">(</span><span class="n">field</span><span class="p">))</span>
+                
+        <span class="k">except</span> <span class="p">(</span><span class="ne">UnicodeEncodeError</span><span class="p">,</span> <span class="ne">UnicodeDecodeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&quot;Field &#39;</span><span class="si">%s</span><span class="s">&#39; is using forbidden unicode characters&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">field_instance</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">FAIL_SILENTLY</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&quot;Could not resolve form field &#39;</span><span class="si">%s</span><span class="s">&#39;.&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">field_instance</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s">&quot;Could not resolve form field &#39;</span><span class="si">%s</span><span class="s">&#39;.&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+            
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="s">&#39;rendered_fields&#39;</span><span class="p">):</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">rendered_fields</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">form</span><span class="o">.</span><span class="n">rendered_fields</span><span class="p">:</span>
+        <span class="n">form</span><span class="o">.</span><span class="n">rendered_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">FAIL_SILENTLY</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&quot;A field should only be rendered once: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s">&quot;A field should only be rendered once: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">field_instance</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">bound_field</span> <span class="o">=</span> <span class="n">BoundField</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="n">field_instance</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="n">render_to_string</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;field&#39;</span><span class="p">:</span> <span class="n">bound_field</span><span class="p">,</span> <span class="s">&#39;labelclass&#39;</span><span class="p">:</span> <span class="n">labelclass</span><span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">html</span>
+
+</div>
+<div class="viewcode-block" id="Layout"><a class="viewcode-back" href="../api_helpers.html#helpers.Layout">[docs]</a><span class="k">class</span> <span class="nc">Layout</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">    Form Layout, add fieldsets, rows, fields and html</span>
+<span class="sd">    </span>
+<span class="sd">    example:</span>
+<span class="sd">        &gt;&gt;&gt; layout = Layout(Fieldset(&#39;&#39;, &#39;is_company&#39;),</span>
+<span class="sd">        ...     Fieldset(_(&#39;Contact details&#39;),</span>
+<span class="sd">        ...         &#39;email&#39;,</span>
+<span class="sd">        ...         Row(&#39;password1&#39;,&#39;password2&#39;),</span>
+<span class="sd">        ...         &#39;first_name&#39;,</span>
+<span class="sd">        ...         &#39;last_name&#39;,</span>
+<span class="sd">        ...         HTML(&#39;&lt;img src=&quot;/media/somepicture.jpg&quot;/&gt;&#39;),</span>
+<span class="sd">        ...         &#39;company&#39;))</span>
+<span class="sd">        &gt;&gt;&gt; helper.add_layout(layout)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="Layout.render"><a class="viewcode-back" href="../api_helpers.html#helpers.Layout.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">form</span><span class="o">.</span><span class="n">fields</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">form</span><span class="o">.</span><span class="n">rendered_fields</span><span class="p">:</span>
+                <span class="n">html</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">html</span>
+
+</div></div>
+<div class="viewcode-block" id="Fieldset"><a class="viewcode-back" href="../api_helpers.html#helpers.Fieldset">[docs]</a><span class="k">class</span> <span class="nc">Fieldset</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Fieldset container. Renders to a &lt;fieldset&gt; &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">legend</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">legend</span> <span class="o">=</span> <span class="n">legend</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="Fieldset.render"><a class="viewcode-back" href="../api_helpers.html#helpers.Fieldset.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">):</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="s">u&#39;&lt;fieldset&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="s">u&#39; id=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="s">u&#39; class=&quot;</span><span class="si">%s</span><span class="s"> </span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">css_class</span><span class="p">,</span> <span class="n">form_style</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="s">u&#39; class=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="n">form_style</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="s">&#39;&gt;&#39;</span>
+
+        <span class="n">html</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">legend</span> <span class="ow">and</span> <span class="p">(</span><span class="s">u&#39;&lt;legend&gt;</span><span class="si">%s</span><span class="s">&lt;/legend&gt;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">legend</span><span class="p">)</span> <span class="ow">or</span> <span class="s">&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">html</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">)</span>
+        <span class="n">html</span> <span class="o">+=</span> <span class="s">u&#39;&lt;/fieldset&gt;&#39;</span>
+        <span class="k">return</span> <span class="n">html</span>
+
+</div></div>
+<div class="viewcode-block" id="MultiField"><a class="viewcode-back" href="../api_helpers.html#helpers.MultiField">[docs]</a><span class="k">class</span> <span class="nc">MultiField</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; multiField container. Renders to a multiField &lt;div&gt; &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c">#TODO: Decide on how to support css classes for both container divs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">div_class</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">,</span> <span class="s">u&#39;ctrlHolder&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">div_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label_class</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;label_class&#39;</span><span class="p">,</span> <span class="s">u&#39;blockLabel&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label_html</span> <span class="o">=</span> <span class="n">label</span> <span class="ow">and</span> <span class="p">(</span><span class="s">u&#39;&lt;p class=&quot;label&quot;&gt;</span><span class="si">%s</span><span class="s">&lt;/p&gt;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">label</span><span class="p">))</span> <span class="ow">or</span> <span class="s">&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="n">fields</span>
+
+<div class="viewcode-block" id="MultiField.render"><a class="viewcode-back" href="../api_helpers.html#helpers.MultiField.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">):</span>
+        <span class="n">FAIL_SILENTLY</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="s">&#39;UNIFORM_FAIL_SILENTLY&#39;</span><span class="p">,</span> <span class="bp">True</span><span class="p">)</span>
+
+        <span class="n">fieldoutput</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">errors</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">helptext</span> <span class="o">=</span> <span class="s">u&#39;&#39;</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">fieldoutput</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">,</span> <span class="s">&#39;uni_form/multifield.html&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">label_class</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">field_instance</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">FAIL_SILENTLY</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&quot;Could not resolve form field &#39;</span><span class="si">%s</span><span class="s">&#39;.&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s">&quot;Could not resolve form field &#39;</span><span class="si">%s</span><span class="s">&#39;.&quot;</span> <span class="o">%</span> <span class="n">field</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+                    <span class="k">continue</span>
+
+            <span class="n">bound_field</span> <span class="o">=</span> <span class="n">BoundField</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="n">field_instance</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+            <span class="n">auto_id</span> <span class="o">=</span> <span class="n">bound_field</span><span class="o">.</span><span class="n">auto_id</span>
+            <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">bound_field</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+                <span class="n">errors</span> <span class="o">+=</span> <span class="s">u&#39;&lt;p id=&quot;error_</span><span class="si">%i</span><span class="s">_</span><span class="si">%s</span><span class="s">&quot; class=&quot;errorField&quot;&gt;</span><span class="si">%s</span><span class="s">&lt;/p&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">auto_id</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
+                <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">bound_field</span><span class="o">.</span><span class="n">help_text</span><span class="p">:</span>
+                <span class="n">helptext</span> <span class="o">+=</span> <span class="s">u&#39;&lt;p id=&quot;hint_</span><span class="si">%s</span><span class="s">&quot; class=&quot;formHint&quot;&gt;</span><span class="si">%s</span><span class="s">&lt;/p&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">auto_id</span><span class="p">,</span> <span class="n">bound_field</span><span class="o">.</span><span class="n">help_text</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">errors</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">css</span> <span class="o">+=</span> <span class="s">u&#39; error&#39;</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="s">u&#39;&lt;div&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">div_id</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; id=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">div_id</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; class=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">div_class</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">&#39;&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="n">errors</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">label_html</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39;&lt;div class=&quot;multiField&quot;&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="n">fieldoutput</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="n">helptext</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39;&lt;/div&gt;</span><span class="se">\n</span><span class="s">&#39;</span>
+        <span class="k">return</span> <span class="n">output</span>
+
+</div></div>
+<div class="viewcode-block" id="Row"><a class="viewcode-back" href="../api_helpers.html#helpers.Row">[docs]</a><span class="k">class</span> <span class="nc">Row</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; row container. Renders to a set of &lt;div&gt; &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="n">fields</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">,</span> <span class="s">u&#39;formRow&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_id&#39;</span><span class="p">,</span> <span class="s">u&#39;&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Row.render"><a class="viewcode-back" href="../api_helpers.html#helpers.Row.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">):</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="s">u&#39;&lt;div&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; id=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; class=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">&#39;&gt;&#39;</span>
+
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39;&lt;/div&gt;&#39;</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+</div></div>
+<div class="viewcode-block" id="Column"><a class="viewcode-back" href="../api_helpers.html#helpers.Column">[docs]</a><span class="k">class</span> <span class="nc">Column</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; column container. Renders to a set of &lt;div&gt; &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">fields</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="n">fields</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_class&#39;</span><span class="p">,</span> <span class="s">u&#39;formColumn&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;css_id&#39;</span><span class="p">,</span> <span class="s">u&#39;&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Column.render"><a class="viewcode-back" href="../api_helpers.html#helpers.Column.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">):</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="s">u&#39;&lt;div&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; id=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_id</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39; class=&quot;</span><span class="si">%s</span><span class="s">&quot;&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">css_class</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">&#39;&gt;&#39;</span>
+
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">+=</span> <span class="n">render_field</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">form</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">+=</span> <span class="s">u&#39;&lt;/div&gt;&#39;</span>
+        <span class="k">return</span> <span class="s">u&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+</div></div>
+<div class="viewcode-block" id="HTML"><a class="viewcode-back" href="../api_helpers.html#helpers.HTML">[docs]</a><span class="k">class</span> <span class="nc">HTML</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; HTML container &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">html</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">html</span> <span class="o">=</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">html</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="HTML.render"><a class="viewcode-back" href="../api_helpers.html#helpers.HTML.render">[docs]</a>    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Template</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">html</span><span class="p">)</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">Context</span><span class="p">({</span><span class="s">&#39;form&#39;</span><span class="p">:</span> <span class="n">form</span><span class="p">}))</span>
+</div></div>
+<div class="viewcode-block" id="FormHelper"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper">[docs]</a><span class="k">class</span> <span class="nc">FormHelper</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    By setting attributes to me you can easily create the text that goes</span>
+<span class="sd">    into the uni_form template tag. One use case is to add to your form</span>
+<span class="sd">    class.</span>
+<span class="sd">    </span>
+<span class="sd">    Special attribute behavior:</span>
+<span class="sd">        </span>
+<span class="sd">        method: Defaults to POST but you can also do &#39;GET&#39;</span>
+<span class="sd">        </span>
+<span class="sd">        form_action: applied to the form action attribute. Can be a named url in</span>
+<span class="sd">            your urlconf that can be executed via the *url* default template tag or can</span>
+<span class="sd">            simply point to another URL.</span>
+<span class="sd">        </span>
+<span class="sd">        id: Generates a form id for dom identification.</span>
+<span class="sd">            If no id provided then no id attribute is created on the form.</span>
+<span class="sd">        </span>
+<span class="sd">        class: add space seperated classes to the class list.</span>
+<span class="sd">            Defaults to uniForm.</span>
+<span class="sd">            Always starts with uniForm even do specify classes.</span>
+<span class="sd">        </span>
+<span class="sd">        form_tag: Defaults to True. If set to False it renders the form without the form tags.</span>
+<span class="sd">        </span>
+<span class="sd">    </span>
+<span class="sd">    Demonstration:</span>
+<span class="sd">        </span>
+<span class="sd">        First we create a MyForm class and instantiate it:</span>
+<span class="sd">            &gt;&gt;&gt; from django import forms</span>
+<span class="sd">            &gt;&gt;&gt; from uni_form.helpers import FormHelper, Submit, Reset</span>
+<span class="sd">            &gt;&gt;&gt; from django.utils.translation import ugettext_lazy as _</span>
+<span class="sd">            &gt;&gt;&gt; class MyForm(forms.Form):</span>
+<span class="sd">            ...     title = forms.CharField(label=_(&#39;Title&#39;), max_length=30, widget=forms.TextInput())</span>
+<span class="sd">            ...     # this displays how to attach a formHelper to your forms class.</span>
+<span class="sd">            ...     helper = FormHelper()</span>
+<span class="sd">            ...     helper.form_id = &#39;this-form-rocks&#39;</span>
+<span class="sd">            ...     helper.form_class = &#39;search&#39;</span>
+<span class="sd">            ...     submit = Submit(&#39;search&#39;,&#39;search this site&#39;)</span>
+<span class="sd">            ...     helper.add_input(submit)</span>
+<span class="sd">            ...     reset = Reset(&#39;reset&#39;,&#39;reset button&#39;)</span>
+<span class="sd">            ...     helper.add_input(reset)</span>
+<span class="sd">        </span>
+<span class="sd">        After this in the template::</span>
+<span class="sd">            {% load uni_form_tags %}</span>
+<span class="sd">            {% uni_form form form.helper %}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_form_method</span> <span class="o">=</span> <span class="s">&#39;post&#39;</span>
+    <span class="n">_form_action</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+    <span class="n">_form_style</span> <span class="o">=</span> <span class="s">&#39;default&#39;</span>
+    <span class="n">form_id</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+    <span class="n">form_class</span> <span class="o">=</span> <span class="s">&#39;&#39;</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">layout</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">form_tag</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="n">form_error_title</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">formset_error_title</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">[:]</span>
+    
+<div class="viewcode-block" id="FormHelper.get_form_method"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.get_form_method">[docs]</a>    <span class="k">def</span> <span class="nf">get_form_method</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form_method</span>
+    </div>
+<div class="viewcode-block" id="FormHelper.set_form_method"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.set_form_method">[docs]</a>    <span class="k">def</span> <span class="nf">set_form_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;get&#39;</span><span class="p">,</span> <span class="s">&#39;post&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">FormHelpersException</span><span class="p">(</span><span class="s">&#39;Only GET and POST are valid in the </span><span class="se">\</span>
+<span class="s">                    form_method helper attribute&#39;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form_method</span> <span class="o">=</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    
+    <span class="c"># we set properties the old way because we want to support pre-2.6 python</span></div>
+    <span class="n">form_method</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">get_form_method</span><span class="p">,</span> <span class="n">set_form_method</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="FormHelper.get_form_action"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.get_form_action">[docs]</a>    <span class="k">def</span> <span class="nf">get_form_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">reverse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_form_action</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">NoReverseMatch</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form_action</span>
+</div>
+<div class="viewcode-block" id="FormHelper.set_form_action"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.set_form_action">[docs]</a>    <span class="k">def</span> <span class="nf">set_form_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form_action</span> <span class="o">=</span> <span class="n">action</span>
+    
+    <span class="c"># we set properties the old way because we want to support pre-2.6 python</span></div>
+    <span class="n">form_action</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">get_form_action</span><span class="p">,</span> <span class="n">set_form_action</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FormHelper.get_form_style"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.get_form_style">[docs]</a>    <span class="k">def</span> <span class="nf">get_form_style</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form_style</span> <span class="o">==</span> <span class="s">&quot;default&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_form_style</span> <span class="o">==</span> <span class="s">&quot;inline&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s">&#39;inlineLabels&#39;</span>
+    </div>
+<div class="viewcode-block" id="FormHelper.set_form_style"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.set_form_style">[docs]</a>    <span class="k">def</span> <span class="nf">set_form_style</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">style</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">style</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;default&#39;</span><span class="p">,</span> <span class="s">&#39;inline&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">FormHelpersException</span><span class="p">(</span><span class="s">&#39;Only default and inline are valid in the </span><span class="se">\</span>
+<span class="s">                    form_style helper attribute&#39;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_form_style</span> <span class="o">=</span> <span class="n">style</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    </div>
+    <span class="n">form_style</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">get_form_style</span><span class="p">,</span> <span class="n">set_form_style</span><span class="p">)</span>
+   
+<div class="viewcode-block" id="FormHelper.add_input"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.add_input">[docs]</a>    <span class="k">def</span> <span class="nf">add_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_object</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">input_object</span><span class="p">)</span>
+    </div>
+<div class="viewcode-block" id="FormHelper.add_layout"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.add_layout">[docs]</a>    <span class="k">def</span> <span class="nf">add_layout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layout</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layout</span> <span class="o">=</span> <span class="n">layout</span>
+    </div>
+<div class="viewcode-block" id="FormHelper.render_layout"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.render_layout">[docs]</a>    <span class="k">def</span> <span class="nf">render_layout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">mark_safe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="n">form_style</span><span class="p">))</span>
+    </div>
+<div class="viewcode-block" id="FormHelper.get_attributes"><a class="viewcode-back" href="../api_helpers.html#helpers.FormHelper.get_attributes">[docs]</a>    <span class="k">def</span> <span class="nf">get_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">items</span><span class="p">[</span><span class="s">&#39;form_method&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_method</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">items</span><span class="p">[</span><span class="s">&#39;form_tag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_tag</span>
+        <span class="n">items</span><span class="p">[</span><span class="s">&#39;form_style&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_style</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_action</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;form_action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_action</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_id</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_id</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_class</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;class&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_class</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;inputs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inputs</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_error_title</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;form_error_title&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form_error_title</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">formset_error_title</span><span class="p">:</span>
+            <span class="n">items</span><span class="p">[</span><span class="s">&#39;formset_error_title&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">formset_error_title</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">items</span>
+</pre></div></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">django-uni-form v0.8.0 documentation</a> &raquo;</li>
+          <li><a href="index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2009-2011, Daniel Greenfeld.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>
