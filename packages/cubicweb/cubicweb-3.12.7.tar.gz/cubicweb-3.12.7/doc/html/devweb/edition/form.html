@@ -1,0 +1,620 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>HTML form construction &mdash; CubicWeb 3.12.7</title>
+    <link rel="stylesheet" href="../../_static/lglb-sphinx-doc.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.12.7',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="CubicWeb 3.12.7" href="../../index.html" />
+    <link rel="up" title="Edition control" href="index.html" />
+    <link rel="next" title="Dissection of a form" href="dissection.html" />
+    <link rel="prev" title="Edition control" href="index.html" /> 
+  </head>
+  <body>
+<div class="header">
+ <a href="http://www.cubicweb.org">
+  <img alt="cubicweb logo" src="../../_static/cubicweb.png"/>
+ </a>
+</div>
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../modindex.html" title="Global Module Index"
+             accesskey="M">modules</a> |</li>
+        <li class="right" >
+          <a href="dissection.html" title="Dissection of a form"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Edition control"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="../index.html" >Web side development</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Edition control</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="../../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="#">HTML form construction</a><ul>
+<li><a class="reference external" href="#exploring-the-available-forms">Exploring the available forms</a></li>
+<li><a class="reference external" href="#the-automatic-entity-form">The Automatic Entity Form</a></li>
+<li><a class="reference external" href="#anatomy-of-a-choices-function">Anatomy of a choices function</a></li>
+<li><a class="reference external" href="#module-cubicweb.web.formwidgets">APIs</a><ul>
+<li><a class="reference external" href="#widgets">Widgets</a><ul>
+<li><a class="reference external" href="#html-input-based-widgets">HTML &lt;input&gt; based widgets</a></li>
+<li><a class="reference external" href="#other-standard-html-widgets">Other standard HTML widgets</a></li>
+<li><a class="reference external" href="#date-and-time-widgets">Date and time widgets</a></li>
+<li><a class="reference external" href="#ajax-javascript-widgets">Ajax / javascript widgets</a></li>
+<li><a class="reference external" href="#other-widgets">Other widgets</a></li>
+<li><a class="reference external" href="#form-controls">Form controls</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="index.html"
+                                  title="previous chapter">Edition control</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="dissection.html"
+                                  title="next chapter">Dissection of a form</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../../_sources/devweb/edition/form.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="../../search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="html-form-construction">
+<span id="webform"></span><h1>HTML form construction<a class="headerlink" href="#html-form-construction" title="Permalink to this headline">¶</a></h1>
+<p>CubicWeb provides the somewhat usual form / field / widget / renderer abstraction
+to provide generic building blocks which will greatly help you in building forms
+properly integrated with CubicWeb (coherent display, error handling, etc...),
+while keeping things as flexible as possible.</p>
+<p>A <tt class="docutils literal"><span class="pre">form</span></tt> basically only holds a set of <tt class="docutils literal"><span class="pre">fields</span></tt>, and has te be bound to a
+<tt class="docutils literal"><span class="pre">renderer</span></tt> which is responsible to layout them. Each field is bound to a
+<tt class="docutils literal"><span class="pre">widget</span></tt> that will be used to fill in value(s) for that field (at form
+generation time) and &#8216;decode&#8217; (fetch and give a proper Python type to) values
+sent back by the browser.</p>
+<p>The <tt class="docutils literal"><span class="pre">field</span></tt> should be used according to the type of what you want to edit.
+E.g. if you want to edit some date, you&#8217;ll have to use the
+<tt class="xref docutils literal"><span class="pre">cubicweb.web.formfields.DateField</span></tt>. Then you can choose among multiple
+widgets to edit it, for instance <a title="cubicweb.web.formwidgets.TextInput" class="reference internal" href="#cubicweb.web.formwidgets.TextInput"><tt class="xref docutils literal"><span class="pre">cubicweb.web.formwidgets.TextInput</span></tt></a> (a
+bare text field), <a title="cubicweb.web.formwidgets.DateTimePicker" class="reference internal" href="#cubicweb.web.formwidgets.DateTimePicker"><tt class="xref docutils literal"><span class="pre">DateTimePicker</span></tt></a> (a simple
+calendar) or even <a title="cubicweb.web.formwidgets.JQueryDatePicker" class="reference internal" href="#cubicweb.web.formwidgets.JQueryDatePicker"><tt class="xref docutils literal"><span class="pre">JQueryDatePicker</span></tt></a> (the JQuery
+calendar).  You can of course also write your own widget.</p>
+<div class="section" id="exploring-the-available-forms">
+<h2>Exploring the available forms<a class="headerlink" href="#exploring-the-available-forms" title="Permalink to this headline">¶</a></h2>
+<p>A small excursion into a <em>CubicWeb</em> shell is the quickest way to
+discover available forms (or application objects in general).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pprint</span><span class="p">(</span> <span class="n">session</span><span class="o">.</span><span class="n">vreg</span><span class="p">[</span><span class="s">&#39;forms&#39;</span><span class="p">]</span> <span class="p">)</span>
+<span class="go">{&#39;base&#39;: [&lt;class &#39;cubicweb.web.views.forms.FieldsForm&#39;&gt;,</span>
+<span class="go">          &lt;class &#39;cubicweb.web.views.forms.EntityFieldsForm&#39;&gt;],</span>
+<span class="go"> &#39;changestate&#39;: [&lt;class &#39;cubicweb.web.views.workflow.ChangeStateForm&#39;&gt;,</span>
+<span class="go">                 &lt;class &#39;cubes.tracker.views.forms.VersionChangeStateForm&#39;&gt;],</span>
+<span class="go"> &#39;composite&#39;: [&lt;class &#39;cubicweb.web.views.forms.CompositeForm&#39;&gt;,</span>
+<span class="go">               &lt;class &#39;cubicweb.web.views.forms.CompositeEntityForm&#39;&gt;],</span>
+<span class="go"> &#39;deleteconf&#39;: [&lt;class &#39;cubicweb.web.views.editforms.DeleteConfForm&#39;&gt;],</span>
+<span class="go"> &#39;edition&#39;: [&lt;class &#39;cubicweb.web.views.autoform.AutomaticEntityForm&#39;&gt;,</span>
+<span class="go">             &lt;class &#39;cubicweb.web.views.workflow.TransitionEditionForm&#39;&gt;,</span>
+<span class="go">             &lt;class &#39;cubicweb.web.views.workflow.StateEditionForm&#39;&gt;],</span>
+<span class="go"> &#39;logform&#39;: [&lt;class &#39;cubicweb.web.views.basetemplates.LogForm&#39;&gt;],</span>
+<span class="go"> &#39;massmailing&#39;: [&lt;class &#39;cubicweb.web.views.massmailing.MassMailingForm&#39;&gt;],</span>
+<span class="go"> &#39;muledit&#39;: [&lt;class &#39;cubicweb.web.views.editforms.TableEditForm&#39;&gt;],</span>
+<span class="go"> &#39;sparql&#39;: [&lt;class &#39;cubicweb.web.views.sparql.SparqlForm&#39;&gt;]}</span>
+</pre></div>
+</div>
+<p>The two most important form families here (for all pracitcal purposes)
+are <cite>base</cite> and <cite>edition</cite>. Most of the time one wants alterations of
+the AutomaticEntityForm (from the <cite>edition</cite> category).</p>
+</div>
+<div class="section" id="the-automatic-entity-form">
+<h2>The Automatic Entity Form<a class="headerlink" href="#the-automatic-entity-form" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="anatomy-of-a-choices-function">
+<h2>Anatomy of a choices function<a class="headerlink" href="#anatomy-of-a-choices-function" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s have a look at the <cite>ticket_done_in_choices</cite> function given to
+the <cite>choices</cite> parameter of the relation tag that is applied to the
+(&#8216;Ticket&#8217;, &#8216;done_in&#8217;, &#8216;*&#8217;) relation definition, as it is both typical
+and sophisticated enough. This is a code snippet from the <a class="reference external" href="http://www.cubicweb.org/project/cubicweb-tracker">tracker</a>
+cube.</p>
+<p>The <tt class="docutils literal"><span class="pre">Ticket</span></tt> entity type can be related to a <tt class="docutils literal"><span class="pre">Project</span></tt> and a
+<tt class="docutils literal"><span class="pre">Version</span></tt>, respectively through the <tt class="docutils literal"><span class="pre">concerns</span></tt> and <tt class="docutils literal"><span class="pre">done_in</span></tt>
+relations. When a user is about to edit a ticket, we want to fill the
+combo box for the <tt class="docutils literal"><span class="pre">done_in</span></tt> relation with values pertinent with
+respect to the context. The important context here is:</p>
+<ul class="simple">
+<li>creation or modification (we cannot fetch values the same way in
+either case)</li>
+<li><tt class="docutils literal"><span class="pre">__linkto</span></tt> url parameter given in a creation context</li>
+</ul>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">cubicweb.web</span> <span class="kn">import</span> <span class="n">formfields</span>
+
+<span class="k">def</span> <span class="nf">ticket_done_in_choices</span><span class="p">(</span><span class="n">form</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+    <span class="n">entity</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">edited_entity</span>
+    <span class="c"># first see if its specified by __linkto form parameters</span>
+    <span class="n">linkedto</span> <span class="o">=</span> <span class="n">formfields</span><span class="o">.</span><span class="n">relvoc_linkedto</span><span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="s">&#39;done_in&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">linkedto</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">linkedto</span>
+    <span class="c"># it isn&#39;t, get initial values</span>
+    <span class="n">vocab</span> <span class="o">=</span> <span class="n">formfields</span><span class="o">.</span><span class="n">relvoc_init</span><span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="s">&#39;done_in&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+    <span class="n">veid</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="c"># try to fetch the (already or pending) related version and project</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">entity</span><span class="o">.</span><span class="n">has_eid</span><span class="p">():</span>
+        <span class="n">peids</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">linked_to</span><span class="p">(</span><span class="s">&#39;concerns&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+        <span class="n">peid</span> <span class="o">=</span> <span class="n">peids</span> <span class="ow">and</span> <span class="n">peids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">peid</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">eid</span>
+        <span class="n">veid</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">done_in</span> <span class="ow">and</span> <span class="n">entity</span><span class="o">.</span><span class="n">done_in</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">eid</span>
+    <span class="k">if</span> <span class="n">peid</span><span class="p">:</span>
+        <span class="c"># we can complete the vocabulary with relevant values</span>
+        <span class="n">rschema</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">vreg</span><span class="o">.</span><span class="n">schema</span><span class="p">[</span><span class="s">&#39;done_in&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">rdef</span><span class="p">(</span><span class="s">&#39;Ticket&#39;</span><span class="p">,</span> <span class="s">&#39;Version&#39;</span><span class="p">)</span>
+        <span class="n">rset</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="s">&#39;Any V, VN ORDERBY version_sort_value(VN) &#39;</span>
+            <span class="s">&#39;WHERE V version_of P, P eid </span><span class="si">%(p)s</span><span class="s">, V num VN, &#39;</span>
+            <span class="s">&#39;V in_state ST, NOT ST name &quot;published&quot;&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;p&#39;</span><span class="p">:</span> <span class="n">peid</span><span class="p">},</span> <span class="s">&#39;p&#39;</span><span class="p">)</span>
+        <span class="n">vocab</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">v</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s">&#39;combobox&#39;</span><span class="p">),</span> <span class="n">v</span><span class="o">.</span><span class="n">eid</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rset</span><span class="o">.</span><span class="n">entities</span><span class="p">()</span>
+                  <span class="k">if</span> <span class="n">rschema</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="p">,</span> <span class="s">&#39;add&#39;</span><span class="p">,</span> <span class="n">toeid</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">eid</span><span class="p">)</span>
+                  <span class="ow">and</span> <span class="n">v</span><span class="o">.</span><span class="n">eid</span> <span class="o">!=</span> <span class="n">veid</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">vocab</span>
+</pre></div>
+</div>
+<p>The first thing we have to do is fetch potential values from the
+<tt class="docutils literal"><span class="pre">__linkto</span></tt> url parameter that is often found in entity creation
+contexts (the creation action provides such a parameter with a
+predetermined value; for instance in this case, ticket creation could
+occur in the context of a <cite>Version</cite> entity). The
+<tt class="xref docutils literal"><span class="pre">cubicweb.web.formfields</span></tt> module provides a <tt class="docutils literal"><span class="pre">relvoc_linkedto</span></tt>
+utility function that gets a list suitably filled with vocabulary
+values.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">linkedto</span> <span class="o">=</span> <span class="n">formfields</span><span class="o">.</span><span class="n">relvoc_linkedto</span><span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="s">&#39;done_in&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">linkedto</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">linkedto</span>
+</pre></div>
+</div>
+<p>Then, if no <tt class="docutils literal"><span class="pre">__linkto</span></tt> argument was given, we must prepare the
+vocabulary with an initial empty value (because <cite>done_in</cite> is not
+mandatory, we must allow the user to not select a verson) and already
+linked values. This is done with the <tt class="docutils literal"><span class="pre">relvoc_init</span></tt> function.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">vocab</span> <span class="o">=</span> <span class="n">formfields</span><span class="o">.</span><span class="n">relvoc_init</span><span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="s">&#39;done_in&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>But then, we have to give more: if the ticket is related to a project,
+we should provide all the non published versions of this project
+(<cite>Version</cite> and <cite>Project</cite> can be related through the <cite>version_of</cite>
+relation). Conversely, if we do not know yet the project, it would not
+make sense to propose all existing versions as it could potentially
+lead to incoherences. Even if these will be caught by some
+RQLConstraint, it is wise not to tempt the user with error-inducing
+candidate values.</p>
+<p>The &#8220;ticket is related to a project&#8221; part must be decomposed as:</p>
+<ul class="simple">
+<li>this is a new ticket which is created is the context of a project</li>
+<li>this is an already existing ticket, linked to a project (through the
+<cite>concerns</cite> relation)</li>
+<li>there is no related project (quite unlikely given the cardinality of
+the <cite>concerns</cite> relation, so it can only mean that we are creating a
+new ticket, and a project is about to be selected but there is no
+<tt class="docutils literal"><span class="pre">__linkto</span></tt> argument)</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">the last situation could happen in several ways, but of course in a
+polished application, the paths to ticket creation should be
+controlled so as to avoid a suboptimal end-user experience</p>
+</div>
+<p>Hence, we try to fetch the related project.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">veid</span> <span class="o">=</span> <span class="bp">None</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">entity</span><span class="o">.</span><span class="n">has_eid</span><span class="p">():</span>
+    <span class="n">peids</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">linked_to</span><span class="p">(</span><span class="s">&#39;concerns&#39;</span><span class="p">,</span> <span class="s">&#39;subject&#39;</span><span class="p">)</span>
+    <span class="n">peid</span> <span class="o">=</span> <span class="n">peids</span> <span class="ow">and</span> <span class="n">peids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">peid</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">eid</span>
+    <span class="n">veid</span> <span class="o">=</span> <span class="n">entity</span><span class="o">.</span><span class="n">done_in</span> <span class="ow">and</span> <span class="n">entity</span><span class="o">.</span><span class="n">done_in</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">eid</span>
+</pre></div>
+</div>
+<p>We distinguish between entity creation and entity modification using
+the <tt class="docutils literal"><span class="pre">Entity.has_eid()</span></tt> method, which returns <cite>False</cite> on creation. At
+creation time the only way to get a project is through the
+<tt class="docutils literal"><span class="pre">__linkto</span></tt> parameter. Notice that we fetch the version in which the
+ticket is <cite>done_in</cite> if any, for later.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">the implementation above assumes that if there is a <tt class="docutils literal"><span class="pre">__linkto</span></tt>
+parameter, it is only about a project. While it makes sense most of
+the time, it is not an absolute. Depending on how an entity creation
+action action url is built, several outcomes could be possible
+there</p>
+</div>
+<p>If the ticket is already linked to a project, fetching it is
+trivial. Then we add the relevant version to the initial vocabulary.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">peid</span><span class="p">:</span>
+    <span class="n">rschema</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">vreg</span><span class="o">.</span><span class="n">schema</span><span class="p">[</span><span class="s">&#39;done_in&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">rdef</span><span class="p">(</span><span class="s">&#39;Ticket&#39;</span><span class="p">,</span> <span class="s">&#39;Version&#39;</span><span class="p">)</span>
+    <span class="n">rset</span> <span class="o">=</span> <span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+        <span class="s">&#39;Any V, VN ORDERBY version_sort_value(VN) &#39;</span>
+        <span class="s">&#39;WHERE V version_of P, P eid </span><span class="si">%(p)s</span><span class="s">, V num VN, &#39;</span>
+        <span class="s">&#39;V in_state ST, NOT ST name &quot;published&quot;&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;p&#39;</span><span class="p">:</span> <span class="n">peid</span><span class="p">})</span>
+    <span class="n">vocab</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">v</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s">&#39;combobox&#39;</span><span class="p">),</span> <span class="n">v</span><span class="o">.</span><span class="n">eid</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rset</span><span class="o">.</span><span class="n">entities</span><span class="p">()</span>
+              <span class="k">if</span> <span class="n">rschema</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="n">form</span><span class="o">.</span><span class="n">_cw</span><span class="p">,</span> <span class="s">&#39;add&#39;</span><span class="p">,</span> <span class="n">toeid</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">eid</span><span class="p">)</span>
+              <span class="ow">and</span> <span class="n">v</span><span class="o">.</span><span class="n">eid</span> <span class="o">!=</span> <span class="n">veid</span><span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">we have to defend ourselves against lack of a project eid. Given
+the cardinality of the <cite>concerns</cite> relation, there <em>must</em> be a
+project, but this rule can only be enforced at validation time,
+which will happen of course only after form subsmission</p>
+</div>
+<p>Here, given a project eid, we complete the vocabulary with all
+unpublished versions defined in the project (sorted by number) for
+which the current user is allowed to establish the relation.</p>
+</div>
+<div class="section" id="module-cubicweb.web.formwidgets">
+<h2>APIs<a class="headerlink" href="#module-cubicweb.web.formwidgets" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="widgets">
+<h3>Widgets<a class="headerlink" href="#widgets" title="Permalink to this headline">¶</a></h3>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>A widget is responsible for the display of a field. It may use more than one
+HTML input tags. When the form is posted, a widget is also reponsible to give
+back to the field something it can understand.</p>
+<p class="last">Of course you can not use any widget with any field...</p>
+</div>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.FieldWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">FieldWidget</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>The abstract base class for widgets.</p>
+<p><strong>Attributes</strong></p>
+<p>Here are standard attributes of a widget, that may be set on concret
+class to override default behaviours:</p>
+<dl class="docutils">
+<dt><tt class="xref docutils literal"><span class="pre">needs_js</span></tt></dt>
+<dd>list of javascript files needed by the widget.</dd>
+<dt><tt class="xref docutils literal"><span class="pre">needs_css</span></tt></dt>
+<dd>list of css files needed by the widget.</dd>
+<dt><tt class="xref docutils literal"><span class="pre">setdomid</span></tt></dt>
+<dd>flag telling if HTML DOM identifier should be set on input.</dd>
+<dt><tt class="xref docutils literal"><span class="pre">settabindex</span></tt></dt>
+<dd>flag telling if HTML tabindex attribute of inputs should be set.</dd>
+<dt><tt class="xref docutils literal"><span class="pre">suffix</span></tt></dt>
+<dd>string to use a suffix when generating input, to ease usage as a
+sub-widgets (eg widget used by another widget)</dd>
+<dt><tt class="xref docutils literal"><span class="pre">vocabulary_widget</span></tt></dt>
+<dd>flag telling if this widget expect a vocabulary</dd>
+</dl>
+<p>Also, widget instances takes as first argument a <cite>attrs</cite> dictionary which
+will be stored in the attribute of the same name. It contains HTML
+attributes that should be set in the widget&#8217;s input tag (though concret
+classes may ignore it).</p>
+<p><strong>Form generation methods</strong></p>
+<dl class="method">
+<dt id="cubicweb.web.formwidgets.FieldWidget.render">
+<tt class="descname">render</tt><big>(</big><em>form</em>, <em>field</em>, <em>renderer=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget.render" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called to render the widget for the given <cite>field</cite> in the given
+<cite>form</cite>.  Return a unicode string containing the HTML snippet.</p>
+<p>You will usually prefer to override the <a title="cubicweb.web.formwidgets.FieldWidget._render" class="reference internal" href="#cubicweb.web.formwidgets.FieldWidget._render"><tt class="xref docutils literal"><span class="pre">_render()</span></tt></a> method so you
+don&#8217;t have to handle addition of needed javascript / css files.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.web.formwidgets.FieldWidget._render">
+<tt class="descname">_render</tt><big>(</big><em>form</em>, <em>field</em>, <em>renderer</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget._render" title="Permalink to this definition">¶</a></dt>
+<dd>This is the method you have to implement in concret widget classes.</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.web.formwidgets.FieldWidget.values">
+<tt class="descname">values</tt><big>(</big><em>form</em>, <em>field</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget.values" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current <em>string</em> values (i.e. for display in an HTML
+string) for the given field. This method returns a list of values since
+it&#8217;s suitable for all kind of widgets, some of them taking multiple
+values, but you&#8217;ll get a single value in the list in most cases.</p>
+<p>Those values are searched in:</p>
+<ol class="arabic simple">
+<li>previously submitted form values if any (on validation error)</li>
+<li>req.form (specified using request parameters)</li>
+<li>extra form values given to form.render call (specified the code
+generating the form)</li>
+<li>field&#8217;s typed value (returned by its
+<tt class="xref docutils literal"><span class="pre">typed_value()</span></tt> method)</li>
+</ol>
+<p>Values found in 1. and 2. are expected te be already some &#8216;display
+value&#8217; (eg a string) while those found in 3. and 4. are expected to be
+correctly typed value.</p>
+<p>3 and 4 are handle by the <tt class="xref docutils literal"><span class="pre">typed_value()</span></tt> method to ease reuse in
+concret classes.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cubicweb.web.formwidgets.FieldWidget.attributes">
+<tt class="descname">attributes</tt><big>(</big><em>form</em>, <em>field</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget.attributes" title="Permalink to this definition">¶</a></dt>
+<dd>Return HTML attributes for the widget, automatically setting DOM
+identifier and tabindex when desired (see <tt class="xref docutils literal"><span class="pre">setdomid</span></tt> and
+<tt class="xref docutils literal"><span class="pre">settabindex</span></tt> attributes)</dd></dl>
+
+<p><strong>Post handling methods</strong></p>
+<dl class="method">
+<dt id="cubicweb.web.formwidgets.FieldWidget.process_field_data">
+<tt class="descname">process_field_data</tt><big>(</big><em>form</em>, <em>field</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FieldWidget.process_field_data" title="Permalink to this definition">¶</a></dt>
+<dd>Return process posted value(s) for widget and return something
+understandable by the associated <cite>field</cite>. That value may be correctly
+typed or a string that the field may parse.</dd></dl>
+
+</dd></dl>
+
+<div class="section" id="html-input-based-widgets">
+<h4>HTML &lt;input&gt; based widgets<a class="headerlink" href="#html-input-based-widgets" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.HiddenInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">HiddenInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.HiddenInput" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;input type=&#8217;hidden&#8217;&gt; for hidden value, will return an unicode
+string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.TextInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">TextInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.TextInput" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;input type=&#8217;text&#8217;&gt;, will return an unicode string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.PasswordSingleInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">PasswordSingleInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.PasswordSingleInput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple &lt;input type=&#8217;password&#8217;&gt;, will return an utf-8 encoded string.</p>
+<p>You may prefer using the <a title="cubicweb.web.formwidgets.PasswordInput" class="reference internal" href="#cubicweb.web.formwidgets.PasswordInput"><tt class="xref docutils literal"><span class="pre">PasswordInput</span></tt></a>
+widget which handles password confirmation.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.FileInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">FileInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FileInput" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;input type=&#8217;file&#8217;&gt;, will return a tuple (name, stream) where
+name is the posted file name and stream a file like object containing the
+posted file data.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.ButtonInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">ButtonInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.ButtonInput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple &lt;input type=&#8217;button&#8217;&gt;, will return an unicode string.</p>
+<p>If you want a global form button, look at the <a title="cubicweb.web.formwidgets.Button" class="reference internal" href="#cubicweb.web.formwidgets.Button"><tt class="xref docutils literal"><span class="pre">Button</span></tt></a>,
+<a title="cubicweb.web.formwidgets.SubmitButton" class="reference internal" href="#cubicweb.web.formwidgets.SubmitButton"><tt class="xref docutils literal"><span class="pre">SubmitButton</span></tt></a>, <a title="cubicweb.web.formwidgets.ResetButton" class="reference internal" href="#cubicweb.web.formwidgets.ResetButton"><tt class="xref docutils literal"><span class="pre">ResetButton</span></tt></a> and <a title="cubicweb.web.formwidgets.ImgButton" class="reference internal" href="#cubicweb.web.formwidgets.ImgButton"><tt class="xref docutils literal"><span class="pre">ImgButton</span></tt></a> below.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="other-standard-html-widgets">
+<h4>Other standard HTML widgets<a class="headerlink" href="#other-standard-html-widgets" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.TextArea">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">TextArea</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.TextArea" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;textarea&gt;, will return an unicode string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.Select">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">Select</tt><big>(</big><em>attrs=None</em>, <em>multiple=False</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.Select" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;select&gt;, for field having a specific vocabulary. Will return
+an unicode string, or a list of unicode strings.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.CheckBox">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">CheckBox</tt><big>(</big><em>attrs=None</em>, <em>separator=None</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.CheckBox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple &lt;input type=&#8217;checkbox&#8217;&gt;, for field having a specific
+vocabulary. One input will be generated for each possible value.</p>
+<p>You can specify separator using the <cite>separator</cite> constructor argument, by
+default &lt;br/&gt; is used.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.Radio">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">Radio</tt><big>(</big><em>attrs=None</em>, <em>separator=None</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.Radio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simle &lt;input type=&#8217;radio&#8217;&gt;, for field having a specific vocabulary. One
+input will be generated for each possible value.</p>
+<p>You can specify separator using the <cite>separator</cite> constructor argument, by
+default &lt;br/&gt; is used.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="date-and-time-widgets">
+<h4>Date and time widgets<a class="headerlink" href="#date-and-time-widgets" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.DateTimePicker">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">DateTimePicker</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.DateTimePicker" title="Permalink to this definition">¶</a></dt>
+<dd>&lt;input type=&#8217;text&#8217;&gt; + javascript date/time picker for date or datetime
+fields. Will return the date or datetime as an unicode string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.JQueryDateTimePicker">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">JQueryDateTimePicker</tt><big>(</big><em>initialtime=None</em>, <em>timesteps=15</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.JQueryDateTimePicker" title="Permalink to this definition">¶</a></dt>
+<dd>Compound widget using <a title="cubicweb.web.formwidgets.JQueryDatePicker" class="reference internal" href="#cubicweb.web.formwidgets.JQueryDatePicker"><tt class="xref docutils literal"><span class="pre">JQueryDatePicker</span></tt></a> and
+<a title="cubicweb.web.formwidgets.JQueryTimePicker" class="reference internal" href="#cubicweb.web.formwidgets.JQueryTimePicker"><tt class="xref docutils literal"><span class="pre">JQueryTimePicker</span></tt></a> widgets to define a date and time picker. Will
+return the date and time as python datetime instance.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.JQueryDatePicker">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">JQueryDatePicker</tt><big>(</big><em>datestr=None</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.JQueryDatePicker" title="Permalink to this definition">¶</a></dt>
+<dd>Use jquery.ui.datepicker to define a date picker. Will return the date as
+an unicode string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.JQueryTimePicker">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">JQueryTimePicker</tt><big>(</big><em>timestr=None</em>, <em>timesteps=30</em>, <em>separator=u':'</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.JQueryTimePicker" title="Permalink to this definition">¶</a></dt>
+<dd>Use jquery.timePicker to define a time picker. Will return the time as an
+unicode string.</dd></dl>
+
+</div>
+<div class="section" id="ajax-javascript-widgets">
+<h4>Ajax / javascript widgets<a class="headerlink" href="#ajax-javascript-widgets" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.FCKEditor">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">FCKEditor</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.FCKEditor" title="Permalink to this definition">¶</a></dt>
+<dd>FCKEditor enabled &lt;textarea&gt;, will return an unicode string containing
+HTML formated text.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.AjaxWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">AjaxWidget</tt><big>(</big><em>wdgtype</em>, <em>inputid=None</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.AjaxWidget" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;div&gt; based ajax widget, requiring a <cite>wdgtype</cite> argument telling
+which javascript widget should be used.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.AutoCompletionWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">AutoCompletionWidget</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.AutoCompletionWidget" title="Permalink to this definition">¶</a></dt>
+<dd>&lt;input type=&#8217;text&#8217;&gt; based ajax widget, taking a <cite>autocomplete_initfunc</cite>
+argument which should specify the name of a method of the json
+controller. This method is expected to return allowed values for the input,
+that the widget will use to propose matching values as you type.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.InOutWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">InOutWidget</tt><big>(</big><em>attrs=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.InOutWidget" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="other-widgets">
+<h4>Other widgets<a class="headerlink" href="#other-widgets" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.PasswordInput">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">PasswordInput</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.PasswordInput" title="Permalink to this definition">¶</a></dt>
+<dd>&lt;input type=&#8217;password&#8217;&gt; and a confirmation input. Form processing will
+fail if password and confirmation differs, else it will return the password
+as an utf-8 encoded string.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.IntervalWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">IntervalWidget</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.IntervalWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Custom widget to display an interval composed by 2 fields. This widget is
+expected to be used with a <tt class="xref docutils literal"><span class="pre">CompoundField</span></tt> containing the two actual
+fields.</p>
+<p>Exemple usage:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">MyForm</span><span class="p">(</span><span class="n">FieldsForm</span><span class="p">):</span>
+   <span class="n">price</span> <span class="o">=</span> <span class="n">CompoundField</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">(</span><span class="n">IntField</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s">&#39;minprice&#39;</span><span class="p">),</span>
+                                 <span class="n">IntField</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s">&#39;maxprice&#39;</span><span class="p">)),</span>
+                         <span class="n">label</span><span class="o">=</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;price&#39;</span><span class="p">),</span>
+                         <span class="n">widget</span><span class="o">=</span><span class="n">IntervalWidget</span><span class="p">())</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.HorizontalLayoutWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">HorizontalLayoutWidget</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.HorizontalLayoutWidget" title="Permalink to this definition">¶</a></dt>
+<dd>Custom widget to display a set of fields grouped together horizontally in
+a form. See <cite>IntervalWidget</cite> for example usage.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.EditableURLWidget">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">EditableURLWidget</tt><big>(</big><em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>suffix=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.EditableURLWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Custom widget to edit separatly an url path / query string (used by
+default for the <cite>path</cite> attribute of <cite>Bookmark</cite> entities).</p>
+<p>It deals with url quoting nicely so that the user edit the unquoted value.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="form-controls">
+<h4>Form controls<a class="headerlink" href="#form-controls" title="Permalink to this headline">¶</a></h4>
+<p>Those classes are not proper widget (they are not associated to field) but are
+used as form controls. Their API is similar to widgets except that <cite>field</cite>
+argument given to <tt class="xref docutils literal"><span class="pre">render()</span></tt> will be <cite>None</cite>.</p>
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.Button">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">Button</tt><big>(</big><em>label=(u'button_ok'</em>, <em>'OK_ICON')</em>, <em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>name=''</em>, <em>value=''</em>, <em>onclick=None</em>, <em>cwaction=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.Button" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple &lt;input type=&#8217;button&#8217;&gt;, base class for global form buttons.</p>
+<p>Note that <cite>label</cite> is a msgid which will be translated at form generation
+time, you should not give an already translated string.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.SubmitButton">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">SubmitButton</tt><big>(</big><em>label=(u'button_ok'</em>, <em>'OK_ICON')</em>, <em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>name=''</em>, <em>value=''</em>, <em>onclick=None</em>, <em>cwaction=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.SubmitButton" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;input type=&#8217;submit&#8217;&gt;, main button to submit a form</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.ResetButton">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">ResetButton</tt><big>(</big><em>label=(u'button_ok'</em>, <em>'OK_ICON')</em>, <em>attrs=None</em>, <em>setdomid=None</em>, <em>settabindex=None</em>, <em>name=''</em>, <em>value=''</em>, <em>onclick=None</em>, <em>cwaction=None</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.ResetButton" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;input type=&#8217;reset&#8217;&gt;, main button to reset a form. You usually
+don&#8217;t want to use this.</dd></dl>
+
+<dl class="class">
+<dt id="cubicweb.web.formwidgets.ImgButton">
+<em class="property">class </em><tt class="descclassname">cubicweb.web.formwidgets.</tt><tt class="descname">ImgButton</tt><big>(</big><em>domid</em>, <em>href</em>, <em>label</em>, <em>imgressource</em><big>)</big><a class="headerlink" href="#cubicweb.web.formwidgets.ImgButton" title="Permalink to this definition">¶</a></dt>
+<dd>Simple &lt;img&gt; wrapped into a &lt;a&gt; tag with href triggering something (usually a
+javascript call).</dd></dl>
+
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../modindex.html" title="Global Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="dissection.html" title="Dissection of a form"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Edition control"
+             >previous</a> |</li>
+        <li><a href="../../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="../index.html" >Web side development</a> &raquo;</li>
+          <li><a href="index.html" >Edition control</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2001-2010, Logilab.
+      Last updated on Jun 21, 2011.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.6.
+    </div>
+  </body>
+</html>

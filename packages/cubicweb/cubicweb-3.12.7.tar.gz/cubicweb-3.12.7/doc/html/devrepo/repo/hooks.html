@@ -1,0 +1,335 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>6.2. Hooks and Operations &mdash; CubicWeb 3.12.7</title>
+    <link rel="stylesheet" href="../../_static/lglb-sphinx-doc.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '3.12.7',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="CubicWeb 3.12.7" href="../../index.html" />
+    <link rel="up" title="6. Repository customization" href="index.html" />
+    <link rel="next" title="6.3. Notifications management" href="notifications.html" />
+    <link rel="prev" title="6.1. Sessions" href="sessions.html" /> 
+  </head>
+  <body>
+<div class="header">
+ <a href="http://www.cubicweb.org">
+  <img alt="cubicweb logo" src="../../_static/cubicweb.png"/>
+ </a>
+</div>
+
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../modindex.html" title="Global Module Index"
+             accesskey="M">modules</a> |</li>
+        <li class="right" >
+          <a href="notifications.html" title="6.3. Notifications management"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="sessions.html" title="6.1. Sessions"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="../index.html" >Repository development</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">6. Repository customization</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="../../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="#">6.2. Hooks and Operations</a><ul>
+<li><a class="reference external" href="#example-using-dataflow-hooks">6.2.1. Example using dataflow hooks</a></li>
+<li><a class="reference external" href="#hooks-writing-tips">6.2.2. Hooks writing tips</a><ul>
+<li><a class="reference external" href="#reminder">6.2.2.1. Reminder</a></li>
+<li><a class="reference external" href="#how-to-choose-between-a-before-and-an-after-event">6.2.2.2. How to choose between a before and an after event ?</a></li>
+<li><a class="reference external" href="#validation-errors">6.2.2.3. Validation Errors</a></li>
+<li><a class="reference external" href="#checking-for-object-created-deleted-in-the-current-transaction">6.2.2.4. Checking for object created/deleted in the current transaction</a></li>
+<li><a class="reference external" href="#peculiarities-of-inlined-relations">6.2.2.5. Peculiarities of inlined relations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="sessions.html"
+                                  title="previous chapter">6.1. Sessions</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="notifications.html"
+                                  title="next chapter">6.3. Notifications management</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../../_sources/devrepo/repo/hooks.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="../../search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="hooks-and-operations">
+<span id="hooks"></span><h1>6.2. Hooks and Operations<a class="headerlink" href="#hooks-and-operations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="example-using-dataflow-hooks">
+<h2>6.2.1. Example using dataflow hooks<a class="headerlink" href="#example-using-dataflow-hooks" title="Permalink to this headline">¶</a></h2>
+<p>We will use a very simple example to show hooks usage. Let us start with the
+following schema.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Person</span><span class="p">(</span><span class="n">EntityType</span><span class="p">):</span>
+    <span class="n">age</span> <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We would like to add a range constraint over a person&#8217;s age. Let&#8217;s write an hook
+(supposing yams can not handle this nativly, which is wrong). It shall be placed
+into <cite>mycube/hooks.py</cite>. If this file were to grow too much, we can easily have a
+<cite>mycube/hooks/... package</cite> containing hooks in various modules.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">cubicweb</span> <span class="kn">import</span> <span class="n">ValidationError</span>
+<span class="kn">from</span> <span class="nn">cubicweb.selectors</span> <span class="kn">import</span> <span class="n">is_instance</span>
+<span class="kn">from</span> <span class="nn">cubicweb.server.hook</span> <span class="kn">import</span> <span class="n">Hook</span>
+
+<span class="k">class</span> <span class="nc">PersonAgeRange</span><span class="p">(</span><span class="n">Hook</span><span class="p">):</span>
+     <span class="n">__regid__</span> <span class="o">=</span> <span class="s">&#39;person_age_range&#39;</span>
+     <span class="n">__select__</span> <span class="o">=</span> <span class="n">Hook</span><span class="o">.</span><span class="n">__select__</span> <span class="o">&amp;</span> <span class="n">is_instance</span><span class="p">(</span><span class="s">&#39;Person&#39;</span><span class="p">)</span>
+     <span class="n">events</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;before_add_entity&#39;</span><span class="p">,</span> <span class="s">&#39;before_update_entity&#39;</span><span class="p">)</span>
+
+     <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+         <span class="k">if</span> <span class="s">&#39;age&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="o">.</span><span class="n">cw_edited</span><span class="p">:</span>
+             <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="o">.</span><span class="n">age</span> <span class="o">&lt;=</span> <span class="mi">120</span><span class="p">:</span>
+                <span class="k">return</span>
+             <span class="n">msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;age must be between 0 and 120&#39;</span><span class="p">)</span>
+             <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">entity</span><span class="o">.</span><span class="n">eid</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;age&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">})</span>
+</pre></div>
+</div>
+<p>In our example the base <cite>__select__</cite> is augmented with an <cite>is_instance</cite> selector
+matching the desired entity type.</p>
+<p>The <cite>events</cite> tuple is used specify that our hook should be called before the
+entity is added or updated.</p>
+<p>Then in the hook&#8217;s <cite>__call__</cite> method, we:</p>
+<ul class="simple">
+<li>check if the &#8216;age&#8217; attribute is edited</li>
+<li>if so, check the value is in the range</li>
+<li>if not, raise a validation error properly</li>
+</ul>
+<p>Now Let&#8217;s augment our schema with new <cite>Company</cite> entity type with some relation to
+<cite>Person</cite> (in &#8216;mycube/schema.py&#8217;).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Company</span><span class="p">(</span><span class="n">EntityType</span><span class="p">):</span>
+     <span class="n">name</span> <span class="o">=</span> <span class="n">String</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+     <span class="n">boss</span> <span class="o">=</span> <span class="n">SubjectRelation</span><span class="p">(</span><span class="s">&#39;Person&#39;</span><span class="p">,</span> <span class="n">cardinality</span><span class="o">=</span><span class="s">&#39;1*&#39;</span><span class="p">)</span>
+     <span class="n">subsidiary_of</span> <span class="o">=</span> <span class="n">SubjectRelation</span><span class="p">(</span><span class="s">&#39;Company&#39;</span><span class="p">,</span> <span class="n">cardinality</span><span class="o">=</span><span class="s">&#39;*?&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We would like to constrain the company&#8217;s bosses to have a minimum (legal)
+age. Let&#8217;s write an hook for this, which will be fired when the <cite>boss</cite> relation
+is established (still supposing we could not specify that kind of thing in the
+schema).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">CompanyBossLegalAge</span><span class="p">(</span><span class="n">Hook</span><span class="p">):</span>
+     <span class="n">__regid__</span> <span class="o">=</span> <span class="s">&#39;company_boss_legal_age&#39;</span>
+     <span class="n">__select__</span> <span class="o">=</span> <span class="n">Hook</span><span class="o">.</span><span class="n">__select__</span> <span class="o">&amp;</span> <span class="n">match_rtype</span><span class="p">(</span><span class="s">&#39;boss&#39;</span><span class="p">)</span>
+     <span class="n">events</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;before_add_relation&#39;</span><span class="p">,)</span>
+
+     <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+         <span class="n">boss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">entity_from_eid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eidto</span><span class="p">)</span>
+         <span class="k">if</span> <span class="n">boss</span><span class="o">.</span><span class="n">age</span> <span class="o">&lt;</span> <span class="mi">18</span><span class="p">:</span>
+             <span class="n">msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;the minimum age for a boss is 18&#39;</span><span class="p">)</span>
+             <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eidfrom</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;boss&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">})</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>We use the <tt class="xref docutils literal"><span class="pre">match_rtype</span></tt> selector to select the
+proper relation type.</p>
+<p class="last">The essential difference with respect to an entity hook is that there is no
+self.entity, but <cite>self.eidfrom</cite> and <cite>self.eidto</cite> hook attributes which
+represent the subject and object <strong>eid</strong> of the relation.</p>
+</div>
+<p>Suppose we want to check that there is no cycle by the <cite>subsidiary_of</cite>
+relation. This is best achieved in an operation since all relations are likely to
+be set at commit time.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">cubicweb.server.hook</span> <span class="kn">import</span> <span class="n">Hook</span><span class="p">,</span> <span class="n">DataOperationMixIn</span><span class="p">,</span> <span class="n">Operation</span><span class="p">,</span> <span class="n">match_rtype</span>
+
+<span class="k">def</span> <span class="nf">check_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="n">eid</span><span class="p">,</span> <span class="n">rtype</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="s">&#39;subject&#39;</span><span class="p">):</span>
+    <span class="n">parents</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="n">eid</span><span class="p">])</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">entity_from_eid</span><span class="p">(</span><span class="n">eid</span><span class="p">)</span>
+    <span class="k">while</span> <span class="n">parent</span><span class="o">.</span><span class="n">related</span><span class="p">(</span><span class="n">rtype</span><span class="p">,</span> <span class="n">role</span><span class="p">):</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">related</span><span class="p">(</span><span class="n">rtype</span><span class="p">,</span> <span class="n">role</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="o">.</span><span class="n">eid</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;detected </span><span class="si">%s</span><span class="s"> cycle&#39;</span> <span class="o">%</span> <span class="n">rtype</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="p">{</span><span class="n">rtype</span><span class="p">:</span> <span class="n">msg</span><span class="p">})</span>
+        <span class="n">parents</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">parent</span><span class="o">.</span><span class="n">eid</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">CheckSubsidiaryCycleOp</span><span class="p">(</span><span class="n">DataOperationMixIn</span><span class="p">,</span> <span class="n">Operation</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">precommit_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">check_cycle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eidto</span><span class="p">,</span> <span class="s">&#39;subsidiary_of&#39;</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">CheckSubsidiaryCycleHook</span><span class="p">(</span><span class="n">Hook</span><span class="p">):</span>
+    <span class="n">__regid__</span> <span class="o">=</span> <span class="s">&#39;check_no_subsidiary_cycle&#39;</span>
+    <span class="n">__select__</span> <span class="o">=</span> <span class="n">Hook</span><span class="o">.</span><span class="n">__select__</span> <span class="o">&amp;</span> <span class="n">match_rtype</span><span class="p">(</span><span class="s">&#39;subsidiary_of&#39;</span><span class="p">)</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;after_add_relation&#39;</span><span class="p">,)</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">CheckSubsidiaryCycleOp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="p">,</span> <span class="n">eidto</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eidto</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Like in hooks, <tt class="xref docutils literal"><span class="pre">ValidationError</span></tt> can be raised in operations. Other
+exceptions are usually programming errors.</p>
+<p>In the above example, our hook will instantiate an operation each time the hook
+is called, i.e. each time the <cite>subsidiary_of</cite> relation is set. There is an
+alternative method to schedule an operation from a hook, using the
+<tt class="xref docutils literal"><span class="pre">get_instance()</span></tt> class method.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">cubicweb.server.hook</span> <span class="kn">import</span> <span class="n">set_operation</span>
+
+<span class="k">class</span> <span class="nc">CheckSubsidiaryCycleHook</span><span class="p">(</span><span class="n">Hook</span><span class="p">):</span>
+    <span class="n">__regid__</span> <span class="o">=</span> <span class="s">&#39;check_no_subsidiary_cycle&#39;</span>
+    <span class="n">events</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;after_add_relation&#39;</span><span class="p">,)</span>
+    <span class="n">__select__</span> <span class="o">=</span> <span class="n">Hook</span><span class="o">.</span><span class="n">__select__</span> <span class="o">&amp;</span> <span class="n">match_rtype</span><span class="p">(</span><span class="s">&#39;subsidiary_of&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">CheckSubsidiaryCycleOp</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="p">)</span><span class="o">.</span><span class="n">add_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eidto</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">CheckSubsidiaryCycleOp</span><span class="p">(</span><span class="n">Operation</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">precommit_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">eid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_data</span><span class="p">():</span>
+            <span class="n">check_cycle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="p">,</span> <span class="n">eid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtype</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here, we call <tt class="xref docutils literal"><span class="pre">set_operation()</span></tt> so that we will simply accumulate eids of
+entities to check at the end in a single <cite>CheckSubsidiaryCycleOp</cite>
+operation. Value are stored in a set associated to the
+&#8216;subsidiary_cycle_detection&#8217; transaction data key. The set initialization and
+operation creation are handled nicely by <tt class="xref docutils literal"><span class="pre">set_operation()</span></tt>.</p>
+<p>A more realistic example can be found in the advanced tutorial chapter
+<a class="reference external" href="../../tutorials/advanced/part02_security.html#adv-tuto-security-propagation"><em>Step 2: security propagation in hooks</em></a>.</p>
+</div>
+<div class="section" id="hooks-writing-tips">
+<h2>6.2.2. Hooks writing tips<a class="headerlink" href="#hooks-writing-tips" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="reminder">
+<h3>6.2.2.1. Reminder<a class="headerlink" href="#reminder" title="Permalink to this headline">¶</a></h3>
+<p>You should never use the <cite>entity.foo = 42</cite> notation to update an
+entity. It will not do what you expect (updating the
+database). Instead, use the <tt class="xref docutils literal"><span class="pre">set_attributes()</span></tt> and
+<tt class="xref docutils literal"><span class="pre">set_relations()</span></tt> methods.</p>
+</div>
+<div class="section" id="how-to-choose-between-a-before-and-an-after-event">
+<h3>6.2.2.2. How to choose between a before and an after event ?<a class="headerlink" href="#how-to-choose-between-a-before-and-an-after-event" title="Permalink to this headline">¶</a></h3>
+<p><cite>before_*</cite> hooks give you access to the old attribute (or relation)
+values. You can also intercept and update edited values in the case of
+entity modification before they reach the database.</p>
+<p>Else the question is: should I need to do things before or after the actual
+modification ? If the answer is &#8220;it doesn&#8217;t matter&#8221;, use an &#8216;after&#8217; event.</p>
+</div>
+<div class="section" id="validation-errors">
+<h3>6.2.2.3. Validation Errors<a class="headerlink" href="#validation-errors" title="Permalink to this headline">¶</a></h3>
+<p>When a hook which is responsible to maintain the consistency of the
+data model detects an error, it must use a specific exception named
+<tt class="xref docutils literal"><span class="pre">ValidationError</span></tt>. Raising anything but a (subclass of)
+<tt class="xref docutils literal"><span class="pre">ValidationError</span></tt> is a programming error. Raising it
+entails aborting the current transaction.</p>
+<p>This exception is used to convey enough information up to the user
+interface. Hence its constructor is different from the default Exception
+constructor. It accepts, positionally:</p>
+<ul class="simple">
+<li>an entity eid,</li>
+<li>a dict whose keys represent attribute (or relation) names and values
+an end-user facing message (hence properly translated) relating the
+problem.</li>
+</ul>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="n">earth</span><span class="o">.</span><span class="n">eid</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;sea_level&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;too high&#39;</span><span class="p">),</span>
+                                  <span class="s">&#39;temperature&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">_</span><span class="p">(</span><span class="s">&#39;too hot&#39;</span><span class="p">)})</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="checking-for-object-created-deleted-in-the-current-transaction">
+<h3>6.2.2.4. Checking for object created/deleted in the current transaction<a class="headerlink" href="#checking-for-object-created-deleted-in-the-current-transaction" title="Permalink to this headline">¶</a></h3>
+<p>In hooks, you can use the
+<tt class="xref docutils literal"><span class="pre">added_in_transaction()</span></tt> or
+<tt class="xref docutils literal"><span class="pre">deleted_in_transaction()</span></tt> of the session
+object to check if an eid has been created or deleted during the hook&#8217;s
+transaction.</p>
+<p>This is useful to enable or disable some stuff if some entity is being added or
+deleted.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cw</span><span class="o">.</span><span class="n">deleted_in_transaction</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eidto</span><span class="p">):</span>
+   <span class="k">return</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="peculiarities-of-inlined-relations">
+<h3>6.2.2.5. Peculiarities of inlined relations<a class="headerlink" href="#peculiarities-of-inlined-relations" title="Permalink to this headline">¶</a></h3>
+<p>Relations which are defined in the schema as <cite>inlined</cite> (see <a class="reference external" href="../datamodel/definition.html#relationtype"><em>Relation type</em></a>
+for details) are inserted in the database at the same time as entity attributes.</p>
+<p>This may have some side effect, for instance when creating an entity
+and setting an inlined relation in the same rql query, then at
+<cite>before_add_relation</cite> time, the relation will already exist in the
+database (it is otherwise not the case).</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../modindex.html" title="Global Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="notifications.html" title="6.3. Notifications management"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="sessions.html" title="6.1. Sessions"
+             >previous</a> |</li>
+        <li><a href="../../index.html">CubicWeb 3.12.7</a> &raquo;</li>
+          <li><a href="../index.html" >Repository development</a> &raquo;</li>
+          <li><a href="index.html" >6. Repository customization</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2001-2010, Logilab.
+      Last updated on Jun 21, 2011.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.6.
+    </div>
+  </body>
+</html>
