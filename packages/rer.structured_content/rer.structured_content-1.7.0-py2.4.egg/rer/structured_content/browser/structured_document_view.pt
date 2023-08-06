@@ -1,0 +1,90 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xml:lang="en"
+      lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="rer.structured_content">
+
+  <head>
+	<metal:css fill-slot="css_slot">
+		<style type="text/css" media="all"
+        	tal:content="string: @import url(${context/++resource++rer-structured_content.css});">
+		</style>
+	</metal:css>
+  </head>
+
+  <body>
+    <metal:fill fill-slot="main">
+      <metal:main_macro define-macro="main"
+            tal:define="portal_type python:here.getPortalTypeName().lower().replace(' ', '_');
+            base_macros here/base/macros;
+            view_template python:'%s_view' % portal_type;
+            view_macros python:path('here/%s/macros|nothing' % view_template);
+            header_macro view_macros/header | header_macro | base_macros/header;
+            body_macro view_macros/body | body_macro | base_macros/body;
+            folderlisting_macro view_macros/folderlisting | folderlisting | base_macros/folderlisting;
+            footer_macro view_macros/footer | footer_macro | base_macros/footer;
+            errors python:request.get('errors', {})">
+
+        <metal:use_header use-macro="header_macro" />
+        
+        <div class="contextualbody">
+        	<div class="documentDescription rer-contextual-description">
+        		<metal:field use-macro="python:here.widget('description', mode='view')">
+        			Description
+        		</metal:field>
+        	</div>
+        	<div tal:attributes="class python: 'right' in view.name and 'rer-contextual-text rer-contextual-text-right' or 'rer-contextual-text'">
+        		<p tal:condition="python: not here.getText() and is_editable"
+           			i18n:translate="no_body_text"
+					i18n:domain="plone"
+           			class="discreet">
+            		This item does not have any body text, click the edit tab to change it.
+ 				</p>
+        		<div tal:replace="structure context/getText">
+        			Body text
+        		</div>
+        	</div>
+        	<div tal:attributes="class python: 'right' in view.name and 'rer-contextual-portlets rer-contextual-portlets-right' or 'rer-contextual-portlets'">
+        		<tal:foldeeps define="foldeeps view/retrieveFolderDeepening"
+                      	      condition="foldeeps">
+                	<tal:foldeep repeat="foldeep foldeeps">
+                		<dl class="portlet portletNavigationTree">
+							<dt class="portletHeader">
+								<span tal:content="foldeep/title">
+									header
+								</span>
+    						</dt>
+    						<dd class="portletItem lastItem"
+    							tal:define="folder_path foldeep/path">
+    							<ul class="navTree navTreeLevel0">
+	    						 	<tal:objs define="objs python: view.retrieveContentsOfFolderDeepening(folder_path)"
+	                						  condition="objs">
+	                					<tal:obj repeat="obj objs">
+	                						<li class="navTreeItem visualNoMarker">
+													<img tal:replace="structure obj/icon" />
+													<a tal:attributes="href obj/url;">
+													<span tal:content="obj/title">body</span></a>
+													<span tal:condition="obj/filesize|nothing"
+														  tal:content="string:(${obj/filesize})">1Mb</span>
+														<div class="description" tal:condition="obj/description" tal:content="obj/description">description</div> 
+												
+											</li>
+	                					</tal:obj>	  
+	                				</tal:objs>
+                				</ul>
+					  		</dd>
+    					</dl>
+    				</tal:foldeep>
+            	</tal:foldeeps>
+			</div>
+    	</div>
+    
+        <metal:use_footer use-macro="footer_macro" />
+
+      </metal:main_macro>
+    </metal:fill>
+  </body>
+</html>
