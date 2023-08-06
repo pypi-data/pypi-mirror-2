@@ -1,0 +1,924 @@
+Metadata-Version: 1.1
+Name: pyctpp2
+Version: 0.9.2
+Summary: Python interface to CTPP2 library.
+Home-page: http://bitbucket.org/klepa/pyctpp2
+Author: Konstantin Lepa
+Author-email: konstantin.lepa@gmail.com
+License: MIT
+Description: .. contents::
+            :depth: 2
+        
+        Example of usage
+        ================
+        
+            First you should make template, file *hello.tmpl*::
+        
+                Foo: <TMPL_var foo>
+                <TMPL_if array>
+                    Here is loop body:
+                    <TMPL_loop array>
+                        Key: <TMPL_var key>
+                    </TMPL_loop>
+                </TMPL_if>
+        
+            Now create Python script::
+        
+                #!/usr/bin/env python
+        
+                import pyctpp2
+        
+                if __name__ == '__main__':
+                    engine = pyctpp2.Engine()
+        
+                    template = engine.parse('hello.tmpl')
+        
+                    result = template.render(foo='bar',
+                                             array=[{'key': 'first'}, {'key': 'second'}])
+        
+            Now check output::
+        
+                Foo: bar
+                    Here is loop body:
+                        Key: first
+                        Key: second
+        
+        CTPP2 tags
+        ==========
+        
+            CTPP2_ template language dialect contains next operators:
+        
+            - <TMPL_var>
+            - <TMPL_if>
+            - <TMPL_elsif>
+            - <TMPL_else>
+            - <TMPL_unless>
+            - <TMPL_loop>
+            - <TMPL_foreach>
+            - <TMPL_udf>
+            - <TMPL_include>
+            - <TMPL_comment>
+            - <TMPL_block>
+            - <TMPL_call>
+        
+            In order to simplify the make-up, all operators names are case insensitive,
+            that is why the notifications such as: **<TMPL_var** , **<TmPl_VaR** ,
+            **<tmpl_VAR** are equal.
+        
+            But the names of variables are case sensitive, that's why for example:
+            **<TMPL_var ABC>**, **<TMPL_var abc>**, **<TMPL_var Abc>** are not in equal
+            state.
+        
+            Parameters, which names starting with a symbol of underlining (for example
+            **__FIRST__**) are reserved names and should NOT be used by the
+            developer. Variable names can be composed of letters, numbers, and
+            underscores (_). Every variable name in CTPP2_ must start with a letter.
+        
+            You can access subproperties (hash references to oher object) of variable
+            by specifying it after variable name separated by dot '.': **<TMPL_var
+            foo.bar>**.
+        
+        TMPL_var
+        --------
+        
+            **<TMPL_var VAR_NAME>**, **<TMPL_udf VAR_NAME>** - Direct parameter output.
+        
+            In CTPP2_ template engine two types of variables are defined: local and
+            global. The sense of these two concepts is completely equal with a similar
+            idea in the other algorithmic languages such as *C++*.
+        
+            For variable output use operator **<TMPL_var VAR_NAME>**.
+        
+                *Example 1*:
+        
+                :Template: ``"Hello, <b><TMPL_var username></b>!"``
+                :Parameter: ``{ 'username': 'Olga' }``
+                :Output: ``"Hello, Olga!"``
+        
+            You can use user defined functions to make a variable output.
+        
+                *Example 2*:
+        
+                :Template: ``"<a href="/index.cgi?username=<TMPL_var URLESCAPE(username)>">"``
+                :Parameter: ``{ 'username': 'Андрей' }``
+                :Output: ``"<a href="/index.cgi?username=%C0%ED%E4%F0%E5%E9">"``
+        
+                *Example 3*:
+        
+                :Template: ``User <TMPL_var user.name> has id <TMPL_var user.id>``
+                :Parameter: ``{ 'user': { 'name': "Fred", 'id': 1234 }}``
+                :Output: ``User Fred has id 1234``
+        
+        TMPL_if, TMPL_unless
+        --------------------
+        
+            These operators impose condition on your template output, it depends on the
+            result of logical expression placed to the right of the operator's body.
+        
+            CTPP2_ defines four operators of condition: **<TMPL_if LOGICAL_EXPR>**,
+            **<TMPL_elsif LOGICAL_EXPR>**, **<TMPL_else>** and
+            **<TMPL_unless LOGICAL_EXPR>**.
+        
+            Operators evaluates logical expression to the result and according to it
+            executes or not the further instructions. You can also use variables (local
+            and global) and user defined functions inside of the operator's body.
+        
+                *Example 1*::
+        
+                    <TMPL_if LOGICAL_EXPR>
+                       Some instructions if result has true value.
+                    <TMPL_elsif OTHER_EXPRESSION>
+                      Some instructions if result has false value.
+                    <TMPL_else>
+                      Else-branch/
+                    </TMPL_if>
+        
+                    <TMPL_unless LOGICAL_EXPR1>
+                      Some instructions if result has false value.
+                    <TMPL_elsif LOGICAL_EXPR2>
+                      Some instructions if evaluation result of
+                      LOGICAL_EXPR2 has true value.
+                    <TMPL_else>
+                      Some instructions if result has true value.
+                    </TMPL_unless>
+        
+            The branches of **<TMPL_elsif>** and **<TMPL_else>** are not firmly binds,
+            it means that the following notification is allowed:
+            **<TMPL_if LOGICAL_EXPR>** Some instructions **</TMPL_if>**.
+        
+            Thus the operator **<TMPL_unless** differs from the operator **<TMPL_if**
+            in the executing some instructions if the evaluated value is false.
+        
+        TMPL_loop, TMPL_foreach
+        -----------------------
+        
+            The loop - The multiple repeating of some pre-defined actions.
+        
+            The only type of loops has been defined in CTPP2_ - the forward running
+            over through the data array. The operator corresponding with this action
+            looks like the following::
+        
+                <TMPL_loop MODIFIERS LOOP_NAME>
+                    The LOOP instructions.
+                </TMPL_loop>
+        
+            **TMPL_foreach** is loop with iterator::
+        
+                <TMPL_foreach LOOP_NAME as ITER_NAME>
+                    <TMPL_var ITER_NAME.VAR_NAME> <TMPL_var VAR_NAME>.
+                </TMPL_foreach>
+        
+            If the name of iterator isn't specified, the variable is searched at first
+            inside of iterator, and then it is searched in global area of the data.
+        
+            If you evidently put the mark to use context variables in the loop body,
+            CTPP2_ inserts seven special variables, called context vars. The names of
+            these variables start with the double underline, this fact points to their
+            system meaning.
+        
+        
+            Set of values for *context vars*:
+        
+              **__FIRST__**
+                  It sets to "1" during the first loop iteration, in other
+                  cases not defined.
+        
+              **__LAST__**
+                  It sets to the last iteration number, otherwise is not defined.
+        
+              **__INNER__**
+                  It accommodates the number from the second to the pre-last
+                  iteration, otherwise undefined.
+        
+              **__ODD__**
+                  The number of an odd iteration. For the even one - undefined.
+        
+              **__COUNTER__**
+                  The number of current iteration.
+        
+              **__EVEN__**
+                  Opposite to the **__ODD__** variable.
+        
+              **__SIZE__**
+                  The whole number of the loop iterations.
+        
+              **__CONTENT__**
+                  It contains value of current iteration.
+        
+        TMPL_include
+        ------------
+        
+            In some cases it happens to allocate conveniently identical parts in
+            several templates (for example, heading or the menu on page) and to place
+            them in one file.
+        
+            This is done by operator **<TMPL_include filename.tmpl>**.
+        
+            *Example 1*:
+        
+                File *main.tmpl*::
+        
+                    <TMPL_loop foo>
+                        <TMPL_include "filename.tmpl"
+                          map(bar : baz, orig_param : include_param)>
+                    </TMPL_loop>
+        
+                File *filename.tmpl*::
+        
+                     <TMPL_var baz>
+        
+            You can rename variable in included templates. In example 1 variable *baz*
+            in file *filename.tmpl* was renamed to *bar* and *orig_param* to
+            *include_param*.  This is useful when you include one template many times
+            in main template.
+        
+            **Attention! You CAN NOT place a part of a loop or condition in separate
+            templates.**
+        
+            In other words, this construction will not work:
+        
+            *Example 2*:
+        
+                File *main.tmpl*::
+        
+                    <TMPL_if foo>
+                       <TMPL_include 'abc.tmpl'>
+        
+                File *abc.tmpl*::
+        
+                    </TMPL_if>
+        
+        TMPL_comment
+        ------------
+        
+            All characters between **<TMPL_comment>** and **</TMPL_comment>** are
+            ignored. This is useful to comment some parts of template.
+        
+        TMPL_block, TMPL_call
+        ---------------------
+        
+           You can declare a block of code and call it by name:
+        
+           *Example 1*::
+        
+                <TMPL_block "foo"> <!-- Declare block with name "foo" -->
+                    ... some foo's HTML and CTPP operators here ...
+                </TMPL_block>
+                <TMPL_block "bar"> <!-- Declare block with name "bar" -->
+                    ... some other HTML and/or CTPP operators here ...
+                </TMPL_block>
+        
+                <TMPL_call block> <!-- Call block by name -->
+        
+        CTPP2 built-in functions
+        ========================
+        
+            There are a variety of situations when you need to represent data according
+            to some condition. To simplify the solution of this problem CTPP2_ support
+            built-in functions. You can call them from the bodies of **<TMPL_if**,
+            **<TMPL_unless**, **<TMPL_var** and **<TMPL_udf** operators.
+        
+            *Example 1*::
+        
+                <TMPL_var HTMLESCAPE(name)>
+        
+                <TMPL_if IN_SET(name, 1, 2, 3)>
+                  Variable "name" is set to "1", "2" or "3".
+                </TMPL_if>
+        
+            CTPP2_ support following built-in functions:
+        
+              - AVG
+              - BASE64_ENCODE
+              - BASE64_DECODE
+              - CAST
+              - DATE_FORMAT
+              - DEFAULT
+              - DEFINED
+              - FORM_PARAM
+              - GETTEXT, (_)
+              - HMAC_MD5
+              - HREF_PARAM
+              - HTMLESCAPE
+              - ICONV
+              - IN_SET
+              - JSESCAPE
+              - JSON
+              - MD5
+              - MAX
+              - MB_SIZE
+              - MB_SUBSTR
+              - MB_TRUNCATE
+              - MIN
+              - NUM_FORMAT
+              - OBJ_DUMP
+              - RANDOM
+              - SIZE
+              - SUBSTR
+              - TRUNCATE
+              - URIESCAPE
+              - URLESCAPE
+              - VERSION
+              - XMLESCAPE
+              - WMLESCAPE
+        
+        AVG
+        ---
+        
+            Function calculates average value of arguments.
+        
+            *Arguments*:
+        
+                :1: Type of used algorithm for calculation of average value.  Admissible
+                    values: 'a' (arithmetic), 'g' (geometric), 'h' (harmonic), 'q'
+                    (quadratic).
+        
+                :2..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var AVG('a', 1, 2, 3)>: 2
+                <TMPL_var AVG('g', 1, 2, 3)>: 1.81712059283
+                <TMPL_var AVG('h', 1, 2, 3)>: 1.63636363636
+                <TMPL_var AVG('q', 1, 2, 3)>: 2.16024689947
+        
+        BASE64_ENCODE
+        -------------
+        
+            Function codes the value in format Base64 (RFC 3548).
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var BASE64_ENCODE("Hello, World!")>
+        
+        BASE64_DECODE
+        -------------
+        
+            Function decodes the value from format Base64 (RFC 3548).
+        
+            *Arguments*:
+        
+                :1: Base64 string.
+        
+            *Examples*::
+        
+                <TMPL_var BASE64_DECODE("SGVsbG8sIFdvcmxkIQ==")>
+        
+        CAST
+        ----
+        
+            Function can be used for conversion between types.
+        
+            *Arguments*:
+        
+                :1: Name of target type. Admissible values: "i[nteger]", "o[ctal]",
+                    "d[ecimal]", "h[exadecimal]", "f[loat]", "s[tring]".
+        
+                :2: Value.
+        
+            *Examples*::
+        
+                <TMPL_var CAST("int", 1.345)>: 1
+                <TMPL_var CAST('int', "010")>: 8
+                <TMPL_var CAST('dec', "010")>: 10
+                <TMPL_var CAST('oct', "010")>: 8
+                <TMPL_var CAST('hex', "010")>: 16
+                <TMPL_var CAST("float", var1)>
+        
+        CONCAT
+        ------
+        
+            Function concatenates arguments.
+        
+            *Arguments*:
+        
+                :1..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var CONCAT('a', 1, 2, 3)>: a123
+        
+        DATE_FORMAT
+        -----------
+        
+            Function formats the date according to a template. Syntax of a template
+            completely matches with syntax for C-function *strftime*.
+        
+            *Arguments*:
+        
+              :1: Number of seconds since the Epoch.
+        
+              :2: *strftime* template.
+        
+            *Examples*::
+        
+              <TMPL_var DATE_FORMAT(1200490323, "%Y-%m-%d %H:%M:%S")>
+              <TMPL_udf DATE_FORMAT(1200490323, "%Y-%m-%d %H:%M:%S")>
+        
+        DEFAULT
+        -------
+        
+            Function returns value of the second arguemtn in case the first isn't set.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+                :2: Default value.
+        
+            *Examples*::
+        
+                <TMPL_var DEFAULT(foo, "bar")>
+        
+        DEFINED
+        -------
+        
+            Function returns true if the variable has the type which is distinct from
+            UNDEF.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_if DEFINED(foo)>Foo defined!</TMPL_if>
+        
+        FORM_PARAM
+        ----------
+        
+            The algorithm of function is similar HREF_PARAM. It is intended for a
+            output in forms of fields of type *hidden*. Replaces with itself::
+        
+                <TMPL_if a>
+                    <input type="hidden" name="param_a" value=<TMPL_var URLESCAPE(a)">
+                </TMPL_if>
+        
+            *Arguments*:
+        
+                :1: Name of parameter.
+        
+                :2: Value wrapped up in URLESCAPE.
+        
+            *Examples*::
+        
+                <TMPL_udf FORM_PARAM("param_a", a)>
+        
+        GETTEXT, (_)
+        ------------
+        
+            Function realizes system NLS support (Native Language Support, l18n).
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+              <TMPL_var GETTEXT(variable)>
+              <TMPL_var _(variable)>
+        
+        HMAC_MD5
+        --------
+        
+            Function generates HMAC_MD5 hash from arguments.
+        
+            *Arguments*:
+        
+                :1..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var HMAC_MD5("Data", "key")>
+        
+        HREF_PARAM
+        ----------
+        
+            The algorithm of function is similar FORM_PARAM. It is intended for a
+            output in links. Replaces with itself::
+        
+                <TMPL_if a>param_a=<TMPL_var URLESCAPE(a)></TMPL_if>
+        
+            *Arguments*:
+        
+                :1: Name of parameter.
+        
+                :2: Value.
+        
+            *Examples*::
+        
+                <a href=/abc?<TMPL_udf HREF_PARAM("param_a", a)>
+        
+        HTMLESCAPE
+        ----------
+        
+            Function replaces symbols ``<``, ``>``, ``"``, ``'``, ``&`` on ``&lt;``,
+            ``&gt;``, ``&quot;``, ``#039;``, ``&amp;`` accordingly.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var HTMLESCAPE(name)>
+                <TMPL_udf HTMLESCAPE(name)>
+        
+        ICONV
+        -----
+        
+            Function converts text from one encoding to another encoding.
+        
+            *Arguments*:
+        
+                :1: Encoding of the input.
+        
+                :2: Encoding of the output.
+        
+                :3: String value.
+        
+                :4: Flags. Admissible values: 'i', 't'. Flag 'i' permits to convert string
+                    with errors. Flag 't' enables transliteration.
+        
+            *Examples*::
+        
+                <TMPL_var ICONV("Windows-1251", "utf-8", "Здравствуй, мир!")>
+                <TMPL_var ICONV("utf-8", "utf-8", "Здравствуй, мир!", "ti")>
+        
+        IN_SET
+        ------
+        
+            Function compares the first argument to other arguments.
+            Returns true if it is found though one coincidence.
+        
+            *Arguments*:
+        
+                :1..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_if IN_SET(variable, "1", "2", "3")>
+                <TMPL_if IN_SET(variable, variable1, "2", variable2)>
+        
+        JSESCAPE
+        --------
+        
+            Function escapes symbols according to agreements of language ECMAScript
+            (Java Script).
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var JSESCAPE(foo)>
+        
+        JSON
+        ----
+        
+            Function serializes object in format JSON.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var JSON(foo)>
+        
+        LOG
+        ---
+        
+            Function calculates value of a logarithm of number. If the base not
+            specified, returns the natural logarithm (base e).
+        
+            *Arguments*:
+        
+                :1: Number.
+        
+                :2: Base.
+        
+            *Examples*::
+        
+                <TMPL_var LOG(2.7182818284)>
+                <TMPL_udf LOG(100, 10)>
+        
+        MD5
+        ---
+        
+            Function generates MD5 hash from arguments.
+        
+            *Arguments*:
+        
+                :1..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var MD5("Hello, World!")>
+                <TMPL_var MD5("Hello", ", ", "World!")>
+        
+        MAX
+        ---
+        
+            Function calculates the maximum value of arguments.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+                :2..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var MAX(1, -2, 3)>: 3
+        
+        MB_SIZE
+        -------
+        
+            Function returns the size of object. It returns length for arrays and dicts,
+            count of characters for strings.
+        
+            *Arguments*:
+        
+                :1: String, array or dict value.
+        
+            *Examples*::
+        
+                <TMPL_var MB_SIZE(foo)>
+        
+        MB_SUBSTR
+        ---------
+        
+            Function is intended for gaining multibyte (UTF-8) substring or
+            replacement of a part of a line.
+        
+            *Arguments*:
+        
+                :1: Input string.
+        
+                :2: Start positiion.
+        
+                :3: Count of characters.
+        
+                :4: String of replacement.
+        
+            *Examples*::
+        
+                <TMPL_var SUBSTR('foobar', 2)>: oobar
+                <TMPL_var SUBSTR('foobar', 2, 3)>: oba
+                <TMPL_var SUBSTR('foobar', 2, 3, '1234')>: fo1234r
+        
+        MB_TRUNCATE
+        -----------
+        
+            Function truncates and output multibyte (UTF-8) lines.
+        
+            *Arguments*:
+        
+                :1: Input string.
+        
+                :2: Count of characters.
+        
+                :3: Tail string.
+        
+            *Examples*::
+        
+                <TMPL_var TRUNCATE('foobar', 3)>: foo
+                <TMPL_var TRUNCATE('foobar', 3, '...')>: foo...
+                <TMPL_var TRUNCATE('foobar', 100, '...')>: foobar
+        
+        MIN
+        ---
+        
+            Function calculates the minimum value of arguments.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+                :2..*: Values.
+        
+            *Examples*::
+        
+                <TMPL_var MIN(1, -2, 3)>: -2
+        
+        NUM_FORMAT
+        ----------
+        
+            Function formats integer and adds period sign.
+        
+            *Arguments*:
+        
+                :1: Integer value.
+        
+                :2: Period sign.
+        
+            *Examples*::
+        
+                <TMPL_var NUM_FORMAT(variable, ",")>
+                <TMPL_udf NUM_FORMAT(variable, ".")>
+        
+        OBJ_DUMP
+        --------
+        
+            Function outputs dump of variables. If functions is called without
+            arguments, then it returns dump of all variables.
+        
+            *Arguments*:
+        
+                :1..*: Variables.
+        
+            *Examples*::
+        
+                <TMPL_var OBJ_DUMP()>
+                <TMPL_var OBJ_DUMP(var1, var2, var3)>
+        
+        RANDOM
+        ------
+        
+            Function generates pseudorandom number. It returns value from range [0,
+            RAND_MAX] without arguments. It returns value from range [0, argument] with
+            1 argument.
+        
+            *Arguments*:
+        
+                :1: First value.
+        
+                :2: Second value.
+        
+            *Examples*::
+        
+                <TMPL_var RANDOM()>
+                <TMPL_udf RANDOM(10)>
+                <TMPL_udf RANDOM(1.5, 2.5)>
+        
+        SIZE
+        ----
+        
+            Function returns the size of object. It returns length for arrays and dicts,
+            count of bytes for strings.
+        
+            *Arguments*:
+        
+                :1: String, array or dict value.
+        
+            *Examples*::
+        
+                <TMPL_var MB_SIZE(foo)>
+        
+        SUBSTR
+        ------
+        
+            Function is intended for gaining substring or
+            replacement of a part of a line.
+        
+            *Arguments*:
+        
+                :1: Input string.
+        
+                :2: Start positiion.
+        
+                :3: Count of characters.
+        
+                :4: String of replacement.
+        
+            *Examples*::
+        
+                <TMPL_var SUBSTR('foobar', 2)>: oobar
+                <TMPL_var SUBSTR('foobar', 2, 3)>: oba
+                <TMPL_var SUBSTR('foobar', 2, 3, '1234')>: fo1234r
+        
+        TRUNCATE
+        --------
+        
+            Function truncates and output lines.
+        
+            *Arguments*:
+        
+                :1: Input string.
+        
+                :2: Count of characters.
+        
+                :3: Tail string.
+        
+            *Examples*::
+        
+                <TMPL_var TRUNCATE('foobar', 3)>: foo
+                <TMPL_var TRUNCATE('foobar', 3, '...')>: foo...
+                <TMPL_var TRUNCATE('foobar', 100, '...')>: foobar
+        
+        URIESCAPE
+        ---------
+        
+            Function is completely similar to function URLESCAPE except that the blank
+            symbol is coded not as "+", and as %20.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var URIESCAPE(name)>
+                <TMPL_udf URIESCAPE(name)>
+        
+        URLESCAPE
+        ---------
+        
+            Function replaces symbols %XX, where XX - a hexadecimal code of a symbol.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var URLESCAPE(name)>
+                <TMPL_udf URLESCAPE(name)>
+        
+        VERSION
+        -------
+        
+            Function returns current versions of standard library CTPP2_ and the virtual
+            machine. Function returns the expanded output with the argument "full".
+        
+            *Arguments*:
+        
+                :1: Admissible value: "full".
+        
+            *Examples*::
+        
+                <TMPL_var VERSION()>
+                <TMPL_var VERSION("full")>
+        
+        XMLESCAPE
+        ---------
+        
+            Function replaces symbols ``<``, ``>``, ``"``, ``'``, ``&`` on ``&lt;``,
+            ``&gt;``, ``&quot;``, ``&apos;``, ``&amp;`` accordingly.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var XMLESCAPE(name)>
+                <TMPL_udf XMLESCAPE(name)>
+        
+        WMLESCAPE
+        ---------
+        
+            Function replaces symbols ``<``, ``>``, ``"``, ``'``, ``$``, ``&`` on ``&lt;``,
+            ``&gt;``, ``&quot;``, ``&apos;``, ``$$``,  ``&amp;`` accordingly.
+        
+            *Arguments*:
+        
+                :1: Value.
+        
+            *Examples*::
+        
+                <TMPL_var WMLESCAPE(name)>
+                <TMPL_udf WMLESCAPE(name)>
+        
+        .. _CTPP2: http://ctpp.havoc.ru/
+        
+        
+        CHANGES
+        =======
+        
+        0.9.2 (28.03.2011)
+        ------------------
+        
+        - Fixed installation by pip.
+        
+        0.9.1 (13.01.2011)
+        ------------------
+        
+        - Added COPYING.txt.
+        - Added support of traversable objects.
+        - Some bug fixes.
+        
+        0.9.0 (11.01.2011)
+        ------------------
+        
+        - Initial release.
+        
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX
+Classifier: Programming Language :: Cython
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Internet :: WWW/HTTP :: Dynamic Content
+Classifier: Topic :: Text Processing :: Markup :: HTML
+Requires: Cython(>=0.14)
