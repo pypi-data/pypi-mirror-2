@@ -1,0 +1,158 @@
+===========
+Django Yama
+===========
+
+Introduction
+============
+
+Django Yama (Yet Another Menuing App) is a fairly generic menuing
+application for Django 1.1 (and up). It supports hierarchical
+(tree-structure) menus of arbitrary depth, and enables you to create
+menus linking to model objects and views from other Django apps, as
+well as external URLs.
+
+The admin part of the app is completely customized, utilizing jQuery
+to provide a simple user interface. The interface was mostly ripped
+off from^W ^W ^W influenced by `django-page-cms
+<http://code.google.com/p/django-page-cms/>`_.
+
+The best way of deploying django-yama in the front-end would probably
+be by the means of a custom template context processor. A template tag
+is included which can render the menu as an unordered HTML list.
+
+Installation and configuration
+==============================
+
+The package is now available through PyPI.  It depends on the
+`django-mptt <http://code.google.com/p/django-mptt/>`_ for its
+hierarchical structure, and obviously on Django itself, so you will
+also need to install those.
+
+Alternatively, you can check out the latest revision from the Mercurial
+repository: ::
+
+  hg clone http://django-yama.googlecode.com/hg django-yama
+
+Having installed Yama, you need a few of the usual steps:
+
+* Add ``'yama'`` to your ``INSTALLED_APPS``
+
+* To create the necessary database tables, run ``python manage.py
+  syncdb``; alternatively, if you're using South, run ``python
+  manage.py migrate yama``.
+
+* Copy the contents of the media directory to your ``MEDIA_ROOT``.
+  You can also use `django-staticfiles
+  <http://pypi.python.org/pypi/django-staticfiles/>`_.
+
+And a few more specific ones:
+
+* Since Yama uses Django's machinery for Javascript translation,
+  you need to provide an entry for Django's ``javascript_catalog``
+  view in your ``urls.py``. Typically, that would look something
+  like: ::
+
+      (r'^jsi18n/(?P<packages>\S+?)/$', 'django.views.i18n.javascript_catalog'),
+
+* If you don't intend to link to objects or views (i.e. plan to enter
+  the URLs directly), you're good to go.  Otherwise, you need to tell
+  Yama which models and views you wish to link to. You can either edit
+  ``settings.py`` in the yama directory, or edit your site-wide
+  ``settings.py`` and adjust the following couple of settings:
+
+  * ``YAMA_MODELS``, which is a dictionary. Keys are pairs in the form
+    ``('app_label', 'model name'), and values provide filters, which
+    allow only a subset of model instances to be used as menu
+    targets. Values can either be None, which indicates that no
+    filtering is to be applied, or ``Q`` objects which express the
+    desired filtering operations. Alternatively, values can also be
+    callables which return ``Q`` objects; these callables are given a
+    single argument, a ``HttpRequest`` object. In fact, callables are
+    your only option for filtering in site-wide ``settings.py``, since
+    importing ``Q`` objects at the top level would cause a circular
+    import. Here's an example: ::
+
+      def user_list(request):
+          from django.db.models import Q
+          return Q(is_active=True)
+       
+      YAMA_MODELS = {('auth', 'User') : user_list}
+
+    All the given models are expected to implement the
+    ``get_absolute_url`` method.
+
+  * ``YAMA_VIEWS``, which is a sequence of pairs. Each pair takes the
+    form of ``('reverse-able name', 'display name')``. Example: ::
+
+      YAMA_VIEWS = (
+           ('blog-index', _('Blog index')),
+           ('blog.views.archive', _('Blog archive')),
+      )
+ 
+    Currently, the views are expected not to take any arguments (apart
+    from ``request``).
+
+Displaying menus
+================
+
+Yama comes with a template tag for rendering ``Menu`` objects as
+unordered HTML lists. First, you need to load the tags in your
+template: ::
+
+  {% load yama %}
+
+Then you can use ``{% menu_as_ul menu_var %}`` to display the menu as
+a list. Note that the top-level <ul> tags are not output, so you can
+have control over the id of the list. Here is a sample output: ::
+
+     <li class="first">
+       <a ... class="a_first">Item 1</a>
+     </li>
+     <li class="li_dir">
+       <a ... class="dir">Item 2</a>
+       <ul>
+         <li class="first">
+           <a ... class="a_first">Item 2/1</a>
+         </li>
+         <li class="last">
+           <a ... class="a_last">Item 2/2</a>
+         </li>
+       </ul>
+     </li>
+     <li class="last li_dir">
+       <a ... class="a_last dir">Item 3</a>
+       <ul>
+         <li class="first">
+           <a ... class="a_first">Item 3/1</a>
+         </li>
+         <li class="">
+           <a ... class="">Item 3/2</a>
+         </li>
+         <li class="last">
+           <a ... class="a_last">Item 3/3</a>
+         </li>
+       </ul>
+     </li>
+
+You can customize the displayed classes by passing keyword arguments
+to the tag, e.g: ::
+
+    {% menu_as_ul top_menu dir_li_class="has_subitems" %}
+
+The default mapping is as follows: ::
+
+   DEFAULT_CLASSES = {
+               'first_li_class' : "first", 
+               'first_a_class' : "a_first",
+               'last_li_class' : "last", 
+               'last_a_class' : "a_last",
+               'dir_li_class' : "li_dir",
+               'dir_a_class' : "dir",
+   }
+
+This is a bit assymetric, but it works out of the box with `these
+menus <http://www.lwis.net/free-css-drop-down-menu/>`_.
+
+**Note**: currently, the template tag is quite database-heavy (hits
+the DB at least once per menu item).
+
