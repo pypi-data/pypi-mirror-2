@@ -1,0 +1,101 @@
+DSE - Delayed SQL Executor
+==========================
+
+Version : 0.9.0
+Author : Thomas Weholt <thomas@weholt.org>
+License : GPL v3.0
+Status : Beta
+Url : https://bitbucket.org/weholt/dse
+Docs at http://readthedocs.org/docs/dse/en/latest/index.html
+
+==Background==
+
+DSE is concept of caching SQL-statements, both inserts and updates, and executing them when a specified
+number of statements has been prepared. This is done using DB API cursor.executemany(list of cached statements)
+and this is way faster than executing SQL-statements in sequence.
+
+DSE also is a way to solve a recurring problem when using the Django ORM; how to insert or update a bunch of
+records without the huge performance hit of using the ORM to do it, for instance when you want to
+scan a filesystem and add or update a record for each file found.
+
+It has been designed to be used outside Django as well, but the main focus is good Django integration.
+
+==Installation==
+
+pip install dse
+
+or
+
+hg clone https://bitbucket.org/weholt/dse
+
+==Example usage==
+
+You got a model like:
+
+    class Person(models.Model):
+        name = models.CharField(max_length = 30)
+        age = models.IntegerField()
+        sex = models.CharField(max_length = 1, choices = (('M', 'Male'), ('F', 'Female')))
+
+Using dse, you`ll be doing something like this:
+
+    import dse
+    dse.patch_models() # This will monkey patch all your models and expose dse for all models:
+
+    with Person.dse as d:
+        for name, age, sex in (('Thomas', 36, 'M'), ,('Joe', 40, 'M'), ('Jane', 28, 'F')):
+             d.add_item(dict(name = name, age = age, sex = sex))
+
+Nothing will be inserted into the database before the loop is done ( or you insert 10000 items ). 
+Then the items will be inserted using executemany, using plain SQL - no ORM in sight.
+
+Version 0.9.1 also introduced support for singletons ( NB! very experimental, no locking or thread support yet! ):
+
+    import dse.singleton
+    
+    p1 = dse.singleton.Person()
+    p2 = dse.singleton.Person()
+    print p1 is p2 # should print True
+    p1.add_item(dict(name = 'Joe'))
+    p2.flush()
+    print Person.objects.all().count() # should print 1
+    
+Singletons makes it possible to cache entries across pieces of code and cache even more data, hitting the db less.
+
+==Release notes==
+
+0.9.1 : - Refactored code even more, added usage.rst, singleton support in the singleton-package and some performance tests. Models not monkey patched be default anymore, must call dse.patch_models().
+
+0.9.0 : - Refactored code and cleaned up tests folder. Focus on getting singleton support in before 1.0.0. And more tests.
+
+0.8.2 : - added 'pysqlite2' to _DBMAP. Thanks to David Marble for 0.8.1 and 0.8.2.
+
+0.8.1 : - attempt to fix quoting problems with fields on postgresql.
+
+0.8.0 : - fixed crash when more than one database connection has been configured. No ModelFactory will be triggered.
+
+0.7.0 : - don`t remember.
+
+0.6.0 : - added support for the with-statement.
+        - added an ModelDelayedExecutor-instance to each model, so you can do Model.dse.add_item
+          instead of dse.ModelFactory.Model.add_item.
+        - renamed dse.modelfactory to dse.ModelFactory to be more style-compliant.
+
+0.5.1 : just some notes on transaction handling.
+
+0.5.0 :
+    - added modelfactory. Upon first import a modelfactory will be created in the DSE module. It`s basically just a
+    helper-class containing ModelDelayedExecutor-instances for all models in all apps found in INSTALLED_APPS in
+    settings.py.
+    - to change the default item limit before automatic execution of cached SQL statements to 10000 instead of the default 1000::
+
+    import dse
+    dse.ITEM_LIMIT = 10000
+
+0.4.0 :
+    - fixed serious bug when using mass updates. Using cursor.executemany is only possible when values
+    for all columns are specified. If only values for a subset of the columns is specified that will be
+    executed as a seperate SQL-call. NOTE! Using dex.get_items() or Djangos Model.objects.values() will give you
+    all the fields.
+    - code clean-up.
+    - added custom exceptions; UpdateManyException, UpdateOneException and InsertManyException.
