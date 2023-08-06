@@ -1,0 +1,156 @@
+{% extends "causal/base.html" %}
+{% load extras %}
+{% load media_loaders %}
+{% block head %}
+    <title>Settings</title>
+    {% load_css "cupertino/jquery-ui.css" %}
+    {% load_js "jquery-ui.min.js" %}
+    {% load_css "iphone-style-checkboxes.css" %}
+    {% load_js "iphone-style-checkboxes.js" %}
+    <script>
+        //<![CDATA[
+        var services = {
+            {% for service in user.userservice_set.all %}
+                {{ service.id }}: "{{ service.app.module.DISPLAY_NAME|escapejs }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        };
+        function _ajax_request(url, data, callback, type, method) {
+            if (jQuery.isFunction(data)) {
+            callback = data;
+            data = {};
+            }
+            return jQuery.ajax({
+            type: method,
+            url: url,
+            data: data,
+            success: callback,
+            dataType: type
+            });
+        }
+        jQuery.extend({
+            put: function(url, data, callback, type) {
+            return _ajax_request(url, data, callback, type, 'PUT');
+            },
+            delete_: function(url, data, callback, type) {
+            return _ajax_request(url, data, callback, type, 'DELETE');
+            }
+        });
+        function reloadPage() { location.reload(true); }	
+        $(function() {
+            $('.share_control').iphoneStyle({
+                checkedLabel: 'Shared',
+                uncheckedLabel: 'Private'
+            });
+            $('.share_control').parent('div').addClass('share_wrapper');
+            $('.share_control').change(function() {
+                $.post(
+                    '{% url share-prefs %}',
+                    $('input.share_control').serialize(),
+                    function(data) {}
+                );
+                return false;
+            });
+            $("button.delete_button").button();
+            $("button.delete_button").click(function() {
+		var id = $(this).attr('id').replace('delete_service_', '');
+                $("#disable-confirm-dialog").html($("#disable-confirm-dialog-template").jqote({'name': services[id]}, '*'));
+		$("#disable-confirm-dialog").dialog({
+		    resizable: false,
+                    draggable: false,
+		    height: $(window).height() / 2,
+		    width: $(window).width() / 2,
+		    modal: true,
+                    title: "Disable service?",
+		    buttons: {
+			'Disable': function() {
+			    $(this).dialog('close');
+			    $.delete_(
+				'/{{ request.user.username }}/service/' + id + '.json',
+				{},
+				reloadPage
+			    );
+			},
+			Cancel: function() {
+			    $(this).dialog('close');
+			}
+		    }
+		});
+                $('.ui-widget-overlay').click(function() {
+                    $('#disable-confirm-dialog').dialog('close');
+                });
+            });
+            $('form#user-profile-form select#id_timezone').change(function() {
+                $.post(
+                    $('form#user-profile-form').attr('action'),
+                    $('form#user-profile-form').serialize(),
+                    function(data) {}
+                );
+            });
+        });
+        //]>
+    </script>
+{% endblock head %}
+
+{% block primary %}
+    <div class="form-data user-settings">
+        <div>
+            <form id="user-profile-form" method="post" action=".">
+                {% csrf_token %}
+                {{ form.as_p }}
+            </form>
+        </div>
+        {% if enabled_services %}
+                <h3>Enabled services:</h3>
+                <ul>
+                    {% for service in enabled_services %}
+                        <li>{% if service.setup %}
+                                <input type="checkbox" id="service_{{ service.pk }}" name="service_{{ service.pk }}" class="share_control" {% if service.share %}checked="checked"{% endif %}/>
+                                <button id="delete_service_{{ service.pk }}" class="delete_button" title="Disable service">X</button>
+    
+                                {% include service.form_template_path %}
+				
+				{% if not service.public %}
+				   <p>This service is currently set to private on it's website. We don't recommend sharing this service.</p>
+				{% endif %}				
+				
+                                {% if not forloop.last %}
+                                    <hr/>
+                                {% endif %}
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+        {% endif %}
+        {% if available_services_unconfigured %}
+        <h3>Unconfigured services:</h3>
+        <ul>
+        {% for service in available_services_unconfigured %}
+            <li>
+            {% if service %} 
+                {% include service.form_template_path %}
+                {% if not forloop.last %}<hr/>{% endif %}
+            {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+        {% endif %}
+        {% if available_services %}
+            <h3>Available services:</h3>
+            <ul>
+                {% for service in available_services %}
+                    <li><a href="{% url enable-service service.id %}">{{ service.module.DISPLAY_NAME }}</a></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+	<h3> JSON Feed  </h3>
+        <p>A feed of all your updates is available as a <a href="{% url user-feed request.user.username %}">JSON feed</a>.</p>
+    </div>
+    <div id="disable-confirm-dialog" class="hide"></div>
+    <script type="text/x-jqote-template" id="disable-confirm-dialog-template">
+        <![CDATA[
+        <p>Do you really want to completely disable <strong><*= this.name *></strong>?</p>
+        <p>It will no longer appear on in your 7 day history, and any authentication data will be erased.<br/>
+        If at any time you want to re-enable the service you can do so from this page, but you'll have to re-authorize the service.</p>
+        ]]>
+    </script>
+{% endblock primary %}

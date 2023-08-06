@@ -1,0 +1,136 @@
+{% extends "causal/base.html" %}
+{% load extras %}
+{% load media_loaders %}
+
+{% block head %}
+    <title>History</title>
+    <script type="text/javascript">
+    // <![CDATA[
+    var days = {
+        {% for day in days %}
+            {{ forloop.counter0 }}: []{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+    var item_sort_callback = function(a, b) {
+        return a['created'] - b['created'];
+    }
+    var response_handler = function(data) {
+        if (typeof data != 'XMLHttpRequest' && !data['error']) {
+            $('li#service_load_' + data['class']).addClass('loaded');
+            data = data['items'];
+            for (i in data) {
+                days[i] = days[i].concat(data[i]);
+                day = days[i];
+                day_ul = $('ul#day_' + i);
+                day_ul.children('li').remove();
+                days[i].sort(item_sort_callback);
+                days[i].reverse();
+                for (j in day) {
+                    item = day[j];
+                    day_ul.append($('#item_template').jqote(item, '*'));
+                }
+            }
+        } else {
+            $('li#service_load_' + data['class']).addClass('service-error');
+            $('li#service_load_' + data['class']).append('<span>Sorry! Unable to fetch items from service. :(</span>');
+        }
+    }
+    var load_services = function() {
+        {% for service in services %}
+            $.ajax({
+                url: "{% url history-callback viewing_user.username service.pk %}",
+                data: {},
+                success: response_handler,
+                error: response_handler,
+                dataType: 'json',
+                type: 'GET'
+            });
+        {% endfor %}
+    }
+    $(function() {
+        setTimeout(load_services, 500);
+    });
+    // ]]>
+    </script>
+    {% load_css "cupertino/jquery-ui.css" %}
+    {% load_css "tabs.css" %}
+    {% load_js "jquery-ui.min.js" %}
+    <script>
+        //<![CDATA[
+        $(function() {
+            $('#service-tabs').tabs().addClass('ui-tabs-vertical ui-helper-clearfix');
+            $('#service-tabs li').removeClass('ui-corner-top').addClass('ui-corner-left');
+            $('#service-tabs .ui-widget-content:not(#all-services)').addClass('tab-loading');
+            $('#service-tabs').tabs({
+                load: function(event, ui) {
+                    $(ui.panel).removeClass('tab-loading');
+                }
+            });
+            $('a.tab-link').click(function() {
+                var top = $(window).scrollTop();
+                document.location = this.href;
+                $(window).scrollTop(top);
+            });
+        });
+        //]]>
+    </script>
+
+{% endblock head %}
+
+{% block primary %}
+    <div id="service-tabs">
+        <ul>
+            <li>
+                <a href="#all-services" class="causal-timeline tab-link" title="7 day timeline">
+                    <span>7 day timeline</span>
+                </a>
+            </li>
+            {% for service in services %}
+                {% if service|stats_url %}
+                    <li>
+                        <a href="{{ service|stats_url }}" class="{{ service.class_name }} tab-link" title="{{ service.app.module.DISPLAY_NAME }} stats">
+                            <span>{{ service.app.module.DISPLAY_NAME }} stats</span>
+                        </a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        <div id="all-services" class="ui-tabs-panel">
+            <ul id="loading-services">
+                {% for service in services %}
+                    <li id="service_load_{{ service.class_name }}">{{ service.app.module.DISPLAY_NAME }}</li>
+                {% endfor %}
+            </ul>
+            {% if services %}
+            {% for items in days %}
+                <ul id="day_{{ forloop.counter0 }}">
+                    <lh>{{ day_names|get:forloop.counter0 }}</lh>
+                </ul>
+            {% endfor %}
+            {% else %}
+                {% if request.user.is_authenticated %}
+                <h3> No configured services yet!</h3>
+                <p>Why not head over to <a href="/accounts/settings/">your settings page</a> to set some up?</p>
+                {% else %}
+                <h3>No Shared Services</h3>
+                This user is feeling a little shy and isn't sharing anything, move along.
+                {% endif %}
+            
+            {% endif %}
+        </div>
+        {% for service in services %}
+            <div id="{{ service.class_name }}-stats" class="ui-tabs-panel"></div>
+        {% endfor %}
+    </div>
+    <script type="text/x-jqote-template" id="item_template">
+        <![CDATA[
+        <li class="<*= this.class_name *>">
+            <a href="<*= this.link_back *>">
+            <*= this.created_date *></a>:
+            <*= this.title ? this.title : '' *>
+            <*= (this.title && this.body) ? '&ndash;' : '' *>
+            <*= this.body ? this.body : '' *>
+        </li>
+        ]]>
+    </script>
+{% endblock primary %}
