@@ -1,0 +1,26 @@
+Introduction
+============
+
+unweb.watermark lets you protect your high resolution images while publishing 
+resized and watermarked versions. The original images will only be available 
+to users with the "Licensee" role.
+
+Add it to your instance eggs in buildout and install using the Plone Add-ons 
+panel. 
+
+Go to the "Watermark settings" configuration panel and set a watermark image.
+
+Then upload your hi-res images normally. The default Plone workflow will be 
+applied. Whenever you publish an image, the original file will be transfered to
+a protected image field and the watermarked and resize image will be displayed
+in the default image field. If you retract the image then the original file
+will replace the watermarked one.
+
+Can be used standalone or in combination with `unweb.iptc`_
+
+.. _unweb.iptc: http://pypi.python.org/pypi/unweb.iptc
+
+Created by `unweb.me`_
+
+.. _unweb.me: https://unweb.me
+ 
