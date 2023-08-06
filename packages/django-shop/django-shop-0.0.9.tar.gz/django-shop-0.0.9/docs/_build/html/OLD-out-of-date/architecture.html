@@ -1,0 +1,379 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Architecture &mdash; Django Shop v0.0.0 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Django Shop v0.0.0 documentation" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li><a href="../index.html">Django Shop v0.0.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="architecture">
+<h1>Architecture<a class="headerlink" href="#architecture" title="Permalink to this headline">¶</a></h1>
+<p>This document should gather all the pre-code architecture requirements/research.</p>
+<div class="section" id="core-system">
+<h2>Core system<a class="headerlink" href="#core-system" title="Permalink to this headline">¶</a></h2>
+<p>Generally, the shop system can be seen as two different phases, with two different problems to solve:</p>
+<div class="section" id="the-shopping-phase">
+<h3>The shopping phase:<a class="headerlink" href="#the-shopping-phase" title="Permalink to this headline">¶</a></h3>
+<p>From a user perspective, this is where you shop around different product categories, and add desired products to
+a shopping cart (or other abstraction). This is a very well-know type of website problematic from a user interface
+perspective as well as from a model perspective: a simple &#8220;invoice&#8221; pattern for the cart is enough.</p>
+<p>The complexity here is to start defining what a shop item should be.</p>
+</div>
+<div class="section" id="the-checkout-process">
+<h3>The checkout process:<a class="headerlink" href="#the-checkout-process" title="Permalink to this headline">¶</a></h3>
+<p>As the name implies, this is a &#8220;workflow&#8221; type of problem: we must be able to add or remove steps to the checkout process depending
+on the presence or absence of some plugins.
+For instance, a credit-card payment plugin whould be able to insert a payment details page with credit card details in the general workflow.</p>
+<p>To solve this we could implement a workflow engine. The person implementing the webshop whould then define the process using
+the blocks we provide, and the system should then &#8220;run on its own&#8221;.</p>
+</div>
+<div class="section" id="random-ideas">
+<h3>Random ideas:<a class="headerlink" href="#random-ideas" title="Permalink to this headline">¶</a></h3>
+<ul>
+<li><p class="first">multiple shops (site and prefixed)</p>
+<blockquote>
+<div><ul>
+<li><p class="first">namespaced urls for shops</p>
+<blockquote>
+<div><p>psuedocode , is this possible and or a good idea? requires restarts like the cms apphooks.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">prefix</span> <span class="o">=</span> <span class="n">shop</span><span class="o">.</span><span class="n">prefix</span>
+<span class="c"># shopsite.get_urls(shop) # returns a tuple of (urlpatterns, app_name, shop_namespace)</span>
+<span class="n">url</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">shopsite</span><span class="o">.</span><span class="n">get_urls</span><span class="p">(</span><span class="n">shop</span><span class="p">),</span> <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s">&#39;shop_prefix&#39;</span><span class="p">:</span> <span class="n">prefix</span><span class="p">})</span>
+</pre></div>
+</div>
+<p>on a product</p>
+<div class="highlight-python"><pre>def get_product_url(self):
+   return reverse('shop_%s:product_detail' % threadlocals.shop_pk, kwargs={'category_slug': self.category_slug, slug=product.slug})</pre>
+</div>
+</div></blockquote>
+</li>
+<li><p class="first">middleware to find current shop based on site and or prefix/ set current shop id in threadlocals?( process view )</p>
+<blockquote>
+<div><div class="highlight-python"><pre>def process_view(self, request, view_func, view_args, view_kwargs)
+    shop_prefix = view_kwargs.pop('shop_prefix', None):
+    if shop_prefix:
+        shop = Shop.objects.get(prefix=shop_prefix)
+        request.shop = shop
+        threadlocals.shop_pk = shop.pk</pre>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p class="first">class-based views</p>
+</li>
+<li><p class="first">class based plugins (not modules based!)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="plugin-structure">
+<h2>Plugin structure<a class="headerlink" href="#plugin-structure" title="Permalink to this headline">¶</a></h2>
+<p>Plugins should be class based, as most of the other stuff in Django is (for instace the admins), with the framework
+defining both a base class for plugin writers to extend, as well as a registration method for subclasses.</p>
+<p>Proposal by fivethreeo for the plugin structure:</p>
+<div class="highlight-python"><pre># django_shop/checkout/__init__.py
+# django_shop/checkout/__init__.py
+
+
+from django_shop.checkout.site import CheckoutSite, checkoutsite
+
+def autodiscover():
+    """
+    Auto-discover INSTALLED_APPS admin.py modules and fail silently when
+    not present. This forces an import on them to register any admin bits they
+    may want.
+    """
+
+    import copy
+    from django.conf import settings
+    from django.utils.importlib import import_module
+    from django.utils.module_loading import module_has_submodule
+
+    for app in settings.INSTALLED_APPS:
+        mod = import_module(app)
+        for submod in ('django_shop_payment', 'django_shop_shipment')
+            # Attempt to import the app's admin module.
+            try:
+                before_import_registry = copy.copy(checkoutsite._registry)
+                import_module('%s.%s' % (app, submod))
+            except:
+                # Reset the model registry to the state before the last import as
+                # this import will have to reoccur on the next request and this
+                # could raise NotRegistered and AlreadyRegistered exceptions
+                # (see #8245).
+                site._registry = before_import_registry
+    
+                # Decide whether to bubble up this error. If the app just
+                # doesn't have an admin module, we can ignore the error
+                # attempting to import it, otherwise we want it to bubble up.
+                if module_has_submodule(mod, submod):
+                    raise
+
+# django_shop/checkout/site.py
+
+from djangoshop.payment_base import PaymentBase
+from djangoshop.shipper_base import ShipperBase
+
+from django.views.generic import TemplateView
+
+class CheckoutView(TemplateView):
+    template_name = "checkout.html"
+
+class CheckoutSite(object):
+
+    checkout_view = CheckoutView.as_view()
+    
+    def __init__(self, name=None, app_name='django_shop'):
+        self._registry = {
+            'shipper': {},
+            'payment': {}
+        }
+         # model_class class -&gt; admin_class instance
+        self.root_path = None
+        if name is None:
+            self.name = 'checkout'
+        else:
+            self.name = name
+        self.app_name = app_name
+        
+    def register(self, registry, classtype, class_or_iterable):
+        """
+        Registers the given model(s) with the checkoutsite
+        """
+        if isinstance(cls, classtype):
+            class_or_iterable = [class_or_iterable]
+        for cls in class_or_iterable:
+            if cls in self._registry[registry].keys():
+                raise AlreadyRegistered('The %s class %s is already registered' % (registry, cls.__name__))
+            # Instantiate the class to save in the registry
+            self._registry[registry][cls] = cls(self)
+
+     def unregister(self, registry, classtype, class_or_iterable):
+        """
+        Unregisters the given classes(s).
+
+        If a class isn't already registered, this will raise NotRegistered.
+        """
+        if isinstance(cls, classtype):
+            class_or_iterable = [class_or_iterable]
+        for cls in class_or_iterable:
+            if cls not in self._registry[registry].keys():
+                raise NotRegistered('The %s class %s is not registered' % (registry, cls.__name__))
+            del self._registry[registry][cls] 
+            
+    def register_shipper(self, shipper):
+        self.register(self, 'shipper', ShipperBase, shipper)
+            
+    def unregister_shipper(self, shipper):
+        self.unregister(self, 'shipper', ShipperBase, shipper)
+        
+    def register_payment(self, payment):
+        self.register(self, 'payment', PaymentBase, payment)
+            
+    def unregister_payment(self, payment):
+        self.unregister(self, 'payment', PaymentBase, payment)
+                
+    def get_urls(self):
+        from django.conf.urls.defaults import patterns, url, include
+
+        # Checkout-site-wide views.
+        urlpatterns = patterns('',
+            url(r'^$', self.checkout_view, name='checkout'),
+        )
+
+        # Add in each model's views.
+        for payment in self._payment_registry:
+            if hasattr(payment, 'urls'):
+                urlpatterns += patterns('',
+                    url(r'^shipment/%s/%s/' % payment.url_prefix,
+                        include(payment.urls))
+                )
+        for shipper in self._shippers_registry:
+            if hasattr(shipper, 'urls'):
+                urlpatterns += patterns('',
+                    url(r'^payment/%s/' % payment.url_prefix,
+                        include(shipper.urls))
+                )
+        return urlpatterns
+
+    @property
+    def urls(self):
+        return self.get_urls(), self.app_name, self.name
+
+checkoutsite = CheckoutSite()
+
+# django_shop/checkout/shipper_base.py
+
+class ShipperBase(object)
+    pass
+    
+# django_shop/checkout/payment_base.py
+from djangoshop. import RegisterAbleClass
+
+class PaymentBase(object)
+
+  def __init__(self, checkout_site):
+    self.checkout_site = checkout_site
+    super(PaymentBase, self).__init__()
+    
+# app/django_shop_shipment.py
+
+from djangoshop.shipper_base import ShipperBase
+
+class ShipmentClass(ShipperBase):
+
+  def __init__(self, checkout_site):
+    self.checkout_site = checkout_site
+    super(PaymentBase, self).__init__()
+    
+checkoutsite.register_shipment(ShipmentClass)
+
+# app/django_shop_payment.py
+
+from django.views.generic import TemplateView
+from djangoshop.payment_base import PaymentBase
+
+class PaymentView(TemplateView):
+    template_name = "payment.html"
+
+class PaymentClass(PaymentBase, UrlMixin):
+    
+    url_prefix = 'payment'
+    
+    payment_view = PaymentView.as_view()
+    
+    def get_urls(self):
+        from django.conf.urls.defaults import patterns, url
+
+        urlpatterns = patterns('',
+            url(r'^$', self.payment_view,
+                name='%s_payment' % self.url_prefix),
+        )
+        return urlpatterns
+        
+    def urls(self):
+        return self.get_urls()
+    urls = property(urls)
+    
+checkoutsite.register_payment(PaymentClass)
+</pre>
+</div>
+<p>Similar to the Django-CMS plugins, most of the shop plugins will probably have to render templates (for instance when
+they want to define a new checkout step).</p>
+</div>
+<div class="section" id="shoppping-cart">
+<span id="cart"></span><h2>Shoppping Cart<a class="headerlink" href="#shoppping-cart" title="Permalink to this headline">¶</a></h2>
+<p>In its core this is a list of a kind of CartItems which relate to Product.</p>
+<p>It should be possible to have the same Product in different CartItems
+when some details are different. Stuff like different service addons
+etc.</p>
+</div>
+<div class="section" id="prices">
+<span id="id1"></span><h2>Prices<a class="headerlink" href="#prices" title="Permalink to this headline">¶</a></h2>
+<p>This seems to be rather complex and must be pluggable. Prices may be
+influenced by many different things like the Product itself,
+quantities, the customer (location, special prices), shipping method
+and the payment method. This all would have to be handled by special /
+custom pricing implementations. The core implementation must only
+include ways for such extension possibilities.</p>
+<p>Prices will also be related to taxes in some way.</p>
+<p>The core product implementation should possibly know nothing about
+prices and taxes at all.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Architecture</a><ul>
+<li><a class="reference internal" href="#core-system">Core system</a><ul>
+<li><a class="reference internal" href="#the-shopping-phase">The shopping phase:</a></li>
+<li><a class="reference internal" href="#the-checkout-process">The checkout process:</a></li>
+<li><a class="reference internal" href="#random-ideas">Random ideas:</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#plugin-structure">Plugin structure</a></li>
+<li><a class="reference internal" href="#shoppping-cart">Shoppping Cart</a></li>
+<li><a class="reference internal" href="#prices">Prices</a></li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/OLD-out-of-date/architecture.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li><a href="../index.html">Django Shop v0.0.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Chris Glass.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
