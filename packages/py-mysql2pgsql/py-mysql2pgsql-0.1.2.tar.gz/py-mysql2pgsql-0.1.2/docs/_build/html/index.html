@@ -1,0 +1,450 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>py-mysql2pgsql - A tool for migrating/converting/exporting data from MySQL to PostgreSQL &mdash; py-mysql2pgsql v0.1.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="py-mysql2pgsql v0.1.1 documentation" href="#" />
+    <link rel="next" title="API Documentation" href="api/index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api/index.html" title="API Documentation"
+             accesskey="N">next</a> |</li>
+        <li><a href="#">py-mysql2pgsql v0.1.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="py-mysql2pgsql-a-tool-for-migrating-converting-exporting-data-from-mysql-to-postgresql">
+<h1>py-mysql2pgsql - A tool for migrating/converting/exporting data from MySQL to PostgreSQL<a class="headerlink" href="#py-mysql2pgsql-a-tool-for-migrating-converting-exporting-data-from-mysql-to-postgresql" title="Permalink to this headline">¶</a></h1>
+<p>This tool allows you to take data from an MySQL server (only tested on
+5.x) and write a PostgresSQL compatable (8.2 or higher) dump file or pipe it directly
+into your running PostgreSQL server (8.2 or higher).</p>
+<div class="admonition attention">
+<p class="first admonition-title">Attention</p>
+<p class="last">Currently there is no support for importing <a class="reference external" href="http://dev.mysql.com/doc/refman/5.5/en/spatial-extensions.html">spatial data from MySQL</a>.</p>
+</div>
+<div class="section" id="installation">
+<h2>Installation:<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>If you&#8217;re like me you don&#8217;t like random stuff polluting your python
+install. Might I suggest installing this in an virtualenv?</p>
+<div class="highlight-python"><pre>&gt; virtualenv --no-site-packages ~/envs/py-mysql2pgsql
+&gt; source ~/envs/py-mysql2pgsql/bin/activate</pre>
+</div>
+<div class="section" id="requirements">
+<h3>Requirements:<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><a class="reference external" href="http://www.python.org/getit/">Python 2.6 or 2.7</a></li>
+<li><a class="reference external" href="http://pypi.python.org/pypi/MySQL-python">MySQL-python</a></li>
+<li><a class="reference external" href="http://pypi.python.org/pypi/psycopg2">psycopg2</a></li>
+<li><a class="reference external" href="http://pypi.python.org/pypi/PyYAML">PyYAML</a></li>
+<li><a class="reference external" href="http://pypi.python.org/pypi/termcolor">termcolor</a> (unless you&#8217;re installing on windows)</li>
+</ul>
+</div>
+<div class="section" id="on-windows">
+<h3>On Windows<a class="headerlink" href="#on-windows" title="Permalink to this headline">¶</a></h3>
+<p>I have only done limited testing on this platform using Python
+2.7. Here are the driver dependencies for windows, install these
+before attempting to install py-mysql2pgsql or it will fail.</p>
+<ul class="simple">
+<li><a class="reference external" href="http://www.stickpeople.com/projects/python/win-psycopg/">psycopg2 for Windows</a></li>
+<li><a class="reference external" href="http://www.codegood.com/archives/129">MySQL-python for Windows</a></li>
+</ul>
+</div>
+<div class="section" id="from-pypi">
+<h3>From PyPI:<a class="headerlink" href="#from-pypi" title="Permalink to this headline">¶</a></h3>
+<p>All dependencies <strong>should</strong> be automatically installed when installing
+the app the following ways</p>
+<div class="highlight-python"><pre>&gt; pip install py-mysql2pgsql</pre>
+</div>
+</div>
+<div class="section" id="from-source">
+<h3>From source:<a class="headerlink" href="#from-source" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><pre>&gt; git clone git://github.com/philipsoutham/py-mysql2pgsql.git
+&gt; cd py-mysql2pgsql
+&gt; python setup.py install</pre>
+</div>
+</div>
+</div>
+<div class="section" id="usage">
+<h2>Usage:<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>Looking for help?</p>
+<div class="highlight-python"><pre>&gt; py-mysql2pgsql -h
+usage: py-mysql2pgsql [-h] [-v] [-f FILE]
+
+Tool for migrating/converting data from mysql to postgresql.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         Show progress of data migration.
+  -f FILE, --file FILE  Location of configuration file (default:
+                        mysql2pgsql.yml). If none exists at that path,
+                        one will be created for you.</pre>
+</div>
+<p>Don&#8217;t worry if this is your first time, it&#8217;ll be gentle.</p>
+<div class="highlight-python"><pre>&gt; py-mysql2pgsql
+No configuration file found.
+A new file has been initialized at: mysql2pgsql.yml
+Please review the configuration and retry...</pre>
+</div>
+<p>As the output suggests, I file was created at mysql2pgsql.yml for you
+to edit. For the impatient, here is what the file contains.</p>
+<div class="highlight-python"><pre># if a socket is specified we will use that
+# if tcp is chosen you can use compression
+mysql:
+ hostname: localhost
+ port: 3306
+ socket: /tmp/mysql.sock
+ username: mysql2psql
+ password:
+ database: mysql2psql_test
+ compress: false
+destination:
+ # if file is given, output goes to file, else postgres
+ file:
+ postgres:
+  hostname: localhost
+  port: 5432
+  username: mysql2psql
+  password:
+  database: mysql2psql_test
+
+# if only_tables is given, only the listed tables will be converted.  leave empty to convert all tables.
+#only_tables:
+#- table1
+#- table2
+# if exclude_tables is given, exclude the listed tables from the conversion.
+#exclude_tables:
+#- table3
+#- table4
+
+# if supress_data is true, only the schema definition will be exported/migrated, and not the data
+supress_data: false
+
+# if supress_ddl is true, only the data will be exported/imported, and not the schema
+supress_ddl: false
+
+# if force_truncate is true, forces a table truncate before table loading
+force_truncate: false</pre>
+</div>
+<p>Pretty self explainitory right? A couple things to note, first if
+<cite>destination -&gt; file</cite> is populated all outpute will be dumped to the
+specified location regardless of what is contained in <cite>destination -&gt;
+postgres</cite>. So if you want to dump directly to your server make sure
+the <cite>file</cite> value is blank.</p>
+<p>Say you have a MySQL db with many, many tables, but you&#8217;re only
+interested in exporting a subset of those table, no problem. Add only
+the tables you want to include in <cite>only_tables</cite> or tables that you
+don&#8217;t want exported to <cite>exclude_tables</cite>.</p>
+<p>Other items of interest may be to skip moving the data and just create
+the schema or vice versa. To skip the data and only create the schema
+set <cite>supress_data</cite> to <cite>true</cite>. To migrate only data and not recreate the
+tables set <cite>supress_ddl</cite> to <cite>true</cite>; if there&#8217;s existing data that you
+want to drop before importing set <cite>force_truncate</cite> to
+<cite>true</cite>. <cite>force_truncate</cite> is not necessary when <cite>supress_ddl</cite> is set to
+<cite>false</cite>.</p>
+<p>One last thing, the <cite>&#8211;verbose</cite> flag. Without it the tool will just go
+on it&#8217;s merry way without bothering you with any output until it&#8217;s
+done. With it you&#8217;ll get a play-by-play summary of what&#8217;s going
+on. Here&#8217;s an example.</p>
+<div class="highlight-python"><pre>&gt; py-mysql2pgsql -v -f mysql2pgsql
+START PROCESSING table_one
+  START  - CREATING TABLE table_one
+  FINISH - CREATING TABLE table_one
+  START  - WRITING DATA TO table_one
+  24812.02 rows/sec [20000]
+  FINISH - WRITING DATA TO table_one
+  START  - ADDING INDEXES TO table_one
+  FINISH - ADDING INDEXES TO table_one
+  START  - ADDING CONSTRAINTS ON table_one
+  FINISH - ADDING CONSTRAINTS ON table_one
+FINISHED PROCESSING table_one
+
+START PROCESSING table_two
+  START  - CREATING TABLE table_two
+  FINISH - CREATING TABLE table_two
+  START  - WRITING DATA TO table_two
+
+  FINISH - WRITING DATA TO table_two
+  START  - ADDING INDEXES TO table_two
+  FINISH - ADDING INDEXES TO table_two
+  START  - ADDING CONSTRAINTS ON table_two
+  FINISH - ADDING CONSTRAINTS ON table_two
+FINISHED PROCESSING table_two</pre>
+</div>
+</div>
+<div class="section" id="data-type-conversion-legend">
+<h2>Data Type Conversion Legend<a class="headerlink" href="#data-type-conversion-legend" title="Permalink to this headline">¶</a></h2>
+<p>Since there is not a one-to-one mapping between MySQL and
+PostgreSQL data types, listed below are the conversions that are applied. I&#8217;ve
+taken some liberties with some, others should come as no surprise.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="32%" />
+<col width="68%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">MySQL</th>
+<th class="head">PostgreSQL</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>char</td>
+<td>character</td>
+</tr>
+<tr><td>varchar</td>
+<td>character varying</td>
+</tr>
+<tr><td>tinytext</td>
+<td>text</td>
+</tr>
+<tr><td>mediumtext</td>
+<td>text</td>
+</tr>
+<tr><td>text</td>
+<td>text</td>
+</tr>
+<tr><td>longtext</td>
+<td>text</td>
+</tr>
+<tr><td>tinyblob</td>
+<td>bytea</td>
+</tr>
+<tr><td>mediumblob</td>
+<td>bytea</td>
+</tr>
+<tr><td>blob</td>
+<td>bytea</td>
+</tr>
+<tr><td>longblob</td>
+<td>bytea</td>
+</tr>
+<tr><td>binary</td>
+<td>bytea</td>
+</tr>
+<tr><td>varbinary</td>
+<td>bytea</td>
+</tr>
+<tr><td>bit</td>
+<td>bit varying</td>
+</tr>
+<tr><td>tinyint</td>
+<td>smallint</td>
+</tr>
+<tr><td>tinyint unsigned</td>
+<td>smallint</td>
+</tr>
+<tr><td>smallint</td>
+<td>smallint</td>
+</tr>
+<tr><td>smallint unsigned</td>
+<td>integer</td>
+</tr>
+<tr><td>mediumint</td>
+<td>integer</td>
+</tr>
+<tr><td>mediumint unsigned</td>
+<td>integer</td>
+</tr>
+<tr><td>int</td>
+<td>integer</td>
+</tr>
+<tr><td>int unsigned</td>
+<td>bigint</td>
+</tr>
+<tr><td>bigint</td>
+<td>bigint</td>
+</tr>
+<tr><td>bigint unsigned</td>
+<td>numeric</td>
+</tr>
+<tr><td>float</td>
+<td>real</td>
+</tr>
+<tr><td>float unsigned</td>
+<td>real</td>
+</tr>
+<tr><td>double</td>
+<td>double precision</td>
+</tr>
+<tr><td>double unsigned</td>
+<td>double precision</td>
+</tr>
+<tr><td>decimal</td>
+<td>numeric</td>
+</tr>
+<tr><td>decimal unsigned</td>
+<td>numeric</td>
+</tr>
+<tr><td>numeric</td>
+<td>numeric</td>
+</tr>
+<tr><td>numeric unsigned</td>
+<td>numeric</td>
+</tr>
+<tr><td>date</td>
+<td>date</td>
+</tr>
+<tr><td>datetime</td>
+<td>timestamp without time zone</td>
+</tr>
+<tr><td>time</td>
+<td>time without time zone</td>
+</tr>
+<tr><td>timestamp</td>
+<td>timestamp without time zone</td>
+</tr>
+<tr><td>year</td>
+<td>smallint</td>
+</tr>
+<tr><td>enum</td>
+<td>character varying (with <cite>check</cite> constraint)</td>
+</tr>
+<tr><td>set</td>
+<td>ARRAY[]::text[]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="about">
+<h2>About:<a class="headerlink" href="#about" title="Permalink to this headline">¶</a></h2>
+<p>I ported much of this from an existing project written in Ruby by Max
+Lapshin over at <a class="reference external" href="https://github.com/maxlapshin/mysql2postgres">https://github.com/maxlapshin/mysql2postgres</a>. I
+found that it worked fine for most things, but for migrating large tables
+with millions of rows it started to break down. This motivated me to
+write <em>py-mysql2pgsql</em> which uses a server side cursor, so there is no &#8220;paging&#8221;
+which means there is no slow down while working it&#8217;s way through a
+large dataset.</p>
+<p>Contents:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/mysql2pgsql/index.html"><tt class="docutils literal"><span class="pre">mysql2pgsql</span></tt></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/mysql2pgsql/mysql_reader.html"><tt class="docutils literal"><span class="pre">mysql_reader</span></tt></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/mysql2pgsql/postgres_db_writer.html"><tt class="docutils literal"><span class="pre">postgres_db_writer</span></tt></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/mysql2pgsql/postgres_file_writer.html"><tt class="docutils literal"><span class="pre">postgres_file_writer</span></tt></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/mysql2pgsql/postgres_writer.html"><tt class="docutils literal"><span class="pre">postgres_writer</span></tt></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">py-mysql2pgsql Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="changes.html#version-0-1-2">Version 0.1.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changes.html#version-0-1-1">Version 0.1.1</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
+<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
+<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">py-mysql2pgsql - A tool for migrating/converting/exporting data from MySQL to PostgreSQL</a><ul>
+<li><a class="reference internal" href="#installation">Installation:</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements:</a></li>
+<li><a class="reference internal" href="#on-windows">On Windows</a></li>
+<li><a class="reference internal" href="#from-pypi">From PyPI:</a></li>
+<li><a class="reference internal" href="#from-source">From source:</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#usage">Usage:</a></li>
+<li><a class="reference internal" href="#data-type-conversion-legend">Data Type Conversion Legend</a></li>
+<li><a class="reference internal" href="#about">About:</a><ul>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Next topic</h4>
+  <p class="topless"><a href="api/index.html"
+                        title="next chapter">API Documentation</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api/index.html" title="API Documentation"
+             >next</a> |</li>
+        <li><a href="#">py-mysql2pgsql v0.1.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Philip Southam.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
