@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+"""
+    Author: John E. Vincent
+	Email:	lusis.org+github.com@gmail.com
+"""
+import argparse
+import sys
+
+import vogeler.persistence as engine
+import vogeler.conf as conf
+import vogeler.logger as logger
+from vogeler.server import VogelerServer
+from vogeler.exceptions import VogelerServerException
+
+def process_message(message):
+    try:
+        response = message
+        syskey = message['syskey']
+        message_format = message['format']
+        del message['syskey']
+        del message['format']
+
+        log.info("Incoming message from: %s" % syskey)
+
+        db.create(syskey)
+
+        for k, v in response.iteritems():
+
+            log.info("Got response for: %s" % k)
+            try:
+                db.update(syskey, k, v, message_format)
+            except Exception, e:
+                log.error("Error in updating database: %s" % e)
+    except TypeError:
+        log.error("Invalid message: %s. Discarding" % message)
+    except:
+        raise
+
+def startup():
+
+    if args.load:
+        explicit_load = True
+        loadpath = args.load
+    else:
+        explicit_load = False
+        loadpath = 'etc/vogeler/_design'
+
+    if explicit_load == True:
+        log.info("Loading design docs from: %s" % loadpath)
+        rc = db.load_views(loadpath)
+        sys.exit(rc)
+    else:
+        log.info("Skipping design document load")
+
+    s.monitor()
+
+def shutdown():
+    log.warn("Shutting down")
+    s.close()
+    sys.exit(0)
+
+if __name__ == "__main__":
+
+    appdesc = 'Vogeler server daemon'
+    parser = argparse.ArgumentParser(description=appdesc)
+    parser.add_argument('--config', '-c',
+            help='Configuration file',
+            default = None,
+            required=False)
+    parser.add_argument('--debug',
+            help='Debug output',
+            default = None,
+            required=False)
+    parser.add_argument('--verbose', '-v',
+            help='Verbose output',
+            default = None,
+            required=False)
+    parser.add_argument('--loglevel',
+            help='Override log level',
+            default = None,
+            required=False)
+
+    runtime = parser.add_argument_group('startup options')
+    runtime.add_argument('--dbhost',
+            help='Persistence uri (i.e. couch://localhost:5984/system_records or couch://user:pass@localhost:5984/system_records)',
+            default = None,
+            required=False)
+    runtime.add_argument('--qhost',
+            help='RabbitMQ server uri (i.e. amqp://guest:guest@localhost:5672/vogeler)',
+            default = None,
+            required=False)
+
+    configuration = parser.add_argument_group('setup options')
+#    configuration.add_argument('--setup', '-s', action='store_true', default=False, help='Setup exchanges and create db/load design docs in CouchDB', required=False)
+    configuration.add_argument('--load', '-l', help='Load design docs in CouchDB. Provide full path to desgin docs')
+
+    args = parser.parse_args()
+
+    if args.config is not None:
+        try:
+            local_config = conf.configure(cfg=args.config)
+            if local_config.has_option('global', 'log_level'):
+                log_level = local_config.get('global', 'log_level')
+        except:
+            raise
+    else:
+        log_level = 'WARN'
+
+    if args.loglevel is not None:
+        log_level = args.loglevel
+
+    log = logger.LogWrapper(name='vogeler-server', level=log_level).logger()
+
+    if args.qhost is not None:
+        log.info("Using qhost from command-line options")
+        mq = args.qhost
+    elif args.config is not None and local_config.has_option('amqp' , 'dsn'):
+        log.info("Using qhost from configuration file")
+        mq = local_config.get('amqp', 'dsn')
+    else:
+        log.fatal("No qhost specified or no configuration file provided")
+        sys.exit(0)
+
+    if args.dbhost is not None:
+        log.info("Using dbhost from command-line options")
+        persistence = args.dbhost
+    elif args.config is not None and local_config.has_option('couch', 'dsn'):
+        log.info("Using dbhost from configuration file")
+        persistence = local_config.get('couch', 'dsn')
+    else:
+        log.fatal("No dbhost specified or no configuration file provided")
+        sys.exit(0)
+
+
+    try:
+        db = engine.create_engine(persistence)
+        db.create_db()
+        s = VogelerServer(callback_function=process_message, dsn=mq, loglevel=log_level)
+        startup()
+    except KeyboardInterrupt:
+        shutdown()
+# vim: set ts=4 et sw=4 sts=4 sta filetype=python :
