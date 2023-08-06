@@ -1,0 +1,27 @@
+======
+Cirrus
+======
+
+dns_setup reads a simple yaml file that only defines credentials, 
+domains and bind style zone files used to define the domains.
+
+Amazon Alias entries are treated as a TXT dns type with the value 
+starting with 'Alias '. This is to work around the dnspython library 
+does not allowing invalid dns types.
+
+update_host.py will update a single host entry in an route 53 domain. It 
+relies on environment variables and command line arguments rather than 
+yaml. I use it to accomplish dynamic dns for ec2 with the simple init 
+script found in contrib. Since this will potentially be on many many 
+machines for security I suggest you use a dns subdomain and different 
+AWS credentials with this script.
+
+
+============
+Known Issues
+============
+- The TTL on route 53 aliases is set automatically but is specified in 
+the source zone file. This means it is easy to end up with a mismatch 
+which the tool always sees as something to fix.
+- Using txt entries for route 53 aliases is less than ideal, a better 
+solution should be found.
