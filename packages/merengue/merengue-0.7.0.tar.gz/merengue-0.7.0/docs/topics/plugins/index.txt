@@ -1,0 +1,428 @@
+.. _topics-plugins-index:
+
+================
+Merengue Plugins
+================
+
+.. highlightlang:: html+django
+
+.. _topics-plugins-overview:
+
+
+Overview
+========
+
+Merengue *plugins* are installable components that increase the functionality
+of your site. This new functionality improvement can be done in several ways:
+
+* New content types.
+* New visual blocks rendered.
+* New actions for content or site.
+* New permissions.
+* New views (listings, content detail view, etc.).
+
+.. admonition:: Django apps vs. Merengue plugins
+
+    There are two main differences between Django apps and Merengue plugins:
+
+      * Merengue plugins can be installed from admin site, without programming. Django apps usually needs (at least) change settings file, copy media, include URL namespace, etc.
+      * Merengue plugins are much more tightly integrated because CMS concepts and conventions that exists in Merengue (blocks, actions, viewlets, template layout, etc.) and has no sense in a web framework.
+
+.. _topics-plugins-installation:
+
+
+Installing third party plugins
+==============================
+
+Only three steps are needed to install a new plugin:
+
+1. Placing decompressed plugin into the ``plugins`` directory (you will find it inside your Merengue project).
+
+2. Registering into Merengue. This can be done in two ways:
+
+  * automatically, if you have :setting:`DETECT_BROKEN_PLUGINS` to ``True`` (by default), and you access to plugins admin view.
+  * manually, if you execute ``mark_broken_plugins`` command.
+
+3. Activate it from plugins admin view. See :ref:`plugins documentation <topics-userguide-plugins>` in user guide.
+
+.. _topics-plugins-media-files:
+
+Media files in plugins
+----------------------
+
+(( to be completed. Talk about media conventions taken in Merengue,
+merengue.views.static.serve view and sync_plugins_media command ))
+
+Broken plugins
+--------------
+
+Merengue detects broken plugins that are downloaded in ``plugins`` directory.
+You can see it in plugins admin view:
+
+.. image:: _images/broken_plugins.png
+
+Merengue broken plugin detection tries to avoid break entire system when you
+download a third party plugin. Broken plugin cannot be installed but if you
+have a broken plugin activated, the exception will break whole system.
+
+Plugins can be broken because one of this causes:
+
+* **Removed from file system:** some times ago, plugin was in file system,
+  and Merengue registered it, but later was deleted.
+
+* **Models are wrong:** models does not validate.
+ 
+* **Syntax error:** you have a syntax error in some code of the plugin. Merengue
+  tried to import plugin and a ``SyntaxError`` was raised.
+
+For detecting broken plugins you can execute ``mark_broken_plugins`` command, or
+set :setting:`DETECT_BROKEN_PLUGINS` to ``True`` (by default) and access to
+plugins admin view.
+
+To debug broken plugins you have to click into the broken plugin admin edit
+change form. In this view Merengue will show the error traceback:
+
+.. image:: _images/broken_plugins_debug.png
+
+.. _topics-plugins-customization:
+
+Plugin customization
+====================
+
+Some plugins have some customization parameters, which appears in plugin admin view.
+See :ref:`registry configuration params <topics-registry-configuration-params>`
+for more details.
+
+.. _topics-plugins-development:
+
+
+Plugin development
+==================
+
+Writing a custom plugin
+-----------------------
+
+To write a merengue custom plugin, you need to create an Django application with several conventions:
+
+* A defined directory layout.
+* Write a configuration file.
+* Extend some components.
+* Extend some base models.
+
+
+Plugin tree
+-----------
+
+All plugins will be placed below ``plugins`` merengue directory.
+
+This is a conventional plugin tree:
+
+.. code-block:: python
+
+     /plugins/
+         |-- fooplugin/
+         |   |-- __init__.py
+         |   |-- actions.py
+         |   |-- blocks.py
+         |   |-- config.py
+         |   |-- models.py
+         |   |-- views.py
+         |   |-- viewlets.py
+         |   |-- urls.py
+         |   `-- templates/
+         |       `-- fooplugin/
+         |   `-- media/
+         |       `-- fooplugin/
+         |
+         ...
+
+.. admonition:: Note
+
+    Only ``__init__.py`` and ``config.py`` files are mandatory.
+
+Let's explain every part listed before:
+
+* ``__init__.py`` is a needed file (usually empty) that makes plugin to be a python module.
+* ``models.py`` is conventional Django app model file. See :ref:`base models <topics-models-base>` to get more info about base models you can extend of.
+* ``config.py`` is the configuration file for plugin. See :ref:`plugin configuration reference <topics-plugins-configuration>`.
+* ``blocks.py`` is blocks file, with the new visual blocks that are defined in plugin.
+* ``actions.py`` is actions file.
+* ``views.py`` is conventional `Django views`_ file.
+* ``urls.py`` is conventional `Django urls`_ file. You can use it for controlling a URL namespace (i.e. all ``/fooplugin/.*`` urls).
+* ``templates/fooplugin/`` is a directory for ``fooplugin`` template namespace.
+* ``media/fooplugin/`` is a directory for media resources like icons, css, etc.
+
+.. _`Django views`: http://docs.djangoproject.com/en/dev/topics/http/views/#topics-http-views
+.. _`Django URLs`: http://docs.djangoproject.com/en/dev/topics/http/urls/#topics-http-urls
+
+.. _topics-plugins-configuration:
+
+Plugin configuration
+--------------------
+
+Plugin configuration is defined in a ``PluginConfig`` class in a ``config.py`` module inside your plugin directory. This class is readed when plugin is loaded in merengue.
+
+This is a ``config.py`` file code fragment example:
+
+.. code-block:: python
+
+    from merengue.pluggable import Plugin
+
+    class PluginConfig(Plugin):
+
+        name = "Foo plugin"
+
+        url_prefixes = (
+            ('fooplugin', 'plugins.fooplugin.urls'),
+        )
+
+        def get_actions(self):
+            return [...]
+
+        def get_blocks(self):
+            return [...]
+
+        def section_models(self):
+            return [...]
+
+        # ... etcetera
+
+Parameters reference
+--------------------
+
+Plugin metadata
+~~~~~~~~~~~~~~~
+
+The ``name`` parameter is used to give this plugin a name that will be
+visible in the Merengue plugin control center. It is a required parameter
+and usually it is just a single word or two.
+
+The ``descrpition`` parameter add some more information for this plugin.
+It can be a full sentence that will help the Merengue administrator to
+decide if it is worthy to install this plugin.
+
+Finally the ``version`` parameter is a string with the version information
+of the plugin. It is not required but highly recommended.
+
+Example:
+
+.. code-block:: python
+
+    class PluginConfig(Plugin):
+
+        name = "Foo"
+        description = "Demo plugin to explain how to create Merengue plugins"
+        version = "1.0.0"
+
+Plugin URLs
+~~~~~~~~~~~
+
+The ``url_prefixes`` parameter is the URL prefix for all your plugin urls.
+
+Example:
+
+.. code-block:: python
+
+    class PluginConfig(Plugin):
+        url_prefixes = (
+            ('fooplugin', 'plugins.fooplugin.urls'),
+            ...
+        )
+
+
+With this example, if plugin was activated, all urls below ``fooplugin`` will
+be handled by ``plugins.fooplugin.urls`` module. Internally, merengue plugin
+system will perform a operation like this:
+
+.. code-block:: python
+
+    urlpatterns += patterns('',
+      (r'^fooplugin/', include('plugins.fooplugin.urls')),
+    )
+
+You can also internazionalize your plugins URLs. See this example:
+
+.. code-block:: python
+
+    class PluginConfig(Plugin):
+        # ... stuff
+        url_prefixes = (
+            ({'en': 'event', 'es': 'eventos'},
+             'plugins.event.urls'),
+        )
+
+The final URL prefix used will depend of the ``URL_DEFAULT_LANG`` setting (by
+default will be same as ``LANGUAGE_CODE``).
+
+.. note::
+    Your site will have only **one** prefix for every url prefixes you have
+    internazionalized. So, if your ``URL_DEFAULT_LANG`` is ``"es"``, only
+    ``/eventos`` will be handled for the plugin and ``/event`` will raise a 404
+    error.
+
+Plugin possibilities
+--------------------
+
+A developer can do a lot of things when developing a new Plugin:
+
+
+* **Defining new blocks**, implementing the ``get_blocks(self)`` method in the ``PluginConfig`` class. See :ref:`blocks reference <topics-blocks>`. Example:
+
+.. code-block:: python
+
+    from plugins.fooplugin.blocks import FooBlock
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_blocks(self):
+            return [FooBlock, ]
+
+* **Defining new actions**, implementing the ``get_actions(self)`` method in the ``PluginConfig`` class. See :ref:`actions reference <topics-actions>`. Example:
+
+.. code-block:: python
+
+    from plugins.fooplugin.actions import FooAction
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_actions(self):
+            return [FooAction, ]
+
+* **Creates new models**, implementing those models in the plugin ``models.py`` file. Example:
+
+.. code-block:: python
+
+    from merengue.base.models import BaseContent
+
+    class FooContent(BaseContent):
+        new_field = models.CharField(max_length=100)
+        # stuff ...
+
+* **Defining a plugin custom admin site**, implementing the ``get_model_admins(self)`` method in the ``PluginConfig`` class. Example:
+
+.. code-block:: python
+
+    from plugins.fooplugin.admin import FooContentAdmin, FooCategoryAdmin
+    from plugins.fooplugin.models import FooContent, FooCategory
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_model_admins(self):
+            return [(FooContent, FooContentAdmin),
+                    (FooCategory, FooCategoryAdmin)]
+
+* **Defining new permissions**, implementing the ``get_perms(self)`` method in the ``PluginConfig`` class. See :ref:`permissions reference <topics-permissions>`. Example:
+
+.. code-block:: python
+
+    from plugins.forum.models import FooContent
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_perms(self):
+            return [('Vote foo', 'vote_foo', [FooContent]), ), ]
+
+* **Defining new viewlets**, implementing the ``get_viewlets(self)`` method in the ``PluginConfig`` class. See :ref:`viewlets reference <topics-viewlets>`. Example:
+
+.. code-block:: python
+
+    from plugins.fooplugin.viewlets import FooViewlet1, FooViewlet2
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_viewlets(self):
+            return [FooViewlet1, FooViewlet2]
+
+* **Defining new middlewares**, implementing the ``get_middlewares(self)`` method in the ``PluginConfig`` class. See `Django middleware reference`_. Example:
+
+.. code-block:: python
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def get_middlewares(self):
+            return ['plugins.fooplugin.middleware.FooMiddleware', ]
+
+.. _`Django middleware reference`: http://docs.djangoproject.com/en/1.1/topics/http/middleware/
+
+* **Anything you want after plugin activation**, implementing the ``hook_post_register(self)`` method in the ``PluginConfig`` class. Example:
+
+.. code-block:: python
+
+    from django.core.mail import send_mail
+
+    class PluginConfig(Plugin):
+        # stuff ...
+
+        def hook_post_register(self):
+            send_mail('Foo plugin enabled', 'The foo plugin has been enabled.', 'from@example.com',
+                      'admin@example.com', fail_silently=True)
+
+Example plugins
+---------------
+
+In the Merengue `plugins directory`_ you can browse several plugins implemented, like the `news plugin`_.
+
+.. _`plugins directory`: http://tracpub.yaco.es/merengue/browser/trunk/merengueproj/plugins/
+.. _`news plugin`: http://tracpub.yaco.es/merengue/browser/trunk/merengueproj/plugins/news/
+
+Required plugins in a project
+-----------------------------
+
+Sometimes your project requires that some plugins were activated by default and
+user cannot deactivated them. For example project logic may rely in existence
+of certains models defined in a plugin.
+
+You can define plugins that will be installed and activated by default including
+next setting in your project settings:
+
+.. code-block:: python
+
+    REQUIRED_PLUGINS = ('core', 'fooplugin', )
+
+Default: ``('core', )`` (``core`` plugin)
+
+.. admonition:: About ``core`` plugin
+
+    ``core`` plugin have to be included in ``REQUIRED_PLUGINS`` to maintain all
+    merengue features.
+
+After changing ``REQUIRED_PLUGINS`` setting, you have to register plugin with this
+command to get new plugins activated (and also get their models created if exist)::
+
+    python manage.py migrate
+
+South migrations in plugins
+---------------------------
+
+If your plugin change its models and you want a clean migration in websites
+with your plugin installed, you may need to implement `South`_ migrations on it.
+
+For creating south migrations, you have to use the ``schemamigration`` and
+``datamigration`` commands (see `South docs`_ for more information). You only
+have to remember to add temporary the plugin name to ``INSTALLED_APPS`` setting
+before executing those commands, because south does not find enabled plugins by
+itself.
+
+When a plugin with south migrations is installed, Merengue automatically will
+execute its South migrations. To execute plugins migrations in already
+installed plugins you have to uninstall and install the plugin in Merengue admin.
+
+Also, there is a useful ``migrate_plugins`` command which migrates all enabled
+plugins in your website. There are some example of use:
+
+.. code-block:: bash
+
+    $ python manage.py migrate_plugins  # migrate all enabled plugins
+    $ python manage.py migrate_plugins --list  # show migration list of enabled plugins
+    $ python manage.py migrate_plugins forum  # migrate only forum plugin, if enabled
+    $ python manage.py migrate_plugins forum 0002  # migrate only 0002* step for forum plugin
+    $ python manage.py migrate_plugins forum 0001_initial  # fakes 0001_initial step for forum plugin
+
+.. _`South`: http://south.aeracode.org/
+.. _`South docs`: http://south.aeracode.org/docs/
