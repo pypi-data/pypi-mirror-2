@@ -1,0 +1,150 @@
+.. -*-doctest-*-
+
+=========
+Providers
+=========
+
+Start with a portal.
+
+    >>> from Products.PloneServicesCenter import testing
+    >>> app = testing.SERVICES_FUNCTIONAL_TESTING['app']
+    >>> portal = testing.SERVICES_FUNCTIONAL_TESTING['portal']
+
+Open a browser and log in as a user who can add content.
+
+    >>> from plone.testing import z2
+    >>> browser = z2.Browser(app)
+    >>> browser.handleErrors = False
+    >>> browser.open(portal.absolute_url())
+
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl('Login Name').value = 'admin'
+    >>> browser.getControl('Password').value = 'secret'
+    >>> browser.getControl('Log in').click()
+
+A site manager can set the available services which can be provided by
+each provider by setting the keywords/tags on the providers folder.
+
+    >>> browser.open(portal.support.providers.absolute_url())
+    >>> browser.getLink('Edit').click()
+    >>> browser.getControl(name="subject_keywords:lines").value = """\
+    ... Hosting provider
+    ... Training
+    ... Consulting
+    ... Custom development"""
+    >>> browser.getControl('Save').click()
+    >>> print browser.contents
+    <...
+                <dd>Changes saved.</dd>...
+
+Log in as a normal user.
+
+    >>> browser.getLink('Log out').click()
+    >>> browser.open(portal.support.providers.absolute_url())
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl('Login Name').value = 'test-user'
+    >>> browser.getControl('Password').value = 'secret'
+    >>> browser.getControl('Log in').click()
+    >>> print browser.contents
+    <...You are now logged in...
+
+Add a provider inside a provider folder.
+
+    >>> browser.getLink(url='createObject?type_name=Provider').click()
+    >>> browser.getControl('Title').value = 'Foo Provider Title'
+    >>> browser.getControl('Description').value = 'Foo Provider Description'
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('URL').value = 'http://foo.example.com'
+
+Providers have a number of checkboxes that set keywords.
+
+    >>> browser.getControl("Hosting provider")
+    <ItemControl name='subject:list' type='checkbox' optionValue='Hosting provider' selected=False>
+    >>> browser.getControl("Training")
+    <ItemControl name='subject:list' type='checkbox' optionValue='Training' selected=False>
+    >>> browser.getControl("Consulting")
+    <ItemControl name='subject:list' type='checkbox' optionValue='Consulting' selected=False>
+    >>> browser.getControl("Custom development")
+    <ItemControl name='subject:list' type='checkbox' optionValue='Custom development' selected=False>
+    >>> browser.getControl('Custom development').selected = True
+    >>> browser.getControl(name="subject_keywords:lines")
+    Traceback (most recent call last):
+    LookupError: name 'subject_keywords:lines'
+
+Save the provider.
+
+    >>> browser.getControl('Save').click()
+    >>> print browser.contents
+    <...
+                <dd>Changes saved.</dd>...
+    >>> browser.url
+    'http://nohost/plone/support/providers/foo-provider-title'
+    >>> portal.support.providers.contentValues()
+    [<Provider at /plone/support/providers/foo-provider-title>]
+    >>> provider = portal.support.providers['foo-provider-title']
+
+Tolerate uppercase country codes.
+
+    >>> z2.login(app.acl_users, 'admin')
+    >>> provider.update(country=provider.getCountry().upper())
+
+If a provider had previously set the deprecated "hostingProvider"
+field, the value is added to the keywords/subject "Provided Services"
+field.
+
+    >>> provider.hostingProvider = True
+
+    >>> import transaction
+    >>> transaction.commit()
+
+After the provider is now visible on the listing.
+
+    >>> browser.open(portal.support.providers.absolute_url())
+    >>> print browser.contents
+    <...Foo Provider Title...
+    ...Foo Provider Description...
+
+The countries are selectable by the human readable country name.  Even
+if, as is the case for the migrated data, the field value is uppercase.
+
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('Filter').click()
+    >>> print browser.contents
+    <...Foo Provider Title...
+    ...Foo Provider Description...
+
+The listing is a clickable link which takes the user to the provider.
+
+    >>> browser.getLink('Foo Provider Title').click()
+    >>> print browser.contents
+    <...Foo Provider Title...
+    ...Foo Provider Description...
+    ...http://foo.example.com...
+    >>> browser.url
+    'http://nohost/plone/support/providers/foo-provider-title'
+
+The description is only shown twice, once in the <head> and once in
+the <body>.
+
+    >>> browser.contents.count('Foo Provider Description')
+    2
+
+The industry and country links to the folder view with the appropriate
+filter.
+
+    >>> browser.getLink('United Kingdom')
+    <Link text='United Kingdom'
+    url='http://nohost/plone/support/providers/by-country/gb'>
+
+The provided services field shows the previously set hostingProvider
+field on the edit form.
+
+    >>> browser.getLink('Edit').click()
+    >>> browser.getControl("Hosting provider").selected
+    True
+
+The properties aren't purged.
+
+    >>> navtree_properties = portal.portal_properties.navtree_properties
+    >>> 'Plone Site' in navtree_properties.getProperty('metaTypesNotToList')
+    True

@@ -1,0 +1,90 @@
+.. -*-doctest-*-
+
+============
+Case Studies
+============
+
+Start with a portal.
+
+    >>> from Products.PloneServicesCenter import testing
+    >>> app = testing.SERVICES_FUNCTIONAL_TESTING['app']
+    >>> portal = testing.SERVICES_FUNCTIONAL_TESTING['portal']
+
+Open a browser and log in as a user who can add content.
+
+    >>> from plone.testing import z2
+    >>> browser = z2.Browser(app)
+    >>> browser.handleErrors = False
+    >>> browser.open(portal.absolute_url())
+
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl('Login Name').value = 'test-user'
+    >>> browser.getControl('Password').value = 'secret'
+    >>> browser.getControl('Log in').click()
+
+Go to the case studies folder and add a case study inside.
+
+    >>> browser.open(portal.support['case-studies'].absolute_url())
+    >>> browser.getLink(url='createObject?type_name=CaseStudy').click()
+    >>> browser.getControl('Title').value = 'Foo Case Study Title'
+    >>> browser.getControl('Description').value = 'Foo Case Study Description'
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('Transportation and Logistics').selected = True
+    >>> browser.getControl('URL').value = 'http://foo.example.com'
+    >>> browser.getControl('Save').click()
+    >>> print browser.contents
+    <...
+                <dd>Changes saved.</dd>...
+    >>> browser.url
+    'http://nohost/plone/support/case-studies/foo-case-study-title'
+    >>> portal.support['case-studies'].contentValues()
+    [<CaseStudy at /plone/support/case-studies/foo-case-study-title>]
+    >>> case = portal.support['case-studies']['foo-case-study-title']
+
+Tolerate uppercase country codes.
+
+    >>> z2.login(app.acl_users, 'admin')
+    >>> case.update(country=case.getCountry().upper())
+    >>> import transaction
+    >>> transaction.commit()
+
+After the case study is now visible on the listing.
+
+    >>> browser.open(portal.support['case-studies'].absolute_url())
+    >>> print browser.contents
+    <...Foo Case Study Title...
+    ...Foo Case Study Description...
+
+The countries are selectable by the human readable country name.
+
+    >>> browser.getControl('United Kingdom').selected = True
+    >>> browser.getControl('Filter').click()
+    >>> print browser.contents
+    <...Foo Case Study Title...
+    ...Foo Case Study Description...
+
+The listing is a clickable link which takes the user to the item.
+
+    >>> browser.getLink('Foo Case Study Title').click()
+    >>> print browser.contents
+    <...Foo Case Study Title...
+    ...Foo Case Study Description...
+    ...http://foo.example.com...
+    >>> browser.url
+    'http://nohost/plone/support/case-studies/foo-case-study-title'
+
+The description is only shown twice, once in the <head> and once in
+the <body>.
+
+    >>> browser.contents.count('Foo Case Study Description')
+    2
+
+The industry and country links to the folder view with the appropriate
+filter.
+
+    >>> browser.getLink('Transportation and Logistics')
+    <Link text='Transportation and Logistics'
+    url='http://nohost/plone/support/case-studies?industries:list=Transportation%20and%20Logistics'>
+    >>> browser.getLink('United Kingdom')
+    <Link text='United Kingdom'
+    url='http://nohost/plone/support/case-studies?countries:list=gb'>

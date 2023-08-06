@@ -1,0 +1,172 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="ploneservicescenter">
+  <body>
+    <div metal:fill-slot="main"
+         tal:define="countries_dict python:modules['Products.PloneServicesCenter.content.country'].vocab;
+                     subpath request/traverse_subpath | nothing;
+                     country python:subpath and subpath[0] or None;
+                     countries python:country and [ country ] or None;
+                     all_countries python:here.getUniqueCountriesNames();
+                     industries_vocab context/getIndustryVocabulary;
+                     providers python:here.getProviders(countries = countries);
+                     batch_size python:request.get('batch_size', 20);
+                     b_start request/b_start|string:0;
+                     Batch python:modules['Products.CMFPlone'].Batch;
+                     global batch python:Batch(providers, batch_size, int(b_start));
+                     here_url string:${here/absolute_url}/${template/getId};
+                     global batch_base_url python: here_url + (country and '/' + country or '')">
+
+      <h2 i18n:translate="label_country_plone_providers">Plone Service Providers</h2>
+
+
+
+      <p class="documentDescription" i18n:translate="label_country_descr">
+        The following listing shows Plone providers around the
+        world.
+      </p>
+
+      <form name="testForm" action="test" 
+            tal:attributes="action string:${portal_url}/filterByCountry"
+            style="white-space:nowrap"> 
+
+        <div style="float:right; width : 17em; text-align: right;">
+            <select name="country:list">  
+              <option tal:attributes="selected not: country; value here_url" i18n:translate="label_country_www">Worldwide
+              </option>
+              <tal:loop tal:repeat="c_country all_countries">
+                <option tal:attributes="selected python: c_country[0] == country;
+                                        value python:here_url + '/' + c_country[0]"
+                        tal:content="python:c_country[1]"/>
+              </tal:loop>
+            </select>
+
+            <input class="searchButton"
+                   type="submit"
+                   value="Filter"
+                   i18n:attributes="value label_search;" />
+        </div>
+      </form>
+
+      <p style="text-align: right" i18n:translate="label_providers_currently">
+        Currently listing
+        <strong>
+          <span i18n:name="label_providers_counts" tal:replace="python:len(providers)" /> service providers
+        </strong>
+        <span tal:condition="not: country">
+          in
+          <strong>
+            <span i18n:name="label_providers_countries" tal:replace="python:len(all_countries)" /> countries.
+          </strong>
+          </span>
+      </p>
+
+      <div tal:repeat="provider batch">
+
+        <div tal:define="pv provider/getObject">
+
+          <div class="listing-provider"
+               tal:condition="provider/isPremium"
+               tal:attributes="class pv/getCssClasses">
+            
+            <div class="listing-title">
+            <table class="listing-title-table">
+              <tr> 
+              <td>
+              <p><a tal:attributes="href provider/getURL"
+                 tal:content="provider/Title"> 
+                Site title
+              </a></p>
+              </td>
+              <td>
+              </td>
+              </tr>
+              </table>
+             </div> <!-- listing title-->
+
+
+            <div class="provider-body">            
+            <a tal:attributes="href provider/getURL"
+               tal:condition="pv/getLogo"
+               class="listing-provider-image-link">
+              <img alt="" src=""
+                   tal:attributes="src string:${provider/getURL}/logo;
+                                   title provider/Title;
+                                   alt provider/Title" />
+            </a>
+            <p tal:content="provider/Description"></p>
+              <a style="float:right" tal:attributes="href string:${here/portal_url}/support/about/sponsorship">
+              <img src="badge-premier.png" alt="Plone Foundation Premium Sponsor" /></a>
+            <div class="second-infos">
+              <span tal:define="country provider/getCountry"
+                    tal:condition="country">
+                <strong i18n:translate="label_psc_country">Country:</strong>
+                <a tal:content="python: countries_dict.getValue(country, country)"
+                   tal:attributes="href string:${here/absolute_url}/${template/getId}/${country}" />
+              </span>
+            </div> <!-- second infos-->
+            </div> <!-- provider body-->
+          
+          </div> <!-- listing-provider -->
+        
+        
+
+          <div class="listing-provider"
+               tal:attributes="class pv/getCssClasses"
+               tal:condition="not:provider/isPremium">
+            
+            <div class="listing-title">
+            <table class="listing-title-table">
+              <tr> 
+              <td>
+              <p><a tal:attributes="href provider/getURL"
+                 tal:content="provider/Title"> 
+                Site title
+              </a></p>
+              </td>
+              <td>
+              </td>
+              </tr>
+              </table>
+             </div> <!-- listing title -->
+
+
+            <div class="provider-body">            
+            <a tal:attributes="href provider/getURL"
+               tal:condition="pv/getLogo"
+               class="listing-provider-image-link">
+              <img alt="" src=""
+                   tal:attributes="src string:${provider/getURL}/logo;
+                                   title provider/Title;
+                                   alt provider/Title" />
+            </a>
+            <p tal:content="provider/Description"></p>
+
+              <span tal:condition="provider/isSponsor">
+              <a style="float:right" tal:attributes="href string:${here/portal_url}/support/about/sponsorship">
+              <img src="badge-sponsor.png" alt="Plone Foundation Sponsor" /></a>
+              </span>
+
+            <div class="second-infos">
+              <span tal:define="country provider/getCountry"
+                    tal:condition="country">
+                <strong i18n:translate="label_psc_country">Country:</strong>
+                <a tal:content="python: countries_dict.getValue(country, country)"
+                   tal:attributes="href string:${here/absolute_url}/${template/getId}/${country}" />
+              </span>
+            </div> <!-- second infos-->
+            </div> <!-- provider-body -->
+          </div> <!-- listing provider -->
+          
+        
+        </div>
+        
+        </div>
+      
+      <div metal:use-macro="here/batch_macros/macros/navigation" />
+    </div>
+  </body>
+</html>

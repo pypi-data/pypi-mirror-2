@@ -1,0 +1,171 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="ploneservicescenter">
+
+  <body>
+    <div metal:fill-slot="main"
+	 tal:define="countries_dict python:modules['Products.PloneServicesCenter.content.country'].vocab; 
+		     countries python:request.get('countries',[]); 
+		     industries_vocab context/getIndustryVocabulary;
+		     industries python:request.get('industries',[]);
+		     buzzes python: here.getBuzzes(countries=countries, industries=industries);
+		     batch_size python:request.get('batch_size', 20);
+		     b_start request/b_start|string:0;
+		     Batch python:modules['Products.CMFPlone'].Batch;
+		     global batch python:Batch(buzzes, batch_size, int(b_start))">
+
+      <h1 class="documentFirstHeading" tal:content="here/Title" />
+
+      <form tal:attributes="action string:${context/absolute_url}/${template/getId}">
+	<div>
+	  <div style="float: right">
+	    <tal:filter-form metal:use-macro="here/psc_macros/macros/filter-form"/>
+	  </div>
+	  <div>
+	    <p>
+	    </p>
+	    <p class="discreet" i18n:translate="label_buzzlist_customlist">
+	      You can customize the listing by selecting countries and industries on the right.
+	    </p>
+	    <p style="text-align: right" i18n:translate="label_buzzlist_curretly_mediacovers">
+	      Currently listing <strong><span i18n:name="label_buzzlist_counts" tal:replace="python:len(buzzes)" /> media coverages</strong> about Plone.
+	    </p>
+	  </div>
+	</div>
+      </form>
+
+      <tal:if tal:condition="not: buzzes">
+	<tal:nothing-found metal:use-macro="here/psc_macros/macros/nothing-found"/>
+      </tal:if>
+
+      <div tal:condition="buzzes">
+	
+	<div tal:repeat="brain batch">
+
+          <div tal:define="base_url string:${here/absolute_url}/${template/getId};
+                           industries python: here.makeIndustryLinks(base_url, brain);
+                           buzz brain/getObject">
+
+	  <div tal:condition="python: brain.getRating == 1"
+	       class="listing-site level1">
+
+	    <h2>
+	      <a tal:attributes="href brain/getURL"
+		 tal:content="brain/Title">
+		Title
+	      </a>
+	    </h2>
+
+	    <a tal:attributes="href brain/getURL"
+               tal:condition="buzz/getLogo"
+	       class="listing-site-image-link">
+	      <img alt=""
+		   tal:attributes="src string:${brain/getURL}/logo_thumb;
+				   title brain/Title;
+				   alt brain/Title" />
+	    </a>
+
+	    <p tal:content="brain/Description">
+	      Description
+	    </p>
+
+	    <div class="first-infos">
+	      <span tal:define="country brain/getCountry"
+		    tal:condition="country">
+		<strong i18n:translate="label_psc_country">Country:</strong>
+                <a tal:content="python: countries_dict.getValue(country, country)"
+                   tal:attributes="href string:${base_url}?countries:list=${country}" />
+              </span>
+	      <span tal:condition="brain/getIndustry">
+		<strong i18n:translate="label_psc_industry">Industry:</strong>
+		<span tal:replace="structure industries" />
+	      </span>
+	      <tal:if tal:condition="buzz/canSeeProvider">
+		<span tal:define="provider buzz/getProvider">
+		  <strong i18n:translate="label_psc_provider">Provider:</strong>
+		  <tal:display-provider metal:use-macro="here/psc_macros/macros/display-provider"/>
+		</span>
+	      </tal:if>
+	    </div>
+	  </div>
+
+	  <div class="listing-site level2"
+	       tal:condition="python: brain.getRating == 2">
+	    
+	    <h3>
+	      <a tal:attributes="href brain/getURL"
+		 tal:content="brain/Title">
+		Site title
+	      </a>
+	    </h3>
+	    
+	    <a tal:attributes="href brain/getURL"
+               tal:condition="buzz/getLogo"
+	       class="listing-site-image-link">
+	      <img alt=""
+		   tal:attributes="src string:${brain/getURL}/logo_thumb;
+				   title brain/Title;
+				   alt brain/Title" />
+	    </a>
+	    
+	    <p tal:content="brain/Description"></p>
+	    <div class="second-infos">
+	      <span tal:define="country brain/getCountry"
+		    tal:condition="country">
+		<strong i18n:translate="label_buzzlist_country">Country:</strong>
+                <a tal:content="python: countries_dict.getValue(country, country)"
+                   tal:attributes="href string:${base_url}?countries:list=${country}" />
+	      </span>
+	      <span tal:condition="brain/getIndustry">
+		<strong i18n:translate="label_buzzlist_industry">Industry:</strong>
+		<span tal:replace="structure industries" />
+	      </span>
+	      <tal:if tal:condition="buzz/canSeeProvider">
+		<span tal:define="provider buzz/getProvider">
+		  <strong i18n:translate="label_psc_provider">Provider:</strong>
+		  <tal:display-provider metal:use-macro="here/psc_macros/macros/display-provider"/>
+		</span>
+	      </tal:if>
+	    </div>
+	  </div>
+	  
+
+	  <div class="listing-site level3"
+	       tal:condition="python: brain.getRating == 3">
+	    <h4><a tal:attributes="href brain/getURL" tal:content="brain/Title"/></h4>
+
+	    <tal:infos tal:define="country  brain/getCountry;
+				   industry brain/getIndustry;">
+	    <dl class="third-infos discreet"
+		tal:condition="python: country or industry">
+	      <tal:country condition="country">
+	      <dt i18n:translate="label_psc_country_cat">Country</dt>
+	      <dd>
+                <a tal:content="python: countries_dict.getValue(country, country)"
+                   tal:attributes="href string:${base_url}?countries:list=${country}" />
+                
+	      </dd>
+	      </tal:country>
+	      
+	      <tal:industry condition="industry">
+	      <dt i18n:translate="label_psc_industry_cat">Industry</dt>
+	      <dd tal:content="structure industries">
+		industry
+	      </dd>
+	      </tal:industry>
+	    </dl>
+	    </tal:infos>
+	    <p class="discreet" tal:content="brain/Description">
+	      Description
+	    </p>
+	  </div>
+        </div>
+	</div>
+	<div metal:use-macro="here/batch_macros/macros/navigation" />
+      </div>
+    </div>
+  </body>
+</html>
