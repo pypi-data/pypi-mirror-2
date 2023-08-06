@@ -1,0 +1,191 @@
+Python References
+=================
+
+Many places in the configuration take optional ``pyref`` attributes.
+These reference a module/function name.  
+
+The general pattern is:
+
+``pyref="location:function_name"``
+
+    The ``location`` can be a module name, or
+    ``file:/path/to/filename.py``.  If it is a literal filename, then
+    the file is exec'd and turned into a module that way.  All
+    references are to functions (or callable objects), and so you must
+    give the function name.  Note that the ``file:`` case isn't a URL,
+    just a path. 
+
+``pyarg-foo="bar"``
+
+    You can pass extra ad hoc arguments to the function using
+    attributes in this form.  This would add the keyword argument
+    ``foo="bar"`` to the function call.  All arguments have string
+    (well, unicode) values. 
+
+In addition to the ad-hoc arguments, parameters such as the request
+and response, and a logger, will be passed into your ``pyref``
+functions.  The particular parameters passed in vary for each case, as
+do the expected return values.  See below for details. 
+
+When they are available, ``request`` and ``response`` are `WebOb
+<http://pythonpaste.org/webob/>`_ objects and ``log`` is a Python
+logging object.
+
+Details
+-------
+
+Theme
+~~~~~
+
+A ``<theme pyref>`` replaces a ``<theme href>`` and so your pyref
+function should return a string href.
+
+You can use a ``<theme>`` like:
+
+.. code-block:: xml
+
+    <theme pyref="mymodule:get_theme" />
+
+Then define a function like:
+
+.. code-block:: python
+
+    def get_theme(request, response, log):
+        return "/%s/theme.html" % request.host
+
+``request`` is the original request received by Deliverance.
+
+``response`` is the *content* HTTP response, i.e. the current page to
+be themed.  Note that this allows you to point to different theme
+locations based on conditions of the current page, by inspecting
+``response``'s status code, headers or even body.
+
+You can raise :exc:`~deliverance.exceptions.AbortTheme` in this
+function (or anywhere else) to signal that the response should be
+returned without any theme applied.
+
+Dest
+~~~~
+
+Within a ``<proxy>`` tag, you can use a ``<dest pyref>`` to
+dynamically generate the proxy destination from code.  Your pyref
+function should return a URL.  For example:
+
+.. code-block:: xml
+
+    <proxy path="/trac">
+      <dest pyref="mymodule:get_proxy_dest" />
+    </proxy>
+
+with the function:
+
+.. code-block:: python
+
+    def get_proxy_dest(request, log):
+        if not request.remote_addr.startswith('192'):
+            raise AbortProxy('Bad remote_addr: %r' % request.remote_addr)
+        return 'http://localhost:10002'
+
+You can return any URL.  URI template substitution is *not* performed.
+
+If you raise :exc:`~deliverance.exceptions.AbortProxy` then the
+``<proxy>`` will be skipped, and another proxy will be looked for.
+(If nothing matches a 404 error is returned.)
+
+Request
+~~~~~~~
+
+Within a ``<proxy>`` tag, you can use a ``<request pyref>`` to
+arbitrarily modify or replace the request object before the proxying
+occurs.
+
+Your pyref function must return a webob.Request object.  For example:
+
+.. code-block:: xml
+
+    <request pyref="mymodule:modify_proxy_request" />
+
+with the code:
+
+.. code-block:: python
+
+    def modify_proxy_request(request, log):
+        request.header['X-Project-Name'] = request.host.split('.')[0]
+        return request
+
+Note that you can modify the request in-place or return a new request.
+
+Response
+~~~~~~~~
+
+Within a ``<proxy>`` tag you can use a ``<response pyref>`` to
+arbitrarily modify or replace the response object returned by the
+proxy, before theming occurs.
+
+Your pyref function will receive six arguments (and any custom keyword
+arguments you define) -- the signature is (request, response,
+orig_base, proxied_base, proxied_url, log):
+
+* orig_base: the original URL base received by Deliverance, e.g. http://localhost:8080/trac
+* proxied_base: where dest sent it to, e.g. http://localhost:10001/
+* proxied_url: the full destination, e.g. http://localhost:10001/report/1
+
+Since ``request`` is a webob.Request object, you can get the full
+original URL from ``request.url``, and all headers.
+
+Your pyref function must return a webob.Response object.  For example:
+
+.. code-block:: xml
+
+    <response pyref="mymodule:modify_proxy_response" />
+
+with the code:
+
+.. code-block:: python
+
+    def modify_proxy_response(request, response, 
+                              orig_base, proxied_base, proxied_url, log):
+        response.body += 'look at me!'
+        return response
+
+Note that you can modify the response in place or return a new webob.Response.
+
+Match, rule, proxy
+~~~~~~~~~~~~~~~~~~
+
+The ``<match>``, ``<rule>`` and ``<proxy>`` elements all support a
+``pyref`` attribute to determine whether they should be active for the
+current request.
+
+Your ``pyref`` function should return a boolean.
+
+The signature is (request, response, response_headers, log):
+
+* response: the current response object, if applicable.
+* response_headers: a list of all the headers in the response,
+  if applicable, including ``<meta http-equiv>`` headers.
+
+In ``<proxy>`` elements, ``response`` and ``response_headers`` will be
+``None``, because ``<proxy>`` commands occur before any subrequest is
+made.
+
+An example:
+
+.. code-block:: python
+
+    def match_request(request, response, response_headers, log):
+        if response.headers.get('x-notheme'):
+            raise AbortTheme
+        return True
+
+Disabling
+---------
+
+You can disallow Python references using ``deliverance-proxy`` with:
+
+.. code-block:: xml
+
+    <server-settings>
+      <execute-pyref>false</execute-pyref>
+    </server-settings>
+
