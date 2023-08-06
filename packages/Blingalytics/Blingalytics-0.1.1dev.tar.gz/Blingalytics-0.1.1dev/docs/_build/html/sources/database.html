@@ -1,0 +1,360 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Database source &mdash; blingalytics v0.1 documentation</title>
+    <link rel="stylesheet" href="../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="blingalytics v0.1 documentation" href="../index.html" />
+    <link rel="up" title="Data Sources" href="../sources.html" />
+    <link rel="next" title="Static source" href="static.html" />
+    <link rel="prev" title="Key range source" href="key_range.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="static.html" title="Static source"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="key_range.html" title="Key range source"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">blingalytics v0.1 documentation</a> &raquo;</li>
+          <li><a href="../sources.html" accesskey="U">Data Sources</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-blingalytics.sources.database">
+<span id="database-source"></span><h1>Database source<a class="headerlink" href="#module-blingalytics.sources.database" title="Permalink to this headline">¶</a></h1>
+<p>The database source provides an interface for querying data from a table in
+the database.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The database source requires SQLAlchemy to be installed and connected to
+your database. It also expects your tables to be described using Elixir.
+See <a class="reference internal" href="../install.html"><em>Installation</em></a>.</p>
+</div>
+<p>The source intentionally does not do any joins for performance reasons.
+Because the reports will often be run over very large data sets, we want to be
+sure that running the reports is not prohibitively time-consuming or hogging
+the database.</p>
+<p>If you want to do produce reports over multiple tables, the best option is
+generally to pre-join the tables into one merged reporting table, and then
+run the report over that. In &#8220;enterprise-ese&#8221; this is basically a <a class="reference external" href="http://en.wikipedia.org/wiki/Star_schema">star-schema
+table</a> in your database with an <a class="reference external" href="http://en.wikipedia.org/wiki/Extract,_transform,_load">ETL</a> process to populate your data into it.
+The interwebs have plenty to say about this topic, so we&#8217;ll leave this issue
+in your capable hands.</p>
+<p>If a whole new reporting database table is too heavy-handed for your use case,
+there are a couple of simpler options. Often all you want is to pull in a bit
+of data from another table, which you can do with the <a class="reference internal" href="#blingalytics.sources.database.Lookup" title="blingalytics.sources.database.Lookup"><tt class="xref py py-class docutils literal"><span class="pre">Lookup</span></tt></a> column.
+You can also use the <a class="reference internal" href="merge.html"><em>Merge source</em></a> to combine the results of two or
+more reports over two or more database tables.</p>
+<p>When using columns from the database source, you&#8217;ll be expected to provide an
+extra report attribute to specify which table to pull the data from:</p>
+<ul>
+<li><p class="first"><tt class="docutils literal"><span class="pre">database_entity</span></tt>: This report attribute specifies the database table to
+query. It should be specified as a dotted-path string pointing to an Elixir
+<tt class="docutils literal"><span class="pre">Entity</span></tt> subclass. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">database_entity</span> <span class="o">=</span> <span class="s">&#39;model.reporting.ReportInfluencer&#39;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="section" id="column-types">
+<h2>Column types<a class="headerlink" href="#column-types" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="blingalytics.sources.database.GroupBy">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">GroupBy</tt><big>(</big><em>entity_column</em>, <em>include_null=False</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.GroupBy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a group-by operation on the given database column. It takes one
+positional argument: a string specifying the column to group by. There is
+also an optional keyword argument:</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">include_null</span></tt>: Whether the database column you&#8217;re grouping on should
+filter out or include the null group. Defaults to <tt class="xref docutils literal"><span class="pre">False</span></tt>, which will
+not include the null group.</li>
+</ul>
+<p>Any group-by columns should generally be listed in your report&#8217;s keys.
+You are free to use more than one of these in your report, which will be
+treated as a multi-group-by operation in the database.</p>
+<p>This column does not compute or output a footer.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.Sum">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">Sum</tt><big>(</big><em>entity_column</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.Sum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a database sum aggregation. The first argument should be a string
+specifying the database column to sum.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.Count">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">Count</tt><big>(</big><em>entity_column</em>, <em>distinct=False</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.Count" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a database count aggregation. The first argument should be a
+string specifying the database column to count on. This also accepts one
+extra keyword argument:</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">distinct</span></tt>: Whether to perform a distinct count or not. Defaults to
+<tt class="xref docutils literal"><span class="pre">False</span></tt>.</li>
+</ul>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.BoolAnd">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">BoolAnd</tt><big>(</big><em>entity_column</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.BoolAnd" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Using this column requires that your database have a <tt class="docutils literal"><span class="pre">bool_and</span></tt>
+aggregation function.</p>
+</div>
+<p>Performs a boolean-and aggregation. This aggregates to true if <em>all</em> the
+aggregated values are true; otherwise, it will aggregate to false. The
+first argument should be a string specifying the database column to
+aggregate on.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.BoolOr">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">BoolOr</tt><big>(</big><em>entity_column</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.BoolOr" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Using this column requires that your database have a <tt class="docutils literal"><span class="pre">bool_or</span></tt>
+aggregation function.</p>
+</div>
+<p>Performs a boolean-or aggregation. This aggregates to true if <em>any</em> of the
+aggregated values are true; otherwise, it will aggregate to false. The
+first argument should be a string specifying the database column to
+aggregate on.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.ArrayAgg">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">ArrayAgg</tt><big>(</big><em>entity_column</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.ArrayAgg" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Using this column requires that your database have an <tt class="docutils literal"><span class="pre">array_agg</span></tt>
+aggregation function.</p>
+</div>
+<p>Performs an array aggregation. This essentially compiles a list of all
+the values in all the rows being aggregated. The first argument should be
+a string specifying the database column to aggregate.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.First">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">First</tt><big>(</big><em>entity_column</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.First" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Using this column requires that your database have a <tt class="docutils literal"><span class="pre">first</span></tt>
+aggregation function. In many databases, you will have to add this
+aggregate yourself. For example, here is a
+<a class="reference external" href="http://wiki.postgresql.org/wiki/First_(aggregate)">PostgreSQL implementation</a>.</p>
+</div>
+<p>Performs a database first aggregation to return the first value found. The
+first argument should be a string specifying the database column.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.Lookup">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">Lookup</tt><big>(</big><em>entity</em>, <em>lookup_attr</em>, <em>pk_column</em>, <em>pk_attr='id'</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.Lookup" title="Permalink to this definition">¶</a></dt>
+<dd><p>This column allows you to &#8220;cheat&#8221; on the no-joins rule and look up a value
+from an arbitrary database table by primary key.</p>
+<p>This column expects several positional arguments to specify how to do the
+lookup:</p>
+<ul class="simple">
+<li>The Elixir <tt class="docutils literal"><span class="pre">Entity</span></tt> object to look up from, specified as a
+dotted-string reference.</li>
+<li>A string specifying the column attribute on the <tt class="docutils literal"><span class="pre">Entity</span></tt> you want to
+look up.</li>
+<li>The name of the column in the report which is the primary key to use for
+the lookup in this other table.</li>
+</ul>
+<p>The primary key name on the lookup table is assumed to be &#8216;id&#8217;. If it&#8217;s
+different, you can use the keyword argument:</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">pk_attr</span></tt>: The name of the primary key column in the lookup database
+table. Defaults to <tt class="docutils literal"><span class="pre">'id'</span></tt>.</li>
+</ul>
+<p>For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">database</span><span class="o">.</span><span class="n">Lookup</span><span class="p">(</span><span class="s">&#39;project.models.Publisher&#39;</span><span class="p">,</span> <span class="s">&#39;name&#39;</span><span class="p">,</span> <span class="s">&#39;publisher_id&#39;</span><span class="p">,</span>
+    <span class="n">format</span><span class="o">=</span><span class="n">formats</span><span class="o">.</span><span class="n">String</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Because the lookups are only done by primary key and are bulked up into
+just a few operations, this isn&#8217;t as taxing on the database as it could
+be. But doing a lot of lookups on large datasets can get pretty
+resource-intensive, so it&#8217;s best to be judicious.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="filter-types">
+<h2>Filter types<a class="headerlink" href="#filter-types" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="blingalytics.sources.database.ColumnTransform">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">ColumnTransform</tt><big>(</big><em>filter_func</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.ColumnTransform" title="Permalink to this definition">¶</a></dt>
+<dd><p>A transform allows you to alter a database column for every report column
+or other filter that needs to access it. For example, this can be used to
+provide a timezone offset option that shifts all date and time columns by
+a certain number of hours.</p>
+<p>This filter expects one positional argument, a function defining the
+transform operation. This function will be passed the Elixir column object
+as its first argument. If a widget is defined for this filter, the
+function will also be passed a second argument, which is the user input
+value. The function should return the altered column object.</p>
+<p>This filter <strong>requires</strong> the columns keyword argument, which should be a
+list of strings referring to the columns this transform will be applied
+to.</p>
+<p>For example, if you have a database column with the number of hours since
+the epoch and want to transform it to the number of days since the epoch,
+with a given number of hours offset for timezone, you can use:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">database</span><span class="o">.</span><span class="n">ColumnTransform</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">column</span><span class="p">,</span> <span class="n">user_input</span><span class="p">:</span> <span class="n">column</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="s">&#39;+&#39;</span><span class="p">)(</span><span class="n">user_input</span><span class="p">)</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)(</span><span class="mi">24</span><span class="p">),</span>
+    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;purchase_time&#39;</span><span class="p">,</span> <span class="s">&#39;user_last_login_time&#39;</span><span class="p">],</span>
+    <span class="n">widget</span><span class="o">=</span><span class="n">widgets</span><span class="o">.</span><span class="n">Select</span><span class="p">(</span><span class="n">choices</span><span class="o">=</span><span class="n">TIMEZONE_CHOICES</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="blingalytics.sources.database.QueryFilter">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">QueryFilter</tt><big>(</big><em>filter_func</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#blingalytics.sources.database.QueryFilter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filters the database query or queries for this report.</p>
+<p>This filter expects one positional argument, a function defining the
+filter operation. This function will be passed as its first argument the
+<tt class="docutils literal"><span class="pre">Entity</span></tt> object. If a widget is defined for this filter, the function
+will also be passed a second argument, which is the user input value. The
+function should return a filtering term that can be used to filter a query
+on that entity. Or, based on the user input, the filter function can
+return <tt class="xref docutils literal"><span class="pre">None</span></tt> to indicate that no filtering should be done.</p>
+<p>More specifically, the returned object should be a
+<tt class="docutils literal"><span class="pre">sqlalchemy.sql.expression._BinaryExpression</span></tt> object. You will generally
+build these in a lambda like so:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">database</span><span class="o">.</span><span class="n">QueryFilter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">entity</span><span class="p">:</span> <span class="n">entity</span><span class="o">.</span><span class="n">is_active</span> <span class="o">==</span> <span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or, with a user input widget:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">database</span><span class="o">.</span><span class="n">QueryFilter</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">entity</span><span class="p">,</span> <span class="n">user_input</span><span class="p">:</span> <span class="n">entity</span><span class="o">.</span><span class="n">user_id</span><span class="o">.</span><span class="n">in_</span><span class="p">(</span><span class="n">user_input</span><span class="p">),</span>
+    <span class="n">widget</span><span class="o">=</span><span class="n">Autocomplete</span><span class="p">(</span><span class="n">multiple</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="key-ranges">
+<h2>Key ranges<a class="headerlink" href="#key-ranges" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="blingalytics.sources.database.TableKeyRange">
+<em class="property">class </em><tt class="descclassname">blingalytics.sources.database.</tt><tt class="descname">TableKeyRange</tt><big>(</big><em>entity</em>, <em>pk_column='id'</em>, <em>filters=</em><span class="optional">[</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#blingalytics.sources.database.TableKeyRange" title="Permalink to this definition">¶</a></dt>
+<dd><p>This key range ensures that there is a key for every row in the given
+database table. This is primarily useful to ensure that you get every row
+ID from an external table in your report.</p>
+<p>This key range takes one positional argument, a dotted-string reference to
+the <tt class="docutils literal"><span class="pre">Entity</span></tt> to pull from. It also takes two optional keyword arguments:</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">pk_column</span></tt>: The column name for the primary key to use from the
+table. Defaults to <tt class="docutils literal"><span class="pre">'id'</span></tt>.</li>
+<li><tt class="docutils literal"><span class="pre">filters</span></tt>: Either a single filter or a list of filters. These filters
+will be applied when pulling the keys from this database table.</li>
+</ul>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Database source</a><ul>
+<li><a class="reference internal" href="#column-types">Column types</a></li>
+<li><a class="reference internal" href="#filter-types">Filter types</a></li>
+<li><a class="reference internal" href="#key-ranges">Key ranges</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="key_range.html"
+                        title="previous chapter">Key range source</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="static.html"
+                        title="next chapter">Static source</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/sources/database.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="static.html" title="Static source"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="key_range.html" title="Key range source"
+             >previous</a> |</li>
+        <li><a href="../index.html">blingalytics v0.1 documentation</a> &raquo;</li>
+          <li><a href="../sources.html" >Data Sources</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Adly Inc..
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
