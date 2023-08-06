@@ -1,0 +1,329 @@
+#!/usr/bin/python2.6
+# -*- coding: utf-8 -*-
+#
+# This program is part of purity-ng.
+# Copyright © 2011, Purity Development Team, see AUTHORS for details.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import os
+import sys
+import decimal
+from optparse import OptionParser
+
+__version__ = "0.1"
+
+class Question(object):
+    def __init__(self, text):
+        self.text = text
+        self.score = None
+    @property
+    def is_answered(self):
+        return self.score is not None
+    def yes(self):
+        self.score = 1
+    def no(self):
+        self.score = 0
+
+# {{ Adapted from http://code.activestate.com/recipes/134892/
+def getch():
+    # FIXME: This is not portable
+    import sys, tty, termios
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
+# End adaptation }}
+
+# List of places to look for tests
+SEARCHPATH=['/usr/share/games/purity/']
+# Things that aren't tests to consider
+EXCLUDE=['intro', 'list']
+
+def get_answer(question, question_number, no_prompt):
+    print "   " + str(question_number+1) + ":" + question
+    if no_prompt:
+        return 0
+    print "   [ynsqb?]",
+    char = getch()
+    if char == 'y':
+        print "yes"
+        return 1
+    elif char == 'n':
+        print "no"
+        return 0
+    elif char == 'q':
+        print "quit"
+        return -1
+    elif char == '?':
+        print "help"
+        return -2
+    elif char == '\x03':
+        # ctrl-c recieved, quit!
+        return -4
+    elif char == 's':
+        print "score"
+        return -5
+    elif char == 'b':
+        print "back\n"
+        return -6
+    # nothing else applies
+    return -3
+
+def get_tests_list(searchpath=SEARCHPATH, exclude=EXCLUDE):
+    '''Return a list of all tests in the searchpath.
+    @arg searchpath should be an array of directory paths containing 
+    purity test files'''
+    # TODO: verify that tests are in fact purity tests and don't
+    # return them if they are invalid. 
+    # TODO: exclude directories, see above.
+    
+    tests = []
+    for path in searchpath:
+        for test in os.listdir(path):
+            if test not in exclude:
+                # Some things are reserved names,
+                # or pseudo-tests there for historical reasons
+                tests.append(test)
+    return tests
+    
+def score_report(questions, question_num):
+    '''Generate a text score report
+    
+    score and questions should be ints'''
+    # round to four digets
+    if question_num == 0:
+        return "   you can't get a score without answering any questions, silly."
+    score = 0
+    for i in range(question_num):
+        score += questions[i].score
+    # score is the number of "yes"s, we want the "no"s
+    purity = question_num - score
+    decimal.getcontext().prec = 4
+    percent = decimal.Decimal(purity) / decimal.Decimal(question_num) * 100
+    
+    # TODO: fix this for "1 question"
+    return "   you answered %s 'no' answers out of %s questions,\n" % (purity, question_num) + "   which makes your purity score %s%%." % (percent)
+
+# goes back to the previous question. Note that this calls
+# ask_question, which could call go_back again. If the previous one
+# returns without the user quiting, it returns back to the original
+# ask_question, then back to the loop though the file.
+def go_back(questions, question_number, no_prompt, sections):
+    if questions[question_number-1].score == 1:
+        print "   Previous answer: yes" 
+    else:
+        print "   Previous answer: no" 
+    ask_return = ask_question(questions, question_number - 1, no_prompt, sections)
+    print ""
+    if ask_return != None:
+        return ask_return
+    return ask_question(questions, question_number, no_prompt, sections)
+
+
+def ask_question(questions, question_number, no_prompt, sections):
+    if question_number in sections:
+        print "\n" + "-"*78
+        print sections[question_number]
+
+    answer = -10
+    while answer < 0: 
+        answer = get_answer(questions[question_number].text, 
+                            question_number, no_prompt)
+        if answer == 0:
+            questions[question_number].no()
+        elif answer == 1:
+            questions[question_number].yes()
+        elif answer == -1:
+            print "   exiting\n   "
+            print score_report(questions, question_number) + "\n"
+            return 0
+        elif answer == -2:
+            print ""
+            print "   y - answer 'yes' to current question"
+            print "   n - answer 'no' to current question"
+            print "   q - quit program"
+            print "   b - go back a question"
+            print "   ? - print this help screen"
+            print ""
+        elif answer == -3:
+            print "huh?\n"
+        elif answer == -4:
+            print "\n\nFine. Be that way. Don't use the 'q' option."
+            return 130
+        elif answer == -5:
+            print "\n" + score_report(questions, question_number) + "\n"
+        elif answer == -6:
+            if not question_number > 0:
+                print "   cannot go back\n"
+                continue
+            # When we go back, we no longer need to read from the
+            # file, so we enter a seperate function that pulls from
+            # the stored questions. 
+            return go_back(questions, question_number, no_prompt, sections)
+
+
+def print_answers(questions, question_number):
+    for i in range(question_number):
+        print questions[i].text ,
+        if questions[i].score == 1:
+            print "Yes\n\n"
+        else:
+            print "No\n\n"
+
+
+
+def main(argv=sys.argv[1:]):
+    # Initalize variables for use in the datafile parsing
+    questions = []
+    sections = {}
+    begining = ""
+    question_text = ""
+    question_section = ""
+    end = ""
+    section_num = 0
+    question_number = 0
+    score = 0
+    in_begining = False
+    in_question = False
+    in_question_section = False
+    in_end = False
+    escaped = False
+
+    usage = ("usage: %prog <test_name> [options] \n" + 
+             "For a list of tests, try \"purity list\"")
+    parser = OptionParser(usage=usage, version=__version__) 
+    parser.add_option("-p", action="store_true", 
+                      dest="no_prompt", default=False,
+                      help="print the test without prompting for answers.")
+    (options, args) = parser.parse_args(argv)
+
+    if len(args) != 1:
+        parser.print_help()
+        return 1
+
+    if args[0] == 'list':
+        # magic keyword, display test list
+        print 'the currently available tests are:\n'
+        for test in get_tests_list():
+            # TODO: extract a short description from tests
+            print test
+        return 0
+    
+    file_path = args[0]
+    
+    questions_file = None
+    
+    try:
+        with open(file_path) as test_file:
+            questions_file = test_file.read()
+    except IOError as e:
+        for path in SEARCHPATH:
+            try:
+                with open(os.path.join(path, file_path)) as test_file:
+                    questions_file = test_file.read()
+            except IOError as e:
+                continue
+        if questions_file == None:
+            print 'Cannot open test file.'
+            return -1
+    
+    for i in range(len(questions_file)):
+        if (questions_file[i] == '\\' and not escaped):
+            escaped = True
+            continue
+
+        if (in_begining):
+            if (questions_file[i] == '}' and not escaped):
+                in_begining = False
+                print begining
+                begining = ""
+                continue
+            begining += questions_file[i]
+
+        elif (in_question):
+            if (questions_file[i] == ')' and not escaped):
+                in_question = False
+                if len(questions) >= question_number:
+                    questions.append(Question(question_text))
+
+                # return any value other than 0
+                question_return = ask_question(questions, question_number, 
+                                               options.no_prompt, sections)
+                if question_return != None:
+                    return question_return
+
+                if not options.no_prompt:
+                    print ""
+                question_text = ""
+                question_number += 1
+                continue
+            question_text += questions_file[i]
+
+        elif (in_question_section):
+            if (questions_file[i] == ']' and not escaped):
+                section_num += 1
+                in_question_section = False
+                sections[question_number] = ("" + str(section_num) + 
+                                               ".  " + question_section)
+                question_section = ""
+                continue
+            question_section += questions_file[i]
+
+        elif (in_end):
+            if (questions_file[i] == '>' and not escaped):
+                if not (options.no_prompt):
+                    print score_report(questions, question_number)
+                in_end = False
+                print end
+                end = ""
+                continue
+            end += questions_file[i]
+
+
+        elif (questions_file[i] == '{' and not escaped):
+            in_begining = True
+            
+        elif (questions_file[i] == '(' and not escaped):
+            in_question = True
+
+        elif (questions_file[i] == '[' and not escaped):
+            in_question_section = True
+
+        elif (questions_file[i] == '<' and not escaped):
+            in_end = True
+
+        if (escaped):
+            escaped = False
+    
+    if not options.no_prompt: 
+        print "Would you like to display your answers? [yn]",
+        answer = 0
+        while (answer != 'y' and answer != 'n'):
+            if question_number in sections:
+                print "\n" + "-"*78
+                print sections[question_number]
+
+            answer = getch()
+            if (answer != 'y' and answer != 'n'):
+                print "\nPlease enter 'y' or 'n'",
+                
+        if answer == 'y':
+            print "yes"
+            print_answers(questions, question_number)
+        else:
+            print "no\n\n Good bye"
+    
+
+if __name__ == '__main__':
+    sys.exit(main())
