@@ -1,0 +1,21 @@
+XStatic-TWikiDraw-moin
+----------------------
+
+TWikiDraw-moin java library packaged for setuptools (easy_install) / pip.
+
+This is a modified version from `TWikiDrawPlugin of 29 Jan 2003 - 21:47 <http://twiki.org/cgi-bin/view/Plugins/TWikiDrawPlugin>`_ 
+adding:
+
+ - basename argument
+ - indexed PNG support
+ - deprecated name attribute of the <map> tag replaced by the id attribute
+ - corrects object stacking order for the map
+
+This package is intended to be used by **any** project that needs these files.
+
+It intentionally does **not** provide any extra code except some metadata
+**nor** has any extra requirements except the minimal support code in the
+XStatic base package.
+
+You can find more info about the xstatic packaging way in the package `XStatic`.
+
