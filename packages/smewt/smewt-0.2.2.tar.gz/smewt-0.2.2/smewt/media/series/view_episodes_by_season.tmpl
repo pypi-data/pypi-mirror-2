@@ -1,0 +1,173 @@
+#set series = $series
+#set displaySynopsis = $displaySynopsis
+
+<%
+from itertools import groupby
+from collections import defaultdict
+from smewt import SmewtUrl, Media
+from smewt.media import Episode, Series, Subtitle
+from smewt.base.utils import pathToUrl, smewtDirectoryUrl, guessCountryCode, tolist
+from smewt.base import SmewtException
+
+import os, os.path
+import_dir = smewtDirectoryUrl('smewt', 'media')
+flags_dir = smewtDirectoryUrl('smewt', 'media', 'common', 'images', 'flags')
+seasons = defaultdict(lambda: [])
+
+#allseries = eps.find_all(node_type = Series)
+#if len(allseries) == 0:
+#    return '<html><body><h1>No media could be found for this media.  Check that the folder where these medias live is accessible.</h1></body></html>'
+
+#series = allseries[0]
+seriesName = series.title
+poster = pathToUrl(series.get('loresImage'))
+englishSubsLink = SmewtUrl('action', 'getsubtitles', { 'title': seriesName, 'language': 'en' })
+frenchSubsLink = SmewtUrl('action', 'getsubtitles', { 'title': seriesName, 'language': 'fr' })
+spanishSubsLink = SmewtUrl('action', 'getsubtitles', { 'title': seriesName, 'language': 'es' })
+if displaySynopsis:
+    displayStyle = 'inline'
+else:
+    displayStyle = 'none'
+
+# First prepare the episodes
+episodes = {}
+
+for ep in tolist(series.episodes):
+    md = dict(ep.literal_items())
+
+
+    # FIXME: we should do sth smarter here, such as ask the user, or at least warn him
+    files = ep.get('files')
+    if not files:
+        # dirty fix so we don't crash if the episode has no associated video file:
+        md['filename'] = ''
+    elif isinstance(files, list):
+        md['filename'] = files[0].filename
+    else:
+        md['filename'] = files.filename
+
+    md['url'] = SmewtUrl('action', 'play', { 'filename1': md['filename'] })
+    md['subtitleUrls'] = []
+
+    languageFiles = defaultdict(lambda: [])
+    subtitles = []
+
+    if files:
+        for subtitle in tolist(ep.get('subtitles')):
+            for subfile in tolist(subtitle.files):
+                subtitleFilename = subfile.filename
+                # we shouldn't need to check that they start with the same prefix anymore, as the taggers/guessers should have mapped them correctly
+                mediaFilename = [ f.filename for f in tolist(files) ] # if subtitleFilename.startswith(os.path.splitext(f.filename)[0]) ]
+                mediaFilename = mediaFilename[0] # FIXME: check len == 1 all the time
+
+                languageFiles[subtitle.language] += [ (mediaFilename, subtitleFilename) ]
+
+    # prepare links for playing movie with subtitles
+    for lang, sfiles in languageFiles.items():
+        nfile = 1
+        args = {}
+
+        for (mediaFilename, subtitleFilename) in sorted(sfiles):
+            args['filename%d' % nfile] = mediaFilename
+            args['subtitle%d' % nfile] = subtitleFilename
+            nfile += 1
+
+        subtitles.append( {'languageImage': flags_dir + '/%s.png' % (lang,),
+                           'url': SmewtUrl('action', 'play', args)} )
+
+    subtitles.sort(key = lambda x: x['languageImage'])
+
+    md['subtitleUrls'] = subtitles
+
+    episodes[(ep.season, ep.episodeNumber)] = md
+
+for md in episodes.values():
+    seasons[ md['season'] ].append( md )
+
+for season, eps in seasons.items():
+    seasons[season] = sorted(eps, key = lambda x: x['episodeNumber'])
+
+%>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <title>single serie display</title>
+    <script type="text/javascript" src="file://$(import_dir)/3rdparty/tabber.js"></script>
+    <script type="text/javascript" src="file://$(import_dir)/3rdparty/styler.js"></script>
+    <link rel="stylesheet" href="file://$(import_dir)/series/series.css" type="text/css">
+
+    <script type="text/javascript" charset="utf-8">
+    #raw
+        function toggleSynopsis() {
+            toggleByName('synopsis');
+            mainWidget.toggleSynopsis(isToggled('synopsis'));
+        }
+    #end raw
+    </script>
+
+</head>
+
+<body>
+
+<img src="file://$poster" height="130px" width:"auto"/>
+
+<div class="rightshifted">
+  <h1>$seriesName</h1>
+
+  <a href="$englishSubsLink">Get missing English subtitles</a>
+  <a href="$frenchSubsLink">Get missing French subtitles</a>
+  <a href="$spanishSubsLink">Get missing Spanish subtitles</a>
+  <a href="javascript:toggleSynopsis()">Toggle synopsis</a>
+</div>
+
+<div class="tabber">
+#for seasonNumber, eps in seasons.items():
+  <div class="tabbertab">
+  <h2>Season $seasonNumber</h2>
+  <p>
+  #for ep in [ ep for ep in eps if 'title' in ep ]
+    #if 'filename' in ep:
+      #try
+        <div class="episode"><a href="$ep.url">$ep.episodeNumber - $ep.title </a>
+      #except
+        <div class="episode"> ? - $ep.title
+      #end try
+
+      #for s in ep['subtitleUrls']
+           <a href="$s.url"><img src="file://$s.languageImage" /></a>
+      #end for
+
+      #if 'synopsis' in ep:
+        <div name="synopsis" style="display:$displayStyle"><p>$ep.synopsis</p></div>
+      #end if
+      </div>
+    #end if
+  #end for
+
+<%
+import os.path
+eps = [ ep for ep in tolist(series.get('episodes')) if ep.episodeNumber == -1 and ep.get('files') ]
+
+files = []
+for ep in eps:
+    files += [ f.filename for f in tolist(ep.files) ]
+
+extras = [ { 'title': f,
+             'url': SmewtUrl('action', 'play', { 'filename1': f })
+             }
+             for f in files ]
+%>
+
+  #if extras
+    <div class="extras">Extras / Untitled / Metadata unknown</div>
+  #end if
+  #for ep in extras
+    <div class="episode"><a href="$ep.url"><i>$ep.title</i></a></div>
+  #end for
+  </p></div>
+#end for
+
+</body>
+</html>
