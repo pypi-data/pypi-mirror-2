@@ -1,0 +1,197 @@
+<html><head>
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+// START JCP ADD
+  if(window.location.href.indexOf("http://www.opengroove.org/") == 0) {
+// END JCP ADD
+  _gaq.push(['_setAccount', 'UA-6079740-6']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+// START JCP ADD
+}
+// END JCP ADD
+
+</script>
+
+</head><body><p
+>Parcon is a parser combinator library. It's designed to be easy to use, easy to learn, and to provide informative error messages.</p
+><p
+>Pargen, which is provided as a submodule of Parcon, is a formatter combinator library. It's much the opposite of Parcon: while Parcon is used to parse text into various objects, Pargen is used to format objects into text. As an example, if you wanted to reimplement Python's json module, you would use Parcon to implement json.loads and Pargen to implement json.dumps.</p
+><p
+><strong
+  >Pydoc documentation for Parcon</strong
+  > is available <a href="parcon.html"
+  >here</a
+  >, and <strong
+  >Pydoc documentation for Pargen</strong
+  > is available <a href="parcon.pargen.html"
+  >here</a
+  >.</p
+><p
+>Some example Parcon grammars (along with explanations of what they do) are available <a href="parcon-examples.html"
+  >here</a
+  >. Example Pargen grammars are provided in the Pargen pydoc documentation, a link to which is provided above.</p
+><div id="introduction"
+><h1
+  >Introduction</h1
+  ><p
+  ><em
+    >One important note here: for the rest of the documentation, we'll assume that you've run the following Python statement:</em
+    ></p
+  ><pre
+  ><code
+    >from parcon import *
+</code
+    ></pre
+  ><p
+  ><em
+    >so that all of the parcon functions and classes are available in the local namespace.</em
+    ></p
+  ><p
+  >Parcon is a Python parser library that uses combinatorial parsing. There is no separate language for declaring grammars; every Parcon grammar is written simply as a series of Python expressions using a number of classes that Parcon provides to represent grammars.</p
+  ><p
+  >Each of these classes is a parser by itself. Every parser class parses a portion of a string and, if it succeeds, returns some parser-specific object representing the result.</p
+  ><p
+  >Each parser class is a subclass of Parser, and as such, each parser class provides some important methods:</p
+  ><ul
+  ><li
+    ><strong
+      >parseString</strong
+      >: This is the method that you'll likely use most. You typically call it like parser.parseString(&quot;some text to parse&quot;), and it either returns the result of the parser or throws an exception if the parser didn't match the input. There are two additional arguments to this method that will be discussed later.</li
+    ><li
+    ><strong
+      >parse</strong
+      >: You typically won't use this method yourself, but you'll need to know about it if you decide to implement your own parser for whatever reason. It's the method that actually knows how to parse text. Each parser provides an implementation of this method. It will be discussed in more detail later.</li
+    ></ul
+  ><p
+  >Methods for parsing input from files or sockets will be present in a future release of Parcon.</p
+  ></div
+><div id="literal-and-significantliteral:-literal-string-parsers"
+><h1
+  >Literal and SignificantLiteral: literal string parsers</h1
+  ><p
+  >Let's look at one of the most basic parsers that Parcon provides: Literal. This parser is constructed with a literal string. It matches only if the input is that string, and it returns None. A similar class, SignificantLiteral, returns the literal string itself instead of None.</p
+  ><p
+  >So, our first example:</p
+  ><pre
+  ><code
+    >expr = Literal(&quot;hello&quot;)
+</code
+    ></pre
+  ><p
+  >expr is now a parser that will parse any piece of text that is exactly &quot;hello&quot;.</p
+  ></div
+><div id="first:-tries-multiple-parsers-until-one-succeeds"
+><h1
+  >First: tries multiple parsers until one succeeds</h1
+  ><p
+  >This isn't really much use to us yet, so let's look at another parser: First. This parser is constructed with any number of other parsers. It tries to match the first parser first. If it matches, it returns whatever that parser's result was. Otherwise, it tries the second parser, and so on. If none of the parsers match, First fails.</p
+  ><p
+  >Using this, we can create a parser that matches either &quot;hello&quot; or &quot;bye&quot;:</p
+  ><pre
+  ><code
+    >expr = First(Literal(&quot;hello&quot;), Literal(&quot;bye&quot;))
+</code
+    ></pre
+  ><p
+  >If we call expr.parseString(&quot;hello&quot;) or expr.parseString(&quot;bye&quot;), the result will be None. If we call expr.parseString with anything else, an exception will be thrown indicating the problem. If we change Literal to SignificantLiteral:</p
+  ><pre
+  ><code
+    >expr = First(SignificantLiteral(&quot;hello&quot;), SignificantLiteral(&quot;bye&quot;))
+</code
+    ></pre
+  ><p
+  >then the result of expr.parseString(&quot;hello&quot;) will be &quot;hello&quot;, and similar for &quot;bye&quot;.</p
+  ></div
+><div id="interlude:-operator-overloading"
+><h1
+  >Interlude: operator overloading</h1
+  ><p
+  >Up until now, actual Parcon classes have been used to create parsers. Every parser overloads some operators, though, which allow us to create parsers in a less verbose manner. These operators are available:</p
+  ><ul
+  ><li
+    ><strong
+      >x + y</strong
+      > is the same as <strong
+      >Then(x, y)</strong
+      >.</li
+    ><li
+    ><strong
+      >x | y</strong
+      > is the same as <strong
+      >First(x, y)</strong
+      >.</li
+    ><li
+    ><strong
+      >-x</strong
+      > is the same as <strong
+      >Optional(x)</strong
+      >.</li
+    ><li
+    ><strong
+      >+x</strong
+      > is the same as <strong
+      >OneOrMore(x)</strong
+      >.</li
+    ><li
+    ><strong
+      >x - y</strong
+      > is the same as <strong
+      >Except(x, y)</strong
+      >.</li
+    ><li
+    ><strong
+      >x[min:max]</strong
+      > is the same as <strong
+      >Repeat(x, min, max)</strong
+      >.</li
+    ><li
+    ><strong
+      >x[function]</strong
+      > is the same as <strong
+      >Translate(x, function)</strong
+      >.</li
+    ><li
+    ><strong
+      >&quot;x&quot; op some_parser</strong
+      > or <strong
+      >some_parser op &quot;x&quot;</strong
+      > is the same as <strong
+      >Literal(&quot;x&quot;) op some_parser</strong
+      > or <strong
+      >some_parser op Literal(&quot;x&quot;)</strong
+      >, respectively.</li
+    ></ul
+  ><p
+  >You've only seen First thus far; the rest of these parsers will be discussed later. If the literal string is used on one side of an operator where a parser is used on the other side, the literal string will be wrapped with Literal automatically. Some other parsers (such as Keyword) will also automatically wrap literal string passed into them with instances of Literal.</p
+  ></div
+><div id="then:-one-parser-followed-by-another"
+><h1
+  >Then: one parser followed by another</h1
+  ><p
+  >Going back to our hello/bye example, let's say that we wanted to be able to parse &quot;hello there&quot; and &quot;bye there&quot;, but we want the result of our parser to still be &quot;hello&quot; or &quot;bye&quot;, so we can't just add &quot; there&quot; to the end of each SignificantLiteral. We can use Then to do this. Then attempts to match its first parser. If it succeeds, it matches its second parser where the first one stopped. If either parser fails, Then fails. If both parsers succeed, the result is a tuple containing the results, with two exceptions: first, if either of Then's parsers also produce a tuple, the resulting tuples are flattened together, and second, if either of Then's parsers produces None, the result is simply the result of the parser that did not, or None if both parsers did.</p
+  ><p
+  >So let's try it out. We'll be using | to represent First and + to represent Then, as outlined in the previous section.</p
+  ><pre
+  ><code
+    >expr = (SignificantLiteral(&quot;hello&quot;) | SignificantLiteral(&quot;bye&quot;)) + &quot; there&quot;
+</code
+    ></pre
+  ><p
+  >This parser will match &quot;hello there&quot; or &quot;bye there&quot;, and will return &quot;hello&quot; or &quot;bye&quot;, respectively. All other strings will result in an exception.</p
+  ></div
+><div id="further-reading"
+><h1
+  >Further reading</h1
+  ><p
+  >Each parser class in the Parcon library has a docstring specifying what it does and how to use it. That's probably the best place to start with all of the other parsers.</p
+  ></div
+>
+</body></html>
