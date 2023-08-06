@@ -1,0 +1,88 @@
+
+.. _extending_theano:
+
+****************
+Extending Theano
+****************
+
+Theano graphs
+-------------
+
+- Theano works with symbolic graphs
+- Those graphs are bi-partite graphs (graph with 2 types of nodes)
+- Those 2 nodes types are Apply and Variable nodes
+
+Inputs and Outputs are lists of Theano variables
+
+.. image:: pics/apply_node.png
+    :width: 500 px
+
+Op contract
+-----------
+
+
+.. code-block:: python
+
+    import theano
+
+    class MyOp(Op):
+        def __eq__(self, other):
+        def __hash__(self):
+        def __str__(self):
+        def make_node(self, x):
+        # Python implementation:
+        def perform(self, node, inputs_storage, output_storage):
+        # C implementation: [see theano web site]
+        # others implementation (pycuda, ...):
+        def make_thunk(self, node, storage_map, _, _2):
+        # optional:
+        def __init__(self, ...):
+        def grad(self, inputs, g):
+        def infer_shape(node, (i0_shapes, ...))
+
+
+Op example
+----------
+
+.. code-block:: python
+
+    import theano
+
+    class DoubleOp(theano.Op):
+        def __eq__(self, other):
+            return type(self) == type(other)
+        def __hash__(self):
+            return hash(type(self))
+        def __str__(self):
+            return self.__class__.__name__
+        def make_node(self, x):
+            x = theano.tensor.as_tensor_variable(x)
+            return theano.Apply(self, [x], [x.type()])
+        def perform(self, node, inputs, output_storage):
+            x = inputs[0]
+            z = output_storage[0]
+            z[0] = x * 2
+
+Test it!
+
+>>> x = theano.tensor.matrix()
+>>> f = theano.function([x],DoubleOp()(x))
+>>> import numpy
+>>> inp = numpy.random.rand(5,5)
+>>> out = f(inp)
+>>> assert numpy.allclose(inp*2, out)
+>>> print inp
+>>> print out
+
+
+Exercises 8
+-----------
+
+- Run the code in the file double_op.py.
+- Modify and execute to compute: x * y
+- Modify and execute the example to return 2 outputs: x + y and x - y
+
+  - Our current elemwise fusion generate computation with only 1 outputs
+
+
+
