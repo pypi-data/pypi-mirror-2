@@ -1,0 +1,179 @@
+Metadata-Version: 1.0
+Name: ttr.xml.csv2xml
+Version: 0.1.2dev002
+Summary: module, providing conversion of csv file into xml
+Home-page: https://bitbucket.org/vlcinsky/ttr.xml.csv2xml
+Author: Jan Vlcinsky
+Author-email: jan.vlcinsky@gmail.com
+License: BSD
+Description: ====================
+        ttr.xml.csv2xml
+        ====================
+        :Author: Jan Vlcinsky
+        :e-mail: jan.vlcinsky@gmail.com
+        :license: BSD
+        
+        ttr.xml.csv2xml module contains:
+        
+        	class Csv2Xml
+        		Converter of CSV lines into xml elements or string
+        	function string2xml
+        		utility function to convert string into xml string in one shot.
+        
+        Features:
+        
+        - read CSV into XML document
+        - get headers from CSV and use them as element names
+        - managing CSV format
+        
+        	- define CSV format as would csv module
+        		- using Dialect (subclass, registered one)
+        		- using fmtparams
+        		- combination (fmtparam override Dialect)
+        
+        - on resulting xml define:
+        
+        	- name of root tag
+        	- name of row element
+        	- optional use and name of attribute in row element, showing line number
+        
+        - iterator over csv / xml rows
+        
+        - simple function string2xml including encoding
+        
+        Installation
+        ============
+        Python must be installed, version 2.6 is expected.
+        You shall have access to Internet to installa additional packages automatically from PyPi_ (lxml at this moment)
+        This package is not on PyPi_ yet (planned).
+        Use of distribution package itself is needed at the moment and andy of following tools shall work
+        
+        Using setup.py: unpack the package and run::
+          python setup.py install
+          
+        Using easy_install::
+          easy_install <package_file>
+          
+        Using pip::
+          pip install <package_file>
+        
+        On windows, using binary setup.exe::
+          simply run the installation program.
+        
+        
+        CSV string into XML string
+        ==========================
+        
+        Simple case could be:
+        	>>> from ttr.xml.csv2xml import string2xml
+        	>>> csv_str = """a;b;c
+        	... 1;2;3
+        	... 11;22;33
+        	... 111;222;333"""
+        	>>> print string2xml(csv_str, delimiter = ";")
+        	<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>
+        
+        If you like to specify output encoding (default is UTF-8), tell it by encoding parameter
+        	>>> print string2xml(csv_str, delimiter = ";", encoding = "windows-1250")
+        	<?xml version='1.0' encoding='windows-1250'?>
+        	<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>
+        
+        The CSV format can be set also by registered dialects, adding also line numbering attribute
+        	>>> excel_str = """a,b,c
+        	... 1,2,3
+        	... 11,22,33
+        	... 111,222,333"""
+        	>>> print string2xml(excel_str, dialect = "excel", row_num_att = "rownum")
+        	<root><row rownum="1"><a>1</a><b>2</b><c>3</c></row><row rownum="2"><a>11</a><b>22</b><c>33</c></row><row rownum="3"><a>111</a><b>222</b><c>333</c></row></root>
+        
+        Or you can define your own dialect using csv.Dialect subclass
+        	>>> import csv
+        	>>> class DialectSemicolon(csv.Dialect):
+        	...  delimiter = ';'
+        	...  quotechar = '"'
+        	...  doublequote = True
+        	...  skipinitialspace = False
+        	...  lineterminator = '\r\n'
+        	...  quoting = csv.QUOTE_NONE
+        	...	
+        	>>> print string2xml(csv_str, dialect = DialectSemicolon)
+        	<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>
+        
+        File object into XML string
+        ===========================
+        Csv2Xml provides only one type of source - file like object.
+        It can be created by opening a file in style: f = open("my.csv", "b")
+        or by using string buffers:
+        
+        	>>> from StringIO import StringIO
+        	>>> buff = StringIO(csv_str)
+        	>>> print buff # doctest:+ELLIPSIS
+        	<StringIO.StringIO ...>
+        	>>> from ttr.xml.csv2xml import Csv2Xml
+        	>>> csv_convertor = Csv2Xml(buff, delimiter = ";") # doctest:+ELLIPSIS
+        	>>> print csv_convertor.as_string()
+        	<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>
+        
+        This way you can easily manage conversion of files without any need to read them in advance into a string.
+        You can specify CSV file format using the same methods as with string2xml function.
+        
+        	>>> buff2 = StringIO(excel_str) 
+        	>>> csv_convertor = Csv2Xml(buff2, dialect = "excel")
+        	>>> print  csv_convertor.as_string()
+        	<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>
+        
+        Reading CSV into XML elements
+        =============================
+        Instead of using string for storing resulting XML, more nataral is to get is as XML element
+        You then get root element with all the row - related elements being nested inside
+        The only difference is you call as_element method now:
+        
+        	>>> buff2 = StringIO(excel_str) # doctest: +ELLIPSIS
+        	>>> csv_convertor = Csv2Xml(buff2, dialect = "excel")
+        	>>> xml_elm = csv_convertor.as_element()
+        	>>> print xml_elm # doctest: +ELLIPSIS
+        	<Element root ...>
+        	>>> from lxml import etree
+        	>>> etree.tostring(xml_elm)
+        	'<root><row><a>1</a><b>2</b><c>3</c></row><row><a>11</a><b>22</b><c>33</c></row><row><a>111</a><b>222</b><c>333</c></row></root>'
+        
+        Iterating over CSV file lines
+        =============================
+        Csv2Xml converter can function also as an iterator - in such a case it will not return root element, but only the row elements.
+        
+        	>>> buff = StringIO(excel_str)
+        	>>> csv_converter = Csv2Xml(buff, dialect = "excel")
+        	>>> for xml_row in csv_converter:
+        	...    print etree.tostring(xml_row)
+        	<row><a>1</a><b>2</b><c>3</c></row>
+        	<row><a>11</a><b>22</b><c>33</c></row>
+        	<row><a>111</a><b>222</b><c>333</c></row>
+          
+        .. _PyPi: http://pypi.python.org/pypi
+        
+        
+        .. This is your project NEWS file which will contain the release notes.
+        .. Example: http://www.python.org/download/releases/2.6/NEWS.txt
+        .. The content of this file, along with README.rst, will appear in your
+        .. project's PyPI page.
+        
+        News
+        ====
+        
+        0.1.2dev
+        ---
+        
+        *Release date: 2011-08-12*
+        
+        * Initial version
+        * removed dependency on lxml, using Python ElementTree
+        
+Keywords: xml csv module
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Topic :: Text Processing :: Markup :: XML
