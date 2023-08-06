@@ -1,0 +1,76 @@
+Introduction
+============
+
+Azavea_'s `Cicero API`_ can be used to look up the elected officials
+for a given address. ``collective.megaphonecicerolookup`` integrates this
+functionality with the Megaphone_ online advocacy tool, so that recipients
+of Megaphone letters and petitions can be found via a Cicero lookup based
+on the address entered by the user.
+
+.. Note::
+   If Cicero returns an e-mail address for the official, Megaphone can
+   deliver the message directly.  However, some officials only publicize
+   web forms for accepting messages. In this case, Megaphone will record
+   the letter but can't deliver it.
+   
+   Megaphone will also record but not deliver the letter if it is unable
+   to find an elected official for the given address (if data is unavailable
+   for the given address or if Cicero cannot be reached.)
+
+.. _Azavea: http://www.azavea.com/
+.. _`Cicero API`: http://www.azavea.com/products/cicero/home.aspx
+.. _Megaphone: http://plone.org/products/megaphone
+
+Installation
+============
+
+``collective.megaphonecicerolookup`` has been tested with Plone 4.
+
+Adding to buildout
+------------------
+
+``collective.megaphonecicerolookup`` has several dependencies. These should get
+pulled in automatically if you add the collective.megaphonecicerolookup egg to your
+buildout. _However_, you need to make sure that you get versions of the
+dependencies that are compatible with your version of Plone. To do so, you may
+extend the following known good set of version pins::
+
+  [buildout]
+  extends = http://good-py.appspot.com/release/collective.megaphone/2.1?plone=4.0.1
+  
+  [instance]
+  ...
+  eggs =
+      ...
+      collective.megaphonecicerolookup
+
+Of course, you may need to adjust the specified Plone version, or create a
+derivative set of version pins if the ones in this set conflict with those
+recommended for some other add-on.
+
+Activating the add-on
+---------------------
+
+After running buildout and starting your Zope instance, install
+collective.megaphonecicerolookup via the Add-ons control panel in Plone
+Site Setup.
+
+Now go to the ``Configuration registry`` control panel and configure your
+Cicero API username and password.
+
+Usage
+=====
+
+1. Add a new Megaphone Action. Select the 'letter' type and continue through
+   the wizard. (Megaphone petitions do not have specific recipients.)
+2. When you reach the Recipients step of the wizard, click the ``Add Recipient``
+   button.
+3. If ``collective.megaphonecicerolookup`` is correctly installed, you can now
+   choose to add a recipient of the ``Cicero lookup: address to official`` type.
+4. Configure the lookup by specifying the label that will be shown to the user
+   sending a letter and the type of official you want to look up.
+   
+   You may optionally specify a set of states for which lookups will be
+   performed. If you do so and the user chooses a different state, their letter
+   will be recorded but without a specific recipient.  If you leave this option
+   blank, lookups will always be attempted.
