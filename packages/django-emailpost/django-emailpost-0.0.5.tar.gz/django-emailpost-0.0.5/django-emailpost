@@ -1,0 +1,307 @@
+#!/usr/bin/env python
+
+#   Copyright 2011 Josh Kearney
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+"""django-emailpost - Post to Django blogs via email."""
+
+from __future__ import with_statement
+
+import bitlyapi
+import optparse
+import os
+import re
+import smtplib
+import sys
+import twitter
+import uuid
+
+from datetime import datetime
+from django.conf import settings
+from django.template import defaultfilters
+from email import message_from_file
+from email.mime.text import MIMEText
+from email.parser import Parser
+from PIL import Image
+from PIL import ImageOps
+
+
+def generate_bitly(url):
+    """Generate a bitly URL."""
+    api = bitlyapi.BitLy(settings.BITLY_LOGIN, settings.BITLY_APIKEY)
+    bitly = api.shorten(longUrl=url)
+
+    return bitly["url"]
+
+
+def tweet(title, url):
+    """Tweet the title and URL of the new post."""
+    if not __TWEET__:
+        return
+
+    api = twitter.Api(consumer_key=settings.TWITTER_CONSUMER_KEY,
+            consumer_secret=settings.TWITTER_CONSUMER_SECRET,
+            access_token_key=settings.TWITTER_ACCESS_TOKEN_KEY,
+            access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET)
+
+    api.PostUpdate("%s - %s" % (title, generate_bitly(url)))
+
+
+def send_confirmation(domain, title, slug):
+    """Send a confirmation email upon a successful post."""
+    post_url = "http://%s/%s/" % (domain, slug)
+
+    msg = "View '%s' here: %s" % (title, post_url)
+    msg = MIMEText(msg)
+
+    msg["Subject"] = "'%s' is live on %s" % (title, domain)
+    msg["From"] = __RECIPIENT__
+    msg["To"] = __SENDER__
+
+    smtp = smtplib.SMTP("localhost")
+    smtp.sendmail(__RECIPIENT__, [__SENDER__], msg.as_string())
+    smtp.quit()
+
+
+def capture_headers(msg):
+    """Capture and return the email's headers."""
+    subject = msg["SUBJECT"]
+
+    # Pull the category out of the subject.
+    match = re.compile("\{(.*)\}").search(subject, 1)
+
+    if match:
+        category = match.group(1).capitalize()
+        # Purge '{category}' from the subject line.
+        subject = subject[:-(len(category) + 2)].strip()
+
+        return dict(
+                original_recipient=os.getenv("ORIGINAL_RECIPIENT"),
+                sender=os.getenv("SENDER"),
+                subject=subject,
+                category=category)
+    else:
+        sys.exit("Must provide a category.")
+
+
+def get_extension(part):
+    """Parse the file extension out of an attachment."""
+    content_type = part.get("Content-Type")
+    match = re.compile("name=\"(.*)\"").search(content_type, 1)
+
+    return match.group(1)[-4:]
+
+
+def walk_email(msg, attachment_dir):
+    """Walk through the email and return its body with attachments."""
+    body = ""
+    attachments = []
+
+    for part in msg.walk():
+        part_type = part.get_content_type()
+
+        if part_type.startswith("image"):
+            part_ext = get_extension(part)
+
+            image_name = uuid.uuid4().hex + part_ext
+            image_path = os.path.join(attachment_dir, image_name)
+            thumbnail_name = image_name[:-len(part_ext)] + "-%dx%d%s" % (
+                    __THUMBNAIL_WIDTH__, __THUMBNAIL_HEIGHT__, part_ext)
+            thumbnail_path = attachment_dir + thumbnail_name
+            gallery_name = image_name[:-len(part_ext)] + "-%dx%d%s" % (
+                    __GALLERY_WIDTH__, __GALLERY_HEIGHT__, part_ext)
+            gallery_path = attachment_dir + gallery_name
+
+            with open(image_path, "w") as f:
+                f.write(part.get_payload(decode=True))
+            f.closed
+
+            image = Image.open(image_path)
+
+            # Resize the image to a reasonable dimension.
+            image = image.resize((__IMAGE_WIDTH__, __IMAGE_HEIGHT__),
+                    Image.ANTIALIAS)
+            image.save(image_path)
+
+            # Generate a thumbnail version of the image.
+            image = image.resize((__THUMBNAIL_WIDTH__, __THUMBNAIL_HEIGHT__),
+                    Image.ANTIALIAS)
+            image.save(thumbnail_path)
+
+            # Generate a gallery version of the image.
+            image = ImageOps.fit(image, (__GALLERY_WIDTH__, __GALLERY_HEIGHT__),
+                    Image.ANTIALIAS)
+            image.save(gallery_path)
+
+            # Let the images be viewable on the web server.
+            os.chmod(image_path, __DEFAULT_FILE_MODE__)
+            os.chmod(thumbnail_path, __DEFAULT_FILE_MODE__)
+            os.chmod(gallery_path, __DEFAULT_FILE_MODE__)
+
+            attachments.append((image_name, thumbnail_name, gallery_name))
+        elif part_type == "text/plain":
+            body = part.get_payload().strip()
+
+    return (body, attachments)
+
+
+def build_options():
+    """Generate command line options."""
+    parser = optparse.OptionParser()
+
+    # Required parameters.
+    parser.add_option("-a", "--app", dest="app",
+            help="name of the Django app")
+    parser.add_option("-p", "--project-path", dest="project_path",
+            help="path to the Django project")
+    parser.add_option("-r", "--recipient", dest="recipient",
+            help="accepted recipient")
+    parser.add_option("--tweet", action="store_true", dest="tweet",
+            help="tweet new posts")
+
+    # Optional parameters.
+    optional = optparse.OptionGroup(parser, "Optional")
+    optional.add_option("--image-width", dest="image_width", type="int",
+            default=1024, help="default image width")
+    optional.add_option("--image-height", dest="image_height", type="int",
+            default=765, help="default image height")
+    optional.add_option("--thubnail-width", dest="thumbnail_width", type="int",
+            default=300, help="default thumbnail width")
+    optional.add_option("--thumbnail-height", dest="thumbnail_height",
+            type="int", default=224, help="default thumbnail height")
+    optional.add_option("--gallery-width", dest="gallery_width",
+            type="int", default=150, help="default gallery width")
+    optional.add_option("--gallery-height", dest="gallery_height",
+            type="int", default=150, help="default gallery height")
+    optional.add_option("--default-file-mode", dest="default_file_mode",
+            type="int", default=0644, help="default file mode")
+    parser.add_option_group(optional)
+
+    return parser.parse_args()
+
+
+def ensure_config_options():
+    """Ensure the required CLI options are present."""
+    if not __APP__:
+        sys.exit("Must supply a Django app.")
+    elif not __PROJECT_PATH__:
+        sys.exit("Must supply the path to the Django project.")
+    elif not __RECIPIENT__:
+        sys.exit("Must supply a recipient.")
+
+    # Add the project to the Python Path and load the app's settings.
+    sys.path.append(__PROJECT_PATH__)
+    sys.path.append(__PROJECT_PATH__ + "/../")
+    os.environ["DJANGO_SETTINGS_MODULE"] = "%s.settings" % os.path.basename(
+            __PROJECT_PATH__)
+
+
+def ensure_allowed():
+    """Ensure sender is permitted to send to recipient."""
+    if __SENDER__ != __HEADERS__["sender"]:
+        sys.exit("Access Denied: Invalid Sender")
+    elif __RECIPIENT__ != __HEADERS__["original_recipient"]:
+        sys.exit("Access Denied: Invalid Recipient")
+
+
+def load_models():
+    """Load and return the app's models."""
+    from django.contrib.sites.models import Site
+    from django.db import models
+
+    domain = str(Site.objects.get_current().domain)
+
+    return (domain, models.get_model(__APP__, "Post"),
+            models.get_model(__APP__, "Category"))
+
+
+def find_category(model, category):
+    """Find and return the category ID."""
+    try:
+        return int(model.objects.filter(name=category)[0].id)
+    except IndexError:
+        sys.exit("Category not found.")
+
+
+def publish_post(domain, model, category_id, title, body, attachments):
+    """Publish the new post to the DB."""
+    if len(attachments) > 0:
+        # TODO(jk0): Add support for multiple attachments.
+        original_path = "%s%s" % (settings.MEDIA_URL, attachments[0][0])
+        thumbnail_path = "%s%s" % (settings.MEDIA_URL, attachments[0][1])
+        gallery_path = "%s%s" % (settings.MEDIA_URL, attachments[0][2])
+
+        # Generate in the Textile markup language.
+        attachment_href = "\"(lightbox)!%s(%s)!\":%s" % (thumbnail_path,
+                title, original_path)
+
+    # If there are attachments and no body, only link the attachments.
+    if len(body) <= 1 and len(attachments) > 0:
+        body = attachment_href
+    # If there is a body and attachments, include both.
+    elif len(body) > 1 and len(attachments) > 0:
+        body = "%s\n\n%s" % (attachment_href, body)
+
+    slug = defaultfilters.slugify(title)
+    post = model(title=title, slug=slug, date=datetime.now(), body=body,
+            published=True)
+    post.save()
+
+    # Give the post a category.
+    post.categories = [category_id]
+    post.save()
+
+    tweet(title, "http://%s/%s/" % (domain, slug))
+    send_confirmation(domain, title, slug)
+
+
+if __name__ == "__main__":
+    OPTIONS, ARGS = build_options()
+
+    __APP__ = OPTIONS.app
+    __PROJECT_PATH__ = OPTIONS.project_path
+    __RECIPIENT__ = OPTIONS.recipient
+    __TWEET__ = OPTIONS.tweet
+
+    __IMAGE_WIDTH__ = OPTIONS.image_width
+    __IMAGE_HEIGHT__ = OPTIONS.image_height
+    __THUMBNAIL_WIDTH__ = OPTIONS.thumbnail_width
+    __THUMBNAIL_HEIGHT__ = OPTIONS.thumbnail_height
+    __GALLERY_WIDTH__ = OPTIONS.gallery_width
+    __GALLERY_HEIGHT__ = OPTIONS.gallery_height
+
+    __DEFAULT_FILE_MODE__ = OPTIONS.default_file_mode
+
+    ensure_config_options()
+
+    # Set this after DJANGO_SETTINGS_MODULE is loaded.
+    __SENDER__ = settings.ADMINS[0][1]
+
+    # Postfix sends messages via stdin.
+    MSG = Parser().parse(sys.stdin)
+
+    # Enforce ACLs and parse the email's headers.
+    __HEADERS__ = capture_headers(MSG)
+    ensure_allowed()
+
+    # Extract email body and attachment filenames.
+    BODY, ATTACHMENTS = walk_email(MSG, settings.MEDIA_ROOT)
+
+    # Load the app's models and the category ID.
+    DOMAIN, POST_MODEL, CATEGORY_MODEL = load_models()
+    CATEGORY_ID = find_category(CATEGORY_MODEL, __HEADERS__["category"])
+
+    # Publish the new post to the DB.
+    publish_post(DOMAIN, POST_MODEL, CATEGORY_ID, __HEADERS__["subject"],
+            BODY, ATTACHMENTS)
