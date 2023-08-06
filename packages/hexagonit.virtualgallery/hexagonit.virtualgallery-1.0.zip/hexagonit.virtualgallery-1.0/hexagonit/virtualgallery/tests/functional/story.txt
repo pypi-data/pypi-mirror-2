@@ -1,0 +1,222 @@
+User story
+==========
+
+A scripted walk-through of basic features of hexagonit.virtualgallery.
+
+Prepare
+-------
+
+We'll start by importing what we need and adding a Folder so we can later
+add images to it.
+
+    >>> from StringIO import StringIO
+    >>> foo = portal.invokeFactory('Folder', 'gallery')
+    >>> import transaction; transaction.commit()
+
+Now, let's login so we can later use the `Add new ...` drop-down menu and start
+adding an Image.
+
+    Go to login screen.
+    >>> browser.open(portal.absolute_url() + '/login')
+
+    Fill in your credentials.
+    >>> browser.getControl(name='__ac_name').value = TEST_USER_NAME
+    >>> browser.getControl(name='__ac_password').value = TEST_USER_PASSWORD
+
+    Click Login button.
+    >>> browser.getControl(name='submit').click()
+
+    Are we logged in?
+    >>> "You are now logged in" in browser.contents
+    True
+
+
+Add an Image
+---------------
+
+Let's now add an Image, to our Folder.
+
+    Click on the add link to open the form for adding an Image.
+    >>> browser.open(portal.gallery.absolute_url())
+    >>> browser.getLink(id='image').click()
+
+    Fill in fields.
+    >>> browser.getControl(name='title').value = "Image"
+    >>> browser.getControl(name='description').value = "Lorem lipsum.."
+    >>> browser.getControl(name='image_file').add_file(StringIO(PNG_IMAGE), 'image/png', 'image.png')
+
+    Click submit to create the Image.
+    >>> browser.getControl(name='form.button.save').click()
+
+    Was our Image really created?
+    >>> 'Changes saved' in browser.contents
+    True
+    >>> hasattr(portal.gallery, 'image')
+    True
+
+
+Set Folder's display view to 'virtualgallery'
+---------------------------------------------
+
+    First, make sure that the settings action is not available before
+    activating the gallery view.
+    >>> browser.open(portal.gallery.absolute_url())
+    >>> 'Virtual gallery settings' in browser.contents
+    False
+
+    Verify that we have the link to display view.
+    >>> browser.getLink(id='virtualgallery').url.endswith("selectViewTemplate?templateId=virtualgallery")
+    True
+
+    Click to set display view.
+    >>> browser.getLink(id='virtualgallery').click()
+    >>> 'View changed' in browser.contents
+    True
+
+    Check that gallery JavaScripts and divs are present in HTML
+    >>> '++resource++hexagonit.virtualgallery/swfobject.js' in browser.contents
+    True
+    >>> 'dataURL:"http://nohost/plone/gallery/@@virtualgallery.json"' in browser.contents
+    True
+    >>> '<div id="virtualgallery-wrapper">' in browser.contents
+    True
+    >>> '<div id="altContent">' in browser.contents
+    True
+
+    Check that the settings action is now visible.
+    >>> 'Virtual gallery settings' in browser.contents
+    True
+
+Verify that the JSON configuration contains the correct image
+-------------------------------------------------------------
+
+    >>> browser.open('{0}/@@virtualgallery.json'.format(portal.gallery.absolute_url()))
+    >>> print browser.headers
+    Status: 200 Ok
+    Content-Length: ...
+    Content-Type: application/json
+
+    >>> print browser.contents
+    {
+      "images": [
+        {
+          "author": " ",
+          "description": "Lorem lipsum..",
+          "title": "Image",
+          "url": "http://nohost/plone/gallery/image"
+        }
+      ],
+      "settings": {
+        "anaglyphModeEnabled": "false"
+      },
+      "ui": {
+        "anaglyph": "Anaglyph",
+        "enterRoom": "Entering room [x] of [y]",
+        "enterRoomToolTip": "Click to enter room [x]",
+        "fullscreen": "Fullscreen",
+        "loadingImg": "Loading image:"
+      }
+    }
+
+
+Configure the gallery to use a particular image scale
+-----------------------------------------------------
+
+Navigate to the virtual gallery settings form.
+
+    >>> browser.open(portal.gallery.absolute_url())
+    >>> browser.getLink('Virtual gallery settings').click()
+    >>> browser.url.endswith('@@virtualgallery-settings')
+    True
+
+Make sure we have a selection of scales to choose from.
+
+    >>> image_scale = browser.getControl('Image scale')
+    >>> image_scale.options
+    ['__original__', 'large', 'preview', 'mini', 'thumb', 'tile', 'icon', 'listing']
+
+Choose a scale
+
+    >>> image_scale.value = ['thumb']
+    >>> browser.getControl('Save changes').click()
+
+Assert that the choice was persisted correctly.
+
+    >>> from hexagonit.virtualgallery.interfaces import IVirtualGallerySettings
+    >>> IVirtualGallerySettings(portal.gallery).image_scale
+    'thumb'
+
+Assert that the URL in the JSON config has changed to reflect the choice of
+the particular scale.
+
+    >>> browser.open('{0}/@@virtualgallery.json'.format(portal.gallery.absolute_url()))
+    >>> print browser.contents
+    {
+      "images": [
+        {
+          "author": " ",
+          "description": "Lorem lipsum..",
+          "title": "Image",
+          "url": "http://nohost/plone/gallery/image/@@images/2f42f6f2-2d76-4883-9907-0bb8d70621ff.jpeg"
+        }
+      ],
+      "settings": {
+        "anaglyphModeEnabled": "false"
+      },
+      "ui": {
+        "anaglyph": "Anaglyph",
+        "enterRoom": "Entering room [x] of [y]",
+        "enterRoomToolTip": "Click to enter room [x]",
+        "fullscreen": "Fullscreen",
+        "loadingImg": "Loading image:"
+      }
+    }
+
+Check that in case of unknown scale configurations we fallback to the original
+scale. This might be the case if a previously available scale is removed from
+the site configuration.
+
+    >>> IVirtualGallerySettings(portal.gallery).image_scale = '<unknown>'
+    >>> transaction.commit()
+
+    >>> browser.open('{0}/@@virtualgallery.json'.format(portal.gallery.absolute_url()))
+    >>> print browser.contents
+    {
+      "images": [
+        {
+          "author": " ",
+          "description": "Lorem lipsum..",
+          "title": "Image",
+          "url": "http://nohost/plone/gallery/image"
+        }
+      ],
+      "settings": {
+        "anaglyphModeEnabled": "false"
+      },
+      "ui": {
+        "anaglyph": "Anaglyph",
+        "enterRoom": "Entering room [x] of [y]",
+        "enterRoomToolTip": "Click to enter room [x]",
+        "fullscreen": "Fullscreen",
+        "loadingImg": "Loading image:"
+      }
+    }
+
+Make sure that the settings form validates the scale input.
+
+    >>> browser.open(portal.gallery.absolute_url())
+    >>> browser.getLink('Virtual gallery settings').click()
+    >>> browser.getControl('Image scale').value = ['thumb']
+
+Remove the 'thumb' as a possible scale before submitting the form.
+
+    >>> scales = portal.portal_properties.imaging_properties.getProperty('allowed_sizes')
+    >>> portal.portal_properties.imaging_properties._updateProperty('allowed_sizes',
+    ...   [scale for scale in scales if 'thumb' not in scale])
+    >>> transaction.commit()
+
+Submit the form and assert we get a validation error.
+
+    >>> browser.getControl('Save changes').click()
+    >>> 'Failed to update virtual gallery settings' in browser.contents
+    True
