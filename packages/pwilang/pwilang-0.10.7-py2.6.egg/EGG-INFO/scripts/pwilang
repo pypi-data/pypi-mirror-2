@@ -1,0 +1,108 @@
+#!/usr/bin/python
+
+VERSION="0.9.pre1"
+
+import sys
+from os.path import abspath, dirname, expanduser
+from os import chdir
+
+import pwilang
+
+def read_csv (filename):
+    """ Reads a csv file and return its contents for sending to the
+        template's context """
+
+    import csv
+
+    f = csv.reader (open (filename, 'rb'))
+    header = next (f)
+    objs = []
+
+    for row in f:
+        newobj = dict ()
+        for i in xrange (0, len (header)):
+            if (i < len (row)):
+                newobj[header[i]] = unicode (row[i], 'utf-8')
+        objs.append (newobj)
+
+    return objs
+
+def read_yaml (filename):
+    """ Read the contents of a Yaml file.
+    """
+    return {}
+
+def read_json (str):
+    """ Reads json contents.
+        @param str: Either a JSon string or a path to a file name
+            containing JSon statements.
+    """
+    return {}
+
+
+from optparse import OptionParser
+
+if __name__ == "__main__":
+    # we concatenate our custom path !
+    p = OptionParser (usage="pwilang file.pwi [-o outfile]", version="pwilang v%s" % VERSION)
+
+    p.add_option ('-o', '--output', action='store', type='string', dest='output', default="-", help='Name of the output file, or "-" for stdout')
+
+    p.add_option ('-n', '--no-pwi', action='store_true', dest='no_pwi', help='Don\'t interpret pwilang code')
+    p.add_option ('-i', '--no-jinja', action='store_true', dest='no_jinja', help='Don\'t interpret jinja code')
+    p.add_option ('-e', '--no-headers', action='store_true', dest='no_headers', help='Don\'t put headers and footers in pdf')
+
+    p.add_option ('-c', '--csv', action='store', type='string', dest='csv', help="A CSV file with data to give to the templates")
+    p.add_option ('-j', '--json', action='store', type='string', dest='json', help="A JSON file or string with data to give to the templates")
+    p.add_option ('-y', '--yaml', action='store', type='string', dest='yaml', help="A Yaml file with data to give to the templates")
+
+    # p.add_option ('-b', '--batch', action='store_true', dest='batch', help="""Treat the input data as batch instructions. This means that in JSon or YaML, the top-level element MUST be an array containing the following objects : { 'output_html' : 'file_name.html', 'output_pdf' : 'file_name.pdf', 'context' : {} }.
+#output_html and output_pdf don't have to be both here, but you need at least one.
+#This option ignores any -o or -p switches since many files will be generated.
+#""")
+
+    p.add_option ('-p', '--pdf', action='store', type='string', dest='pdf', help='Name of the pdf file to generate')
+
+    (options, args) = p.parse_args (sys.argv[1:])
+
+    if len (args) != 1:
+        p.error ("Please specify a .pwi file to parse")
+    source_filename = args[0]
+
+    # GETTING CONTEXT
+    ctx = dict ()
+    if options.csv:
+        ctx['context'] = read_csv (options.csv)
+
+    if options.json:
+        ctx['context'] = read_json (options.json)
+
+    if options.yaml:
+        ctx['context'] = read_yaml (options.yaml)
+
+    # OPENING THE OUTPUT FILES FOR THE HTML
+    out = sys.stdout
+    if options.output != "-":
+        f = open (options.output, "w")
+        out = f
+
+    if options.pdf and options.output == "-":
+        # No html output file specified, we need to open a temporary file.
+        import tempfile
+        out = tempfile.mkstemp ()
+        options.output = out[1] + '.html'
+        out = open (options.output, 'w')
+
+    f = open (source_filename, 'r')
+    chdir (dirname (abspath (source_filename)))
+    pwilang.process (f, out, ctx, with_pwilang=not options.no_pwi, with_jinja2=not options.no_jinja)
+    f.close ()
+
+    if options.output != "-":
+        out.close ()
+
+    if options.pdf:
+        pwilang.create_pdf (options.output, options.pdf, not options.no_headers)
+
+
+
