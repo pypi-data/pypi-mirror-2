@@ -1,0 +1,97 @@
+{% load i18n %}
+{% load txcommontags %}
+
+<script type="text/javascript">
+
+$(document).ready(function(){
+    $("#create_new_resource").toggle(function(){
+        $("#create_new_resource_form").slideDown();
+    }, function(){
+        $("#create_new_resource_form").slideUp();
+    });
+
+    {% if resource %}
+
+        var uuid = '{{ resource.source_file.uuid }}';
+		var resource_slug = '{{resource.slug}}';
+        $("div#notification-container div").html("{% blocktrans with resource.source_file.name as resource_name %}Extracting strings from '{{ resource_name }}'. This might take a while...{% endblocktrans %}");
+        $("div#notification-container").fadeIn("fast");
+
+        $.ajax({
+            type : 'POST',
+            url: sprintf('{{ api_project_files }}', '{{ project.slug }}'),
+            contentType : 'application/json',
+            responseType: "json",
+            data: JSON.stringify({'uuid':uuid, 'slug': resource_slug }),
+            dataType: 'json',
+            success: function(data, textStatus, XMLHttpRequest){
+                window.location = data['redirect'];
+            },
+            error: function(XMLHttpRequest, textStatus, errorThrown){
+                alert(XMLHttpRequest.responseText);
+            },
+            complete: function(XMLHttpRequest, textStatus){
+                $("div#notification-container").fadeOut("slow");
+            }
+        });
+
+
+    {% endif %}
+
+});
+</script>
+
+<p style="text-align:center">
+<span id="create_new_resource" class="i16 add submit_button buttonized houdini_toggler">{% trans "Create resource..." %}</span>
+</p>
+
+<div id="create_new_resource_form" class="generic_form" {% if not display_form %}style="display:none;"{% endif %}>
+
+ <form action='' method='post' class="microform houdini">{% csrf_token %}
+  <fieldset style="margin-top: 1em;">
+  <legend>{% trans "Create resource to be translated" %}</legend>
+
+  <p class="helptext clear">
+  {% blocktrans %}
+  Create a resource by selecting a source language and uploading a source translation file from your workstation, such as an English POT file.
+  Transifex will analyze the file, extract the strings from inside it, and create your resource based on these.
+  {% endblocktrans %}
+  </p>
+
+  <table style="padding:0 1em">
+  <tbody>
+    {% comment %}
+    Overridden form_as_table_rows in order to better customize it.
+    {% endcomment %}
+    {% if create_resource_form %}
+        {% if create_resource_form.non_field_errors %}
+            <ul class="fielderrors">{{ create_resource_form.non_field_errors }}</ul>
+        {% endif %}
+        {% for field in create_resource_form %}
+            {% if field.is_hidden %}
+                {{ field }}
+                {% if field.errors %}
+                   <p class="fieldp">{{ field }}</p>
+                   <p class="fielderrors">{% for error in field.errors %}{{ error }}{% endfor %}</p>
+                {% endif %}
+            {% else %}
+                <tr{% if id %} id="sub_{{ id }}{{ forloop.counter}}" style="display:none"{% endif %}>
+                <th>{{ field.label }}: {% if field.field.required %}<span class="required">*</span>{% endif %}</th>
+                <td>
+                    <p class="fieldp">{{ field }}</p>
+                    {% if field.errors %}<p class="fielderrors">{% for error in field.errors %}{{ error }}{% endfor %}</p>{% endif %}
+                </td>
+                </tr>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+  </tbody>
+  </table>
+  <p class="submit" style="text-align:center"><span class="buttonized"><input type="submit" class="i16 submit" name="create_resource" value="{% trans "Create Resource" %}" /></span></p>
+
+  </fieldset>
+ </form>
+
+</div>
+
+
