@@ -1,0 +1,223 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>servermgr.pyro_ns &mdash; ServerMgr v0.2.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.2.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="ServerMgr v0.2.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ServerMgr v0.2.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for servermgr.pyro_ns</h1><div class="highlight"><pre>
+<span class="c"># -*- mode: python; tab-width:8; py-indent-offset:4; indent-tabs-mode:nil -*-</span>
+<span class="c">#pylint: disable=C0301</span>
+<span class="c">#line length;</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Pyro module management.</span>
+
+<span class="sd">Use this module to manage a Pyro name server.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">Pyro.naming</span>
+
+<span class="kn">import</span> <span class="nn">base</span>
+
+<div class="viewcode-block" id="Manager"><a class="viewcode-back" href="../../pyro_ns.html#servermgr.pyro_ns.Manager">[docs]</a><span class="k">class</span> <span class="nc">Manager</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">Manager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Pyro manager object.</span>
+
+<span class="sd">    :param host: the interface to listen on.</span>
+<span class="sd">    :param port: the port to listen on.</span>
+<span class="sd">    :type port: int</span>
+<span class="sd">    :param data_dir: name of the pyro data directory</span>
+<span class="sd">    :keyword name: the program name</span>
+<span class="sd">    :keyword process_name: the string to diplay in &#39;ps&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">__implements__</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">ManagerInterface</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">&quot;pyro_ns&quot;</span><span class="p">,</span> <span class="n">process_name</span><span class="o">=</span><span class="s">&quot;Pyro NameServer&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        
+        <span class="nb">super</span><span class="p">(</span><span class="n">Manager</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">host</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">port</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">=</span> <span class="n">data_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">process_name</span> <span class="o">=</span> <span class="n">process_name</span>
+
+<div class="viewcode-block" id="Manager.health"><a class="viewcode-back" href="../../pyro_ns.html#servermgr.pyro_ns.Manager.health">[docs]</a>    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check Pyro health.</span>
+
+<span class="sd">        :raises: **base.WorkerError** if we cannot locate the Pyro name server.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Pyro</span><span class="o">.</span><span class="n">naming</span><span class="o">.</span><span class="n">NameServerLocator</span><span class="p">()</span><span class="o">.</span><span class="n">getNS</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">Pyro</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">PyroError</span><span class="p">,</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">base</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+    </div>
+<div class="viewcode-block" id="Manager.start"><a class="viewcode-back" href="../../pyro_ns.html#servermgr.pyro_ns.Manager.start">[docs]</a>    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">10.0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Launch the Pyro name server in its own process.</span>
+<span class="sd">        </span>
+<span class="sd">        :param wait: If true, call self.ready_wait() after starting the subprocess.</span>
+<span class="sd">        :param timeout: When calling ready_wait(), use this timeout value.</span>
+<span class="sd">        :type timeout: float, number of seconds</span>
+<span class="sd">        :raises: **base.WorkerError** if the worker hasn&#39;t started before timeout elapses.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">env</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span>
+        <span class="n">env</span><span class="p">[</span><span class="s">&quot;PYRO_STORAGE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span>
+
+        <span class="c"># Note: Can&#39;t set the ps display unless we write a custom pyro-ns script;</span>
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s">&quot;pyro-ns&quot;</span><span class="p">,</span>
+                                    <span class="s">&quot;-n&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                                    <span class="s">&quot;-p&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">),</span>
+                                    <span class="s">&quot;-d&quot;</span><span class="p">],</span>
+                                   <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">process</span> <span class="o">=</span> <span class="n">process</span>
+
+        <span class="k">if</span> <span class="n">wait</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ready_wait</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+</div></div>
+<span class="k">def</span> <span class="nf">interrupt</span><span class="p">(</span><span class="n">_unused_signum</span><span class="p">,</span> <span class="n">_unused_frame</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Handle user stopping with control-C.&quot;&quot;&quot;</span>
+    <span class="k">print</span> <span class="o">&gt;&gt;</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Keyboard interrupt, exiting.&quot;</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../pyro_ns.html#servermgr.pyro_ns.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    You can use this script to start a copy of the pyro nameserver; however, you could </span>
+<span class="sd">    just as easily run the **pyro-ns** script installed by pyro.</span>
+
+<span class="sd">    Usage: pyro.py [options]</span>
+
+<span class="sd">    Options:</span>
+<span class="sd">      -h, --help            show this help message and exit</span>
+<span class="sd">      -H HOST, --host=HOST  Pyro nameserver hostname</span>
+<span class="sd">      -p PORT, --port=PORT  Pyro nameserver port</span>
+<span class="sd">      -d DATADIR, --datadir=DATADIR</span>
+<span class="sd">                            Pyro data directory</span>
+<span class="sd">&quot;&quot;&quot;</span>
+    
+    <span class="kn">import</span> <span class="nn">optparse</span>
+    <span class="kn">import</span> <span class="nn">signal</span>
+
+    <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">interrupt</span><span class="p">)</span>
+
+    <span class="n">default_host</span> <span class="o">=</span> <span class="s">&quot;localhost&quot;</span>
+    <span class="n">default_port</span> <span class="o">=</span> <span class="mi">7604</span>
+    <span class="n">default_datadir</span> <span class="o">=</span> <span class="s">&quot;/tmp&quot;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">optparse</span><span class="o">.</span><span class="n">OptionParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="s">&quot;usage: %prog [options]</span><span class="se">\n</span><span class="s">For help, run: %prog -h&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-H&quot;</span><span class="p">,</span> <span class="s">&quot;--host&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;host&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;Pyro nameserver hostname&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-p&quot;</span><span class="p">,</span> <span class="s">&quot;--port&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;port&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;Pyro nameserver port&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-d&quot;</span><span class="p">,</span> <span class="s">&quot;--datadir&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&quot;store&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s">&quot;datadir&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;Pyro data directory&quot;</span><span class="p">)</span>
+
+    <span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">_unused_args</span><span class="p">)</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">host</span> <span class="o">=</span> <span class="n">default_host</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">host</span><span class="p">:</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">host</span>
+
+    <span class="n">port</span> <span class="o">=</span> <span class="n">default_port</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">port</span><span class="p">:</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">port</span><span class="p">)</span>
+
+    <span class="n">datadir</span> <span class="o">=</span> <span class="n">default_datadir</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">datadir</span><span class="p">:</span>
+        <span class="n">datadir</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">datadir</span>
+
+    <span class="n">server</span> <span class="o">=</span> <span class="n">Manager</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span>  <span class="n">datadir</span><span class="p">,</span> 
+                     <span class="n">process_name</span><span class="o">=</span><span class="s">&quot;Pyro nameserver&quot;</span><span class="p">)</span>
+    <span class="k">print</span> <span class="s">&quot;starting nameserver&quot;</span>
+    <span class="n">server</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="k">print</span> <span class="s">&quot;nameserver ready&quot;</span>
+    <span class="n">server</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ServerMgr v0.2.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Don Bennett.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.4.
+    </div>
+  </body>
+</html>
