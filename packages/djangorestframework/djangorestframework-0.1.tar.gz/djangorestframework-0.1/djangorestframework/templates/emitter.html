@@ -1,0 +1,127 @@
+{% load urlize_quoted_links %}{% load add_query_param %}<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" 
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+     <style>
+       /* Override some of the Django admin styling */
+       #site-name a {color: #F4F379 !important;}
+       .errorlist {display: inline !important}
+       .errorlist li {display: inline !important; background: white !important; color: black !important; border: 0 !important;}
+     </style>
+     <link rel="stylesheet" type="text/css" href='{{ADMIN_MEDIA_PREFIX}}css/base.css'/>
+     <link rel="stylesheet" type="text/css" href='{{ADMIN_MEDIA_PREFIX}}css/forms.css'/>
+    <title>Django REST framework - {{ name }}</title>
+  </head>
+  <body>
+  <div id="container">
+  
+	<div id="header">
+		<div id="branding">
+		  <h1 id="site-name"><a href='http://django-rest-framework.org'>Django REST framework</a></h1>
+		</div>
+		<div id="user-tools">
+		  {% if user.is_active %}Welcome, {{ user }}.{% if logout_url %} <a href='{{ logout_url }}'>Log out</a>{% endif %}{% else %}Anonymous {% if login_url %}<a href='{{ login_url }}'>Log in</a>{% endif %}{% endif %}
+		</div>
+	</div>
+	
+	<div class="breadcrumbs">
+	{% for breadcrumb_name, breadcrumb_url in breadcrumblist %}
+    <a href="{{breadcrumb_url}}">{{breadcrumb_name}}</a> {% if not forloop.last %}&rsaquo;{% endif %}
+    {% endfor %}
+    </div>
+
+    <div id="content" class="{% block coltype %}colM{% endblock %}">
+
+	<div class='content-main'>
+	    <h1>{{ name }}</h1>
+	    <p>{% if markeddown %}{% autoescape off %}{{ markeddown }}{% endautoescape %}{% else %}{{ description|linebreaksbr }}{% endif %}</p>
+	    <div class='module'>
+	    <pre><b>{{ response.status }} {{ response.status_text }}</b>{% autoescape off %}
+{% for key, val in response.headers.items %}<b>{{ key }}:</b> {{ val|urlize_quoted_links }}
+{% endfor %}
+{{ content|urlize_quoted_links }}</pre>{% endautoescape %}</div>
+
+	{% if 'GET' in resource.allowed_methods %}
+			<form>
+				<fieldset class='module aligned'>
+				<h2>GET {{ name }}</h2>
+				<div class='submit-row' style='margin: 0; border: 0'>
+				<a href='{{ request.path }}' rel="nofollow" style='float: left'>GET</a>
+				{% for media_type in resource.emitted_media_types %}
+				  {% with resource.ACCEPT_QUERY_PARAM|add:"="|add:media_type as param %}
+				    [<a href='{{ request.path|add_query_param:param }}' rel="nofollow">{{ media_type }}</a>]
+				  {% endwith %}
+				{% endfor %}
+				</div>
+				</fieldset>
+			</form>
+	{% endif %}
+	
+	{% comment %} *** Only display the POST/PUT/DELETE forms if we have a bound form, and if method     ***
+	              *** tunneling via POST forms is enabled.                                              ***
+	              *** (We could display only the POST form if method tunneling is disabled, but I think ***
+	              ***  the user experience would be confusing, so we simply turn all forms off.         *** {% endcomment %}
+	
+	{% if resource.METHOD_PARAM and form %}
+		{% if 'POST' in resource.allowed_methods %}
+				<form action="{{ request.path }}" method="post">
+				<fieldset class='module aligned'>
+					<h2>POST {{ name }}</h2>
+				    {% csrf_token %}
+				    {{ form.non_field_errors }}
+					{% for field in form %}
+					<div class='form-row'>
+					    {{ field.label_tag }}
+					    {{ field }}
+					    <span class='help'>{{ field.help_text }}</span>
+					    {{ field.errors }}
+					</div>
+					{% endfor %}
+					<div class='submit-row' style='margin: 0; border: 0'>
+						<input type="submit" value="POST" class="default" />
+					</div>
+				</fieldset>
+				</form>
+		{% endif %}
+		
+		{% if 'PUT' in resource.allowed_methods %}
+				<form action="{{ request.path }}" method="post">
+				<fieldset class='module aligned'>
+					<h2>PUT {{ name }}</h2>
+					<input type="hidden" name="{{ resource.METHOD_PARAM }}" value="PUT" />
+					{% csrf_token %}
+					{{ form.non_field_errors }}
+					{% for field in form %}
+					<div class='form-row'>
+					    {{ field.label_tag }}
+					    {{ field }}
+					    <span class='help'>{{ field.help_text }}</span>
+					    {{ field.errors }}			    
+					</div>
+					{% endfor %}
+					<div class='submit-row' style='margin: 0; border: 0'>			
+					  <input type="submit" value="PUT" class="default" />
+					</div>
+				</fieldset>
+				</form>
+		{% endif %}
+		
+		{% if 'DELETE' in resource.allowed_methods %}
+				<form action="{{ request.path }}" method="post">
+				<fieldset class='module aligned'>			
+					<h2>DELETE {{ name }}</h2>
+				    {% csrf_token %}
+					<input type="hidden" name="{{ resource.METHOD_PARAM }}" value="DELETE" />
+					<div class='submit-row' style='margin: 0; border: 0'>			
+					  <input type="submit" value="DELETE" class="default" />
+					</div>
+				</fieldset>
+				</form>
+		{% endif %}
+	{% endif %}
+	</div>
+	</div>
+	</div>
+  </body>
+</html>
