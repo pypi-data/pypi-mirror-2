@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load markup %}
+
+{% block title %}
+  {% if booking and booking.id %}
+    {% trans "Booking" %} {{ booking.get_key }}: {{ booking.get_title }}
+  {% endif %}
+{% endblock %}
+
+{% block page-title %}
+
+  {% if booking and booking.id %}
+    {% include "booking_star.html" %}
+    {% trans "Booking" %} <a href="">{{ booking.get_key }}</a>: {{ booking.get_title }} {% if booking.is_closed %}({% trans "closed" %}){% endif %}
+  {% else %}
+    {{ date }}, {{ page_title }}
+  {% endif %}
+
+
+{% endblock %}
+
+{% block sub-navigation %}
+  <ul>
+    <li>
+    {% if booking %}
+      <a href="/time/{{ booking.day.date|date:"Y/m/d" }}" style="font-weight: bold;">&laquo; {% trans "Back to" %} {{ booking.day.date }}</a>
+    {% else %}
+      <a href="/time/{{ date|date:"Y/m/d" }}" style="font-weight: bold;">&laquo; {% trans "Back to" %} {{ date }}</a>
+    {% endif %}
+    </li>
+  </ul>
+{% endblock %}
+
+{% block sidebar %}
+
+{% endblock %}
+
+{% block content %}
+
+  <aside id="right">
+    {% if booking and booking.id %}
+      {% if booking.is_closed %}
+        <h3>{% trans "Can't edit" %}</h3>
+        {{ booking.get_closing_reason_string|markdown }}<br/><br/>
+      {% endif %}
+
+  <h3>{% trans "Dates" %}</h3>
+  <strong>{% trans "Created" %}:</strong><br/>
+  {{ booking.created|date}} {% trans "by" %} {{ booking.created_by_id|show_user_link }}<br/>
+  <strong>{% trans "Updated" %}:</strong><br/>
+  {{ booking.updated|date }} {% trans "by" %} {{ booking.updated_by_id|show_user_link }}<br/>
+  {% if booking.invoice_no %}
+    <br/>
+    <strong>{% trans "Invoice no." %}:</strong><br/>
+    {{ booking.invoice_no }}<br/>
+  {% endif %}
+
+  {% if booking.issue %}
+    <br/>
+    <h3>{% trans "Issue" %}</h3>
+    <code><a href="/issues/{{ booking.issue.id }}">#{{ booking.issue.no }} {{ booking.issue.title }}</a></code><br/><br/>
+    <br/>
+    {% endif %}
+  {% endif %}
+
+  </aside>
+
+  <section id="xxx" style="width: 72%;">
+  <form action="" method="post">
+    {% csrf_token %}
+    <div class="module">
+      <h3 class="header" id="blue">
+        {% trans 'Contract' %}
+      </h3>
+      <div class="body" id="blue">
+        <div class="clearfix after">
+          <label for="id_customer">{{ form.customer.label }}:</label>
+          {% if booking.is_closed %}<p>{{ booking.project.customer }}</p>{% else %}{{ form.customer }}{% endif %}{{ form.customer.errors }}
+        </div>
+        <div class="clearfix after">
+          <label for="id_project">{{ form.project.label }}:</label>
+          {% if booking.is_closed %}<p>{{ booking.project }}</p>{% else %}{{ form.project }}{% endif %}{{ form.project.errors }}
+        </div>
+        <div class="clearfix after">
+          <label for="id_step">{{ form.step.label }}:</label>
+          {% if booking.is_closed %}<p>{{ booking.step }}</p>{% else %}{{ form.step }}{% endif %}{{ form.step.errors }}
+        </div>
+      </div>
+    </div>
+
+  <div class="module">
+    <h3 class="header" id="blue">
+      {% trans 'Working time' %}
+    </h3>
+    <div class="body" id="blue">
+      <div class="clearfix after">
+        <label for="id_date">{{ form.date.label }}:</label>
+        {% if booking.is_closed %}<p>{{ booking.day.date|date }}</p>{% else %}{{ form.date }}{% endif %}{{ form.date.errors }}
+      </div>
+      <div class="clearfix after">
+        <label>{% trans 'Start' %} / {% trans 'End' %}:</label>
+        {% if booking.is_closed %}<p>{{ booking.start_time }} - {{ booking.end_time }}</p>{% else %}{{ form.from_time }} - {{ form.to_time }} <span class="eg">{% trans 'e.g. 08:30' %}</span>{% endif %}
+      </div>
+      <div class="clearfix after">
+        <label for="id_duration">{% trans 'Duration' %}:</label>
+        {% if booking.is_closed %}<p>{{ booking.duration|format_minutes_to_time }}</p>{% else %}{{ form.hours }} {{ form.minutes }}<span class="eg">{% trans 'Hours' %} / {% trans 'Minutes' %}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <h3 class="header" id="blue">
+      <a id="general-information-pointer"
+         href="javascript:inhouse.toggle_section('general-information');"
+         class="toggled-section ">
+        <span id="general-information-image"
+              class="sprite {% if not expand_boxes %}plus{% else %}minus{% endif %}">
+        </span>
+        {% trans 'Details' %}
+      </a>
+    </h3>
+    <div class="body" id="general-information" style="{% if not expand_boxes %}display:none;{% endif %}">
+      <div class="clearfix after">
+        <label for="id_title">{{ form.title.label }}:</label>
+        {% if booking.is_closed %}<p>{{ booking.title }}</p>{% else %}{{ form.title }}{% endif %}{{ form.title.errors }}
+      </div>
+      <div class="clearfix after">
+        <label for="id_description">{{ form.description.label }}:</label>
+        {% if booking.is_closed %}<p>{{ booking.description }}</p>{% else %}{{ form.description }}{% endif %}{{ form.description.errors }}
+      </div>
+      <div class="clearfix after">
+        <label for="id_location">{% trans 'Location' %}:</label>
+        {% if booking.is_closed %}<p>{{ booking.location }}</p>{% else %}{{ form.location }}{% endif %}{{ form.location.errors }}
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <h3 class="header" id="blue">
+      <a id="ticket-information-pointer"
+         href="javascript:inhouse.toggle_section('ticket-information');"
+         class="toggled-section ">
+        <span id="ticket-information-image"
+              class="sprite {% if not expand_boxes %}plus{% else %}minus{% endif %}">
+        </span>
+        {% trans 'Issue' %}
+      </a>
+    </h3>
+    <div class="body" id="ticket-information" style="{% if not expand_boxes %}display:none;{% endif %}">
+      <div class="clearfix after">
+        <label for="id_tracker">{{ form.tracker.label }}:</label>
+        {% if booking.is_closed %}<p>{{ booking.issue.tracker }}</p>{% else %}{{ form.tracker }}{% endif %}{{ form.tracker.errors }}
+      </div>
+      <div class="clearfix after">
+        <label for="id_issue_no">{{ form.issue_no.label }}:</label>
+        {% if booking.is_closed %}<p>{{ booking.issue.no }}</p>{% else %}{{ form.issue_no }}{% endif %}{{ form.issue_no.errors }}
+      </div>
+    </div>
+  </div>
+  <table>
+    <tr>
+      {% if not booking or not booking.is_closed %}
+        <td><input name="save" type="submit" value="{{ submit_value }}"></td>
+      {% endif %}
+      <td><input name="cancel" type="submit" value="{{ cancel_value }}"></td>
+    </tr>
+  </table>
+</form>
+</section>
+{% endblock %}

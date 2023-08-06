@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load pagination_tags %}
+
+{% block title %}
+  {{ date }}
+{% endblock %}
+
+{% block page-title %}
+  {{ date|date:"l, j. F Y" }}
+  {% if date == today %}
+    ({% trans "Today" %})
+  {% endif %}
+{% endblock %}
+
+{% block navigation %}
+  {% activetab "main" "time" %}
+  {{ block.super }}
+{% endblock %}
+
+{% block sub-navigation %}
+  <ul>
+    <li><a href="{% url inhouse.views.show_today %}">{% trans "Current day" %}</a></li>
+    <li><a href="{% url inhouse.views.overview %}">{% trans "Overview" %}</a></li>
+    <li><a href="{% url inhouse.views.show_week today.year today.month today.day %}">{% trans "Weekly view" %}</a></li>
+    <li><a href="">{% trans "Month" %}</a></li>
+  </ul>
+  <form action="new" method="get">
+    {% csrf_token %}
+    <input type="submit" value="{% trans "Create new entry" %}">
+  </form>
+{% endblock %}
+
+{% block content %}
+  {% autopaginate bookings 20 %}
+  <form method="post">
+  {% csrf_token %}
+  <h3>
+    <a id="bookings-pointer" href="javascript:inhouse.toggle_section('bookings');" class="toggled-section">{% trans "Bookings" %}</a>
+  </h3>
+  <div id="bookings" class="default-list">
+    <div class="pagination">
+      <div style="float: left">
+        <a href="/time/{{ prev_date|date:"Y/m/d" }}">&laquo;  {% trans "Previous day" %}</a>
+        |
+        <a href="/time/{{ next_date|date:"Y/m/d" }}">{% trans "Next day" %} &raquo;</a>
+        |
+        <a href="javascript:inhouse.toggle_checkboxes('booking-list', true);">{% trans "Select all" %}</a>
+        |
+        <a href="javascript:inhouse.toggle_checkboxes('booking-list', false);">{% trans "Deselect all" %}</a>
+      </div>
+      <div style="float: right;">
+        <input type="submit" value="{% trans "Copy to next day" %}" name="copy">
+        <input type="submit" value="{% trans "Delete" %}" name="delete">
+      </div>
+      <div style="clear:both;"></div>
+    </div>
+    <table id="booking-list" class="default-table">
+      <thead>
+        {% include "booking_heading.html" %}
+      </thead>
+      <tbody>
+        {% for booking in bookings %}
+          {% include "booking_row.html" %}
+        {% empty %}
+          <tr><td class="first last" colspan="11">{% trans "No entries found" %}</td></tr>
+        {% endfor %}
+        {% if bookings %}
+          <tr class="sum">
+            <td class="first"></td>
+            <td colspan="3"><strong>{% trans "Sum" %}:</strong></td>
+            <td style="text-align: center;"><strong>{{ day.get_booking_sum|format_minutes_to_time }}</strong></td>
+            <td class="last" colspan="5"></td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <div class="pagination">
+      {% paginate %}
+    </div>
+  </div>
+  </form>
+{% endblock %}
