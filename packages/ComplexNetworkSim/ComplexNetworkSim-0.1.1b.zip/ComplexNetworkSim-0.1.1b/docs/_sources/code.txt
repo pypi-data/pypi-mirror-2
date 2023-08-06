@@ -1,0 +1,176 @@
+.. _code:
+
+Executing the code
+==================
+
+The code is in pure Python, and you can try to run the provided example models
+like any other Python script. I suggest doing so before writing your own
+models. You may wish to become familiar with both `SimPy`_ and `NetworkX`_ before attempting to write you own simulation models, as this project is based heavily on them. 
+
+*ComplexNetworkSim* must be on the PYTHONPATH in order to run any of the
+models.
+
+This project includes models (in the *examples* subfolder) for both of its example case studies.
+
+Example execution of a model from a command prompt:
+
+::
+
+    (...)/Models/SIR_model> python model_scale_free.py
+    Starting simulations...
+    ---Trial 0 ---
+    set up agents...
+    Written 26 items to pickled binary file:
+    (...)/PyComplexSim/Models/SIR_model/test/log_trial_0_states.pickled
+    Written 1 items to pickled binary file:
+    (...)/PyComplexSim/Models/SIR_model/test/log_trial_0_topology.pickled
+    Written 26 items to pickled binary file:
+    (...)/PyComplexSim/Models/SIR_model/test/log_trial_0_statevectors.pickled
+    ---Trial 1 ---
+      *...other trials omitted for brevity...*
+    Simulation completed. 
+    Creating PNGs ... attempting gif creation ... success! 
+    Animation at (...)/PyComplexSim/Models/SIR_model/test/SIR_scale_free.gif 
+    Plot at (...)/PyComplexSim/Models/SIR_model/test/plot_SIR_scale_free.png
+
+
+Designing models
+================
+
+To design future models, it is suggested to have a look the provided
+modules (examples folder) that specify models and agent behaviour.
+
+1. The agent part
+-----------------
+
+Any agent has to adhere to the following structure, in its constructor
+calling its superclass constructor and having a *Run* method:
+::
+
+    '''Structure agent classes need to follow'''
+
+    from ComplexNetworkSim import NetworkAgent, Sim
+
+    class myAgent(NetworkAgent):    
+        
+        def __init__(self, state, initialiser):
+            NetworkAgent.__init__(self, 0, initialiser)
+            #other code goes here
+            
+        def Run(self):
+            #further initialisation code may go here
+            while True:     
+                #main agent logic goes here
+
+				
+2. The simulation and network part
+----------------------------------
+
+Generally we would define an initial complex network (for example a scale-free network) using `NetworkX`_ - any networkx graph object will work. This we then feed along with other parameters into a NetworkSimulation object, and run it. A simulation will create multiple result files under a specified directory (another parameter here). These files can then be used for statistical analysis, plotting an visualisation.  
+
+::
+
+    '''
+    Example model specification for epidemic 
+	Susceptible-Infected-Recovered over a scale-free network.
+
+    This module only executes a simulation and no plotting. 
+    See model_scale_free.py for combined behaviour
+    @author: Joe Schaul <joe.schaul@gmail.com>
+    '''
+    import networkx as nx
+
+    from ComplexNetworkSim import NetworkSimulation
+    from agent_SIR import INFECTED, RECOVERED, SUSCEPTIBLE
+    from agent_SIR import SIRSimple as agentClass
+    from environment_SIR import SIRenvironment as environmentAgent
+
+    # Simulation constants    
+    MAX_SIMULATION_TIME = 25.0
+    TRIALS = 2 
+
+    def main(nodes=30):         
+        # Model parameters
+        directory = 'test'
+        globalSharedParameters =  
+        globalSharedParameters['infection_rate'] = 0.3
+        globalSharedParameters['inf_dur'] = "7"
+            
+        # Network and initial states
+        G = nx.scale_free_graph(nodes)    
+        states = [SUSCEPTIBLE for n in G.nodes()]       
+        
+        # run simulation
+        simulation = NetworkSimulation(G,
+                                       states,
+                                       agentClass,
+                                       directory,
+                                       MAX_SIMULATION_TIME,
+                                       TRIALS,
+                                       environmentAgent,
+                                       **globalSharedParameters)
+        simulation.runSimulation()
+
+    if __name__ == '__main__':
+        main()
+		
+		
+
+3. The visualisation part
+-------------------------
+::
+
+    '''
+    Entry Point module for running plotting and/or animations
+    on simulation files generated from a previous simulation.
+    @author: Joe Schaul <joe.schaul@gmail.com>
+    '''
+    from ComplexNetworkSim import AnimationCreator, PlotCreator
+
+    #states:
+    SUSCEPTIBLE = 0
+    INFECTED = 1
+    RECOVERED = 2
+
+    def main():
+        
+        #directory containing simulation output files (relative or absolute path)
+        directory = 'exampleSimulation'
+        filenames = "SIR"    
+        plotStates = True #set to False if you only want the visualisation  
+        animate = True #set to False if you only want the plotting
+        
+        # Parameters for plotting of system states  
+        # define those states you wish to appear on the plot,
+        # along with their colour and label
+        statesToMonitor = [INFECTED, SUSCEPTIBLE]
+        colours = ["r", "g"]
+        labels = ["Infected", "Susceptible"]
+        titlePlot = "Simulation of agent-based simple SIR"
+        
+        # Parameters for animated visualisations
+        # define a mapping from state to colour
+        # define the specific trial you wish to visualise. Default=0, first trial
+        mapping = {SUSCEPTIBLE:"w", INFECTED:"r", RECOVERED:"0.4"}
+        titleVisual = "Simulation of agent-based simple SIR"    
+        trialToVisualise = 0
+
+        if animate: #run visualisation  
+            visualiser = AnimationCreator(directory, filenames, titleVisual, mapping, trial=trialToVisualise)
+            visualiser.create_gif(verbose=True)
+        
+        if plotStates: #plot results
+            p = PlotCreator(directory, filenames, titlePlot, statesToMonitor, colours, labels)   
+            p.plotSimulation(show=False)
+
+    if __name__ == '__main__':
+        main()
+
+Quick links to 
+
+:ref:`install`
+
+
+.. _SimPy: http://simpy.sourceforge.net/
+.. _NetworkX: http://networkx.lanl.gov/
+.. _ImageMagick: http://www.imagemagick.org/
