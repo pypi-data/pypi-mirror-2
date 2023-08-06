@@ -1,0 +1,18 @@
+nibabel
+=======
+
+.. automodule:: nibabel
+
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
