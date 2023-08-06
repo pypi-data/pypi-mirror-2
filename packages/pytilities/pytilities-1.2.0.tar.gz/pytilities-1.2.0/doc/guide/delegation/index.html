@@ -1,0 +1,386 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Delegation &mdash; Pytilities 1.2.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.2.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="Pytilities 1.2.0 documentation" href="../../" />
+    <link rel="up" title="Programming guide" href="../" />
+    <link rel="next" title="Descriptors" href="" />
+    <link rel="prev" title="Aspect oriented programming tools" href="" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Descriptors"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="#" title="Aspect oriented programming tools"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../">Pytilities 1.2.0 documentation</a> &raquo;</li>
+          <li><a href="../" accesskey="U">Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="delegation">
+<h1>Delegation<a class="headerlink" href="#delegation" title="Permalink to this headline">¶</a></h1>
+<p>Pytilities delegation utilities help in applying the concept of
+<a class="reference external" href="http://en.wikipedia.org/wiki/Delegation_%28programming%29">delegation</a>
+to your code, it makes delegation less tedious so you are less tempted to use
+inheritance (delegation tends to be more flexible, but most languages have
+better support for easy inheriting rather than easy delegating).</p>
+<div class="section" id="basic-delegation">
+<h2>Basic delegation<a class="headerlink" href="#basic-delegation" title="Permalink to this headline">¶</a></h2>
+<p>Delegation is done using the <cite>DelegationAspect</cite>, its usage and use is
+best shown by example: Imagine you are making a game. You have a Player, an Enemy
+and a Box class. These all have health, can take damage and can be destroyed.
+We decide to centralise this code in a Destructible class. As Player, Enemy and
+Box will have other characteristics as well we decide not to simply inherit
+from the Destructible but give ourselves the extra flexibility by giving each
+of them a Destructible instance and delegate calls on the public object to it.</p>
+<p>Normally, you&#8217;d have to write:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Player</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span> <span class="o">=</span> <span class="n">Destructible</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">take_damage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">amount</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">take_damage</span><span class="p">(</span><span class="n">amount</span><span class="p">)</span>
+
+    <span class="nd">@getter</span>
+    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">health</span>
+
+    <span class="nd">@health.setter</span>
+    <span class="k">def</span> <span class="nf">health</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span><span class="o">.</span><span class="n">health</span> <span class="o">=</span> <span class="n">value</span>
+
+<span class="c"># repeat above code for Enemy and Box</span>
+</pre></div>
+</div>
+<p>When Destructible&#8217;s interface changes, you have to change this code too... how
+tedious. With DelegationAspect you can narrow it down to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">DelegationAspect</span>
+
+<span class="k">class</span> <span class="nc">Player</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_destructible</span> <span class="o">=</span> <span class="n">Destructible</span><span class="p">()</span>
+
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_destructible</span><span class="p">),</span>
+                                     <span class="p">(</span><span class="s">&#39;take_damage&#39;</span><span class="p">,</span> <span class="s">&#39;health&#39;</span><span class="p">))</span>
+<span class="n">delegation_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">Player</span><span class="p">)</span>
+
+<span class="c"># do the same for Enemy and Player, note you can reuse the aspect for all 3</span>
+</pre></div>
+</div>
+<p>Using DelegationAspect, the code is more maintainable, and still readable even
+though it&#8217;s shorter.</p>
+<p>The first parameter to DelegationAspect is a descriptor that returns the
+object to which to delegate. The descriptor is passed the instance on which it
+is ran (in this case: a player instance).</p>
+<p>The second parameter specifies the names of the attributes to delegate. Instead
+of an iterable of names, you can provide a &#8216;*&#8217; to indicate all attributes
+should be delegated.</p>
+</div>
+<div class="section" id="advanced-delegation">
+<h2>Advanced delegation<a class="headerlink" href="#advanced-delegation" title="Permalink to this headline">¶</a></h2>
+<p><cite>DelegationAspect</cite>&#8216;s has a second overload with as second parameter a Mapping
+of (access, source_attribute_name) to target_attribute_name&#8217;s. This allows for
+advanced delegation, especially in combination with
+<cite>pytilities.dictionary.FunctionMap</cite>. With this you can delegate only &#8216;get&#8217;
+access, all attributes that start with &#8216;a&#8217; (to give a silly example), delegate
+to from source attribute &#8216;x&#8217; to target attribute &#8216;y&#8217;.</p>
+<p>Access indicates on which types of access delegation should occur. Possible
+values are:</p>
+<ul class="simple">
+<li>&#8216;get&#8217;: whenever you __get__ an attribute: e.g. obj.x</li>
+<li>&#8216;set&#8217;: whenever you __set__ an attribute: e.g. obj.x = 1</li>
+<li>&#8216;delete&#8217;: whenever you __del__ an attribute: e.g. del obj.x</li>
+</ul>
+<div class="section" id="delegating-to-a-differently-named-attribute">
+<h3>Delegating to a differently named attribute<a class="headerlink" href="#delegating-to-a-differently-named-attribute" title="Permalink to this headline">¶</a></h3>
+<p>In order to delegate to differently named attributes:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># Note: Rectangle and Vector implementation omitted</span>
+<span class="n">mapping</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="p">(</span><span class="s">&#39;get&#39;</span><span class="p">,</span> <span class="s">&#39;left&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;x&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s">&#39;set&#39;</span><span class="p">,</span> <span class="s">&#39;left&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;x&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s">&#39;delete&#39;</span><span class="p">,</span> <span class="s">&#39;left&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;x&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s">&#39;get&#39;</span><span class="p">,</span> <span class="s">&#39;top&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;y&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s">&#39;set&#39;</span><span class="p">,</span> <span class="s">&#39;top&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;y&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s">&#39;delete&#39;</span><span class="p">,</span> <span class="s">&#39;top&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="s">&#39;y&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_top_left</span><span class="p">),</span>
+                                     <span class="n">mapping</span><span class="p">)</span>
+<span class="n">delegation_aspect</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">Rectangle</span><span class="p">)</span>
+
+<span class="n">top_left</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">bottom_right</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">Rectangle</span><span class="p">(</span><span class="n">top_left</span><span class="p">,</span> <span class="n">bottom_right</span><span class="p">)</span>
+<span class="n">r</span><span class="o">.</span><span class="n">top</span> <span class="c"># returns 2</span>
+<span class="n">r</span><span class="o">.</span><span class="n">left</span> <span class="c"># returns 1</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="delegating-all-attributes-that-start-with-an-a">
+<h3>Delegating all attributes that start with an &#8216;a&#8217;<a class="headerlink" href="#delegating-all-attributes-that-start-with-an-a" title="Permalink to this headline">¶</a></h3>
+<p>In order to delegate all attributes that start with an &#8216;a&#8217;:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">DelegationAspect</span>
+<span class="kn">from</span> <span class="nn">pytilities.dictionary</span> <span class="kn">import</span> <span class="n">FunctionMap</span>
+
+<span class="k">def</span> <span class="nf">mapper</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+    <span class="n">access</span><span class="p">,</span> <span class="n">source_attribute_name</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">if</span> <span class="n">source_attribute_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">&#39;a&#39;</span><span class="p">):</span>
+        <span class="c"># delegate to attrib with same name on target</span>
+        <span class="k">return</span> <span class="n">source_attribute_name</span>
+    <span class="k">return</span> <span class="bp">None</span>  <span class="c"># do not delegate</span>
+
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">FunctionMap</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
+<span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span>
+    <span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_target</span><span class="p">),</span> <span class="n">mapping</span><span class="p">,</span>
+    <span class="bp">True</span><span class="p">)</span> <span class="c"># undefined_keys: set to True if mapping can&#39;t return a valid set</span>
+          <span class="c"># of keys, as is the case with FunctionMap</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="generating-mappings-with-decorators">
+<h2>Generating mappings with decorators<a class="headerlink" href="#generating-mappings-with-decorators" title="Permalink to this headline">¶</a></h2>
+<p>Instead of specifying the attributes to delegate directly, you can use the
+<cite>mapped</cite> and <cite>mapped_class</cite> decorator to generate it for you.</p>
+<p>Here&#8217;s an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pytilities.delegation</span> <span class="kn">import</span> <span class="n">mapped_class</span><span class="p">,</span> <span class="n">mapped</span>
+
+<span class="c"># mapped_class is required by the mapped decorator (it just doesn&#39;t work</span>
+<span class="c"># without it)</span>
+<span class="nd">@mapped_class</span>
+<span class="k">class</span> <span class="nc">Dispatcher</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c"># an event dispatcher (cfr observer pattern)</span>
+    <span class="c"># fill mappings with empty dicts (any MutableMapping will do)</span>
+    <span class="n">public_mapping</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">protected_mapping</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">__remove_handlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">owner</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="k">def</span> <span class="nf">foo</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">add_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">handler</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">protected_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">dispatch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">keyword_args</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">remove_handlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="c"># the &#39;get&#39;, &#39;set&#39; is the access to delegate on. It wasn&#39;t necessary in</span>
+    <span class="c"># this case though, just showing it can be done</span>
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">,</span> <span class="s">&#39;get&#39;</span><span class="p">,</span> <span class="s">&#39;set&#39;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">remove_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">handler</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">owner</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">has_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">public_mapping</span><span class="p">)</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">events</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+    <span class="nd">@mapped</span><span class="p">(</span><span class="n">protected_mapping</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">register_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">event_names</span><span class="p">):</span>
+        <span class="s">&#39;omitted code&#39;</span>
+
+<span class="c"># include all mappings of public_mapping in protected_mapping</span>
+<span class="n">Dispatcher</span><span class="o">.</span><span class="n">protected_mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">Dispatcher</span><span class="o">.</span><span class="n">public_mapping</span><span class="p">)</span>
+
+<span class="c"># value of public_mapping:</span>
+<span class="c"># {</span>
+<span class="c">#     (&#39;get&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;remove_handler&#39;): &#39;remove_handler&#39;</span>
+<span class="c">#     (&#39;set&#39;, &#39;remove_handler&#39;): &#39;remove_handler&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c"># }</span>
+
+<span class="c"># value of protected_mapping:</span>
+<span class="c"># {</span>
+<span class="c">#     (&#39;get&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;add_handler&#39;): &#39;add_handler&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;dispatch&#39;): &#39;dispatch&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;dispatch&#39;): &#39;dispatch&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;dispatch&#39;): &#39;dispatch&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;remove_handlers&#39;): &#39;remove_handlers&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;remove_handler&#39;): &#39;remove_handler&#39;</span>
+<span class="c">#     (&#39;set&#39;, &#39;remove_handler&#39;): &#39;remove_handler&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;event&#39;): &#39;event&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;has_event&#39;): &#39;has_event&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;events&#39;): &#39;events&#39;,</span>
+<span class="c">#</span>
+<span class="c">#     (&#39;get&#39;, &#39;register_events&#39;): &#39;register_events&#39;,</span>
+<span class="c">#     (&#39;set&#39;, &#39;register_events&#39;): &#39;register_events&#39;,</span>
+<span class="c">#     (&#39;delete&#39;, &#39;register_events&#39;): &#39;register_events&#39;,</span>
+<span class="c"># }</span>
+</pre></div>
+</div>
+<p>Public_mapping and protected_mapping are valid mappings to pass
+to a DelegationAspect:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">delegation_aspect</span> <span class="o">=</span> <span class="n">DelegationAspect</span><span class="p">(</span><span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_dispatcher</span><span class="p">),</span>
+                                     <span class="n">Dispatcher</span><span class="o">.</span><span class="n">public_mapping</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>One of the added benefits is that you&#8217;ll only ever have to change the mappings
+on your class when delegation needs to change, as opposed to changing any class
+that delegates to it.</p>
+<p>Note that the keys of the generated mappings could also be used as keys for
+advice to give in AOP Aspects. (Just replace the values with advice)</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Delegation</a><ul>
+<li><a class="reference internal" href="#basic-delegation">Basic delegation</a></li>
+<li><a class="reference internal" href="#advanced-delegation">Advanced delegation</a><ul>
+<li><a class="reference internal" href="#delegating-to-a-differently-named-attribute">Delegating to a differently named attribute</a></li>
+<li><a class="reference internal" href="#delegating-all-attributes-that-start-with-an-a">Delegating all attributes that start with an &#8216;a&#8217;</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#generating-mappings-with-decorators">Generating mappings with decorators</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href=""
+                        title="previous chapter">Aspect oriented programming tools</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href=""
+                        title="next chapter">Descriptors</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/guide/delegation.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search/" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex/" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex/" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="#" title="Descriptors"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="#" title="Aspect oriented programming tools"
+             >previous</a> |</li>
+        <li><a href="../../">Pytilities 1.2.0 documentation</a> &raquo;</li>
+          <li><a href="../" >Programming guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Tim Diels (limyreth).
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre.
+    </div>
+  </body>
+</html>

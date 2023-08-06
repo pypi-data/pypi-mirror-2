@@ -1,0 +1,262 @@
+Delegation
+==========
+
+Pytilities delegation utilities help in applying the concept of 
+`delegation <http://en.wikipedia.org/wiki/Delegation_%28programming%29>`_ 
+to your code, it makes delegation less tedious so you are less tempted to use 
+inheritance (delegation tends to be more flexible, but most languages have 
+better support for easy inheriting rather than easy delegating).
+
+
+Basic delegation
+----------------
+Delegation is done using the `DelegationAspect`, its usage and use is
+best shown by example: Imagine you are making a game. You have a Player, an Enemy
+and a Box class. These all have health, can take damage and can be destroyed. 
+We decide to centralise this code in a Destructible class. As Player, Enemy and
+Box will have other characteristics as well we decide not to simply inherit
+from the Destructible but give ourselves the extra flexibility by giving each
+of them a Destructible instance and delegate calls on the public object to it.
+
+Normally, you'd have to write::
+
+  class Player(object):
+      def __init__(self):
+          self._destructible = Destructible()
+
+      def take_damage(self, amount):
+          self._destructible.take_damage(amount)
+
+      @getter
+      def health(value):
+          return self._destructible.health
+
+      @health.setter
+      def health(self, value):
+          self._destructible.health = value
+
+  # repeat above code for Enemy and Box
+
+When Destructible's interface changes, you have to change this code too... how
+tedious. With DelegationAspect you can narrow it down to::
+
+  from pytilities.delegation import DelegationAspect
+
+  class Player(object):
+      def __init__(self):
+          self._destructible = Destructible()
+
+  delegation_aspect = DelegationAspect(property(lambda s: s._destructible),
+                                       ('take_damage', 'health'))
+  delegation_aspect.apply(Player)
+
+  # do the same for Enemy and Player, note you can reuse the aspect for all 3
+
+Using DelegationAspect, the code is more maintainable, and still readable even
+though it's shorter.
+
+The first parameter to DelegationAspect is a descriptor that returns the 
+object to which to delegate. The descriptor is passed the instance on which it
+is ran (in this case: a player instance).
+
+The second parameter specifies the names of the attributes to delegate. Instead
+of an iterable of names, you can provide a '*' to indicate all attributes 
+should be delegated.
+
+
+Advanced delegation
+-------------------
+`DelegationAspect`'s has a second overload with as second parameter a Mapping 
+of (access, source_attribute_name) to target_attribute_name's. This allows for 
+advanced delegation, especially in combination with 
+`pytilities.dictionary.FunctionMap`. With this you can delegate only 'get'
+access, all attributes that start with 'a' (to give a silly example), delegate
+to from source attribute 'x' to target attribute 'y'.
+
+Access indicates on which types of access delegation should occur. Possible
+values are:
+
+- 'get': whenever you __get__ an attribute: e.g. obj.x
+- 'set': whenever you __set__ an attribute: e.g. obj.x = 1
+- 'delete': whenever you __del__ an attribute: e.g. del obj.x
+
+
+Delegating to a differently named attribute
+'''''''''''''''''''''''''''''''''''''''''''
+In order to delegate to differently named attributes::
+
+  # Note: Rectangle and Vector implementation omitted
+  mapping = {
+      ('get', 'left') : 'x',
+      ('set', 'left') : 'x',
+      ('delete', 'left') : 'x',
+      ('get', 'top') : 'y',
+      ('set', 'top') : 'y',
+      ('delete', 'top') : 'y',
+  }
+
+  delegation_aspect = DelegationAspect(property(lambda s: s._top_left),
+                                       mapping)
+  delegation_aspect.apply(Rectangle)
+
+  top_left = Vector(x=1, y=2)
+  bottom_right = Vector(x=3, y=4)
+  r = Rectangle(top_left, bottom_right)
+  r.top # returns 2
+  r.left # returns 1
+
+
+Delegating all attributes that start with an 'a'
+''''''''''''''''''''''''''''''''''''''''''''''''
+In order to delegate all attributes that start with an 'a'::
+
+  from pytilities.delegation import DelegationAspect
+  from pytilities.dictionary import FunctionMap
+
+  def mapper(key):
+      access, source_attribute_name = key
+      if source_attribute_name.startswith('a'):
+          # delegate to attrib with same name on target
+          return source_attribute_name  
+      return None  # do not delegate
+
+  mapping = FunctionMap(mapper)
+  delegation_aspect = DelegationAspect(
+      property(lambda s: s._target), mapping,
+      True) # undefined_keys: set to True if mapping can't return a valid set
+            # of keys, as is the case with FunctionMap
+
+
+Generating mappings with decorators
+-----------------------------------
+Instead of specifying the attributes to delegate directly, you can use the 
+`mapped` and `mapped_class` decorator to generate it for you.
+
+Here's an example::
+
+  from pytilities.delegation import mapped_class, mapped
+
+  # mapped_class is required by the mapped decorator (it just doesn't work
+  # without it)
+  @mapped_class 
+  class Dispatcher(object):  # an event dispatcher (cfr observer pattern)
+      # fill mappings with empty dicts (any MutableMapping will do)
+      public_mapping = {}
+      protected_mapping = {}
+
+      def __remove_handlers(self, event, owner):
+          'omitted code'
+
+      def foo(self):
+          'omitted code'
+
+      @mapped(public_mapping)
+      def add_handler(self, event_name, handler, owner = None):
+          'omitted code'
+
+      @mapped(protected_mapping)
+      def dispatch(self, event_name, *args, **keyword_args):
+          'omitted code'
+
+      @mapped(public_mapping)
+      def remove_handlers(self, event_name=None, owner=None):
+          'omitted code'
+
+      # the 'get', 'set' is the access to delegate on. It wasn't necessary in 
+      # this case though, just showing it can be done
+      @mapped(public_mapping, 'get', 'set')
+      def remove_handler(self, event_name, handler, owner = None):
+          'omitted code'
+
+      @mapped(public_mapping)
+      def event(self, event_name, owner = None):
+          'omitted code'
+
+      @mapped(public_mapping)
+      def has_event(self, event_name):
+          'omitted code'
+
+      @mapped(public_mapping)
+      @property
+      def events(self):
+          'omitted code'
+
+      @mapped(protected_mapping)
+      def register_events(self, *event_names):
+          'omitted code'
+
+  # include all mappings of public_mapping in protected_mapping
+  Dispatcher.protected_mapping.update(Dispatcher.public_mapping)
+
+  # value of public_mapping:
+  # {
+  #     ('get', 'add_handler'): 'add_handler', 
+  #     ('set', 'add_handler'): 'add_handler', 
+  #     ('delete', 'add_handler'): 'add_handler', 
+  #
+  #     ('get', 'remove_handlers'): 'remove_handlers', 
+  #     ('set', 'remove_handlers'): 'remove_handlers', 
+  #     ('delete', 'remove_handlers'): 'remove_handlers', 
+  #
+  #     ('get', 'remove_handler'): 'remove_handler'
+  #     ('set', 'remove_handler'): 'remove_handler', 
+  #
+  #     ('get', 'event'): 'event', 
+  #     ('set', 'event'): 'event', 
+  #     ('delete', 'event'): 'event', 
+  #
+  #     ('get', 'has_event'): 'has_event', 
+  #     ('set', 'has_event'): 'has_event', 
+  #     ('delete', 'has_event'): 'has_event', 
+  #
+  #     ('get', 'events'): 'events', 
+  #     ('set', 'events'): 'events', 
+  #     ('delete', 'events'): 'events', 
+  # }
+
+  # value of protected_mapping:
+  # {
+  #     ('get', 'add_handler'): 'add_handler', 
+  #     ('set', 'add_handler'): 'add_handler', 
+  #     ('delete', 'add_handler'): 'add_handler', 
+  #
+  #     ('get', 'dispatch'): 'dispatch', 
+  #     ('set', 'dispatch'): 'dispatch', 
+  #     ('delete', 'dispatch'): 'dispatch', 
+  #
+  #     ('get', 'remove_handlers'): 'remove_handlers', 
+  #     ('set', 'remove_handlers'): 'remove_handlers', 
+  #     ('delete', 'remove_handlers'): 'remove_handlers', 
+  #
+  #     ('get', 'remove_handler'): 'remove_handler'
+  #     ('set', 'remove_handler'): 'remove_handler', 
+  #
+  #     ('get', 'event'): 'event', 
+  #     ('set', 'event'): 'event', 
+  #     ('delete', 'event'): 'event', 
+  #
+  #     ('get', 'has_event'): 'has_event', 
+  #     ('set', 'has_event'): 'has_event', 
+  #     ('delete', 'has_event'): 'has_event', 
+  #
+  #     ('get', 'events'): 'events', 
+  #     ('set', 'events'): 'events', 
+  #     ('delete', 'events'): 'events', 
+  #
+  #     ('get', 'register_events'): 'register_events', 
+  #     ('set', 'register_events'): 'register_events', 
+  #     ('delete', 'register_events'): 'register_events', 
+  # }
+
+Public_mapping and protected_mapping are valid mappings to pass
+to a DelegationAspect::
+
+  delegation_aspect = DelegationAspect(property(lambda s: s._dispatcher),
+                                       Dispatcher.public_mapping)
+
+One of the added benefits is that you'll only ever have to change the mappings
+on your class when delegation needs to change, as opposed to changing any class
+that delegates to it.
+
+Note that the keys of the generated mappings could also be used as keys for
+advice to give in AOP Aspects. (Just replace the values with advice)

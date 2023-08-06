@@ -1,0 +1,389 @@
+Aspect oriented programming tools
+=================================
+
+This guide starts with an introduction to give you a general idea of AOP (for
+a decent introduction to AOP I suggest (e)books, google, ...). It then proceeds
+with a top down approach running you through: using aspects, making aspects and
+eventually writing advice for your aspects.
+
+
+Introduction
+------------
+The aim of aspect oriented programming (AOP) is to allow better separation of 
+concerns. It allows you to centralise code spread out over multiple classes into
+a single class, called an aspect, uncluttering code.
+
+Aspects consist of pieces of advice which are given to methods of a class. Advice are functions/methods
+that wrap around a method/descriptor, allowing them to change its behaviour.
+
+With this AOP library you can give advice to methods, and any other kind of descriptor (e.g. properties). 
+You can even 'advise' unexisting attributes on a class, effectively adding new attributes to the class.
+
+
+Using aspects
+-------------
+Advice is given by applying aspects to instances, for example::
+
+    # Making a Vector instance that sends out change events
+
+    from pytilities.geometry import Vector, verbose_vector_aspect
+
+    vector = Vector()  # a Vector is an (x, y) coordinate
+
+    # this adds functionality to just this vector instance so that you can listen for
+    # change events on it
+    verbose_vector_aspect.apply(vector)  
+
+    def on_changed(old_xy_tuple):
+        pass
+
+    vector.add_handler('changed', on_changed)  # this now works
+
+The aspect's `apply()` method accepts either a class or an instance. If given 
+a class, it is applied to all instances of that class and that class itself.
+If given an instance, it is applied to just that instance.  Built-in/extension 
+types cannot have aspects applied to them.
+
+Multiple aspects can be applied to the same instance. When trying to
+apply/unapply an aspect to an instance for the second time, the call is
+ignored. Note that advice applied to a specific instance always takes
+precedence over advice applied to all instances of a class.
+
+Aspects can be unapplied to objects with the `unapply()` method. Note that you
+can unapply them in any order.
+
+Some more examples of applying/unapplying behaviour::
+
+    # taken from pytilities.test.aop.aspect.AspectTestCase.test_apply_unapply
+    # A: class; a1, a2: instances of A
+    # aspects are ordered according to get_applied_aspects
+    self.when_apply_aspects(a1, aspect1, aspect2)
+
+    aspect2.apply(A)
+    self.then_applied_aspects(a1, aspect2, aspect1) 
+    self.then_applied_aspects(a2, aspect2)
+
+    aspect2.unapply(a1)
+    self.then_applied_aspects(a1, aspect1)
+    self.then_applied_aspects(a2, aspect2)
+
+    aspect2.apply(a1)
+    self.then_applied_aspects(A, aspect2)
+    self.then_applied_aspects(a1, aspect2, aspect1)
+    self.then_applied_aspects(a2, aspect2)
+
+    aspect2.unapply(A)
+    self.then_applied_aspects(a1, aspect1)
+    self.then_applied_aspects(a2)
+
+
+Writing new aspects
+-------------------
+You write new aspects by extending the `Aspect` class (you don't have to, but you'd have to use advisor in pytilities.aop directly).
+Here's an example of a basic aspect::
+
+    from pytilities import aop
+    from pytilities.aop import Aspect
+
+    class SpamAspect(Aspect):
+        
+        def __init__(self):
+            Aspect.__init__(self)
+
+            # map advice to attribute names of the objects it will be applied to
+            # In this case apply spam advice to calls to some_object.eat_spam
+            self._advice_mappings['call', 'eat_spam'] = self.spam  
+
+        # some advice that prints spam and then calls the original method
+        def spam(self): 
+            print('Spam')
+            yield aop.proceed
+
+    # singleton code (you could parameterise your aspect of course, e.g. like the DelegationAspect)
+    verbose_vector_aspect = VerboseVectorAspect()
+    del VerboseVectorAspect
+
+The `_advice_mappings` attribute inherited from Aspect contains a dict which is
+used to map advice to attribute names for a particular access type. You can
+replace the dict with any other `Mapping`, as long as it has mappings of
+(access, attribute_name) to an advice function or None.
+
+
+The possible values of access are:
+
+- 'get': whenever you __get__ an attribute: e.g. obj.x
+- 'set': whenever you __set__ an attribute: e.g. obj.x = 1
+- 'delete': whenever you __del__ an attribute: e.g. del obj.x
+- 'call': whenever you __call__ an attribute: e.g. obj.x()
+
+
+Note that the advised attributes of the instances should contain either a 
+descriptor or should not exist at all.
+
+You can only advise attributes with a public or special name that aren't in
+(`advisor.unadvisables`).  Use `advisor.is_advisable` to see if an attribute 
+name is valid.
+
+Note: as with regular OO you should try to keep coupling nice and loose. Try to
+write your aspects so that they assume as little as possible of what they
+advise. Your advice should ideally only have to know about the object it is 
+applied to, and the effect it has on it; not how it might work in combination 
+with other aspects, ...
+
+
+Advising non-existing attributes (creating new attributes)
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+You can also advice non-existing attributes, an example::
+
+    from pytilities import aop
+    from pytilities.aop import Aspect
+
+    class MagicAspect(Aspect):
+
+        '''Advise a non-existing attribute to return 3'''
+
+        def __init__(self):
+            Aspect.__init__(self)
+            self._advice_mappings['get', 'x'] = self._advice  
+
+        def _advice(self):
+            yield aop.return_(3)
+
+    magic_aspect = MagicAspect()
+
+    class SomeClass(object): pass
+    someClass = SomeClass()
+    
+    # print(someClass.x) would fail
+    magic_aspect.apply(someClass)
+    print(someClass.x) # now prints 3
+
+
+More advanced (access, attribute) to advice matching
+''''''''''''''''''''''''''''''''''''''''''''''''''''
+Pytilities provides special Mapping classes that are very useful when used
+together with _advice_mappings.
+
+In the following example I will show how to advise any attribute on get access
+using FunctionMap::
+
+    from pytilities import aop
+    from pytilities.aop import Aspect
+    from pytilities.dictionary import FunctionMap
+
+    class MagicAspect(Aspect):
+
+        '''Advise a non-existing attribute to return 3'''
+
+        def __init__(self):
+            Aspect.__init__(self)
+
+            # Replace normal dict with a FunctionMap. A FunctionMap uses a
+            # function to map its keys to values
+            self._advice_mappings = FunctionMap(self._mapper)
+
+            # must tell Aspect that _advice_mappings doesn't know its keys(),
+            # as is the case with FunctionMap
+            self._undefined_keys = True
+
+        def _mapper(self, key):
+            access, attribute_name = key
+            if access == 'get':
+                return self._advice
+            return None  # no advice for other access types
+
+        def _advice(self):
+            yield aop.return_(3)
+
+    magic_aspect = MagicAspect()
+
+    class SomeClass(object): pass
+    someClass = SomeClass()
+    
+    # print(someClass.x) would fail
+    magic_aspect.apply(someClass)
+    print(someClass.x) # now prints 3
+    print(someClass.y) # also prints 3
+    print(someClass.cake) # also prints 3!
+
+
+Writing advice for your aspects
+-------------------------------
+Advice is a generator function that yields aop commands (the commands are discussed below).
+When some form of access is done on a particular attribute of a class (this is defined by your self._advise calls
+your aspect), the advice is called before that attribute is accessed. The advice function
+can yield commands to return straight away, manipulate the return value, manipulate the args to pass to the advised member,
+proceed with accessing the member in the 'normal' way.
+
+The following sections introduce each of the commands by example 
+(they are located in pytilities.aop.commands, but can also be imported from pytilities.aop).
+For brevity, the following examples omit the Aspect class' declaration.
+
+The proceed command
+'''''''''''''''''''
+Yielding proceed from your advice proceeds with accessing the advised member::
+
+    # the object whose increase() call accesses will be advised
+    counter.reset() # reset counter to 0
+    counter.increase(1) # increase counter by 1 and return the new value (in this case, 1)
+
+    # this advice proceeds with attribute access,
+    # and then prints the return value
+    def advice():
+        return_value = yield aop.proceed
+        print(return_value)
+
+    # with advice2 applied to counter
+    counter.reset()
+    counter.increase(1)  # prints 1, then returns 1
+    
+    # this advice will proceed twice
+    def advice2():
+        yield aop.proceed
+        yield aop.proceed
+
+    # with advice2 applied to counter
+    counter.reset()
+    counter.increase(1)  # returns 2. increase(1) is called twice by the double proceed, only the last return value is returned
+
+Using yield proceed() you can change the args of the underlying call::
+
+    # using the same counter from the example above
+    counter.reset()
+    counter.increase(1)  # returns 1
+    counter.increase(5)  # returns 6
+
+    def advice():
+        yield aop.proceed(2)  # change the argument to 2
+
+    # after applying the advice
+    counter.reset()
+    counter.increase(1)  # returns 2
+    counter.increase(5)  # returns 4
+
+proceed also supports keyword arguments (see the api reference).
+
+The return\_ command
+''''''''''''''''''''
+Yielding return\_ from your advice returns the return value of the last 
+proceed. If you return\_ before yielding proceed, None is returned
+
+An example::
+
+    # using the same counter from the example above
+
+    # don't call the original increase() and return 1
+    def advice():
+        yield aop.return_(1)
+        print('this statement is never reached')
+
+    # after applying the advice
+    counter.reset()
+    counter.increase(1)  # returns 1
+    counter.increase(5)  # returns 1
+
+    # proceed, then return 3
+    def advice2():
+        yield aop.proceed
+        yield aop.return_(3)
+        never_reached = True
+
+    # after applying the advice
+    counter.reset()
+    counter.increase(1)  # returns 3
+
+Upon yielding return\_, the value is returned.
+When the advice ends without yielding return\_, an implicit return\_ is assumed.
+
+The suppress_aspect command
+'''''''''''''''''''''''''''
+Yielding suppress_aspect 'disables' the aspect of the advice until the end of
+its context:: 
+
+    # taken from pytilities.test.aop.advice.AdviceTestCase
+    def advice_suppress_aspect_temporarily(self):
+        self.suppressed_call += 1
+        o = yield aop.advised_instance
+        with (yield aop.suppress_aspect):
+            # this would be a recursive infinite loop without the with 
+            # statement. Within the with statement this advice won't be
+            # reentered.
+            yield aop.return_(o.x)
+
+    def test_suppress_aspect_temporarily(self):
+        self.when_apply_advice(to=a, get=self.advice_suppress_aspect_temporarily)
+        a.x
+
+This can be useful to avoid infinite recursive loops in aspects that apply
+their advice to any attribute (e.g. by using FunctionMap)
+
+Various other commands
+''''''''''''''''''''''
+Various commands to query the context of the advice run::
+
+    # using that same counter from the examples above
+
+    def advice():
+        # arguments returns (args, kwargs)
+        print(yield aop.arguments)
+
+        # name of the advised member (the same advice can be applied to multiple members)
+        print((yield aop.advised_attribute)[0])
+
+        # the attribute value of the attribute we advised
+        print((yield aop.advised_attribute)[1])
+
+        # the instance to which the advise is applied
+        # or the class if the advised is a class/static method
+        print(yield aop.advised_instance)
+
+
+    # after applying the advice
+    counter.reset()
+    counter.increase(2) # prints: ((2,), {})
+                        # then prints: increase
+                        # then prints: the counter object
+                        # then prints: the increase function descriptor object
+
+
+Views
+-----
+Sometimes you want to apply an aspect only when accesed through a special wrapper;
+pytilities refers to this as a View and provides pytilities.aop.aspects.create_view()
+to aid you in making views.
+
+We'll explain views using an example. You may have a getSize method that returns an
+x,y coordinate. In your class you store this coordinate in a mutable Vector instance. 
+You don't want users to be able to manipulate the size using the return of that method.
+You want to provide an immutable view to your size Vector.
+
+Here's how you could do this with pytilities::
+
+    from pytilities.aop.aspects import ImmutableAspect, create_view
+    from pytilities.geometry import Vector
+
+    # your size vector
+    size = Vector()
+
+    # make an aspect that makes the x and y attributes immutable
+    immutable_vector_aspect = ImmutableAspect(('x', 'y'))
+
+    # create a view that only enables the given aspect when
+    # you access the object it wraps through the wrapper
+    ImmutableVector = create_view(immutable_vector_aspect)
+
+    # make an ImmutableVector view instance of the size vector
+    immutableSize = ImmutableVector(size)
+
+    size.x = 1  # this still works
+    immutableSize.x = 5  # this will throw an exception
+
+
+Note that the ImmutableVector of the above example is included in
+pytilities.geometry.
+
+
+More examples
+-------------
+For more examples: See the unit tests in pytilities.test.aop
+
