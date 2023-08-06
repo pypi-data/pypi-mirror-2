@@ -1,0 +1,51 @@
+{% if prepared_instructions.js and prepared_instructions.render_full_page %}
+    {% for js in prepared_instructions.js %}
+        {% if js.ieversion %}
+        <!--[if {{ js.ieversion }}]>
+        {% endif %}
+        {% if js.location %}
+            <script type="text/javascript" src="{{ js.location }}"></script>
+        {% else %}
+            <script type="text/javascript">
+            //<![CDATA[
+            {{ js.source }}
+            //]]>
+            </script>
+        {% endif %}
+        {% if js.ieversion %}
+        <![endif]-->
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% if prepared_instructions.chirp %}
+    <!-- Dojo Toolkit dynamic loading output -->
+    <script type="text/javascript">
+    //<![CDATA[
+    {% for chirp in prepared_instructions.chirp %}
+        {% if chirp.needs_registration %}
+            dojo.registerModulePath('{{ chirp.namespace }}', '{{ cache_url }}{{ prepared_instructions.cache_prefix }}{{ chirp.location }}');
+        {% else %}
+            // {{ chirp.namespace }} module registration rolled up
+        {% endif %}
+        {% for requirement in chirp.require %}
+            dojo.require('{{ requirement }}');
+        {% endfor %}
+    {% endfor %}
+    {% if is_instrumented %}
+        dojo.addOnLoad(function() {
+            if (ChirpTools.TestRunner.TestCaseCollector) {
+                var collector = ChirpTools.TestRunner.TestCaseCollector;
+
+                {% for chirp in prepared_instructions.chirp %}
+                    {% for testcase in chirp.tests %}
+                        collector.add('{{ testcase }}');
+                    {% endfor %}
+                {% endfor %}
+
+                dojo.addOnLoad(function() { collector.kickoff(); });
+            }
+        });
+    {% endif %}
+    //]]>
+    </script>
+{% endif %}
