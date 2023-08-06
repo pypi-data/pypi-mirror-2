@@ -1,0 +1,114 @@
+<scr_python>
+q = chr(34) #Quote
+f = "Function E" + table.TableName + "("
+
+# for cl in table.cols: Debería ordenar por table[cl].Index
+
+
+for cl in table.cols:
+    f = f + "Optional " + table[cl].Identifier + " AS Variant, "
+cmWrite(f + ") As Variant")
+cmWrite("    Dim sql As String, cw As String, rsu As ADODB.Recordset, cnn As New ADODB.Connection")
+cmWrite("    Dim cant As Integer")
+cmWrite("        Set rsu = New ADODB.Recordset")
+cmWrite("        cnn.ConnectionString = gstrCN1")
+cmWrite("        cnn.Open")
+for cl in table.cols:
+    c = table[cl].Identifier
+    if table[cl].Format == "nvarchar":
+        m = "Csql("
+    else:
+        m = "Nsql("
+    cmWrite("        If Not IsNull(" + c + ") Then ArmaSQL cw, " + q  + c + "=" + q + " & " + m + c + ")")
+cmWrite("        sql = "+ q + "SELECT COUNT(*) AS cant FROM [" + table.TableName + "]" + q + " & cw")
+cmWrite("        OpRs rsu, sql, cnn")
+cmWrite("        cant = rsu!cant")
+cmWrite("        If cant = 0 Then")
+cmWrite("            E" + table.TableName + " = Null")
+cmWrite("        Else")
+cmWrite("            E"+ table.TableName + " = cw")
+cmWrite("        End If")
+cmWrite("        rsu.Close")
+cmWrite("        cnn.Close")
+cmWrite("End Function")
+</scr_python>
+
+
+<scr_python>
+q = chr(34) #Quote
+f = "Function G" + table.TableName + "("
+for cl in table.cols:
+    f = f + "Optional " + table[cl].Identifier + " AS Variant, "
+cmWrite(f + "cw AS Variant) As Variant")
+cmWrite("    Dim sql As String, cc As String")
+cmWrite("        If IsNull(cw) Then")
+cmWrite("            sql = " + q + "INSERT INTO [" + table.TableName + "] VALUES (" + q)
+for cl in table.cols:
+    c = table[cl].Identifier
+    if table[cl].Format == "nvarchar":
+        m = "Csql("
+    else:
+        m = "Nsql("
+    cmWrite("            sql = sql & " + m + c + ") & " + q + "," + q)
+
+cmWrite("        Else 'UPDATE")
+
+for cl in table.cols:
+    c = table[cl].Identifier
+    if table[cl].Format == "nvarchar":
+        m = "Csql("
+    else:
+        m = "Nsql("
+    cmWrite("            ArmaUpdate cc, " + c + ", " + q + c + "=" + q + " & " + m + c + ")")
+cmWrite("            sql = sql & cc & cw")
+cmWrite("        End If")
+cmWrite("        G" + table.TableName + " = sql")
+
+
+cmWrite("End Function")
+
+</scr_python>
+
+
+'/*/*/*/*/* Ejemplos /*/*/*/*/*/*
+
+Function EArtiSect(Optional arti As Variant = Null, Optional sect As Variant = Null) As Variant
+    Dim sql As String, cw As String, rsu As ADODB.Recordset, cnn As New ADODB.Connection
+    Dim cant As Integer
+        Set rsu = New ADODB.Recordset
+        cnn.ConnectionString = gstrCN1
+        cnn.Open
+        If Not IsNull(arti) Then ArmaSQL cw, "arti=" & CSql(arti, LclArti)
+        If Not IsNull(sect) Then ArmaSQL cw, "sect=" & NSql(sect)
+        sql = "SELECT COUNT(*) AS cant FROM [ArtiSect]" & cw
+        OpRs rsu, sql, cnn
+        cant = rsu!cant
+        If cant = 0 Then
+            EArtiSect = Null
+        Else
+            EArtiSect = cw
+        End If
+        rsu.Close
+        cnn.Close
+End Function
+
+Function GArtiSect(Optional arti As Variant = Null, Optional sect As Variant = Null, Optional fech As Variant = Null, Optional nota As Variant = Null, Optional cw As Variant = Null) As String
+    Dim sql As String, cc As String
+        If IsNull(cw) Then
+            sql = "INSERT INTO [ArtiSect] VALUES ("
+            sql = sql & CSql(arti, LclArti) & "," 'arti
+            sql = sql & NSql(sect) & "," 'sect
+            sql = sql & FSql(fech) & "," 'fech
+            sql = sql & SSql(nota) & "," 'nota
+            sql = sql & NSql(gintUser) & ")" 'usua
+        Else 'UPDATE
+            sql = "UPDATE [ArtiSect] SET "
+            ArmaUpdate cc, arti, "arti=" & CSql(arti, LclArti)
+            ArmaUpdate cc, sect, "sect=" & NSql(sect)
+            ArmaUpdate cc, fech, "fech=" & FSql(fech)
+            ArmaUpdate cc, nota, "nota=" & SSql(nota)
+            ArmaUpdate cc, gintUser, "usua=" & NSql(gintUser)
+            sql = sql & cc & cw
+        End If
+        GArtiSect = sql
+End Function

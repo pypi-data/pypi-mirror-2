@@ -1,0 +1,100 @@
+'^D*************************************************************************************
+'*                                                                                     *
+'*                                        DEFINICIONES                                 *
+'*                                                                                     *
+'***************************************************************************************
+Option Explicit
+'Undo Controles
+Const mintLimUndo As Integer = 100
+Dim mUndo(1 To mintLimUndo) As tundo, mintCUndo As Integer
+'Grid
+Private WithEvents grd As slyGrid
+Attribute grd.VB_VarHelpID = -1
+'Módulo
+Public mbolAgre As Boolean, mbolModi As Boolean, mbolElim As Boolean
+
+'^G*************************************************************************************
+'*                                                                                     *
+'*                                        Generales                                    *
+'*                                                                                     *
+'***************************************************************************************
+Sub Inicia(ctr As Control)
+        Select Case ctr.name
+            Case "txt", "dtp", "cbo", "cbt", "txb", "dth", "tnu"
+                ctr.Init
+            Case Else
+        End Select
+End Sub
+
+Function Iguala(tabla As String, dire As String, Optional tdire As String) As String 'Screen - Recordset
+    'dire: "Lee" de Recordset - "Graba" en Recordset
+    Dim sql As String, p As Integer
+        Select Case tabla
+            <scr_python>
+            cmWrite("Case \"" + table.TableName + "\"")
+            </scr_python>
+                If dire = "Lee" Then                    
+                    <scr_python>
+                    x = 0 
+                    u = 0
+                    for cl in table.cols:
+                        if table[cl].Format == "varchar":
+                            c = "txt(" + str(x) + ").v = ValStr(rs!" + table[cl].Identifier + ")"
+                            x+=1
+                        else:
+                            c = "tnu(" + str(u) + ").v = Valreal(rs!" + table[cl].Identifier + ")"                 
+                            u+=1
+                        cmWrite(c)                          
+                    </scr_python>                                                            
+                    Iguala = ""
+                    ResetUndo
+                Else 'Graba
+                    If tdire = "INSERT" Then
+                        <scr_python>
+                        cmWrite("sql = \"INSERT INTO [" + table.TableName + "] VALUES (\"")
+                        x = 0 
+                        u = 0
+                        for cl in table.cols:
+                            if table[cl].Format == "varchar":
+                                c = "sql = sql & \" Ssql(txt(" + str(x) + ").v) & \",\" '" + table[cl].Identifier
+                                x+=1
+                            else:
+                                c = "sql = sql & \" Nsql(txt(" + str(u) + ").v) & \",\" '" + table[cl].Identifier              
+                                u+=1    
+                            cmWrite(c)                          
+                        </scr_python>    
+                    Else 'UPDATE
+                        <scr_python>
+                        cmWrite("sql = \"UPDATE [" + table.TableName + "] SET\"")
+                        x = 0 
+                        u = 0
+                        for cl in table.cols:
+                            if table[cl].Format == "varchar":
+                                c = "sql = sql & \"" + table[cl].Identifier + "=\" & " + "Ssql(txt(" + str(x) + ").v)"
+                                x+=1
+                            else:
+                                c = "sql = sql & \"" + table[cl].Identifier + "=\" & " + "Nsql(txt(" + str(u) + ").v)"
+                                u+=1    
+                            cmWrite(c)                          
+                        </scr_python>                     
+                    End If
+                    Iguala = sql
+                End If
+        End Select
+End Function
+
+'^B*************************************************************************************
+'*                                                                                     *
+'*                                        Búsquedas                                    *
+'*                                                                                     *
+'***************************************************************************************
+
+<scr_python>
+for cl in table.cols:
+    if table[cl].IsPKey == True:
+        cmWrite("Sub TomaB" + table[cl].Identifier + "(cc As String) 'Toma Resultado Busqueda")                               
+        cmWrite("    DoEvents")
+        cmWrite("    txt(0).v = cc")
+        cmWrite("End Sub")
+</scr_python>
+
