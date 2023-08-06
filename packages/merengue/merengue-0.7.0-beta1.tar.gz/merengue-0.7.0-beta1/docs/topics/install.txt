@@ -1,0 +1,677 @@
+.. _topics-install:
+
+=======================
+How to install Merengue
+=======================
+
+This document will get you up and running with Merengue.
+
+.. admonition:: Conventions
+
+    We must have a convention about operating system for installing system
+    packages. We will suppose *Ubuntu OS*, and you will have to adapt ``apt-get``
+    commands to your specific system.
+
+
+Previous dependencies
+=====================
+
+* ``python 2.5+``: The python programming language.
+
+.. code-block:: bash
+
+    $ sudo apt-get install python2.5
+
+* ``python-setuptools``: To be able to install python packages.
+
+.. code-block:: bash
+
+    $ sudo apt-get install python-setuptools
+
+* ``ffmpeg``: FFmpeg is a complete, cross-platform solution to record, convert and stream audio and video. It includes libavcodec - the leading audio/video codec library. 
+
+.. code-block:: bash
+
+    $ sudo apt-get install ffmpeg libavcodec-unstripped-52 libavdevice-unstripped-52 libavformat-unstripped-52 libavutil-unstripped-49 libpostproc-unstripped-51 libswscale-unstripped-0 yamdi
+
+Other recommended dependencies
+------------------------------
+
+* ``ipython``: a python shell with auto complete, help, etc.
+
+.. code-block:: bash
+
+    $ apt-get install ipython
+
+
+Installing with easy_install
+============================
+
+It is the easiest way to install Merengue, because all dependencies will be
+installed automatically.
+
+The command is this:
+
+.. code-block:: bash
+
+    $ sudo easy_install merengue
+
+Go to `project creation`_ section to continue.
+
+.. _`project creation`: #merengue-project-creation
+
+
+Manual installation
+===================
+
+Installing Django
+-----------------
+
+Merengue uses Django 1.1.3. You can install
+it with these instructions:
+
+.. code-block:: bash
+
+    $ wget http://www.djangoproject.com/download/1.1.3/tarball/
+    $ tar xzvf Django-1.1.3.tar.gz
+    $ cd Django-1.1.3
+    $ sudo python setup.py install
+
+Test if you have the correct django version:
+
+.. code-block:: bash
+
+    $ python -c "import django; print django.VERSION"
+    (1, 1, 3, 'final', 0)
+
+Downloading merengue
+--------------------
+
+Download the Merengue source from tarball or subversion code:
+
+.. code-block:: bash
+
+    $ svn checkout https://svn.merengueproject.org/trunk/merengueproj
+    $ cd merengueproj
+
+Installing python dependencies
+------------------------------
+
+You need fullfill some python eggs dependencies, defined in `requirements.txt`_
+file. You may install every egg with ``easy_install`` or use ``pip`` with
+this command:
+
+.. code-block:: bash
+
+    $ sudo pip install -r requirements.txt
+
+.. _`requirements.txt`: http://dev.merengueproject.org/browser/trunk/merengueproj/requirements.txt
+
+Installing merengue
+-------------------
+
+The manual install process is executing ``setup.py`` script as follow:
+
+.. code-block:: bash
+
+    $ sudo python setup.py install
+
+
+Merengue project creation
+=========================
+
+You've got two options to start a new merengue project: production mode and
+development mode.
+
+In production mode, project will contain a freezed merengue version (it will be
+copied). So, if you are using merengue subversion code, any following updates
+will not affect to your project.
+
+In development mode, project will contain symbolic links to merengue code. So,
+if you are using merengue subversion code, your project will be affected by any
+later merengue updates (new features, new fixes or new possible errors or
+incompatible changes).
+
+* Project creation in *production mode*:
+
+.. code-block:: bash
+
+    $ merengue-admin.py startproject myproject
+
+
+* Project creation in *development mode*:
+
+.. code-block:: bash
+
+    $ merengue-admin.py startproject myproject --develop
+
+
+Languages configuration
+-----------------------
+
+In Merengue, language configuration should be done before database creation,
+because data models are created with translatable fields (as much columns as 
+languages are configurated).
+
+Then it's necessary to define ``LANGUAGE_CODE`` and ``LANGUAGES`` parameters
+in the configuration file ``myproject/settings.py``:
+
+    .. code-block:: python
+
+        LANGUAGE_CODE = 'es'
+
+        LANGUAGES = (
+            ('es', ugettext('Español')),
+            ('en', ugettext('English')),
+            ('fr', ugettext('Français')),
+        )
+
+.. admonition:: Deep into
+
+    See `django-transmeta`_ app for more information about translatable models.
+
+.. _`django-transmeta`: http://code.google.com/p/django-transmeta/
+
+Database installation and configuration
+---------------------------------------
+
+You need to define your database connection, defining ``DATABASE_*`` parameters
+in the configuration file.
+
+.. admonition:: PostgreSQL as convention database
+
+    Next steps will consider PostgreSQL as choiced database engine.
+    Other engines can be used, but you have to adapt instructions to the
+    specific database engine commands.
+
+Let's suppose that you were configuring a PostgreSQL database with the
+following parameters:
+
+    .. code-block:: python
+
+       DATABASE_ENGINE = 'postgresql_psycopg2'
+       DATABASE_NAME = 'myproject'
+       DATABASE_USER = 'myprojectuser'
+       DATABASE_PASSWORD = 'password'
+       DATABASE_HOST = ''
+       DATABASE_PORT = ''
+
+You can use all database engine supported by django
+http://docs.djangoproject.com/en/1.1/ref/settings/#database-engine
+
+Installing database and python dependencies: ``postgresql``, ``python-psycopg2``.
+
+* ``postgresql``: the object-relational database system that we will use.
+
+    .. code-block:: bash
+
+        $ apt-get install postgresql
+
+* ``python-psycopg``: python interface to PostgreSQL database.
+
+    .. code-block:: bash
+
+        $ apt-get install python-psycopg2
+
+
+Creating the project database
+-----------------------------
+
+.. admonition:: Note
+
+    We suppose that your user has superadmin permissions in PostgreSQL.
+
+PostgreSQL database and user is created with these instructions:
+
+.. code-block:: bash
+
+    $ createuser myprojectuser
+    $ createdb --owner=myprojectuser myproject
+
+We have to permit connections to database from local computer. Editing
+/etc/postgresql/X.X/main/pg_hba.conf adding the following line (not at
+the end):
+
+.. code-block:: bash
+
+    local myproject myprojectuser trust
+    local test_myproject myprojectuser trust # necessary for tests
+
+Reload pg_hba.conf in PostgreSQL server:
+
+.. code-block:: bash
+ 
+    $ /etc/init.d/postgresql-X.X reload
+
+Restart PostgreSQL and check access with this command:
+
+.. code-block:: bash
+
+    $ psql myproject -U myprojectuser
+
+Building initial merengue models
+--------------------------------
+
+You need build merengue initial models with these two commands:
+
+.. code-block:: bash
+
+    $ python manage.py syncdb
+    $ python manage.py migrate
+
+You can ignore the creation of superuser because a user named ``admin`` with
+``admin`` password will be created automatically.
+
+
+Collecting media from installed Django applications
+---------------------------------------------------
+
+Some Django apps use media files that Merengue needs. For including those in
+the project you have to execute this command:
+
+.. code-block:: bash
+
+    $ python manage.py sync_apps_media --link
+
+.. admonition:: Note
+
+    You can remove ``--link`` option if you want that Merengue copy media files instead linking them.
+
+
+View the site
+-------------
+
+Go to our project directory. Test that django development server runs ok:
+
+.. code-block:: bash
+
+    $ python manage.py runserver
+
+Open the web browser and go to http://localhost:8000/admin/ and check
+that the admin web interface is running successfully.
+
+To see the web public version, we can access to http://localhost:8000/
+
+Default admin interface user:
+
+.. code-block:: bash
+
+    user: admin
+    password: admin
+
+
+Installation with GIS
+=====================
+
+Merengue CMS has built-in GIS features disabled by default.
+
+If you want add GIS support to your merengue project it's necessary some
+specific installations and configurations. You can skip this section if GIS is
+not needed for your project.
+
+
+Settings changes
+----------------
+
+For use GIS it's necessary to change one line to your project ``settings.py``:
+
+.. code-block:: python
+
+    USE_GIS = True
+
+
+PostGIS dependencies
+--------------------
+
+.. admonition:: Note
+
+    Again, we are supposing you have Postgresql as database backend and PostGIS
+    as GIS extensions. If you are using other engine you have to adapt these 
+    instructions.
+    GeoDjango install instructions are online at http://geodjango.org/docs/install.html
+
+Apart from the previous dependencies if you want to use GIS there are
+more dependencies:
+
+* ``geopy``: makes it easy for developers to locate the coordinates of
+  addresses, cities, countries, and landmarks across the globe.
+
+.. code-block:: bash
+
+    $ easy_install geopy
+
+
+GIS extensions install
+----------------------
+
+In Ubuntu 10.04, you could install all using packages over postgresql-8.4:
+
+.. code-block:: bash
+
+    $ sudo apt-get install binutils libgdal1-1.6.0 postgresql-8.4-postgis python-psycopg2 python-setuptools
+    $ export PG_CONFIG='/usr/lib/postgresql/8.4/bin/pg_config'
+
+In Ubuntu > 8.04 < 10.04, you can install all using packages over postgresql-8.3:
+
+.. code-block:: bash
+
+    $ sudo apt-get install binutils libgdal1-1.5.0 postgresql-8.3-postgis python-psycopg2 python-setuptools
+    $ export PG_CONFIG='/usr/lib/postgresql/8.3/bin/pg_config'
+
+
+.. admonition:: Note
+
+    If you have postgresql-8.4 in ubuntu earlier to 10.04 and there is no package
+    ``postgresql-8.4-postgis``, you will use ``postgresql-8.3`` for all, use the
+    option ``-p 5433`` with ``psql``, ``createuser``, ``createdb``, and
+    configure your merengue project to use that port in database.
+
+If your distribution doesn't have the package postgis it's necessary to
+compile:
+
+1. PostgreSQL source headers:
+
+.. code-block:: bash
+
+    $ sudo apt-get install postgresql-server-dev-X.X
+    $ export PG_CONFIG='/usr/lib/postgresql/X.X/bin/pg_config'
+
+2. `GEOS`_ library:
+
+.. code-block:: bash
+
+    $ cd resources
+    $ tar xjf geos-x.x.x.tar.bz2
+    $ cd geos-x.x.x
+    $ ./configure && make
+    $ sudo make install
+
+3. `PROJ.4`_ library:
+
+.. code-block:: bash
+
+    $ cd resources
+    $ tar xzf proj-x.x.x.tar.gz
+    $ cd proj-x.x.x/nad
+    $ tar xzf ../../proj-datumgrid-x.x.tar.gz
+    $ cd ..
+    $ ./configure
+    $ make
+    $ sudo make install
+    $ cd ..
+
+4. `PostGIS`_:
+
+.. code-block:: bash
+
+    $ tar xzf postgis-x.x.x.tar.gz
+    $ cd postgis-x.x.x
+    $ ./configure --with-pgsql=$PG_CONFIG --datadir=`$PG_CONFIG --sharedir`
+    $ make
+    $ sudo make install
+    $ cd ..
+
+5. `GDAL`_ library:
+
+.. code-block:: bash
+
+    $ tar xzf gdal-x.x.x.tar.gz
+    $ cd gdal-x.x.x
+    $ ./configure
+    $ make # Go get some coffee, this takes a while.
+    $ sudo make install
+    $ cd ..
+
+6. Update all dynamic libraries:
+
+.. code-block:: bash
+
+    $ sudo ldconfig -v
+
+.. admonition:: Note
+
+    Make sure that the file ``/etc/ld.so.conf`` is in directory
+    ``/usr/local/lib``
+
+.. _`GEOS`: http://trac.osgeo.org/geos/
+.. _`PROJ.4`: http://download.osgeo.org/proj/
+.. _`PostGIS`: http://postgis.refractions.net/
+.. _`GDAL`: http://trac.osgeo.org/gdal/
+
+
+Changes in database configuration
+---------------------------------
+
+Create postgis template database:
+
+.. code-block:: bash
+
+    $ createdb -E UTF8 template_postgis
+    $ createlang -d template_postgis plpgsql
+
+* In ubuntu >= 10.04:
+
+.. code-block:: bash
+
+    $ PG_GIS_TEMPLATES=/usr/share/postgresql/8.4/contrib/
+    $ psql -d template_postgis -f $PG_GIS_TEMPLATES/postgis.sql
+    $ psql -d template_postgis -f $PG_GIS_TEMPLATES/spatial_ref_sys.sql
+    $ psql -d template_postgis -c "GRANT ALL ON geometry_columns TO PUBLIC;"
+    $ psql -d template_postgis -c "GRANT ALL ON spatial_ref_sys TO PUBLIC;"
+
+* In ubuntu > 8.04 < 10.04 (with postgres-8.3-postgis package)
+
+.. code-block:: bash
+
+    $ PG_GIS_TEMPLATES=/usr/share/postgresql-8.3-postgis/
+    $ psql -d template_postgis -f $PG_GIS_TEMPLATES/lwpostgis.sql
+    $ psql -d template_postgis -f $PG_GIS_TEMPLATES/spatial_ref_sys.sql
+    $ psql -d template_postgis -c "GRANT ALL ON geometry_columns TO PUBLIC;"
+    $ psql -d template_postgis -c "GRANT ALL ON spatial_ref_sys TO PUBLIC;"
+
+.. admonition:: Note
+
+     Remember that if you have postgresql-8.3 and 8.4 running at the
+     same time you need to add -p 5433 option to psql createdb and
+     createlang commands.
+
+* In other case:
+
+.. code-block:: bash
+
+    $ psql -d template_postgis -f `$PG_CONFIG --sharedir`/lwpostgis.sql
+    $ psql -d template_postgis -f `$PG_CONFIG --sharedir`/spatial_ref_sys.sql
+    $ psql -d template_postgis -c "GRANT ALL ON geometry_columns TO PUBLIC;"
+    $ psql -d template_postgis -c "GRANT ALL ON spatial_ref_sys TO PUBLIC;"
+
+Creating the project database
+-----------------------------
+
+.. admonition:: Note
+
+     If you have followed previous install instructions, you will need to
+     re-create database, because the same database will not work with GIS
+     enabled. Then, you need to delete previous database before continue
+     in this step.
+
+Database creation changes slightly because project database has to use
+``template_postgis`` as database template (with all postgis extensions
+included).
+
+.. code-block:: bash
+
+    $ createuser myproject
+    $ createdb -T template_postgis --owner=myproject myproject
+
+
+Upgrading merengue in development mode
+======================================
+
+If your merengue project is in development mode, when you update merengue code
+maybe models can change. For upgrading models after a code update, you can use
+south ``migrate`` command as follows:
+
+.. code-block:: bash
+
+    $ python manage.py migrate
+
+Also, we recommend you follow `changes`_ on merengue `skel project`_ because may
+be needed to reproduce some of these changes in your project.
+
+.. _`changes`: https://tracpub.yaco.es/merengue/log/trunk/merengueproj/projskel
+.. _`skel project`: http://tracpub.yaco.es/merengue/browser/trunk/merengueproj/projskel
+
+
+Database backup
+===============
+
+You can make a database backup in SQL with the following command:
+
+.. code-block:: bash
+
+    $ python manage.py backupdb
+
+.. note::
+
+    When using PostgreSQL as database backend, you need install ``pexpect``
+    python package.
+
+==================
+Deploying Merengue
+==================
+
+To deploying merengue, because Merengue is Django based, we recommend the reading
+of `Deploying Django`_ documentation.
+
+Merengue recommended deployment configuration is using nginx with WSGI, but can be
+used with any other Django configurations.
+
+This section will talk about the specific consideration to be taken in a Merengue
+site deployment.
+
+Ensure media is served by web server
+====================================
+
+To get plugins and apps more redistributable, Merengue plugins (and some
+Merengue apps) can contain media files included in a ``media`` directory inside
+each plugin directory. Merengue has implemented ``merengue.views.static.serve``
+view that virtualizes all media directory as was included in ``MEDIA_ROOT``. So,
+Django development server will works rightly.
+
+However, if you want to configure media files to get served by web server, you
+need to collect all media files below ``MEDIA_ROOT``. This is done with this
+command:
+
+.. code-block:: bash
+
+    $ python manage.py sync_plugins_media --link --all
+
+``--link`` option can be removed out if you want to copy media files (not
+symlink them).
+
+Also, some Django apps include its own media files. You have to collect those
+media file also with this command:
+
+.. code-block:: bash
+
+    $ python manage.py sync_apps_media --link
+
+.. admonition:: Deep into
+
+    See :ref:`media files in plugins <topics-plugins-media-files>` for more information about this.
+
+
+Example Merengue configuration with nginx and WSGI
+==================================================
+
+In this section we will show demo.merengueproject.org configuration, that is
+based on ``nginx`` server with ``uWSGI`` module. See `Running uWSGI behind Nginx`_
+to deep into.
+
+.. _`Running uWSGI behind Nginx`: http://projects.unbit.it/uwsgi/wiki/RunOnNginx
+
+This is an example nginx configuration file::
+
+    http {
+        server {
+            listen       80;
+            server_name  demo.merengueprojectorg.org;
+
+            access_log  logs/demo.merengue.access.log main;
+
+            location /media/ {
+                alias /home/demomerengue/demomerengueprojectorg/media/;
+            }
+
+            location /admin_media/ {
+                alias /home/demomerengue/django_src/django/contrib/admin/media/;
+            }
+
+            location / {
+                uwsgi_pass unix:///home/demomerengue/sock/uwsgi.sock;
+                include uwsgi_params;
+                uwsgi_param UWSGI_SCRIPT wsgi;
+            }
+        }
+    }
+
+The ``include uwsgi_params`` line includes this file::
+
+    uwsgi_param  QUERY_STRING       $query_string;
+    uwsgi_param  REQUEST_METHOD     $request_method;
+    uwsgi_param  CONTENT_TYPE       $content_type;
+    uwsgi_param  CONTENT_LENGTH     $content_length;
+
+    uwsgi_param  REQUEST_URI        $request_uri;
+    uwsgi_param  PATH_INFO          $document_uri;
+    uwsgi_param  DOCUMENT_ROOT      $document_root;
+    uwsgi_param  SERVER_PROTOCOL    $server_protocol;
+
+    uwsgi_param  REMOTE_ADDR        $remote_addr;
+    uwsgi_param  REMOTE_PORT        $remote_port;
+    uwsgi_param  SERVER_PORT        $server_port;
+    uwsgi_param  SERVER_NAME        $server_name;
+
+Finally, for starting the uwsgi server, you need a script like this (see
+`demomerengue script`_ for a more complete example):
+
+.. _`demomerengue script`: http://dev.merengueproject.org/browser/sites/demomerengueprojectorg/conf/demo/scripts/demomerengue
+
+.. code-block:: bash
+
+    BASEDIR="/home/demomerengue"
+    PIDFILE="$BASEDIR/pid/demomerengue.pid"
+    VIRTUALENV=$BASEDIR/virtualenv/
+    SOCKET="$BASEDIR/sock/uwsgi.sock"
+    PROJECTNAME="demomerengueprojectorg"
+    LOGFILE="$BASEDIR/logs/demomerengue.uwsgi.log"
+
+    cd $BASEDIR
+    . $BASEDIR/virtualenv/bin/activate
+    $BASEDIR/bin/uwsgi -p 2 -C -M 4 -A 4 -m -s $SOCKET -H $VIRTUALENV $PROJECTNAME.wsgi --pythonpath $BASEDIR/$PROJECT/ --pidfile $PIDFILE -d $LOGFILE
+
+Configuring caching
+===================
+
+Merengue uses a smart content caching, implemented using `Johnny Cache`. This
+fantastic application does transparent caching of all your data models. When
+user updates any content of a model, cache for this model is invalidated
+transparently.
+
+Merengue uses local memory by default for caching. The main problem is when you
+use local memory backend in multithreaded environments, with this settings:
+
+.. code-block:: python
+
+    CACHE_BACKEND = 'johnny.backends.locmem:///'
+
+In multithreaded environments, this configuration may cause randomized errors
+of views not refreshed correctly, after a content modification. The way to get
+fixed this error is changing cache backend to something like memcached:
+
+.. code-block:: python
+
+    CACHE_BACKEND = 'johnny.backends.memcached://127.0.0.1:11211/'
+
+.. _`Deploying Django`: http://docs.djangoproject.com/en/dev/howto/deployment/
+.. _`Johnny Cache`: http://packages.python.org/johnny-cache/
