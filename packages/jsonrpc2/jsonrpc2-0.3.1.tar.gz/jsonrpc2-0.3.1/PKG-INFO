@@ -1,0 +1,222 @@
+Metadata-Version: 1.0
+Name: jsonrpc2
+Version: 0.3.1
+Summary: WSGI Framework for JSON RPC 2.0
+Home-page: http://hg.aodag.jp/jsonrpc2/
+Author: Atsushi Odagiri
+Author-email: aodagx@gmail.com
+License: MIT
+Description: .. -*- restructuredtext -*-
+        
+        jsonrpc2 is WSGI Framework for JSON RPC 2.0.
+        JSON RPC 2.0 Spec can be seen on http://groups.google.com/group/json-rpc/web/json-rpc-2-0
+        
+        .. contents::
+        
+        QuickStart
+        ==========================================
+        
+        install via pip::
+        
+         $ pip install jsonrpc2
+        
+        or install via easy_install::
+        
+         $ easy_install jsonrpc2
+        
+        write your procedures in hello.py::
+        
+         def greeting(name):
+             return dict(message="Hello, %s!" % name)
+        
+        run jsonrpc2 server::
+        
+         $ runjsonrpc2 hello
+        
+        
+        Integration with Paste Script
+        ===============================================
+        
+        create project with paste script template::
+        
+         $ paster create -t paster_jsonrpc2 myrpc
+         $ cd myrpc
+        
+        run server
+        
+         $ paster serve run.ini
+        
+        access http://localhost:8080/
+        
+        
+        Internal
+        ===============================
+        
+        ::
+        
+         >>> import simplejson as json
+         >>> from jsonrpc2 import JsonRpcApplication
+        
+        sample procedure::
+        
+         >>> def greeting(name="world"):
+         ...     return "Hello, %s!" % name
+        
+        create rpc application::
+        
+         >>> app = JsonRpcApplication(rpcs=dict(greeting=greeting))
+        
+        set up for test::
+        
+         >>> from webtest import TestApp
+         >>> testapp = TestApp(app)
+        
+        call procedure::
+        
+         >>> call_values = {'jsonrpc':'2.0', 'method':'greeting', 'id':'greeting'}
+         >>> res = testapp.post('/', params=json.dumps(call_values), content_type="application/json")
+        
+        got results::
+        
+         >>> res.json
+         {'jsonrpc': '2.0', 'id': 'greeting', 'result': 'Hello, world!'}
+        
+        
+        lazy loading::
+        
+         >>> app.rpc.methods['sample.add'] = 'tests.sample:add'
+         >>> call_values = {'jsonrpc':'2.0', 'method':'sample.add', 'id':'sample.add', 'params':[1, 2]}
+         >>> res = testapp.post('/', params=json.dumps(call_values), content_type="application/json")
+         >>> res.json
+         {'jsonrpc': '2.0', 'id': 'sample.add', 'result': 3}
+        
+        
+        JSON-RPC2 Example
+        =====================================================
+        
+        use raw rpc processor::
+        
+         >>> from jsonrpc2 import JsonRpc
+         >>> rpc = JsonRpc()
+        
+        sample procedures::
+        
+         >>> def subtract(minuend, subtrahend):
+         ...     return minuend - subtrahend
+         >>> def update(*args):
+         ...     pass
+         >>> def foobar():
+         ...     pass
+        
+        register procedures with dict interface::
+        
+         >>> rpc['subtract'] = subtract
+         >>> rpc['update'] = update
+         >>> rpc['foobar'] = foobar
+        
+        Procedure Call with positional parameters::
+        
+         >>> rpc({"jsonrpc": "2.0", "method": "subtract", "params": [42, 23], "id": 1})
+         {'jsonrpc': '2.0', 'id': 1, 'result': 19}
+        
+         >>> rpc({"jsonrpc": "2.0", "method": "subtract", "params": [23, 42], "id": 2})
+         {'jsonrpc': '2.0', 'id': 2, 'result': -19}
+        
+        Procedure Call with named parameters::
+        
+         >>> rpc({"jsonrpc": "2.0", "method": "subtract", "params": {"subtrahend": 23, "minuend": 42}, "id": 3})
+         {'jsonrpc': '2.0', 'id': 3, 'result': 19}
+        
+         >>> rpc({"jsonrpc": "2.0", "method": "subtract", "params": {"minuend": 42, "subtrahend": 23}, "id": 4})
+         {'jsonrpc': '2.0', 'id': 4, 'result': 19}
+        
+        Notification::
+        
+         >>> rpc({"jsonrpc": "2.0", "method": "update", "params": [1,2,3,4,5]})
+         >>> rpc({"jsonrpc": "2.0", "method": "foobar"})
+        
+        Procedure Call of non-existent procedure::
+         >>> del rpc['foobar']
+         >>> rpc({"jsonrpc": "2.0", "method": "foobar", "id": "1"})
+         {'jsonrpc': '2.0', 'id': '1', 'error': {'message': 'Method Not Found', 'code': -32601}}
+        
+        Procedure Call with invalid JSON-RPC::
+        
+         >>> rpc([1,2,3])
+         {'jsonrpc': '2.0', 'id': None, 'error': {'message': 'Invalid Request', 'code': -32600}}
+        
+         >>> rpc({"jsonrpc": "2.0", "method": 1, "params": "bar"})
+         {'jsonrpc': '2.0', 'id': None, 'error': {'message': 'Invalid Request', 'code': -32600}}
+        
+        
+        Batched Call::
+        
+         >>> rpc['sum'] = lambda *args: reduce(lambda a, b: a + b, args)
+         >>> def get_data():
+         ...     return ["hello", 5]
+         >>> rpc['get_data'] = get_data
+         >>> result = rpc ([ {"jsonrpc": "2.0", "method": "sum", "params": [1,2,4], "id": "1"},
+         ...      {"jsonrpc": "2.0", "method": "notify_hello", "params": [7]},
+         ...      {"jsonrpc": "2.0", "method": "subtract", "params": [42,23], "id": "2"},
+         ...      {"foo": "boo"},
+         ...      {"jsonrpc": "2.0", "method": "foo.get", "params": {"name": "myself"}, "id": "5"},
+         ...      {"jsonrpc": "2.0", "method": "get_data", "id": "9"} ])
+         >>> from pprint import pprint
+         >>> pprint(result)
+         [{'id': '1', 'jsonrpc': '2.0', 'result': 7},
+          {'error': {'code': -32601, 'message': 'Method Not Found'},
+           'id': None,
+           'jsonrpc': '2.0'},
+          {'id': '2', 'jsonrpc': '2.0', 'result': 19},
+          {'error': {'code': -32600, 'message': 'Invalid Request'},
+           'id': None,
+           'jsonrpc': '2.0'},
+          {'error': {'code': -32601, 'message': 'Method Not Found'},
+           'id': '5',
+           'jsonrpc': '2.0'},
+          {'id': '9', 'jsonrpc': '2.0', 'result': ['hello', 5]}]
+        
+        
+        
+        ChangeLog
+        ===================================================
+        
+        0.3
+        -----------------------------------------------
+        
+        - fix bugs
+        - Paste Scripte templates
+        - runjsonrpc2 command
+        
+        0.3.1
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        - fix bugs (content-type with charset)
+        
+        0.2
+        -----------------------------------------------
+        
+        - remove dependency to WebOb
+        - split procedure call class from web application class
+        
+        0.2.1
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        - lazy loading from method name.
+        
+        0.2.2
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        - add dict interface.
+        
+        0.2.3
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        - fix: read body with CONTENT_LENGTH.
+        
+Keywords: wsgi request web http json rpc
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI
+Classifier: Topic :: Internet :: WWW/HTTP :: WSGI :: Application
