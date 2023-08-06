@@ -1,0 +1,935 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# aeltei: a virtual multi instrument environment
+# Copyright (C) 2011  Niels Serup
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Website  ]## http://metanohi.org/projects/aeltei/
+##[ Development  ]## http://gitorious.org/aeltei
+
+# [Lacking comments]
+
+from __future__ import with_statement
+import sys
+import os
+import shutil
+import re
+import time
+import subprocess
+import textwrap
+import datetime
+import math
+import curses
+import curses.ascii
+import curses.textpad
+import locale
+import array
+import wave
+try: import cPickle as pickle
+except ImportError: import pickle
+
+import mingus.core.notes as notes
+from mingus.midi import fluidsynth
+from mingus.containers.Note import Note
+
+locale.setlocale(locale.LC_ALL, '')
+_preferred_encoding = locale.getpreferredencoding()
+
+KEY_ESC = 27
+KEY_BACKSPACE = 127
+
+_key_extra_dict = {
+    'esc': KEY_ESC,
+    'up': curses.KEY_UP,
+    'right': curses.KEY_RIGHT,
+    'down': curses.KEY_DOWN,
+    'left': curses.KEY_LEFT,
+    'del': curses.KEY_DC,
+    'home': curses.KEY_HOME,
+    'end': curses.KEY_END,
+    'backspace': curses.KEY_BACKSPACE,
+    'pagedown': curses.KEY_NPAGE,
+    'pageup': curses.KEY_PPAGE,
+    'tab': ord('\t'),
+    'space': ord(' ')
+    }
+
+class Keys(object):
+    def __init__(self):
+        self.keys = []
+
+    def cursify(self, key):
+        meta, ctrl = False, False
+        spl = key.split('-')
+        i = 0
+        for x in spl:
+            if x == 'C':
+                ctrl = True
+            elif x == 'M':
+                meta = True
+            else:
+                char = '-'.join(spl[i:])
+                break
+            i += 1
+        if char.startswith('<') and char.endswith('>'):
+            char = _key_extra_dict[char[1:-1]]
+
+        # Special keys such as ESC and backspace don't work with Ctrl or
+        # Meta. They probably could, but that feature has not been implemented.
+        if ctrl:
+            char = ord(curses.ascii.ctrl(char))
+        else:
+            try:
+                char = ord(char)
+            except Exception:
+                pass
+        if meta:
+            char = 'M' + str(char)
+        return char
+
+    def __call__(self, *keys, **kwds):
+        desc = kwds.get('desc').strip().replace('\n', ' ')
+        curses_keys = tuple(map(self.cursify, keys))
+        self.keys.append((desc, tuple(keys), curses_keys))
+        return curses_keys
+
+    def format(self, width=72):
+        t = ''
+        vkeys = [', '.join(x[1]) for x in self.keys]
+        vkeysm = max(map(len, vkeys))
+        for i in range(len(self.keys)):
+            desc = self.keys[i][0]
+            keys = vkeys[i]
+            extraw = vkeysm - len(vkeys[i])
+            ind = ' ' * (len(keys) + extraw + 2)
+            wrapper = textwrap.TextWrapper(
+                width=width, initial_indent=ind, subsequent_indent=ind)
+            desc = wrapper.fill(desc)[len(ind):]
+            t += '%s:%s %s\n' % (keys, ' ' * extraw, desc)
+        return t
+
+_ = Keys()
+_keybindings = _
+
+K_EXIT = _('C-e', '<del>', '<esc>', desc='exit program')
+K_DOWN = _('C-n', '<down>', desc='go down a level')
+K_UP = _('C-p', '<up>', desc='go up a level')
+K_STOP = _('C-s', '<end>', desc='stop all notes')
+K_NEXT = _('C-f', '<right>', desc='next instrument')
+K_PREV = _('C-b', '<left>', desc='previous instrument')
+
+K_HELP = _('C-h', desc='show this help screen')
+K_HELP_EXIT = _('q', 'C-e', '<del>', '<esc>',
+                desc='exit this help screen')
+K_SDOWN = _('n', 'C-n', '<down>', desc='scroll down one line')
+K_SUP = _('p', 'C-p', '<up>', desc='scroll up one line')
+K_SMDOWN = _('d', 'C-v', '<space>', '<pagedown>',
+             desc='scroll down height of page')
+K_SMUP = _('u', 'M-v', '<backspace>', '<pageup>',
+           desc='scroll up height of page')
+
+K_GET = _('C-g', '<left>', desc='''
+enter an instrument\'s id number and get the instrument. See the table below
+for id numbers
+''')
+
+K_SEARCH = _('<tab>', desc='''\
+enter an instrument name and get an instrument. The first instrument where the
+search term appears in its name will be chosen''')
+
+
+class ExitCursesWrapper(Exception):
+    pass
+
+__tool_name__ = 'aeltei'
+__tool_version__ = (0, 1, 0)
+__tool_short_description__ = 'a virtual multi instrument environment'
+__tool_version_description__ = '''\
+%s %s
+Copyright (C) 2011  Niels Serup
+License AGPLv3+: GNU AGPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.\
+''' % (__tool_name__, '.'.join(map(str, __tool_version__)))
+
+
+_likely_soundfont_paths = (
+    '/usr/share/sounds/sf2/FluidR3_GM.sf2',
+    '/usr/share/sounds/sf2/FluidR3_GS.sf2'
+    )
+
+_sf2text_prog = 'sf2text'
+_sf2text_package = 'awesfx'
+
+_usable_drivers = ('alsa', 'oss', 'jack', 'portaudio', 'pulseaudio')
+
+_max_note = 115
+_max_note_range = range(_max_note + 1)
+_notes = tuple(Note().from_int(i) for i in _max_note_range)
+
+_nothing = lambda *x: None
+class _nowriter(object):
+    def write(self, m):
+        pass
+
+def _del_stderr():
+    sys.stderr = _nowriter
+
+# These are ugly defaults. Most people should change these using the calibrator.
+_ = 'qwertyuiopasdfghjklzxcvbnm'
+__ = {}
+for i in range(len(_)):
+    __[ord(_[i])] = (True, i)
+    __[ord(_[i].upper())] = (False, i)
+_default_qwerty_us_note_keys = __
+
+class ApproximatingDict(dict):
+    def cache_for_fitting(self):
+        self.keys_cached = tuple((x.lower(), x) for x in self.keys())
+        
+    def get_first_fit(self, key):
+        key = key.lower()
+        for x in self.keys_cached:
+            if key in x[0]:
+                return self.__getitem__(x[1])
+
+class NoteTracker(object):
+    def __init__(self, file):
+        try:
+            self.file = open(file, 'w')
+            self.time = datetime.datetime.now()
+        except (TypeError, IOError):
+            nothing = lambda *x: None
+            self.set_soundfont = nothing
+            self.set_samplerate = nothing
+            self.set_volume = nothing
+            self.set_instrument = nothing
+            self.play_note = nothing
+            self.stop_note = nothing
+            self.stop_all_notes = nothing
+            self.end = nothing
+
+    def get_time(self):
+        now = datetime.datetime.now()
+        t = now - self.time
+        t = ((t.days * 86400 + t.seconds) *
+             1000000 + t.microseconds) / 1000
+        self.time = now
+        return t
+
+    def set_soundfont(self, soundfont):
+        self.put(1, soundfont)
+
+    def set_samplerate(self, samplerate):
+        self.put(2, samplerate)
+
+    def set_volume(self, volume):
+        self.put(3, volume)
+
+    def set_instrument(self, *instrument):
+        self.put(4, instrument)
+
+    def play_note(self, note):
+        self.put(5, note)
+
+    def stop_note(self, note):
+        self.put(6, note)
+
+    def stop_all_notes(self):
+        self.put(7)
+
+    def put(self, nid, arg=None):
+        t = self.get_time()
+        self.file.write('%d.%d.%s\n' % (nid, t, str(arg)
+                                        if arg is not None else ''))
+
+    def end(self):
+        self.file.close()
+
+class AelteiPlayer(object):
+    def __init__(self, path, driver='alsa', wavfile=None):
+        self.path = path
+        self.driver = driver
+        self.wavfile = wavfile
+        if driver:
+            self.init = lambda sf2: fluidsynth.init(sf2, self.driver)
+            self.set_samplerate = _nothing
+            self.sleep = lambda t: time.sleep(t / 1000.0)
+            self.end = _nothing
+        elif wavfile:
+            self.init = lambda sf2: fluidsynth.midi.load_sound_font(sf2)
+            self.set_samplerate = self._set_wav_frame_rate
+            self.sleep = self._add_wav_frames
+            self.end = lambda: self.wave.close()
+        self.textra = 0
+            
+    def _set_wav_frame_rate(self, f):
+        self.wave.setframerate(f)
+        self.frame_rate = f
+
+    def _add_wav_frames(self, t):
+        self.textra += t
+        self.wave.writeframes(fluidsynth.midi.fs.get_samples(
+                int((t / 1000.0) * self.frame_rate)))
+
+    def start(self):
+        if self.wavfile:
+            self.wave = wave.open(self.wavfile, 'wb')
+            self.wave.setnchannels(2)
+            self.wave.setsampwidth(2)
+
+        with open(self.path) as f:
+            for x in f:
+                line = x.rstrip().split('.', 2)
+                nid, t = map(int, line[:2])
+                s = line[2]
+                if nid == 1:
+                    self.init(s)
+                elif nid == 2:
+                    self.set_samplerate(int(s))
+                elif nid == 3:
+                    fluidsynth.main_volume(1, int(s))
+                elif nid == 4:
+                    fluidsynth.set_instrument(1, *eval(s))
+                elif nid == 5:
+                    self.sleep(t)
+                    fluidsynth.play_Note(int(s))
+                elif nid == 6:
+                    self.sleep(t)
+                    fluidsynth.stop_Note(int(s))
+                elif nid == 7:
+                    self.sleep(t)
+                    stop_all_notes()
+        self.sleep(self.textra + 1000)
+        self.end()
+
+def stop_all_notes():
+    # fluidsynth.stop_everything() # Doesn't work that well
+    for i in _max_note_range:
+        fluidsynth.stop_Note(i)
+
+class AelteiBase(object):
+    def __init__(self):
+        self.cfg_dir = os.path.expanduser('~/.aeltei')
+        self.cfg_cache_dir = os.path.join(self.cfg_dir, 'cache')
+        self.cfg_saves_dir = os.path.join(self.cfg_dir, 'saves')
+
+    def setup_config_dir(self):
+        try: os.mkdir(self.cfg_dir)
+        except OSError: pass
+        try: os.mkdir(self.cfg_cache_dir)
+        except OSError: pass
+        try: os.mkdir(self.cfg_saves_dir)
+        except OSError: pass
+        
+    def clear_cache(self):
+        try:
+            shutil.rmtree(self.cfg_cache_dir)
+        except OSError:
+            pass
+
+    def clear_saves(self):
+        try:
+            shutil.rmtree(self.cfg_saves_dir)
+        except OSError:
+            pass
+
+class Aeltei(AelteiBase):
+    def __init__(self, samplerate=44100, volume=75, soundfont=None,
+                 driver='alsa', note_keys=None, auto_load_save=True,
+                 keep_track=None):
+        AelteiBase.__init__(self)
+
+        if soundfont is None:
+            for x in _likely_soundfont_paths:
+                if os.path.isfile(x):
+                    self.soundfont = x
+                    break
+            else:
+                if soundfont:
+                    raise ValueError('soundfont %s does not exist' % repr(soundfont))
+                else:
+                    raise ValueError('no soundfont given')
+        else:
+            self.soundfont = soundfont
+
+        self.cfg_cache_soundfont_info = os.path.join(
+            self.cfg_cache_dir, '%s.info' % os.path.basename(self.soundfont))
+
+        self.cfg_saves_base_info = os.path.join(self.cfg_saves_dir, 'base.info')
+
+
+        self.samplerate = samplerate
+        self.volume = volume
+        self.driver = driver
+        self.note_keys = note_keys if note_keys is not None else \
+            _default_qwerty_us_note_keys
+        self.auto_load_save = auto_load_save
+        self.tracker = NoteTracker(keep_track)
+        self.tracker.set_samplerate(self.samplerate)
+        self.tracker.set_volume(self.volume)
+        self.tracker.set_soundfont(self.soundfont)
+        
+        self.current_instrument = None
+        self.instruments_text = None
+
+    def get_instruments(self):
+        try:
+            with open(self.cfg_cache_soundfont_info) as f:
+                self.instruments = pickle.load(f)
+        except IOError:
+            self.instruments = self._get_instruments()
+            with open(self.cfg_cache_soundfont_info, 'w') as f:
+                pickle.dump(self.instruments, f)
+
+        l = len(self.instruments)
+        sl = '%' + str(len(str(l - 1))) + 'd  %s'
+        self.instruments_name_dict = ApproximatingDict()
+        for i in range(l):
+            self.instruments_name_dict[self.instruments[i][0]] = i
+        self.instruments_name_dict.cache_for_fitting()
+
+    def _get_instruments(self):
+        try:
+            instrtext = subprocess.Popen((_sf2text_prog, self.soundfont),
+                                         stdout=subprocess.PIPE).communicate()[0]
+        except IOError:
+            raise RuntimeError('the %s program, part of the %s package, \
+is not installed' % (_sf2text_prog, _sf2text_package))
+        return tuple(sorted([
+                    (x[0], int(x[1]), int(x[2])) for x in
+                    re.findall(r'"([\w ]+?)" \(preset (\d+)\) \(bank (\d+)\)',
+                               instrtext)]))
+
+    def get_saves(self):
+        try:
+            with open(self.cfg_saves_base_info) as f:
+                self.base_level, prev_soundfont, \
+                    prev_instrument, prev_instruments_text = pickle.load(f)
+                if prev_soundfont == self.soundfont:
+                    self.select_instrument(prev_instrument)
+                    self.instruments_text = prev_instruments_text
+        except (IOError, ValueError):
+            self.base_level = 0
+
+    def save_saves(self):
+        try:
+            with open(self.cfg_saves_base_info, 'w') as f:
+                pickle.dump((self.base_level, self.soundfont,
+                             self.current_instrument, self.instruments_text), f)
+        except (AttributeError, IOError):
+            pass
+
+    def select_instrument(self, num=None, name=None, strict=False):
+        if num is None:
+            if name is not None:
+                num = self.instruments_name_dict.get_first_fit(name)
+        if num is not None:
+            num %= len(self.instruments)
+            try:
+                fluidsynth.set_instrument(1, *self.instruments[num][1:])
+                self.current_instrument = num
+                self.current_instrument_string = self.get_instrument_string()
+                self.tracker.set_instrument(*self.instruments[num][1:])
+                return num
+            except IndexError:
+                num = None
+        if strict and not num:
+            if name is not None:
+                raise ValueError('no instrument named %s exists' % name)
+            else:
+                raise ValueError('no instrument number or name given')
+
+    def select_next_instrument(self, num=1):
+        return self.select_instrument(self.current_instrument + num)
+
+    def select_previous_instrument(self, num=1):
+        return self.select_next_instrument(-num)
+
+    def get_instrument_string(self, num=None):
+        if num is None:
+            num = self.current_instrument
+        return self.instruments[num][0]
+
+    def generate_instruments_text(self):
+        l = len(self.instruments)
+        sl = '%' + str(len(str(l - 1))) + 'd  %s'
+
+        ts = [sl % (i, self.instruments[i][0]) for i in range(l)]
+        lf = float(l)
+        avglen = int(math.ceil(sum(map(len, ts)) / lf) + 2)
+        hnum = self.width / avglen
+        while True:
+            vnum = int(math.ceil(lf / hnum))
+            maxes = [max(map(len, ts[i:i + vnum])) + 2 for i in xrange(0, l, vnum)]
+            maxes_sum = sum(maxes)
+            if maxes_sum > l:
+                hnum -= 1
+            else:
+                break
+        t = ''
+        for i in range(vnum):
+            for j in range(hnum):
+                u = i + vnum * j
+                if u < l:
+                    tt = ts[u]
+                    t += tt + ' ' * (maxes[j] - len(tt))
+            t += '\n'
+        self.instruments_text = t
+
+    def _fix_note(self, i):
+        if i < 0:
+            i = 0
+        i = self.base_level + i
+        if i > _max_note:
+            i = _max_note
+        return i
+    
+    def play_note(self, i):
+        i = self._fix_note(i)
+        fluidsynth.play_Note(_notes[i])
+        self.tracker.play_note(i)
+
+    def stop_note(self, i):
+        i = self._fix_note(i)
+        fluidsynth.stop_Note(_notes[i])
+        self.tracker.stop_note(i)
+
+    def stop_all_notes(self):
+        stop_all_notes()
+        self.tracker.stop_all_notes()
+
+    def increase_level(self, num=1):
+        new_level = self.base_level + num
+        if new_level > _max_note:
+            self.base_level = _max_note
+        elif new_level < 0:
+            self.base_level = 0
+        else:
+            self.base_level = new_level
+
+    def decrease_level(self, num=1):
+        return self.increase_level(-num)
+
+    def pass_note_from_key(self, key):
+        try:
+            key = self.note_keys[key]
+        except KeyError:
+            return
+        while isinstance(key, dict):
+            try:
+                key = key[self._get_key()]
+            except KeyError:
+                return
+        if key[0]:
+            self.play_note(key[1])
+        else:
+            self.stop_note(key[1])
+
+    def start(self):
+        try:
+            curses.wrapper(self._curses_start)
+        except ExitCursesWrapper:
+            pass
+
+    def update_status(self):
+        self.scr.clear()
+        self.scr.addstr(0, 0, 'Base level: %3d    Instrument: %s' % (
+                self.base_level, self.current_instrument_string))
+        self.scr.refresh()
+
+    def _curses_start(self, scr):
+        self.scr = scr
+        self.scr.idlok(1)
+        self.scr.keypad(1)
+        self.scr.scrollok(True)
+        curses.use_default_colors()
+        curses.curs_set(0)
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        self.color_white_on_black = curses.color_pair(1) | curses.A_BOLD
+
+        self.height, self.width = self.scr.getmaxyx()
+        self.help_width = self.width if self.width < 80 else 80
+        self.keybindings_text = _keybindings.format(self.help_width)
+        self._start()
+        self.update_status()
+        self._loop()
+
+    def _start(self):
+        self.setup_config_dir()
+        self.get_instruments()
+
+        fluidsynth.init(self.soundfont, self.driver)
+        fluidsynth.main_volume(1, self.volume)
+
+        if self.auto_load_save:
+            self.get_saves()
+        if self.current_instrument is None:
+            self.select_instrument(0)
+        if self.instruments_text is None:
+            self.generate_instruments_text()
+        self.generate_help_text()
+
+    def generate_help_text(self):
+        self.text = (
+'This is the help screen for Aeltei, a virtual multi instrument environment.',
+'''
+
+When you press a character on your keyboard, and that character is linked to a
+note, that note will be either played or stopped, depending on what you set it
+to do. You can run `aeltei --calibrate outputfile' and then `aeltei outputfile'
+to first generate a keyfile and then use it in this program. The default is to
+use a US QWERTY keyboard with a-z linked to playing note 0--25, and A-Z linked
+to stopping note 0--25. It is strongly advised not to use this default (because
+it is not very good).
+
+''',
+   'Keyboard bindings and available instruments:', (self.keybindings_text,),
+                                                   (self.instruments_text,))
+        wrapper = textwrap.TextWrapper(width=self.help_width)
+        self.text = '\n\n'.join(wrapper.fill(x.strip().replace('\n', ' ')).strip() \
+                                    if isinstance(x, basestring) \
+                                    else x[0] for x in self.text).split('\n')
+        self.lines_num = len(self.text) + 1
+        self.line = 0
+        
+    def show_help(self):
+        self.scr.clear()
+        self._refresh_help_pad()
+        self._help_loop()
+
+    def _refresh_help_pad(self):
+        self.scr.clear()
+        y = 0
+        for t in self.text[self.line:self.line + self.height - 1]:
+            self.scr.addstr(y, 0, t)
+            y += 1
+        self.scr.addstr(self.height - 1, 0, '~~ %3d%% read ~~' %
+                        (100 * (self.line + self.height) /
+                         float(self.lines_num)), self.color_white_on_black)
+        self.scr.refresh()
+
+    def scroll_down(self, n=1):
+        n_line = self.line + n
+        if n_line < 0:
+            n_line = 0
+        elif n_line > self.lines_num - self.height:
+            n_line = self.lines_num - self.height
+        if n_line != self.line:
+            self.line = n_line
+
+    def scroll_up(self, num=1):
+        self.scroll_down(-num)
+
+    def scroll_much_down(self, n=1):
+        self.scroll_down(n * (self.height - 1))
+
+    def scroll_much_up(self, n=1):
+        self.scroll_much_down(-n)
+
+    def get_entered_text(self):
+        curses.curs_set(1)
+        textbox = curses.textpad.Textbox(curses.newwin(1, self.width, 1, 0))
+        text = textbox.edit()
+        curses.curs_set(0)
+        return text
+
+    def _get_key(self):
+        key = self.scr.getch()
+        if key == KEY_ESC: # Also Meta/Alt key
+            key = self.scr.getch()
+            if key != KEY_ESC:
+                key = 'M' + str(key)
+        return key
+
+    def _help_loop(self):
+        while True:
+            key = self._get_key()
+            if key in K_HELP_EXIT:
+                break
+            elif key in K_SDOWN:
+                self.scroll_down()
+            elif key in K_SUP:
+                self.scroll_up()
+            elif key in K_SMDOWN:
+                self.scroll_much_down()
+            elif key in K_SMUP:
+                self.scroll_much_up()
+            self._refresh_help_pad()
+        
+    def _loop(self):
+        while True:
+            key = self._get_key()
+            if key in K_EXIT:
+                self.exit()
+            elif key in K_DOWN:
+                self.decrease_level()
+            elif key in K_UP:
+                self.increase_level()
+            elif key in K_STOP:
+                self.stop_all_notes()
+            elif key in K_NEXT:
+                self.select_next_instrument()
+            elif key in K_PREV:
+                self.select_previous_instrument()
+            elif key in K_HELP:
+                self.show_help()
+            elif key in K_SEARCH:
+                text = self.get_entered_text().strip()
+                self.select_instrument(name=text)
+            elif key in K_GET:
+                num = int(self.get_entered_text())
+                self.select_instrument(num)
+            else:
+                self.pass_note_from_key(key)
+            self.update_status()
+
+    def exit(self):
+        raise ExitCursesWrapper
+
+    def end(self):
+        self.tracker.end()
+        if self.auto_load_save:
+            self.save_saves()
+
+def setup_nonblocking_mode(func):
+    import termios, fcntl, sys, os
+    fd = sys.stdin.fileno()
+
+    try:
+        oldterm = termios.tcgetattr(fd)
+        newattr = termios.tcgetattr(fd)
+        newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+        termios.tcsetattr(fd, termios.TCSANOW, newattr)
+
+        oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+
+        try:
+            ret = func()
+        finally:
+            termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
+            fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
+    except termios.error:
+        ret = func()
+    return ret
+
+def _calibrate_keys():
+    keys = [[], []]
+    prev_keys = []
+    i = 0
+    tmp, tmp_str = [], ''
+    while True:
+        try:
+            c = sys.stdin.read(1)
+            try:
+                k = ord(c)
+            except TypeError:
+                break
+            if k == KEY_ESC:
+                if i == 1:
+                    print >>sys.stderr, \
+'You haven\'t entered a note-stopping character\n\
+for the last note.'
+                    continue
+                else:
+                    break
+            elif c == '\t':
+                if not tmp:
+                    continue
+                print >>sys.stderr, 'Entered %s (%s)' % (tmp_str, repr(tmp)[1:-1])
+                if tmp_str in prev_keys:
+                    print >>sys.stderr, 'key already in use; ignoring'
+                    tmp, tmp_str = [], ''
+                else:
+                    keys[i].append(tuple(tmp))
+                    prev_keys.append(tmp_str)
+                    tmp, tmp_str = [], ''
+                    i = (i + 1) % 2
+            elif k == KEY_BACKSPACE:
+                if tmp:
+                    tmp, tmp_str = [], ''
+                    print >>sys.stderr, 'Removed current character'
+                else:
+                    try:
+                        del keys[i][-1]
+                        del prev_keys[-1]
+                        tmp, tmp_str = [], ''
+                        i = (i + 1) % 2
+                        print >>sys.stderr, 'Removed previous character'
+                    except IndexError:
+                        pass
+            else:
+                tmp.append(k)
+                tmp_str += c
+        except IOError:
+            pass
+    _ = {}
+    j = True
+    for k in keys:
+        for i in range(len(k)):
+            x = k[i]
+            t = _
+            for y in x[:-1]:
+                try:
+                    t = t[y]
+                except KeyError:
+                    t[y] = {}
+                    t = t[y]
+            t[x[-1]] = (j, i)
+        j = not j
+    return pickle.dumps(_)
+            
+def calibrate_keys():
+    print >>sys.stderr, '''\
+Enter the characters you wish to use as notes. The
+first character gets the value 0 (lowest pitch),
+and the rest will be continually incremented by
+1. One should enter two characters for each note,
+the first character being the one used to play the
+note, the second character being the one used to
+stop the note. Character pairs and characters in a
+character pair should be separated by pressing the
+Tab key; for example, one could enter
+'a<tab>A<tab>b<tab>B<tab>c<tab>C' to get the
+string 'aAbBcC'. To end, press ESC. To delete a
+character, press Backspace.
+'''
+    return setup_nonblocking_mode(_calibrate_keys)
+
+if __name__ == '__main__':
+    from optparse import OptionParser
+    try:
+        from setproctitle import setproctitle
+    except ImportError:
+        setproctitle = lambda *args: None
+
+    class NewOptionParser(OptionParser):
+        def format_epilog(self, formatter):
+            return self.epilog
+
+        def state(self, message):
+            print '%s: %s' % (self.prog, message)
+    
+    parser = NewOptionParser(
+        prog=__tool_name__,
+        usage='Usage: %prog [OPTION]... [KEYFILE]',
+        description=__tool_short_description__,
+        version=__tool_version_description__,
+        epilog='''
+Aeltei uses a curses frontend to function on the command line. Soundfonts and
+fluidsynth are used for sounds.
+
+A keyfile contains the keys you wish to use for playing and stopping notes. You
+can have as many as needed. In the case of a keyfile where "aAbBcC" has been
+entered, pressing "a" while running Aeltei will play the note with value 0, "A"
+will stop that note, "b" will play note 1, "c" will play note 2, etc. (defaults
+to built-in QWERTY US keyboard with letters only; it is advised to change this
+with the --calibrate option)
+
+When the curses environment has started up, it is recommended to enter the help
+screen. Press Ctrl-H to do that. The help screen has a list of keybindings and
+instruments available. The keybindings are written in Emacs-style, meaning "C"
+''')
+    parser.add_option('-r', '--samplerate', dest='samplerate',
+                      metavar='Hz', type='int', default=44100,
+                      help='set the frame rate (defaults to 44100)')
+    parser.add_option('-u', '--volume', dest='volume', default=75,
+                      metavar='0--100', type='int',
+                      help='set the main volume (defaults to 75)')
+    parser.add_option('-d', '--driver', dest='driver', default='alsa',
+                      metavar='Hz', type='choice', choices=_usable_drivers,
+                      help='select sound driver (defaults to alsa)')
+    parser.add_option('-s', '--soundfont', dest='soundfont',
+                      metavar='PATH', help='''\
+set the path of the soundfont you wish to use (defaults to built-in paths)''')
+    parser.add_option('-t', '--keep-track', dest='keep_track',
+                      metavar='OUTFILE', help='''\
+keep track of what you have been playing by continually saving your playing in
+a simple format (which can be converted to e.g. MIDI later on) to OUTFILE ("-"
+is standard out, does not track by default)
+''')
+    parser.add_option('-p', '--play-track', dest='play_track',
+                      metavar='INFILE', help='''\
+play a track saved by --keep-track ("-" means standard in)
+''')
+    parser.add_option('-R', '--record-track', dest='record_track',
+                      metavar='INFILE OUTFILE', nargs=2, help='''\
+record a track saved by --keep-track to OUTFILE in WAV format ("-" means
+standard in)
+''')
+    parser.add_option('-l', '--calibrate', dest='calibrate',
+                      action='store_true', default=False, help='''\
+do not start the instrument environment, but create a keyfile instead. This
+keyfile will be sent to standard out
+''')
+    parser.add_option('-q', '--quiet', dest='term_verbose',
+                      action='store_false',
+                      help='do not print status and error messages')
+    parser.add_option('-A', '--no-auto-load-save', dest='auto_load_save',
+                      action='store_false', default=True,
+                      help='do not load and save session data automatically')
+    parser.add_option('-C', '--clear-cache', dest='clear_cache',
+                      action='store_true', default=False,
+                      help='clear cache')
+    parser.add_option('-S', '--clear-saves', dest='clear_saves',
+                      action='store_true', default=False,
+                      help='clear save data')
+
+    options, args = parser.parse_args()
+
+    if options.clear_cache:
+        AelteiBase().clear_cache()
+        parser.state('cache cleared')
+    if options.clear_saves:
+        AelteiBase().clear_saves()
+        parser.state('save data cleared')
+    if options.calibrate:
+        print calibrate_keys(),
+    elif options.play_track:
+        a = AelteiPlayer(options.play_track, driver=options.driver,
+                         wavfile=False)
+        a.start()
+    elif options.record_track:
+        a = AelteiPlayer(options.record_track[0],
+                         driver=False, wavfile=options.record_track[1])
+        a.start()
+
+    if not options.clear_cache and not options.clear_saves and \
+            not options.calibrate and not options.play_track and \
+            not options.record_track:
+        setproctitle(__tool_name__)
+
+        try:
+            with open(args[0]) as f:
+                options.note_keys = pickle.load(f)
+        except (IndexError, OSError):
+            options.note_keys = None
+        _del_stderr()
+        aeltei = Aeltei(options.samplerate, options.volume,
+                        options.soundfont, options.driver,
+                        options.note_keys, options.auto_load_save,
+                        options.keep_track)
+        try:
+            aeltei.start()
+        except (EOFError, KeyboardInterrupt):
+            pass
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        finally:
+            aeltei.end()
