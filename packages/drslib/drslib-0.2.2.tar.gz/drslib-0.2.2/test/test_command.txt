@@ -1,0 +1,198 @@
+Test the command line client for dataset version managment.
+
+Something like
+
+# Show list of realm-trees with a status summary
+$ drs-tree list --root=<drs-root> --incoming=<incoming-root> --product=p --institute=i --model=m ...
+
+Defaults are taken from the config.
+
+# Show detailed status
+$ drs-tree status --root=<drs-root> ...
+
+# Move to next version
+$ drs-tree next ...
+
+Test Prerequisites
+==================
+
+Import modules required to for this test.
+
+>>> import sys, os, shutil
+>>> sys.path.append(os.path.dirname(__file__))
+>>> from drslib.drs_command import main as drs_tool_main
+>>> import gen_drs
+
+Create a directory and build a drs-tree in it called './drs_tool_example/cmip5'
+
+>>> tmpdir = './drs_tool_example'
+>>> drs_root = tmpdir
+>>> incoming = os.path.join(tmpdir, 'output')
+>>> if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
+>>> os.mkdir(tmpdir)
+>>> gen_drs.write_eg2(tmpdir)
+>>> gen_drs.write_listing(incoming, os.path.dirname(__file__)+'/cmip5_nomodel_test_ls')
+
+Create a function to run the drs_tool command.
+
+>>> def do_drs_tool(subcommand, args='', pattern="cmip5.output1.MOHC.HadCM3"):
+... 	cmd = "drs_tool %s --root=%s --incoming=%s --version=20100101 \
+...                     %s %s" % (subcommand, drs_root, incoming, pattern, args)
+...     drs_tool_main(cmd.split())
+ 
+List the realm-trees
+
+>>> do_drs_tool('list') #doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1                 0:0 5:305
+cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1                0:0 5:325
+------------------------------------------------------------------------------
+2 datasets awaiting upgrade
+==============================================================================
+
+If product is not specified the datasets are rejected
+
+>>> do_drs_tool('list', pattern='cmip5.%.MOHC.HadCM3') #doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+Incompletely specified incoming datasets
+------------------------------------------------------------------------------
+cmip5.%.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1                     
+cmip5.%.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1                    
+==============================================================================
+
+
+
+Show what manipulations will be done for next version
+
+>>> do_drs_tool('todo', '--realm=atmos') # doctest:+ELLIPSIS +NORMALIZE_WHITESPACE
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Publisher Tree ... todo for version 20100101
+<BLANKLINE>
+mkdir -p .../r1i1p1/files/tas_20100101
+mv .../tas_day_HadCM3_1pctto4x_r1i1p1_2001123114-2004010104.nc .../r1i1p1/files/tas_20100101/tas_day_HadCM3_1pctto4x_r1i1p1_2001123114-2004010104.nc
+...
+ln -s .../output1/MOHC/HadCM3/1pctto4x/day/atmos/day/r1i1p1/files/tas_20100101/tas_day_HadCM3_1pctto4x_r1i1p1_2000010100-2001123114.nc .../output1/MOHC/HadCM3/1pctto4x/day/atmos/day/r1i1p1/v20100101/tas/tas_day_HadCM3_1pctto4x_r1i1p1_2000010100-2001123114.nc
+==============================================================================
+
+Upgrade one PublisherTree
+
+>>> do_drs_tool('upgrade', '--realm=atmos') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Upgrading cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 to version 20100101 ... done 5
+==============================================================================
+
+List the results
+
+>>> do_drs_tool('list') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100101       5:305
+cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1                0:0 5:325
+------------------------------------------------------------------------------
+1 datasets awaiting upgrade
+==============================================================================
+
+Upgrade the other PublisherTree
+
+>>> do_drs_tool('upgrade') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Publisher Tree cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 has no pending upgrades
+Upgrading cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1 to version 20100101 ... done 5
+==============================================================================
+
+>>> do_drs_tool('list') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100101       5:305
+cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1.v20100101      5:325
+==============================================================================
+
+Simulate a new file ariving
+
+>>> cmd= "cp %s/output1/MOHC/HadCM3/1pctto4x/day/atmos/day/r1i1p1/v20100101/tas/tas_day_HadCM3_1pctto4x_r1i1p1_2004010104-2005123119.nc %s" % (drs_root, incoming)
+>>> os.system(cmd)
+0
+>>> do_drs_tool('list') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100101       5:305 1:61
+cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1.v20100101      5:325
+------------------------------------------------------------------------------
+1 datasets awaiting upgrade
+==============================================================================
+
+>>> do_drs_tool('todo') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Publisher Tree ... todo for version 20100101
+<BLANKLINE>
+mv ...
+------------------------------------------------------------------------------
+Nothing todo for ...
+==============================================================================
+
+>>> do_drs_tool('todo', '-M rsync') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Publisher Tree ... todo for version 20100101
+<BLANKLINE>
+rsync ...
+------------------------------------------------------------------------------
+Nothing todo for ...
+==============================================================================
+
+>>> do_drs_tool('upgrade', '--version=20100102') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+Upgrading cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 to version 20100102 ... done 1
+Publisher Tree cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1 has no pending upgrades
+==============================================================================
+
+>>> do_drs_tool('list') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100102       5:305
+cmip5.output1.MOHC.HadCM3.1pctto4x.mon.ocean.Omon.r1i1p1.v20100101      5:325
+==============================================================================
+
+>>> do_drs_tool('history', '--realm=atmos') # doctest:+ELLIPSIS
+==============================================================================
+DRS Tree at ...
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100102
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1.v20100101
+==============================================================================
+
+>>> do_drs_tool('mapfile', '--realm=atmos') # doctest:+ELLIPSIS
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 | ./drs_tool_example/.../tas_day_HadCM3_1pctto4x_r1i1p1_2001123114-2004010104.nc | 61 | mod_time=...
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 | ./drs_tool_example/.../tas_day_HadCM3_1pctto4x_r1i1p1_2004010104-2005123119.nc | 61 | mod_time=...
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 | ./drs_tool_example/.../tas_day_HadCM3_1pctto4x_r1i1p1_2005123119-2008010109.nc | 61 | mod_time=...
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 | ./drs_tool_example/.../tas_day_HadCM3_1pctto4x_r1i1p1_2008010109-2010010100.nc | 61 | mod_time=...
+cmip5.output1.MOHC.HadCM3.1pctto4x.day.atmos.day.r1i1p1 | ./drs_tool_example/.../tas_day_HadCM3_1pctto4x_r1i1p1_2000010100-2001123114.nc | 61 | mod_time=...
+
+>>> do_drs_tool('list', '--product=output1', pattern="cmip5.%.MOHC.NoModel")
+==============================================================================
+DRS Tree at ./drs_tool_example
+------------------------------------------------------------------------------
+cmip5.output1.MOHC.NoModel.historical.mon.atmos.Amon.r1                 0:0 62:3255
+------------------------------------------------------------------------------
+1 datasets awaiting upgrade
+==============================================================================
