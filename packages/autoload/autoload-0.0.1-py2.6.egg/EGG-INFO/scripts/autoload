@@ -1,0 +1,71 @@
+#!/usr/bin/python2.6
+
+import ConfigParser
+import sys
+
+from autoload.grapher import Grapher
+from autoload.reporter import Reporter
+from autoload.tester import Tester
+    
+args = {}
+
+try:
+    args['input'] = sys.argv[1]
+except IndexError:
+    print "autoload: missing config option. You have to specify a test configuration file.\nUsage: autoload config output"
+    sys.exit(1)
+try:
+    args['output'] = sys.argv[2]
+except IndexError:
+    print "autoload: missing output option. You have to specify a filename in which output will be saved.\nUsage: autoload config output"
+    sys.exit(1)
+
+def load_tests():
+    conf_file = args['input']
+    config = ConfigParser.RawConfigParser()
+    config.read(conf_file)
+
+    try:
+        tests = []
+        for test_section in ','.join(config.get('autoload', 'tests').split('\n')).split(','):
+            if test_section:
+                test = {'title': test_section.capitalize()}
+                for option in config.options(test_section):
+                    value = config.get(test_section, option)
+                    if value.lower() == 'true':
+                        value = ''
+                    elif value.lower() == 'false':
+                        continue
+                    test[option] = value
+                tests.append(test)
+
+        return tests
+    except ConfigParser.NoSectionError, e:
+        print "autoload: test configuration section error - %s" % e
+        sys.exit(1)
+    except ConfigParser.NoOptionError, e:
+        print "autoload: test configuration option error - %s" % e
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    #import signal
+    #from tester import alarm_handler
+    #signal.signal(signal.SIGALRM, alarm_handler)
+    reporter = Reporter(args['output'])
+    tester = Tester()
+
+    tests = load_tests()
+    all_graphs = []
+    for test in tests:
+        results = tester.run(test)
+        if results:
+            graphs = Grapher(results, test)
+            all_graphs.append(graphs)
+            reporter.build_page(test, graphs, results)
+
+    reporter.generate()
+    for graphs in all_graphs:
+        graphs.cleanup()
+
+
