@@ -1,0 +1,58 @@
+======
+syscon
+======
+
+syscon is a python package providing remote control tools for other computers
+in the network. At the moment, syscon is still a beta version, since I hope
+to be able to add some new functions.
+
+Please use the control2.py and client2.py[w] module, the other ones are not
+working...
+
+Syntax
+======
+
+
+Client
+------
+
+On the client, you just have to start the client2.pyw or client2.py
+
+controlling Computer
+--------------------
+
+On the controlling computer, usage is as follows:
+
+	import syscon.control2
+	
+	con = syscon.control2.Connection("RemoteComputerName")
+	# This defines con as a connection with the Computer "RemoteComputerName
+	# over port 51000. If you want to use another port, use the second
+	# parameter, e.g. for port 9999:
+	# con = syscon.control2.Connection("RemoteComputerName", 9999)
+	
+	# Now send orders with con.send (next section)
+	
+	con.send("stopcontrol")
+	# This immediately stops the connection and closes the client2.py[w]
+	# at the other computer
+	
+
+Orders to remote computer
+=========================
+
+There are the following orders in version 0.2.0:
+
+1. **execpy**: This command needs a second parameter. The code from the second parameter is executed with "exec" on the remote machine.
+
+2. **executefile**: Starts the program specified in the second parameter.
+
+3. **download**: Downloads the file from the url in the third parameter to the local path (on the remote computer) in the second parameter.
+
+4. **shutdown**: Sends a shutdown signal to the remote computer (note: works only with Windows NT to Windows 7)
+
+5. **logoff**: Sends a logoff signal to the remote computer (note: works also only with Windows NT to Windows 7)
+
+6. **stopcontrol**: Stops the remote control immediately.
+
+
