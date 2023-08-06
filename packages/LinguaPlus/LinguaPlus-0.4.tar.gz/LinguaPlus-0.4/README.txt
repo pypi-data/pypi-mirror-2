@@ -1,0 +1,49 @@
+LinguaPlus
+==========
+
+Overview
+--------
+
+LinguaPlus provides several amenities designed to improve the LinguaPlone
+workflow. By automatically applying 'mark outdated' (from slc.outdated)
+to translations when the canonical version is changed,  translators can
+keep track of which translated items need to be updated. Side-by-side
+editing for plone.app.iterate working copies allows the translator
+to reference the canonical version while making changes in a working
+copy. When the content has been updated an administrator can check it
+back in and remove the outdated flag.
+
+Provide content rule triggers for `plone.app.iterate`.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This package allows you to trigger content rules based on
+plone.app.iterate's four events: "An object will been checked
+out" (IBeforeCheckoutEvent), "An object has been checked out"
+(ICheckoutEvent), "A working copy will be checked in" (ICheckinEvent),
+"A working copy has been checked in" (IAfterCheckinEvent).
+
+Mark translations as outdated when the canonical version is changed.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This package provides a content action that can be used to mark all
+translations as outdated when the canonical version is edited, using
+`slc.outdated` to provide the underlying 'mark as outdated' feature.
+
+Most sites are probably edited both directly and by checkout/checkin
+depending on the privileges of the author. To detect both kinds of edits,
+you will need two content rules. One for 'A working copy has been checked
+in' and another for 'Object Modified (but only if the object is not
+a folder)'.
+
+Once these rules are set up, per-language collections of outdated content
+can serve as a to-do list for translators. Once the content has been
+updated, manually 'toggle outdated' on the newly retranslated content.
+
+Edit working copies side-by-side with the canonical version.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This package provides a 'side-by-side' view to edit plone.app.iterate
+working copies alongside the baseline's canonical revision, just like
+LinguaPlone's edit view but for working copies. In a working copy, just
+use the 'side by side' tab instead of the 'edit' tab to reference the
+canonical version.
