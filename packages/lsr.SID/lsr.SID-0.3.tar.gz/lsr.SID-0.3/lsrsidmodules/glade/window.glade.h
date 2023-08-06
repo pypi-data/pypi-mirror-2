@@ -1,0 +1,16 @@
+char *s = N_("Artists");
+char *s = N_("Directories");
+char *s = N_("Reindex HVSC");
+char *s = N_("Search");
+char *s = N_("Search: ");
+char *s = N_("Songs longer than...");
+char *s = N_("Songs shorter than...");
+char *s = N_("_Best rated");
+char *s = N_("_File");
+char *s = N_("_Help");
+char *s = N_("_Most played");
+char *s = N_("_Playlist");
+char *s = N_("_Random Entries");
+char *s = N_("_View");
+char *s = N_("toolbutton");
+char *s = N_("toolbutton1");
