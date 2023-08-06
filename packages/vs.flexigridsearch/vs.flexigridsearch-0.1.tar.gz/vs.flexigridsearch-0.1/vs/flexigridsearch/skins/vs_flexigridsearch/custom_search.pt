@@ -1,0 +1,81 @@
+<html metal:use-macro="context/main_template/macros/master">
+
+    <div metal:fill-slot="javascript_head_slot">
+
+        <script type="text/javascript" tal:content="string:SEARCH_URL = '${portal_url}/@@searchJSON'"></script>
+
+        <script type="text/javascript"
+            tal:define="columns context/portal_properties/flexigridsearch_properties/columns; 
+                        columns python: list(columns)"
+            tal:content="string:COLUMNS = $columns" 
+            >
+        </script>
+
+        <script type="text/javascript" tal:condition="request/SearchableText | nothing">
+
+            /* KEYS *must* identical with ZCatalog index names */
+
+            KNOWN_FIELDS = {
+              Title:        {display: 'Title', name : 'sortable_title', width : 120, sortable : true, align: 'left'},
+              Description:  {display: 'Description', name : 'Description', width : 150, sortable : false, align: 'left'},
+              Creator:      {display: 'Creator', name : 'Creator', width : 50, sortable : true, align: 'center'},
+              created:      {display: 'Created', name : 'created', width : 70, sortable : true, align: 'center'},
+              Shortname:    {display: 'Shortname', name : 'getId', width : 70, sortable : true, align: 'center'},
+              Subject:      {display: 'Subject', name : 'subject', width : 50, sortable : false, align: 'center'},
+              portal_type:  {display: 'Type', name : 'portal_type', width : 90, sortable : true, align: 'left'},
+              getObjSize:   {display: 'Size', name : 'getObjSize', width : 50, sortable : false, align: 'center'},
+              review_state: {display: 'State', name : 'review_state', width : 50, sortable : true, align: 'center'}
+            };
+
+            $j = jQuery.noConflict()
+
+            function clearForm() {
+                $j('#SearchableText').val('');
+                $j('#results').hide();
+            }
+
+            $j(document).ready(function() {
+
+                /* Calculate colModel */
+                var colModel = new Array()
+                for (var i=0; i < COLUMNS.length; i++) {
+                    var col = COLUMNS[i];
+                    if (col in KNOWN_FIELDS)
+                        colModel.push(KNOWN_FIELDS[col]);
+                    else
+                        alert('Unknown field found in column specification: ' + col);
+                }
+
+                $j('#results').flexigrid({
+                    url : SEARCH_URL,
+                    dataType : 'json',
+                    colModel : colModel,
+                    sortname: "id",
+                    sortorder: "asc",
+                    usepager: true,
+                    title: "Searchresults",
+                    useRp: true,
+                    rp: 10,
+                    showTableToggleBtn: false,
+                    resizable: true,
+                    height: 300,
+                    singleSelect: true
+                    });
+            });
+        </script>
+    </div>
+
+    <div metal:fill-slot="main">
+        <fieldset>
+            <legend>Search</legend>
+            <form method="get" tal:attributes="action string:$portal_url/custom_search">
+                SearchableText: 
+                <input type="text" size="80" name="SearchableText" id="SearchableText" tal:attributes="value request/SearchableText | nothing" />
+                <br/>
+                <input class="context" type="submit" value="Search" />
+                <input class="context" type="button" value="Reset form" onclick="clearForm()" />
+            </form>
+        </fieldset>
+        <table id="results" style="display: none"></table>
+    </div>
+</html>
