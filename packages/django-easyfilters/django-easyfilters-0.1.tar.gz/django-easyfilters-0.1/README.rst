@@ -1,0 +1,44 @@
+==================
+django-easyfilters
+==================
+
+Overview
+========
+
+This library provides filters similar in some ways to ``list_filter`` and
+``date_hierarchy`` in Django's admin, but for use outside the
+admin. Importantly, it also includes result counts for the choices. It is
+designed to be very easy to get started with.
+
+Docs
+====
+See the docs/ directory, especially docs/overview.rst
+
+
+Demo
+====
+
+A small demo app is included, see the instructions in docs/develop.rst
+
+A (currently) live example can be seen at:
+
+http://www.christchurchbradford.org.uk/sermons/
+
+Status
+======
+
+The library is in a useful state, but not quite 'complete'. The main glaring
+feature omission in nice handling of Decimal fields (or other numeric fields that need
+to be treated as a continuum of values) to provide range-base selection.
+
+The internal API of Filter and FilterSet are not firmed up, but are not far from
+being so. Test coverage is extensive.
+
+Feedback regarding API or features is very welcome!
+
+TODO
+====
+
+* Automatic range-based filters for DecimalFields - e.g. for prices
+* Ability to specify 'defaults' attribute for FilterSet
+* Allow the automatic 'page' resetting to be customized
