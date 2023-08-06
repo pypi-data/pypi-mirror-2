@@ -1,0 +1,84 @@
+""" Code to get/add information to/from FITS headers
+
+Context : SRP
+Module  : SRPFitsHeaders.py
+Version : 1.0.0
+Status  : approved
+Author  : Stefano Covino
+Date    : 27/04/2011
+E-mail  : stefano.covino@brera.inaf.it
+URL:    : http://www.merate.mi.astro.it/utenti/covino
+
+Usage   : SRPFitsHeader -f arg1 [-h] [-k arg2] [-n arg3 arg4 arg5] [-o arg6] [-v]
+            The option -v generates a more verbose output.
+            The option -f arg1 is the FITS file name. With no other options
+            the whole header content is shown. If only one keyword is of interest 
+            the option -k arg2 allows one to select it.
+            To add or update a new keyword with -n arg3 arg4 arg5 one
+            can provide a keyword name, a value, and a comment (units, etc.).
+            If the output file name, -o arg6, is provided a new FITS file is
+            created. Else the input file is overwritten.
+
+History : (27/04/2011) First version.
+"""
+
+
+
+import os, os.path
+from optparse import OptionParser
+from SRP.SRPFits.AddHeaderEntry import AddHeaderEntry
+from SRP.SRPFits.GetHeader import GetHeader
+from SRP.SRPFits.GetHeaderValue import GetHeaderValue
+
+
+
+parser = OptionParser(usage="usage: %prog -f arg1 [-h] [-k arg2] [-n arg3 arg4 arg5] [-o arg6] [-v]", version="%prog 1.0.0")
+parser.add_option("-f", "--fitsfile", action="store", nargs=1, type="string", dest="fitsfile", help="Input FITS file")
+parser.add_option("-k", "--keyword", action="store", nargs=1, type="string", dest="keyword", help="Keyword to be searched for")
+parser.add_option("-o", "--outfitsfile", action="store", nargs=1, type="string", dest="outfitsfile", help="Output FITS file")
+parser.add_option("-n", "--newkeyword", action="store", nargs=3, type="string", dest="newkeyword", help="New keyword (key value comment)")
+parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="Fully describe operations")
+(options, args) = parser.parse_args()
+
+if options.fitsfile:
+    if not options.newkeyword and not options.outfitsfile:
+        if options.keyword:
+            res = GetHeaderValue(options.fitsfile,options.keyword)
+        else:
+            res = GetHeader(options.fitsfile)
+    #
+        if res[0] == None:
+            if options.verbose:
+                print "File or header not found."
+            else:
+                print 
+        else:
+            if options.keyword:
+                if options.verbose:
+                    print "Header: %s = %s" % (options.keyword, res[0])
+                else:
+                    print res[0]                
+            else:
+                if options.verbose:
+                    print "Headers:"
+                    print res[0]
+                else:
+                    print res[0]
+    elif options.newkeyword and not options.keyword:
+        if options.outfitsfile:
+            ofile = options.outfitsfile
+        else:
+            ofile = options.fitsfile
+        res = AddHeaderEntry(options.fitsfile,[options.newkeyword[0],],[options.newkeyword[1],],[options.newkeyword[2],],ofile)
+        if res[0] == False:
+            if options.verbose:
+                print "File or header not found."
+            else:
+                print 
+        else:
+            if options.verbose:
+                print "Header %s with value %s and comment %s created in file %s." % (options.newkeyword[0],options.newkeyword[1],options.newkeyword[2],ofile)
+            else:
+                print options.newkeyword[1]
+else:
+    parser.print_help()

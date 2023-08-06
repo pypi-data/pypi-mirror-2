@@ -1,0 +1,170 @@
+#!/usr/bin/env python
+#
+""" Code to show a spectrum with superposed various lines.
+
+Context : SRP
+Module  : SRPShowSepc.py
+Version : 1.0.0
+Status  : approved
+Author  : Stefano Covino
+Date    : 12/08/2009
+E-mail  : stefano.covino@brera.inaf.it
+URL:    : http://www.merate.mi.astro.it/covino
+Purpose : Show a spectrum
+
+Remarks : 
+
+History : (12/08/2009) First version.
+"""
+
+
+import SRP.SRPSpecLib as SRPSpecLib
+try:
+ from optparse import OptionParser
+except:
+ from optik import OptionParser
+import pyfits
+import pylab
+import SRP.stats as stats
+
+
+parser = OptionParser(usage="usage: %prog [-b arg1] [-e arg2] -f arg3 [-l] [-h] [-v] [-z arg4]")
+parser.add_option("-b", "--boxes", action="store", nargs=1, type="int", dest="boxes", default=1, help="Number of boxes for spectrum")
+parser.add_option("-e", "--espec", action="store", nargs=1, type="string", dest="espec", help="Error spectrum to show")
+parser.add_option("-f", "--spec", action="store", nargs=1, type="string", dest="spec", help="Spectrum to show")
+parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="fully describe operations")
+parser.add_option("-l", "--lines", action="store_true", dest="lines", help="To show spectral lines superposed")
+parser.add_option("-z", "--z", action="store", nargs=1, type="float", default=0.0, dest="z", help="Object redshift (>= 0)")
+parser.add_option("-y", "--yvalue", action="store", nargs=1, type="float", default=0.0, dest="yv", help="Y-value for line label")
+parser.add_option("-c", "--conv", action="store", nargs=1, default=1.0, type="float", dest="conv", help="Conversion factor from spectrum wavelength units to Angstrom (> 0)")
+(options, args) = parser.parse_args()
+
+
+
+
+if not options.spec:
+    parser.print_help()
+else:
+	try:
+		hdulist = pyfits.open(options.spec)
+	except IOError:
+		parser.error("FITS file %s can not be accessed." % options.spec)
+	prihdr = hdulist[0].header
+	scidata = hdulist[0].data
+        if len(scidata.shape) > 1:
+            try:
+                scidata = hdulist[0].data[0]
+            except IndexError:
+                parser.error("FITS scientific data in %s can not be accessed." % options.spec)
+	refpix = prihdr['CRPIX1']
+	reflmb = prihdr['CRVAL1']
+        headererrflag1 = headererrflag2 = False
+        try:
+                refdl = prihdr['CDELT1']
+        except KeyError:
+                headererrflag1 = True
+        try:
+                refdl = prihdr['CD1_1']
+        except KeyError:
+                headererrflag2 = True
+	hdulist.close()
+        if headererrflag1 == True and headererrflag2 == True:
+                parser.error("FITS headers in %s not recognized." % options.spec)
+	if options.verbose:
+		print "FITS file %s accessed." % options.spec
+	if options.espec:
+		try:
+			ehdulist = pyfits.open(options.espec)
+		except IOError:
+			parser.error("FITS file %s can not be accessed." % options.espec)
+		eprihdr = ehdulist[0].header
+		escidata = ehdulist[0].data
+                if len(escidata.shape) > 1:
+                    try:
+                        escidata = ehdulist[0].data[0]
+                    except IndexError:
+                        parser.error("FITS scientific data in %s can not be accessed." % options.espec)
+		erefpix = eprihdr['CRPIX1']
+		ereflmb = eprihdr['CRVAL1']
+                headererrflag1 = headererrflag2 = False
+                try:
+                        erefdl = eprihdr['CDELT1']
+                except KeyError:
+                        headererrflag1 = True
+                try:
+                        erefdl = eprihdr['CD1_1']
+                except KeyError:
+                        headererrflag2 = True
+                hdulist.close()
+                if headererrflag1 == True and headererrflag2 == True:
+                        parser.error("FITS headers in %s not recognized." % options.espec)
+		if options.verbose:
+			print "FITS file %s accessed." % options.espec
+	#
+	lamb = []
+	flx = []
+	for i in range(len(scidata)):
+		lamb.append((i-refpix)*refdl + reflmb)
+		flx.append(scidata[i])
+	if options.espec:
+		elamb = []
+		eflx = []
+		for i in range(len(escidata)):
+			elamb.append((i-erefpix)*erefdl + ereflmb)
+			eflx.append(escidata[i])
+	#
+	if options.z < 0.0:
+		parser.error ("Redshift can not be negative.")
+	if options.conv <= 0.0:
+		parser.error ("Conversion factor must be positive.")
+        if options.boxes <= 0:
+                parser.error("Number of boxes must be positive.")
+	#
+        absxmin = min(lamb)
+        absxmax = max(lamb)
+        extplt = absxmax-absxmin
+        for b in range(options.boxes):
+            if options.verbose:
+                print "Box nr. %d" % (b+1)
+            pylab.subplot(options.boxes,1,b+1)
+            if b == (options.boxes-1):
+                xtxt = pylab.xlabel("Observed Wavelength")
+            ytxt = pylab.ylabel("Flux")
+            xmin = absxmin+(extplt/options.boxes)*b
+            xmax = absxmin+(extplt/options.boxes)*(b+1)
+            flxb = []
+            lambb = []
+            eflxb = []
+            elambb = []
+            for l in range(len(lamb)):
+                if xmin <= lamb[l] < xmax:
+                    flxb.append(flx[l])
+                    lambb.append(lamb[l])
+                    if options.espec:
+                        eflxb.append(eflx[l])
+                        elambb.append(elamb[l])
+            mdn = stats.median(flxb)
+            if options.verbose:
+                print "Limits: %g, %g" % (xmin,xmax)
+            p1 = pylab.plot(lambb,flxb,label="Spectrum")
+            if options.espec:
+		p2 = pylab.plot(elambb,eflxb,label="Error")
+            #
+            pylab.ylim(mdn/10.0,mdn*10.0)
+            if options.lines:
+		zred = options.z
+                if b == 0:
+                    ttxt = pylab.title("Redshift = %f" % zred)
+		posstrans = SRPSpecLib.SRPTransitionDict.keys()
+		wave = []
+		ylev = []
+		for i in posstrans:
+                    lmb = SRPSpecLib.SRPTransitionDict[i][0]
+                    if xmin <= lmb*(1+zred) <= xmax:
+                        wave.append(lmb*(1+zred))
+                        ylev.append(options.yv)
+                        pylab.axvline(wave[-1],color='red')
+                        pylab.text(wave[-1],ylev[-1],i,bbox=dict(facecolor='red', alpha=0.5),fontsize=12,horizontalalignment='center',rotation='vertical')
+            pylab.xlim((xmin,xmax))
+            pylab.legend()
+	pylab.show()

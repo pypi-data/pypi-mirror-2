@@ -1,0 +1,670 @@
+#!/usr/bin/env python
+#
+"""
+
+Context : SRP
+Module  : SRPREMPipelineManager.py
+Version : 1.3.1
+Status  : approved
+Author  : Stefano Covino
+Date    : 25/06/2011
+E-mail  : stefano.covino@brera.inaf.astro.it
+URL:    : http://www.merate.mi.astro.it/utenti/covino
+Purpose : Manage the execution of the REM pipeline
+
+Remarks :
+
+History : (27/11/2010) First version.
+        : (13/12/2010) Position of the selected objects.
+        : (14/12/2010) Maximum number of backup files.
+        : (20/12/2010) Managment of too small error circle for GRB counterpart.
+        :               PROCSTAT and PHOTSTAB added.
+        : (05/03/2011) Filter in GRB message.
+        : (28/03/2011) AGN photometry for optical data too.
+        : (25/06/2011) ZP for REMIR Z band too.
+"""
+
+
+from optparse import OptionParser
+import logging, logging.handlers, math, os, os.path, shutil, sys, time
+
+
+from SRP.SRPPipelines.REM import REMPipelineManagerConstants
+from SRP.SRPPipelines.CreateLocDB import CreateLocDB
+from SRP.SRPPipelines.CreateRemDB import CreateRemDB
+from SRP.SRPPipelines.IsRightHost import IsRightHost
+from SRP.SRPPipelines.IsRightUser import IsRightUser
+from SRP.SRPPipelines.REM.WhichREMImagingFrame import WhichREMImagingFrame
+from SRP.SRPPipelines.REM.GetREMFrame import GetREMFrame
+from SRP.SRPPipelines.REM.GetGRBInfo import GetGRBInfo
+from SRP.SRPPipelines.REM.GetREMFrameInfo import GetREMFrameInfo
+from SRP.SRPPipelines.REM.LoadProcessPointFName import LoadProcessPointFName
+from SRP.SRPPipelines.REM.SaveProcessPointFName import SaveProcessPointFName
+from SRP.SRPPipelines.REM.LoadREMTargets import LoadREMTargets
+from SRP.SRPPipelines.SaveResult2LocDB import SaveResult2LocDB
+from SRP.SRPPipelines.SaveResult2RemDB import SaveResult2RemDB
+from SRP.SRPNet.SendEMail import SendEMail
+from SRP.SRPSystem.Which import Which
+from SRP.SRPSystem.Pipe import Pipe
+from SRP.SRPFrames import EclipseConstants
+from SRP.SRPFrames import SExtractorConstants
+from SRP.SRPFits.AddHeaderComment import AddHeaderComment
+from SRP.SRPFits.GetHeaderValue import GetHeaderValue
+
+
+
+parser = OptionParser(usage="usage: %prog [-a] [-c] [-d] [-p] [-r] [-s arg1] [-v] [-z] ")
+parser.add_option("-d", "--database", action="store_true", help="Database feeding")
+parser.add_option("-H", "--host", action="store_true", help="Analysis of host data")
+parser.add_option("-k", "--keep", action="store_true", help="Keep files locally after processing")
+parser.add_option("-p", "--photometry", action="store_true", help="Compute photometry")
+parser.add_option("-s", "--startingid", action="store", nargs=2, type='int', help="Starting id (ross remir)")
+parser.add_option("-v", "--verbose", action="store_true", dest="verbose", help="Fully describe operations")
+parser.add_option("-z", "--zeropoint", action="store_true", help="Compute zero-point")
+(options, args) = parser.parse_args()
+
+
+# Check host or user
+if not (IsRightHost(REMPipelineManagerConstants.AccHost) or IsRightUser(REMPipelineManagerConstants.AccUser)):
+    parser.error("Only authorized host can run the pipeline.")
+
+
+# Input safety checks
+if options.zeropoint and not options.photometry:
+    parser.error("Zero-point computation requires photometry.")
+
+
+# Pipeline component safety check
+if Which(REMPipelineManagerConstants.calend) == None:
+    parser.error("%s not found." % REMPipelineManagerConstants.calend)
+#
+if options.photometry:
+    if Which(REMPipelineManagerConstants.photo) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.photo)
+    elif Which(REMPipelineManagerConstants.sigmak) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.sigmak)
+    elif Which(REMPipelineManagerConstants.param) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.param)
+    elif Which(SExtractorConstants.SRPsex) == None and Which(SExtractorConstants.SRPsex_cyg) == None:
+        parser.error("%s not found." % SExtractorConstants.SRPsex)
+#
+if options.zeropoint:
+    if Which(REMPipelineManagerConstants.zpoint) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.zpoint)
+    elif Which(REMPipelineManagerConstants.query) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.query)
+#
+if options.photometry or options.zeropoint:
+    if Which(REMPipelineManagerConstants.gettab) == None:
+        parser.error("%s not found." % REMPipelineManagerConstants.gettab)
+        
+        
+
+
+codename = os.path.basename(sys.argv[0])
+
+# Define logging system
+
+if not os.path.isdir(REMPipelineManagerConstants.LogDir):
+    try:
+        os.mkdir(REMPipelineManagerConstants.LogDir)
+    except:
+        parser.error("Cannot create log directory %s." % REMPipelineManagerConstants.LogDir)
+
+# create logger
+logger = logging.getLogger(codename)
+logger.setLevel(logging.DEBUG)
+
+# create console handler
+chs = logging.StreamHandler()
+chs.setLevel(logging.DEBUG)
+
+# create file handler
+chf = logging.handlers.TimedRotatingFileHandler(REMPipelineManagerConstants.LogPath,'D',1,backupCount=30)
+chf.setLevel(logging.INFO)
+
+# create a mail handler
+chm = logging.handlers.SMTPHandler(REMPipelineManagerConstants.REMSMTP,REMPipelineManagerConstants.FromAdr,
+        REMPipelineManagerConstants.ToAdr,REMPipelineManagerConstants.PipeMsg)
+chm.setLevel(logging.CRITICAL)
+
+# create formatter
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+# add formatter
+chs.setFormatter(formatter)
+chf.setFormatter(formatter)
+chm.setFormatter(formatter)
+
+# add handler
+if options.verbose:
+    logger.addHandler(chs)
+logger.addHandler(chf)
+logger.addHandler(chm)
+
+
+
+if options.database:
+    # dbase dir
+    if not os.path.isdir(REMPipelineManagerConstants.DBaseLocDir):
+        try:
+            os.mkdir(REMPipelineManagerConstants.DBaseLocDir)
+        except:
+            parser.error("Cannot create dbase directory %s." % REMPipelineManagerConstants.DBaseLocDir)
+    # create, if it does not exist already a local and a remote dbase
+    ldbcr = CreateLocDB(REMPipelineManagerConstants.DBaseLocPath,REMPipelineManagerConstants.DBLocTabName,REMPipelineManagerConstants.DBLocParDict)
+    dbcr = CreateRemDB(REMPipelineManagerConstants.DBaseRemAddr,REMPipelineManagerConstants.DBaseRemDB,REMPipelineManagerConstants.DBaseRemUser,
+                REMPipelineManagerConstants.DBaseRemPwd,REMPipelineManagerConstants.DBaseRemTabName,REMPipelineManagerConstants.DBaseRemParDict)
+    if ldbcr and dbcr:
+        logger.info("Database table %s ready." % REMPipelineManagerConstants.DBLocTabName)
+    elif not ldbcr:
+        logger.error("Local database table %s cannot be created or database cannot be accessed." % REMPipelineManagerConstants.DBLocTabName)
+    elif not dbcr:
+        logger.error("Remote database table %s cannot be created or database cannot be accessed." % REMPipelineManagerConstants.DBaseRemTabName)
+if options.database and options.host:
+    # Host data analysis
+    ldbcrh = CreateLocDB(REMPipelineManagerConstants.DBaseLocPath,REMPipelineManagerConstants.DBHostTabName,REMPipelineManagerConstants.DBLocParDict)
+    dbcrh = CreateRemDB(REMPipelineManagerConstants.DBaseRemAddr,REMPipelineManagerConstants.DBaseRemDB,REMPipelineManagerConstants.DBaseRemUser,
+                REMPipelineManagerConstants.DBaseRemPwd,REMPipelineManagerConstants.DBaseHostTabName,REMPipelineManagerConstants.DBaseHostParDict)
+    if ldbcrh and dbcrh:
+        logger.info("Database table %s ready." % REMPipelineManagerConstants.DBHostTabName)
+    elif not ldbcr:
+        logger.error("Local database table %s cannot be created or database cannot be accessed." % REMPipelineManagerConstants.DBHostTabName)
+    elif not dbcr:
+        logger.error("Remote database table %s cannot be created or database cannot be accessed." % REMPipelineManagerConstants.DBaseHostTabName)
+    
+
+
+
+# Pipeline targets
+if not os.path.isdir(REMPipelineManagerConstants.TrgDir):
+    try:
+        os.mkdir(REMPipelineManagerConstants.TrgDir)
+    except:
+        parser.error("Cannot create target directory %s." % REMPipelineManagerConstants.TrgDir)
+
+
+
+
+# Starting mjd entry
+if options.startingid:
+    rossid = options.startingid[0]
+    remirid = options.startingid[1]
+else:
+    dt = LoadProcessPointFName(REMPipelineManagerConstants.ProcessPointFName)
+    if dt == None:
+        logger.warn("No process point file or badly formatted.")
+        rossid = None
+        remirid = None
+    else:
+        # There is a reference file
+        logger.info("Reading process point file %s" % REMPipelineManagerConstants.ProcessPointFName)
+        rossid = dt[0]
+        remirid = dt[1]
+    
+# Starting frame id
+if rossid != None and remirid != None:
+    logger.info("Selected starting Id is %d for ROSS and %d for REMIR." % (rossid,remirid))
+else:
+    logger.info("Starting Ids will be the most recent in table.")
+
+
+
+    
+oldrossid = rossid
+oldremirid = remirid
+#
+while True:
+    # Read catalog table
+    logger.info("Logging to %s to get frames to be analyzed" % REMPipelineManagerConstants.REMDBaseAddr)
+    frdata = GetREMFrameInfo(REMPipelineManagerConstants.REMDBaseAddr,REMPipelineManagerConstants.REMDBaseDB,
+                REMPipelineManagerConstants.REMDBaseUser,REMPipelineManagerConstants.REMDBasePwd,
+                REMPipelineManagerConstants.REMDBaseTabName,rossid,remirid)
+    if frdata == None:
+        logger.critical("Database repository at %s cannot be accessed." % REMPipelineManagerConstants.REMDBaseAddr)
+    elif frdata == []:
+        logger.info("No new data to be analyzed.")
+    else:
+        for fr in frdata:
+            frmjd = fr[REMPipelineManagerConstants.REMDBaseMJDObs]
+            MIDJFRAME = frmjd
+            ELTIME = fr[REMPipelineManagerConstants.REMDBaseExp]
+            lrsfname = fr[REMPipelineManagerConstants.REMDBaseFName]
+            SERIAL = fr[REMPipelineManagerConstants.REMDBaseId]
+            #Compute observation date
+            cmd = REMPipelineManagerConstants.calend + ' -m %.6f ' % (fr[REMPipelineManagerConstants.REMDBaseMJDObs])
+            logger.debug("Date computed with command %s" % cmd)
+            calendres = Pipe(cmd)
+            YYYYMMDDOBS = calendres.split()[2]
+            HHMMSS = calendres.split()[3]
+            logger.info("Observations of frame %s carried out on %s %s" % (lrsfname, YYYYMMDDOBS, HHMMSS))
+            ymd = YYYYMMDDOBS.replace('/','')
+            entryfil = "%s/%s" % (ymd,lrsfname)
+            FILENAME = entryfil
+            # get image header
+            logger.info("Analyzing %s frame (mjd: %.5f)." % (entryfil,frmjd))
+            logger.info("Parsing table entries for %s." % entryfil)
+            msg = ''
+            for i in REMPipelineManagerConstants.REMDBTableList:
+                msg = msg + os.linesep + str(i) + ':  '+str(fr[i])
+            logger.debug("Chosen table entries for the %s file: %s" % (entryfil, msg))
+            # RA,DEC
+            RA = fr[REMPipelineManagerConstants.REMDBaseRA]
+            DEC = fr[REMPipelineManagerConstants.REMDBaseDEC]
+            logger.info("Frame %s coordinates are RA: %.6f and DEC: %.6f." % (entryfil,RA,DEC))     
+            # Filter
+            FILTER = fr[REMPipelineManagerConstants.REMDBaseFilter]
+            logger.info("Frame %s obtained with filter %s." % (entryfil,FILTER))
+            # PI
+            PI = fr[REMPipelineManagerConstants.REMDBasePI]
+            logger.info("Frame %s PI: %s." % (entryfil,PI))
+            #
+            wcam = WhichREMImagingFrame(fr)
+            # OBJECT and OBSCODE
+            OBJECT = fr[REMPipelineManagerConstants.REMDBaseObj]            
+            if wcam == REMPipelineManagerConstants.ROSS:
+                # ROSS obscodes are one less than REMIR obscodes
+                OBSCODE = fr[REMPipelineManagerConstants.REMDBaseObsCode]+1
+                rossid = fr[REMPipelineManagerConstants.REMDBaseId]
+            elif wcam == REMPipelineManagerConstants.REMIR:
+                OBSCODE = fr[REMPipelineManagerConstants.REMDBaseObsCode]
+                remirid = fr[REMPipelineManagerConstants.REMDBaseId]
+            #
+            if wcam != None:
+                # REM Imaging frame frame
+                logger.info("Frame %s target is %s with code %d." % (entryfil,OBJECT,OBSCODE))
+                if wcam == REMPipelineManagerConstants.ROSS:
+                    if fr[REMPipelineManagerConstants.REMDBaseFilter] in REMPipelineManagerConstants.ROSSFilterSet: 
+                        ROSSFlag = True
+                        REMIRFlag = False
+                        CAMERA = REMPipelineManagerConstants.ROSS
+                        logger.info("%s is a REM-ROSS imaging frame." % entryfil)
+                        logger.info("Serial number is %d." % rossid)
+                    else:
+                        ROSSFlag = False
+                        REMIRFlag = False
+                        logger.info("%s is a REM-ROSS frame not to be processed." % entryfil)    
+                        logger.info("Serial number is %d." % remirid)                    
+                elif wcam == REMPipelineManagerConstants.REMIR:
+                    if fr[REMPipelineManagerConstants.REMDBaseFilter] in REMPipelineManagerConstants.REMIRFilterSet:
+                        ROSSFlag = False
+                        REMIRFlag = True
+                        CAMERA = REMPipelineManagerConstants.REMIR
+                        logger.info("%s is a REM-REMIR imaging frame." % entryfil)
+                        logger.info("Serial number is %d." % remirid)
+                    else:
+                        ROSSFlag = False
+                        REMIRFlag = False
+                        logger.info("%s is a REM-REMIR sub-frame not to be processed." % entryfil)    
+                        logger.info("Serial number is %d." % remirid)                    
+                if ROSSFlag or REMIRFlag:
+                    # Good imaing frame
+                    # Retrieve only those we are interested in
+                    if OBSCODE in REMPipelineManagerConstants.OkTargetSet:
+                        logger.info("%s is a REM imaging frame to be processed." % entryfil)
+                        logger.info("Retrieving REM frame: %s" % entryfil)
+                        #
+                        attmpt = 0 
+                        while GetREMFrame (entryfil,wcam,lrsfname) == None and attmpt < 3:   
+                            # retry next time
+                            attmpt = attmpt + 1
+                            time.sleep(REMPipelineManagerConstants.DwnDelay)
+                        #
+                        if attmpt == 3:
+                            logger.critical("Cannot import %s REM file" % entryfil)
+                            break
+                        else:
+                            logger.info("Local file %s created." % (lrsfname+REMPipelineManagerConstants.locext))
+                        # Header values
+                        # AZ,ALT
+                        res1 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.AZ)[0]
+                        if REMIRFlag:
+                            res2 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.ALT)[0]                
+                        elif ROSSFlag:
+                            res2 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.EL)[0]
+                        try:
+                            AZ = float(res1)
+                            ALT = float(res2)
+                            logger.info("AZ and ALT of frame %s are %.6f %.6f" % (entryfil,AZ,ALT))
+                        except ValueError:
+                            AZ = 0.0
+                            ALT = 0.0
+                            logger.warn("In file %s AZ,EL badly formatted." % entryfil)
+                        # Astrometry & photometry
+                        PROCSTAT = -99
+                        PHOTSTAB = -99
+                        if ROSSFlag:
+                            res = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.PROCSTAT)[0]
+                            try:
+                                PROCSTAT = int(res)
+                                logger.info("PROCSTAT for frame %s: %d" % (entryfil,PROCSTAT))
+                            except ValueError:
+                                logger.warn("In file %s PROCSTAT badly formatted." % entryfil)
+                        elif REMIRFlag:
+                            res1 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.PHOTSTAB)[0]
+                            try:
+                                PHOTSTAB = float(res1)
+                                logger.info("PHOTSTAB for frame %s: %d" % (entryfil,PHOTSTAB))
+                            except ValueError:
+                                logger.warn("In file %s PHOTSTAB badly formatted." % entryfil)
+                        # MidMJD, Eltime
+                        if REMIRFlag:
+                            res1 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.TMJDOBS)[0]
+                            res2 = GetHeaderValue(lrsfname+REMPipelineManagerConstants.locext,REMPipelineManagerConstants.TEXP)[0]                
+                            try:
+                                MIDJFRAME = float(res1)
+                                ELTIME = float(res2)
+                                logger.info("Mid modified JD and elapsed tine of frame %s are %.6f %.6f" % (entryfil,MIDJFRAME,ELTIME))
+                            except ValueError:
+                                logger.warn("In file %s mid JD and elapsed time badly formatted." % entryfil)  
+                        #
+                        # extinction coeffienct and tables
+                        extcoeff = REMPipelineManagerConstants.LaSillaExtCoeff[FILTER]
+                        #
+                        if OBSCODE == REMPipelineManagerConstants.AGN:
+                            filtcol = REMPipelineManagerConstants.REMFiltColDictAGN[FILTER]
+                            tabcat = REMPipelineManagerConstants.REMFiltCatDictAGN[FILTER]                        
+                        else:
+                            filtcol = REMPipelineManagerConstants.REMFiltColDict[FILTER]
+                            tabcat = REMPipelineManagerConstants.REMFiltCatDict[FILTER]
+                        #
+            
+                        # photometry
+                        NPHOTOSTARS = 0
+                        FWHMFRAME = -1
+                        #
+                        if options.photometry:
+                        #
+                            if CAMERA == REMPipelineManagerConstants.ROSS:
+                                cmd = REMPipelineManagerConstants.param + ' -p REM-ROSS'
+                            elif CAMERA == REMPipelineManagerConstants.REMIR:
+                                cmd = REMPipelineManagerConstants.param + ' -p REM-REMIR'                        
+                            logger.debug("SExtractor parameter file generated with command: %s" % cmd)
+                            Pipe(cmd)
+                            if CAMERA == REMPipelineManagerConstants.ROSS:
+                                cmd = REMPipelineManagerConstants.photo + ' -i %s -g %.2f -s %.2f ' % (lrsfname+REMPipelineManagerConstants.locext,
+                                    REMPipelineManagerConstants.ROSSGAIN, REMPipelineManagerConstants.ROSSSATURATION)
+                            elif CAMERA == REMPipelineManagerConstants.REMIR:
+                                cmd = REMPipelineManagerConstants.photo + ' -i %s -g %.2f -s %.2f ' % (lrsfname+REMPipelineManagerConstants.locext,
+                                    REMPipelineManagerConstants.REMIRGAIN, REMPipelineManagerConstants.REMIRSATURATION)
+                            logger.debug("Photometry derived with command: %s" % cmd)
+                            photores = Pipe(cmd)
+                            NPHOTOSTARS = int(photores.split()[0])
+                            photooutfile = photores.split()[1]
+                            logger.info("%d stars in frame %s photometrized." % (NPHOTOSTARS,entryfil))
+                            if NPHOTOSTARS > 0:
+                                cmd = REMPipelineManagerConstants.sigmak + ' -i %s -d 12' % (photooutfile)
+                                logger.debug("FWHM estimated with command: %s" % cmd)
+                                fwhmres = Pipe(cmd)
+                                FWHMFRAME = float(fwhmres.split()[0])
+                                logger.info("FWHM for frame %s: %.2f pixel." % (entryfil, FWHMFRAME))
+
+                        # zeropoint
+                        ZPMAG = -99
+                        ZPMAGERR = -99
+                        ZPNSTARS = 0
+                        CATNSTARS = 0
+                        #
+                        if options.zeropoint and NPHOTOSTARS > 0:
+                            #
+                            cmd = REMPipelineManagerConstants.query + ' -c %.6f %.6f -r %.1f -o %s -C %s' % (RA, DEC,
+                                REMPipelineManagerConstants.REMSIZE, REMPipelineManagerConstants.CatOutFile, tabcat)
+                            logger.debug("Standard star catalog query executed with command: %s" % cmd)
+                            queryres = Pipe(cmd)
+                            CATNSTARS = int(queryres.split()[0])
+                            logger.info("Number of standard stars found: %d." % CATNSTARS)                    
+                            if CATNSTARS > 0:
+                                if OBSCODE == REMPipelineManagerConstants.STD:
+                                    # standard star, magnitude to infinity
+                                    cmd = REMPipelineManagerConstants.zpoint + ' -i %s -c %s -I 1 4 5 10 11 14 -C 1 2 3 %d %d -a %s -t %.1f' % (photooutfile,
+                                        REMPipelineManagerConstants.CatOutFile, filtcol[0], filtcol[1], extcoeff, 5)
+                                else:
+                                    # all other targets, aperture magnitude
+                                    cmd = REMPipelineManagerConstants.zpoint + ' -i %s -c %s -I 1 4 5 6 7 14 -C 1 2 3 %d %d -a %s -t %.1f' % (photooutfile,
+                                        REMPipelineManagerConstants.CatOutFile, filtcol[0], filtcol[1], extcoeff, 5)
+                                logger.debug("Zero-point computation executed with command: %s" % cmd)
+                                zerores = Pipe(cmd)
+                                ZPMAG = float(zerores.split()[0])
+                                ZPMAGERR = float(zerores.split()[1])
+                                ZPNSTARS = int(zerores.split()[2])
+                                if ZPNSTARS == 0:
+                                    ZPMAG = -99
+                                    ZPMAGERR = -99
+                                    logger.warning("Not enough standard stars / frame stars matches.")
+                                else:
+                                    logger.info("Frame %s zero-point in filter %s is %.3f +/- %.3f derived with %d stars." % (entryfil, FILTER, ZPMAG, ZPMAGERR, ZPNSTARS))
+                    
+                        #
+                        OBJMAG = -99
+                        OBJMAGERR = -99
+                        XPOS = -99
+                        YPOS = -99
+                        #
+                        # AGN
+                        if OBSCODE == REMPipelineManagerConstants.AGN:
+                            if NPHOTOSTARS > 0 and ZPMAG > -90:
+                                # Only for NIR and good data.
+                                logger.info("Frame %s is an AGN frame." % entryfil)
+                                trglist = LoadREMTargets(REMPipelineManagerConstants.TrgAGNPath)
+                                if trglist != None:
+                                    # find selected objects in photometry file
+                                    for tg in trglist:
+                                        agname = tg[0]
+                                        agnra = tg[1]
+                                        agndec = tg[2]
+                                        logger.info("Target %s of coordinates RA=%.6f DEC=%.6f in AGN list." % (agname, agnra, agndec))
+                                        #
+                                        cmd = REMPipelineManagerConstants.gettab + ' -i %s -c 4 5 -C %.6f %.6f -t %.5f -a' % (photooutfile,
+                                            agnra, agndec, 3.0/3600.0)
+                                        logger.debug("Selected AGN target searched with command: %s" % cmd)
+                                        selres = Pipe(cmd)
+                                        selresl = selres.split(os.linesep)
+                                        try:
+                                            nbs = int(selresl[0])
+                                        except ValueError:
+                                            nbs = 0
+                                            logger.critical("Selected table entry error in photometry file %s." % photooutfile)
+                                        if nbs > 0:
+                                            logger.info("%d object(s) selected." % nbs)
+                                            try:
+                                                amag = float(selresl[1].split()[5])
+                                                eamag = float(selresl[1].split()[6])
+                                                XPOS = float(selresl[1].split()[1])
+                                                YPOS = float(selresl[1].split()[2])
+                                            except ValueError:
+                                                amag = -99
+                                                eamag = -99
+                                                XPOS = -99
+                                                YPOS = -99
+                                                logger.critical("Cannot read object data from photometry file %s" % photooutfile)
+                                            OBJMAG = amag -25.0 + ZPMAG
+                                            OBJMAGERR = math.sqrt(eamag**2 + ZPMAGERR**2)
+                                            OBJECT = agname
+                                            logger.info("Object %s has magnitude %.3f +/- %.3f in filter %s" % (OBJECT, OBJMAG, OBJMAGERR, FILTER)) 
+                                            logger.info("Object %s is at position X: %.2f and Y: %.2f" % (OBJECT, XPOS, YPOS)) 
+                                            break
+                                        #
+                                else:
+                                    logger.warning("No AGN target file %s or file not readable." % REMPipelineManagerConstants.TrgAGNPath)
+                        
+                        # GRB
+                        if OBSCODE in REMPipelineManagerConstants.GRBTargetSet:
+                            if NPHOTOSTARS > 0:
+                                # Only for good data.
+                                logger.info("Frame %s is a GRB frame." % entryfil)
+                                grblist = GetGRBInfo(OBJECT)
+                                if grblist == None:
+                                    logger.error("GRB data not accessible.")
+                                else:
+                                    if 0 <= grblist[3] < 10:
+                                        logger.info("GRB accurate information available.")
+                                        logger.info("Event: %s, RA: %.6f, DEC: %.6f, Err.: %.2f, Burst time: %.6f." % (grblist[0],grblist[1],grblist[2],grblist[3],grblist[4]))
+                                        #
+                                        if grblist[3] < 3:
+                                            grberr = 3.0
+                                        else:
+                                            grberr = grblist[3]
+                                        #
+                                        cmd = REMPipelineManagerConstants.gettab + ' -i %s -c 4 5 -C %.6f %.6f -t %.5f -a' % (photooutfile,
+                                            grblist[1], grblist[2], math.ceil(grberr)/3600.0)
+                                        logger.debug("GRB target searched with command: %s" % cmd)
+                                        selres = Pipe(cmd)
+                                        selresl = selres.split(os.linesep)
+                                        try:
+                                            nbs = int(selresl[0])
+                                        except ValueError:
+                                            nbs = 0
+                                            logger.critical("Selected table entry error in photometry file %s." % photooutfile)
+                                        logger.info("%d object(s) selected." % nbs)
+                                        if nbs > 0:
+                                            try:
+                                                amag = float(selresl[1].split()[5])
+                                                eamag = float(selresl[1].split()[6])
+                                                XPOS = float(selresl[1].split()[1])
+                                                YPOS = float(selresl[1].split()[2])
+                                            except ValueError:
+                                                amag = -99
+                                                eamag = -99
+                                                XPOS = -99
+                                                YPOS = -99
+                                                logger.critical("Cannot read object data from photometry file %s" % photooutfile)
+                                            if CAMERA == REMPipelineManagerConstants.ROSS:
+                                                ZPMAG = REMPipelineManagerConstants.RossZP[FILTER][0]
+                                                ZPMAGERR = REMPipelineManagerConstants.RossZP[FILTER][1]
+                                            elif CAMERA == REMPipelineManagerConstants.REMIR and FILTER == REMPipelineManagerConstants.Z:
+                                                ZPMAG = REMPipelineManagerConstants.RemirZP[FILTER][0]
+                                                ZPMAGERR = REMPipelineManagerConstants.RemirZP[FILTER][1]
+                                            #
+                                            OBJMAG = amag -25.0 + ZPMAG
+                                            OBJMAGERR = math.sqrt(eamag**2 + ZPMAGERR**2)
+                                            OBJECT = grblist[0]
+                                            # Compute observation julian date
+                                            cmd = REMPipelineManagerConstants.calend + ' -m %.6f ' % (MIDJFRAME)
+                                            logger.debug("Julian date computed with command %s" % cmd)
+                                            calendres = Pipe(cmd)
+                                            bjd = float(calendres.split()[0])
+                                            #
+                                            if nbs > 1:
+                                                logger.info("There are %d objects in error circle. Selecting the closest." % nbs) 
+                                            logger.info("Object %s has magnitude %.3f +/- %.3f at %.0f s from burst in filter %s" % (OBJECT, OBJMAG, OBJMAGERR, (bjd-grblist[4])*86400.0, FILTER)) 
+                                            logger.info("Object %s is at position X: %.2f and Y: %.2f" % (OBJECT, XPOS, YPOS)) 
+                                            #
+                                            # Mail to friends
+                                            msg1 = "Object %s has magnitude %.3f +/- %.3f at %.0f s from burst in filter %s." % (OBJECT, OBJMAG, OBJMAGERR, (bjd-grblist[4])*86400.0, FILTER)
+                                            msg1b = "Object %s is at position X: %.2f and Y: %.2f" % (OBJECT, XPOS, YPOS)
+                                            if nbs > 1:
+                                                msg2 = "%d objects in error cicle. Selected the closest." % nbs
+                                            else:
+                                                msg2 = ""
+                                            sbj = "%s REM automatic analysis result" % OBJECT
+                                            SendEMail(msg1+os.linesep+msg1b+os.linesep+msg2,REMPipelineManagerConstants.ToGRBAdr,REMPipelineManagerConstants.REMSMTP,sbj,REMPipelineManagerConstants.FromAdr)
+                                            #
+                                    else:
+                                        logger.info("No available accurate information for %s" % OBJECT)
+
+
+                        if options.host:
+                            # Vitali
+                            if OBSCODE == REMPipelineManagerConstants.AGN and PI == 'Fabrizio_Vitali':
+                                if NPHOTOSTARS > 0 and ZPMAG > -90 and CAMERA == REMPipelineManagerConstants.REMIR:
+                                    # Only for NIR and good data.
+                                    logger.info("Frame %s is a NIR AGN frame with PI Fabrizio Vitali." % entryfil)
+                                    trglist = LoadREMTargets(REMPipelineManagerConstants.TrgVitaliPath)
+                                    if trglist != None:
+                                        # find selected objects in photometry file
+                                        for tg in trglist:
+                                            agname = tg[0]
+                                            agnra = tg[1]
+                                            agndec = tg[2]
+                                            logger.info("Target %s of coordinates RA=%.6f DEC=%.6f in Vitali's list." % (agname, agnra, agndec))
+                                            #
+                                            cmd = REMPipelineManagerConstants.gettab + ' -i %s -c 4 5 -C %.6f %.6f -t %.5f -a' % (photooutfile,
+                                                agnra, agndec, 3.0/3600.0)
+                                            logger.debug("Selected Vitali's target searched with command: %s" % cmd)
+                                            selres = Pipe(cmd)
+                                            selresl = selres.split(os.linesep)
+                                            try:
+                                                nbs = int(selresl[0])
+                                            except ValueError:
+                                                nbs = 0
+                                                logger.critical("Selected table entry error in photometry file %s." % photooutfile)
+                                            if nbs > 0:
+                                                logger.info("%d object(s) selected." % nbs)
+                                                try:
+                                                    amag = float(selresl[1].split()[5])
+                                                    eamag = float(selresl[1].split()[6])
+                                                    XPOS = float(selresl[1].split()[1])
+                                                    YPOS = float(selresl[1].split()[2])
+                                                except ValueError:
+                                                    amag = -99
+                                                    eamag = -99
+                                                    XPOS = -99
+                                                    YPOS = -99
+                                                    logger.critical("Cannot read object data from photometry file %s" % photooutfile)
+                                                OBJMAGH = amag -25.0 + ZPMAG
+                                                OBJMAGERRH = math.sqrt(eamag**2 + ZPMAGERR**2)
+                                                OBJECTH = agname
+                                                logger.info("Object %s has magnitude %.3f +/- %.3f" % (OBJECTH, OBJMAGH, OBJMAGERRH))
+                                                logger.info("Object %s is at position X: %.2f and Y: %.2f" % (OBJECTH, XPOS, YPOS)) 
+                                                if options.database:
+                                                    dbargh = (FILENAME,OBJECTH,CAMERA,FILTER,NPHOTOSTARS,FWHMFRAME,ZPMAG,ZPMAGERR,ZPNSTARS,
+                                                        OBJMAGH,OBJMAGERRH,MIDJFRAME,ELTIME,PI,XPOS,YPOS,PROCSTAT,PHOTSTAB)
+                                                    ldbsavh = SaveResult2LocDB(REMPipelineManagerConstants.DBaseLocPath,REMPipelineManagerConstants.DBHostTabName,dbargh)
+                                                    dbsavh = SaveResult2RemDB(REMPipelineManagerConstants.DBaseRemAddr,REMPipelineManagerConstants.DBaseRemDB,
+                                                        REMPipelineManagerConstants.DBaseRemUser,REMPipelineManagerConstants.DBaseRemPwd,REMPipelineManagerConstants.DBaseHostTabName,dbargh)
+                                                    if dbsavh and ldbsavh:
+                                                        logger.info("Host database data for frame %s saved." % entryfil)
+                                                    elif not dbsavh:
+                                                        logger.error("Remote host database data for frame %s could not be saved." % entryfil)
+                                                    elif not ldbsavh:
+                                                        logger.error("Local host database data for frame %s could not be saved." % entryfil)                                    
+                                            #
+                                    else:
+                                        logger.warning("No AGN target file %s or file not readable." % REMPipelineManagerConstants.TrgVitaliPath)
+
+
+                        
+                        # database
+                        if options.database:
+                            #
+                            dbarg = (FILENAME,OBJECT,REMPipelineManagerConstants.REMTargetDict[OBSCODE],RA,DEC,SERIAL,CAMERA,
+                                FILTER,NPHOTOSTARS,FWHMFRAME,ZPMAG,ZPMAGERR,ZPNSTARS,AZ,ALT,OBJMAG,OBJMAGERR,MIDJFRAME,ELTIME,XPOS,YPOS,PROCSTAT,PHOTSTAB)
+                            ldbsav = SaveResult2LocDB(REMPipelineManagerConstants.DBaseLocPath,REMPipelineManagerConstants.DBLocTabName,dbarg)
+                            dbsav = SaveResult2RemDB(REMPipelineManagerConstants.DBaseRemAddr,REMPipelineManagerConstants.DBaseRemDB,
+                                REMPipelineManagerConstants.DBaseRemUser,REMPipelineManagerConstants.DBaseRemPwd,REMPipelineManagerConstants.DBaseRemTabName,dbarg)
+                            if dbsav and ldbsav:
+                                logger.info("Database data for frame %s saved." % entryfil)
+                            elif not dbsav:
+                                logger.error("Remote database data for frame %s could not be saved." % entryfil)
+                            elif not ldbsav:
+                                logger.error("Local database data for frame %s could not be saved." % entryfil)                                    
+                                    
+                                                                
+                        # remove processed file
+                        if not options.keep:
+                            os.remove(lrsfname+REMPipelineManagerConstants.locext)
+                            logger.info("Local file %s removed." % lrsfname)
+                        if os.path.exists(REMPipelineManagerConstants.CatOutFile):
+                            os.remove(REMPipelineManagerConstants.CatOutFile)
+                        if os.path.exists(lrsfname+REMPipelineManagerConstants.PhotOutFile):
+                            os.remove(lrsfname+REMPipelineManagerConstants.PhotOutFile)
+    
+    
+                            
+            else:
+                # any other file
+                logger.warning("It is not possible to classify frame %s." % entryfil)
+    
+            #                
+            # Upgrade of the processed file name
+            sp = SaveProcessPointFName(REMPipelineManagerConstants.ProcessPointFName,rossid,remirid)
+            logger.info("Process point file %s updated at %s and %s." % (REMPipelineManagerConstants.ProcessPointFName,str(rossid),str(remirid)))
+            if not sp:
+                logger.error("Process file %s cannot be saved." % REMPipelineManagerConstants.ProcessPointFName)
+                                        
+    # delay
+    if rossid == oldrossid and remirid == oldremirid:
+        time.sleep(REMPipelineManagerConstants.TimeDelay)
+    else:
+        oldrossid = rossid
+        oldremirid = remirid
