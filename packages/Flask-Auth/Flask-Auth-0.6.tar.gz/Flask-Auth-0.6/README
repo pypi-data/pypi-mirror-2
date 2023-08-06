@@ -1,0 +1,61 @@
+Flask-Auth
+==========
+
+Flask-Auth is a flask extension that offers database-agnostic (but still fairly plug-and-play) role-based user authentication. Sounds impressive, right?
+
+Features
+--------
+* Set of functions to assist in user session management (logging in and out, getting the current user, expiring sessions, encrypting passwords, etc).
+* Base user class AuthUser that can be used with most ORM's.
+* Plug-and-play model for Google App Engine (and a working example for SQLAlchemy).
+* Straightforward permission model to differentiate access rights between (groups of) users.
+
+Initializing the extension
+--------------------------
+You just install the extension and then initialize it like so:
+
+	from flaskext.auth import Auth
+	auth = Auth(app)
+
+Et voila, you're ready to go! The Auth object you just created allows you to customize a number of settings (such as default callback when logging in is required and the user session timeout), but the default settings should be fine for most cases.
+
+Users
+-----
+What you need to do now is think about where your users will be defined/stored. The most common option is to persist your users to a database, in which case you will most probably use an ORM. The AuthUser base class provides a couple of convenience functions so it is recommended to use this as a base class or mixin. If you're using Google App Engine, a plug-and-play model is defined in flaskext.auth.gae.User, which can of course be extended. If you use SQLAlchemy, you can follow the implementation in `examples/sqlalchemy_model.py`.
+
+If you have a small website with just a couple of static users or if you want to read your users from a file, you can use the AuthUser class directly and implement the loading of users using a function decorated with flask's `before_request` decorator. This use case is illustrated in `examples/no_persistence.py`.
+
+Roles and permissions
+---------------------
+If you want to differentiate between users and do specific permission checking on views, a permission model based on roles can be defined. It works very straightforward: A user has a role (like "admin") and a role has a set of permissions, with a permission being an action that is applied on a resource. Examples of resources are "newsitem", "user", "ticket", "product", but also "newsitem.comment", "user.role", etc. Examples of actions are "create", "read", "list", "download", etc.
+
+To get the above working, you first have to define your roles and the permissions they have in some way. Personally I am of the opinion that you shouldn't store roles and the permissions they have in a database, as it is part of the configuration of your application and as such should be stored in a versioned repository. In this extension, you can do this by defining instances of the Role and Permission objects in your settings file. The only thing that really has to be stored is the role of a user, which can be done by simply storing the name of the role with the user. There are however of course valid use cases in which you would want to store it in the database anyway, which is fairly simple to do by using the Role and Permission classes as mixins for your ORM models.
+
+In both of the above cases, you can tie everything together by providing a callback to load a role and attach this to the `load_role` attribute of the auth object we created when initializing the extension. This callback is called with as argument the name of a role and is supposed to return a Role object (containing the role name and a list of permissions). In code, the above could result in something like this:
+
+	from flaskext.auth.permissions import Permission, Role
+
+	user_create = Permission('user', 'create')
+	user_view = Permission('user', 'view')
+
+	roles = {
+		'admin': Role('admin', [user_create, user_view]),
+		'userview': Role('userview', [user_view]),
+	}
+
+	def load_role(role_name):
+		return roles.get(role_name)
+
+	auth.load_role = load_role
+
+Moving on
+---------
+Usage from here on exists in creating a way for users to log in and out (using the `login()` and `logout()` functions, or the `authenticate()` method of the AuthUser class), displaying the current user information (with `get_current_user()`), checking permissions with the `has_permission()` function and decorating views with either the `login_required()` or the `permission_required()` decorator.
+
+Future development
+------------------
+* Testing.
+* Multiple role support.
+* Plug-and-play models for some other ORM's.
+
+Suggestions are welcome.
