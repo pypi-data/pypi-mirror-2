@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+"""
+    Author: John E. Vincent
+	Email:	lusis.org+github.com@gmail.com
+"""
+import argparse
+import sys
+
+import vogeler.persistence as engine
+from vogeler.server import VogelerServer
+from vogeler.exceptions import VogelerException
+
+def setup(pargs):
+    pass
+
+def process_message(message):
+    response = message
+    syskey = message['syskey']
+    message_format = message['format']
+    del message['syskey']
+    del message['format']
+
+    print "Incoming message from: %s" % syskey
+
+    db.create(syskey)
+
+    for k, v in response.iteritems():
+        print "Got response for: %s" % k
+        try:
+            db.update(syskey, k, v, message_format)
+        except:
+            raise
+            sys.exit(1)
+
+def startup(pargs):
+    global s, db
+
+    if pargs.config:
+        config = pargs.config
+
+    if pargs.setup:
+        setup(pargs)
+
+    if pargs.load:
+        explicit_load = True
+        loadpath = pargs.load
+    else:
+        explicit_load = False
+        loadpath = 'etc/vogeler/_design'
+
+    db = engine.create_engine(pargs.dbhost)
+    db.create_db()
+
+    if explicit_load == True:
+        print "Loading design docs from: %s" % loadpath
+        rc = db.load_views(loadpath)
+        sys.exit(rc)
+    else:
+        print "Skipping design document load"
+
+    s = VogelerServer(callback_function=process_message,
+                    host=pargs.qhost,
+                    username=pargs.quser,
+                    password=pargs.qpass)
+    s.monitor()
+
+def shutdown():
+    print "Shutting down"
+    s.close()
+    sys.exit(0)
+
+if __name__ == "__main__":
+    appdesc = 'Vogeler server daemon'
+    parser = argparse.ArgumentParser(description=appdesc)
+    parser.add_argument('--config', help='Configuration file', default='/etc/vogeler', required=False)
+
+    runtime = parser.add_argument_group('startup options')
+    runtime.add_argument('--dbhost',
+            help='Persistence uri (i.e. couch://localhost:5984/system_records or couch://user:pass@localhost:5984/system_records)',
+            default='couch://127.0.0.1:5984/system_records',
+            required=False)
+    runtime.add_argument('--qhost',
+            help='RabbitMQ server address',
+            default='localhost',
+            required=False)
+    runtime.add_argument('--quser',
+            help='RabbitMQ user',
+            default='guest',
+            required=False)
+    runtime.add_argument('--qpass',
+            help='RabbitMQ password',
+            default='guest',
+            required=False)
+
+    configuration = parser.add_argument_group('setup options')
+    configuration.add_argument('--setup', '-s', action='store_true', default=False, help='Setup exchanges and create db/load design docs in CouchDB', required=False)
+    configuration.add_argument('--load', '-l', help='Load design docs in CouchDB. Provide full path to desgin docs')
+
+    args = parser.parse_args()
+
+    try:
+        startup(args)
+    except KeyboardInterrupt:
+        shutdown()
+# vim: set ts=4 et sw=4 sts=4 sta filetype=python :
