@@ -1,0 +1,2 @@
+<%inherit
+        file="Enum.mako" />
