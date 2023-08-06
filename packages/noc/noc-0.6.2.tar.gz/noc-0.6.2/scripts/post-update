@@ -1,0 +1,63 @@
+#!/bin/sh
+##----------------------------------------------------------------------
+## NOC post-update script
+## Execute after hg pull or after version upgrade
+##----------------------------------------------------------------------
+## Copyright (C) 2007-2010 The NOC Project
+## See LICENSE for details
+##----------------------------------------------------------------------
+PROGNAME=`basename $0`
+error_exit ( ) {
+    echo "$PROGNAME: ${1:-'Unknown error'}" 1>&2
+    echo "Terminating" 1>&2
+    exit 1
+}
+
+info ( ) {
+    echo $1 1>&2
+}
+
+PREFIX=`dirname "$0"`/../
+info "Jumping to '$PREFIX'"
+cd $PREFIX || error_exit "$LINENO: Cannot chdir to '$PREFIX'"
+info "Landing at '$PWD'"
+
+# Refresh contrib/lib when necessary
+info "Checking contrib/"
+./scripts/sync-contrib -c
+if [ $? -ne 0 ]; then
+    info "Contrib is out-of-date. Rebuilding"
+    # Change user when necessary
+    if [ -w ./contrib/lib/ ]; then
+        ./scripts/sync-contrib || error_exit "$LINENO: contrib sync failed"
+    else
+        info "Changing to superuser to execute '$PWD/scripts/sync-contrib'"
+        sudo $PWD/scripts/sync-contrib || error_exit "$LINENO: contrib sync failed"
+    fi
+fi
+# Check configuration files
+info "Checking configuration files"
+python manage.py check-conf || error_exit "$LINENO: configuration check failed"
+# Syncronize database
+info "Syncronizing database"
+python manage.py syncdb || error_exit "$LINENO: syncdb failed"
+# Migrate database
+info "Migrating database"
+python manage.py migrate || error_exit "$LINENO: migrate failed"
+# Set up permissions
+info "Setting up permissions"
+python manage.py sync-perm || error_exit "$LINENO: sync-perm failed"
+# Syncronize pyRules
+info "Syncronizing pyRules"
+python manage.py sync-pyrules || error_exit "$LINENO: sync-pyrules failed"
+# Syncronize refbooks
+info "Syncronizing refbooks"
+python manage.py sync-refbooks || error_exit "$LINENO: sync-refbooks failed"
+# Syncronize FM rules
+info "Installing FM rules"
+python manage.py sync-rules || error_exit "$LINENO: sync-rules failed"
+# Build documentation
+info "Building documentation"
+python manage.py sync-doc || error_exit "$LINO: cannot build documentation"
+#
+info "$PROGNAME complete"
