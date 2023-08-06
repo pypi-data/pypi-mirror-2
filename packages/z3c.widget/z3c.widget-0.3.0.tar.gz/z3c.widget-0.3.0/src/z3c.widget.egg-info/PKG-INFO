@@ -1,0 +1,2071 @@
+Metadata-Version: 1.0
+Name: z3c.widget
+Version: 0.3.0
+Summary: Additional zope.formlib Widgets
+Home-page: http://svn.zope.org/z3c.widget
+Author: Zope Community
+Author-email: zope-dev@zope.org
+License: ZPL 2.1
+Description: .. contents::
+        
+        
+        
+        ======================
+        Changes for z3c.widget
+        ======================
+        
+        0.3.0 (2010-11-16)
+        ==================
+        
+        - Added translation for french.
+        
+        - Updated tests to run with `zope.formlib` 4.0 and `zope.schema` 3.6.
+        
+        - Using Python's ``doctest`` module instead of depreacted
+        ``zope.testing.doctest[unit]``.
+        
+        - Added doctests to ``long_description`` to be visible on PyPI.
+        
+        2008/01/29 0.2.1
+        ================
+        
+        - add translation for hungarian and romanian languages
+        
+        2007/09/21 0.2.0
+        ================
+        
+        - feature: Added a date-selection widget.
+        - feature: Added a social security number widget.
+        - feature: Added a US phone number widget.
+        
+        2007/09/19 0.1.7
+        ================
+        
+        - added translation for english to get i18n working in some browsers
+        
+        
+        2007/09/19 0.1.6
+        ================
+        
+        - added cheesehop classification, registered there
+        - fixed typos
+        
+        2007/09/05 0.1.5
+        ================
+        
+        - bugfix: browse butten will now be enabled after cancel was clicked in
+        the open file dialog
+        - do not set the progessbar to 100% before the upload was started
+        - bugfix: files will not be uploaded if no limit was set
+        
+        
+        2007/09/05 0.1.4
+        ================
+        
+        - dealing file size during upload. If one or more files are bigger than
+        the passed size each one of them will be ignored during upload but listed
+        below the progress bar after the upload of the working files is done.
+        - displaying the maximal allowed file size (if it's contained in the config
+        file)
+        
+        
+        2007/09/03 0.1.3
+        ================
+        
+        - bugfix: too much quoting.
+        
+        
+        2007/09/03 0.1.2
+        ================
+        
+        - using passed config url instead of hard coded flashuploadvars.xml
+        
+        
+        2007/08/06 0.1.1
+        ================
+        
+        - flashupload: better skinnability for upload.swf. cleanup folder
+        structure for flash stuff.
+        
+        
+        2007/06/14 0.1.0:
+        =================
+        
+        - z3c.widget.image: added translations for es
+        
+        - update to newest bootstrap.py version
+        
+        
+        ======================
+        Autocomplete Widgets
+        ======================
+        
+        Autocomplete widgets are an alternative to normal select widgets.
+        
+        >>> from z3c.widget.autocomplete.widget import AutoCompleteWidget
+        
+        Let us create a vocabulary.
+        
+        >>> from zope.schema.vocabulary import SimpleVocabulary
+        >>> from zope.publisher.browser import TestRequest
+        >>> from zope import schema, component, interface
+        >>> items = ((u'value1',1,u'Title1'),
+        ...          (u'value2',2,u'Title2'),
+        ...          (u'value3',3,u'Title3'))
+        >>> terms = map(lambda i: SimpleVocabulary.createTerm(*i),items)
+        >>> voc = SimpleVocabulary(terms)
+        >>> [term.title for term in voc]
+        [u'Title1', u'Title2', u'Title3']
+        >>> field = schema.Choice(__name__='foo',
+        ...     missing_value=None,
+        ...     vocabulary=voc)
+        >>> request = TestRequest()
+        >>> widget =  AutoCompleteWidget(field, request)
+        >>> widget
+        <z3c.widget.autocomplete.widget.AutoCompleteWidget object at ...>
+        >>> print widget()
+        <input class="textType" id="field.foo" name="field.foo" type="text" value=""  />
+        <div id="field.foo.target" class="autoComplete"></div>
+        <script type="text/javascript">
+        new Ajax.Autocompleter('field.foo','field.foo.target',
+        'http://127.0.0.1/++widget++field.foo/suggestions'
+        ,options={
+        paramName: 'value'
+        });
+        </script>
+        
+        Let's add some input. Note that the input must match the title of the
+        vocabulary term.
+        
+        >>> request.form['field.foo']=u'Title1'
+        >>> widget.getInputValue()
+        u'value1'
+        
+        If we have no matching title a ConversionError is raised.
+        
+        >>> request.form['field.foo']=u'Unknown'
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        ConversionError: ('Invalid value', u'Unknown')
+        
+        Also the form value is the title of the term with the given value.
+        
+        >>> widget._toFormValue('value1')
+        u'Title1'
+        
+        >>> suggestions = widget.getSuggestions('Title')
+        >>> [title for title in suggestions]
+        [u'Title1', u'Title2', u'Title3']
+        >>> suggestions = widget.getSuggestions('Title1')
+        >>> [title for title in suggestions]
+        [u'Title1']
+        >>> suggestions = widget.getSuggestions('ABC')
+        >>> [title for title in suggestions]
+        []
+        >>> suggestions = widget.getSuggestions('title')
+        >>> [title for title in suggestions]
+        [u'Title1', u'Title2', u'Title3']
+        
+        
+        =======================
+        AutoCompleteWidget Demo
+        =======================
+        
+        This demo packe provides a simple content class which uses the
+        z3c autocomplete widget.
+        
+        >>> from zope.testbrowser.testing import Browser
+        >>> browser = Browser()
+        >>> browser.handleErrors = False
+        >>> browser.addHeader('Authorization', 'Basic mgr:mgrpw')
+        >>> browser.open('http://localhost/@@contents.html')
+        
+        It can be added by clicking on the "Autocomplete Widget Demo" link in the
+        add menu. And giving it a name.
+        
+        >>> link = browser.getLink('Autocomplete Widget Demo')
+        >>> link.click()
+        >>> nameCtrl = browser.getControl(name='new_value')
+        >>> nameCtrl.value = 'mydemo'
+        >>> applyCtrl = browser.getControl('Apply')
+        >>> applyCtrl.click()
+        >>> link = browser.getLink('mydemo')
+        >>> link.click()
+        >>> browser.url
+        'http://localhost/mydemo/@@edit.html'
+        
+        Let us test the widget rendering by direct access.
+        
+        >>> browser.open('http://localhost/mydemo/@@edit.html/++widget++country')
+        >>> print browser.contents
+        <input class="textType" ...
+        </script>
+        
+        The suggestions are proveded by its own view.
+        
+        >>> browser.open('http://localhost/mydemo/@@edit.html/++widget++country/suggestions')
+        >>> print browser.contents
+        
+        >>> browser.open('http://localhost/++lang++en/mydemo/@@edit.html/++widget++country/suggestions?value=a')
+        >>> print browser.contents
+        <BLANKLINE>
+        <ul>
+        <li>Algeria</li>
+        <li>Andorra</li>
+        <li>Antigua and Barbuda</li>
+        <li>Afghanistan</li>
+        <li>Anguilla</li>
+        <li>Armenia</li>
+        <li>Albania</li>
+        <li>Angola</li>
+        <li>Antarctica</li>
+        <li>American Samoa</li>
+        <li>Argentina</li>
+        <li>Australia</li>
+        <li>Austria</li>
+        <li>Aruba</li>
+        <li>Azerbaijan</li>
+        </ul>
+        <BLANKLINE>
+        <BLANKLINE>
+        
+        Suggestions are translated.
+        
+        >>> browser.open('http://localhost/++lang++de/mydemo/@@edit.html/++widget++country/suggestions?value=a')
+        >>> print browser.contents
+        <BLANKLINE>
+        <ul>
+        <li>Amerikanische Jungferninseln</li>
+        <li>Amerikanisch-Ozeanien</li>
+        <li>Algerien</li>
+        <li>Andorra</li>
+        <li>Antigua und Barbuda</li>
+        <li>Afghanistan</li>
+        <li>Anguilla</li>
+        <li>Armenien</li>
+        <li>Albanien</li>
+        <li>Angola</li>
+        <li>Antarktis</li>
+        <li>Amerikanisch-Samoa</li>
+        <li>Argentinien</li>
+        <li>Australien</li>
+        <li>Aruba</li>
+        <li>Aserbaidschan</li>
+        </ul>
+        <BLANKLINE>
+        <BLANKLINE>
+        
+        
+        =========================
+        Country selection Widgets
+        =========================
+        
+        This package provides widgets to select a country.
+        The dropdown type is registered as a default for the Country schema.
+        
+        The pain was to sort the options after the translation.
+        
+        
+        
+        Before we can start, we have to do a little bit of setup:
+        
+        >>> import zope.component
+        >>> import zope.schema
+        >>> import zope.app.form.browser
+        >>> from z3c.widget.country.widget import CountryInputDropdown
+        >>> from z3c.widget.country import ICountry
+        >>> from z3c.i18n.iso import territoryVocabularyFactory
+        >>> from zope.publisher.interfaces.browser import IBrowserRequest
+        
+        First we have to create a field and a request:
+        
+        >>> from z3c.widget.country import Country
+        
+        >>> countryFld = Country(
+        ...     __name__='country',
+        ...     title=u'Country',
+        ...     description=u'Select a Country')
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Now we can initialize the widget.
+        
+        >>> class Content(object):
+        ...     country = None
+        >>> content = Content()
+        >>> boundCountry = countryFld.bind(content)
+        
+        >>> widget = CountryInputDropdown(boundCountry,
+        ...   territoryVocabularyFactory(None), request)
+        
+        Let's make sure that all fields have the correct value:
+        
+        >>> widget.name
+        'field.country'
+        
+        >>> widget.label
+        u'Country'
+        
+        >>> widget.hint
+        u'Select a Country'
+        
+        >>> widget.visible
+        True
+        
+        Let's see how the widget is rendered:
+        
+        >>> print widget()
+        <div>
+        <div class="value">
+        <select id="field.country" name="field.country" size="1" >
+        <option value="AF">Afghanistan</option>
+        <option value="AL">Albania</option>
+        <option value="DZ">Algeria</option>
+        ...
+        <option value="HU">Hungary</option>
+        <option value="IS">Iceland</option>
+        <option value="IN">India</option>
+        ...
+        <option value="ZM">Zambia</option>
+        <option value="ZW">Zimbabwe</option>
+        </select>
+        ...
+        
+        #Let's see the german translation:
+        #z3c.i18n registrations required!!!
+        #
+        #  >>> request = TestRequest(HTTP_ACCEPT_LANGUAGE='de')
+        #
+        #  >>> widget = CountryInputDropdown(boundCountry,
+        #  ...   territoryVocabularyFactory(None), request)
+        #
+        #  >>> print widget()
+        #  <div>
+        #  <div class="value">
+        #  <select id="field.country" name="field.country" size="1" >
+        #  <option value="AF">Afghanistan</option>
+        #  <option value="AL">Albania</option>
+        #  <option value="DZ">Algeria</option>
+        #  ...
+        #  <option value="HU">Hungary</option>
+        #  <option value="IS">Iceland</option>
+        #  <option value="IN">India</option>
+        #  ...
+        #  <option value="ZM">Zambia</option>
+        #  <option value="ZW">Zimbabwe</option>
+        #  </select>
+        #  ...
+        
+        
+        =====================
+        Date Selection Widget
+        =====================
+        
+        The ``DateSelectWidget`` widget provides three select boxes presenting the
+        day, month and year.
+        
+        First we have to create a field and a request. Note that we can set the
+        year range in this widget:
+        
+        >>> import datetime
+        >>> from z3c.schema.dateselect import DateSelect
+        >>> from z3c.widget.dateselect.browser import DateSelectWidget
+        
+        >>> field = DateSelect(
+        ...     title=u'Birthday',
+        ...     description=u'Somebodys birthday',
+        ...     yearRange=range(1930, 2007),
+        ...     required=True)
+        >>> field.__name__ = 'field'
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Now we can initialize widget.
+        
+        >>> widget = DateSelectWidget(field, request)
+        
+        Let's make sure that all fields have the correct value:
+        
+        >>> widget.name
+        'field.field'
+        
+        >>> widget.label
+        u'Birthday'
+        
+        >>> widget.hint
+        u'Somebodys birthday'
+        
+        >>> widget.visible
+        True
+        
+        >>> widget.required
+        True
+        
+        The constructor should have also created 3 widgets:
+        
+        >>> widget.widgets['year']
+        <z3c.widget.dateselect.browser.DropdownWidget object at ...>
+        >>> widget.widgets['month']
+        <z3c.widget.dateselect.browser.DropdownWidget object at ...>
+        >>> widget.widgets['day']
+        <z3c.widget.dateselect.browser.DropdownWidget object at ...>
+        
+        let's also test the year range:
+        
+        >>> '1929' in widget.widgets['year'].vocabulary.by_token.keys()
+        False
+        >>> '1930' in widget.widgets['year'].vocabulary.by_token.keys()
+        True
+        >>> '2006' in widget.widgets['year'].vocabulary.by_token.keys()
+        True
+        >>> '2007' in widget.widgets['year'].vocabulary.by_token.keys()
+        False
+        
+        Test another year range:
+        
+        >>> field2 = DateSelect(
+        ...     title=u'Another Birthday',
+        ...     yearRange=range(2000, 2010))
+        >>> field2.__name__ = 'field'
+        >>> widget2 = DateSelectWidget(field2, request)
+        
+        >>> '1930' in widget2.widgets['year'].vocabulary.by_token.keys()
+        False
+        >>> '2000' in widget2.widgets['year'].vocabulary.by_token.keys()
+        True
+        >>> '2009' in widget2.widgets['year'].vocabulary.by_token.keys()
+        True
+        >>> '2010' in widget2.widgets['year'].vocabulary.by_token.keys()
+        False
+        
+        
+        ``setRenderedValue(value)`` Method
+        ==================================
+        
+        The first method is ``setRenderedValue()``. The widget has two use cases,
+        based on the type of value. If the value is a custom score system, it will
+        send the information to the custom, min and max widget:
+        
+        >>> widget = DateSelectWidget(field, request)
+        >>> year = 2000
+        >>> month = 12
+        >>> day = 31
+        >>> data = datetime.date(year, month, day)
+        >>> widget.setRenderedValue(data)
+        
+        >>> 'value="2000"' in widget()
+        True
+        >>> 'value="12"' in widget()
+        True
+        >>> 'value="31"' in widget()
+        True
+        
+        
+        ``setPrefix(prefix)`` Method
+        ============================
+        
+        The prefix determines the name of the widget and all its sub-widgets.
+        
+        >>> widget.name
+        'field.field'
+        >>> widget.widgets['year'].name
+        'field.field.year'
+        >>> widget.widgets['month'].name
+        'field.field.month'
+        >>> widget.widgets['day'].name
+        'field.field.day'
+        
+        >>> widget.setPrefix('test.')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['year'].name
+        'test.field.year'
+        >>> widget.widgets['month'].name
+        'test.field.month'
+        >>> widget.widgets['day'].name
+        'test.field.day'
+        
+        If the prefix does not end in a dot, one is added:
+        
+        >>> widget.setPrefix('test')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['year'].name
+        'test.field.year'
+        >>> widget.widgets['month'].name
+        'test.field.month'
+        >>> widget.widgets['day'].name
+        'test.field.day'
+        
+        
+        ``getInputValue()`` Method
+        ==========================
+        
+        This method returns a date object:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        
+        >>> widget = DateSelectWidget(field, request)
+        
+        >>> value = widget.getInputValue()
+        >>> value.year
+        2006
+        >>> value.month
+        2
+        >>> value.day
+        24
+        
+        If a set of values does not produce a valid date object, a value error is
+        raised:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '29'})
+        
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('field', u'Birthday', u'day is out of range for month')
+        
+        >>> widget._error.__class__
+        <class 'zope.formlib.interfaces.WidgetInputError'>
+        
+        
+        ``applyChanges(content)`` Method
+        ================================
+        
+        This method applies the new date to the passed content. However, it
+        must be smart enough to detect whether the values really changed.
+        
+        >>> class Content(object):
+        ...     field = None
+        >>> content = Content()
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.applyChanges(content)
+        True
+        >>> content.field
+        datetime.date(2006, 2, 24)
+        
+        >>> widget.applyChanges(content)
+        False
+        
+        
+        ``hasInput()`` Method
+        =====================
+        
+        This method checks for any input, but does not validate it.
+        
+        >>> request = TestRequest()
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.month': '2'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasInput()
+        True
+        
+        
+        ``hasValidInput()`` Method
+        ==========================
+        
+        Additionally to checking for any input, this method also checks whether the
+        input is valid:
+        
+        >>> request = TestRequest()
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.month': '2'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.hasValidInput()
+        True
+        
+        
+        ``hidden()`` Method
+        ===================
+        
+        This method is renders the output as hidden fields:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> print widget.hidden()
+        <input class="hiddenType" id="field.field.year" name="field.field.year"
+        type="hidden" value="2006" />
+        <input class="hiddenType" id="field.field.month" name="field.field.month"
+        type="hidden" value="2"  />
+        <input class="hiddenType" id="field.field.day" name="field.field.day"
+        type="hidden" value="24"  />
+        
+        
+        ``error()`` Method
+        ==================
+        
+        Let's test some bad data and check the error handling.
+        
+        The day field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '99'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        ConversionError: (u'Invalid value', InvalidValue("token '99' not found in vocabulary"))
+        >>> print widget.error()
+        <span class="error">Invalid value</span>
+        
+        The month field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '0',
+        ...     'field.field.day': '31'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        ConversionError: (u'Invalid value', InvalidValue("token '0' not found in vocabulary"))
+        >>> print widget.error()
+        <span class="error">Invalid value</span>
+        
+        The year field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '1900',
+        ...     'field.field.month': '1',
+        ...     'field.field.day': '31'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        ConversionError: (u'Invalid value', InvalidValue("token '1900' not found in vocabulary"))
+        >>> print widget.error()
+        <span class="error">Invalid value</span>
+        
+        The single inputs were correct, but did not create a valid date.
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '1980',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '31'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('field', u'Birthday', u'day is out of range for month')
+        
+        >>> print widget.error()
+        <span class="error">day is out of range for month</span>
+        
+        No error occurred:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '1980',
+        ...     'field.field.month': '1',
+        ...     'field.field.day': '31'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> widget.getInputValue()
+        datetime.date(1980, 1, 31)
+        >>> widget.error()
+        ''
+        
+        
+        ``__call__()`` Method
+        =====================
+        
+        This method renders the widget using the sub-widgets. Let's see the output:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.year': '2006',
+        ...     'field.field.month': '2',
+        ...     'field.field.day': '24'})
+        >>> widget = DateSelectWidget(field, request)
+        >>> print widget()
+        <select id="field.field.day" name="field.field.day" size="1" >
+        <option value="1">1</option>
+        ...
+        <option value="23">23</option>
+        <option selected="selected" value="24">24</option>
+        <option value="25">25</option>
+        ...
+        <option value="31">31</option>
+        </select><input name="field.field.day-empty-marker" type="hidden"
+        value="1" />&nbsp;
+        <select id="field.field.month" name="field.field.month" size="1" >
+        <option value="1">1</option>
+        <option selected="selected" value="2">2</option>
+        <option value="3">3</option>
+        ...
+        <option value="12">12</option>
+        </select><input name="field.field.month-empty-marker" type="hidden"
+        value="1" />&nbsp;
+        <select id="field.field.year" name="field.field.year" size="1" >
+        <option value="1930">1930</option>
+        ...
+        <option value="2005">2005</option>
+        <option selected="selected" value="2006">2006</option>
+        </select><input
+        name="field.field.year-empty-marker" type="hidden" value="1" />
+        <BLANKLINE>
+        
+        
+        DropDownDateWidget
+        ==================
+        
+        >>> from z3c.widget.dropdowndatewidget.widget import DropDownDateWidget
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Widgets are use for fields.
+        
+        >>> from zope.schema import Date
+        >>> dateField = Date(__name__='foo', title=u'Foo')
+        
+        >>> widget = DropDownDateWidget(dateField, request)
+        
+        >>> widget.name
+        'field.foo'
+        >>> widget.label
+        u'Foo'
+        >>> widget.hasInput()
+        False
+        
+        We need to provide some input.
+        
+        >>> request.form['field.foo.day'] = '1'
+        >>> widget.hasInput()
+        False
+        >>> request.form['field.foo.month'] = '6'
+        >>> widget.hasInput()
+        False
+        >>> request.form['field.foo.year'] = '1963'
+        >>> widget.hasInput()
+        True
+        
+        Read the value.
+        
+        >>> widget.getInputValue()
+        datetime.date(1963, 6, 1)
+        
+        Let's render the widget.
+        
+        >>> print widget()
+        <div class="dropDownDateWidget"><select class="dayField" id="field.foo.day" name="field.foo.day">...</select>
+        <select class="monthField" id="field.foo.month" name="field.foo.month">...</select>
+        <select class="yearField" id="field.foo.year" name="field.foo.year">...</select>
+        </div>
+        
+        And if we set a value.
+        
+        >>> from datetime import date
+        >>> widget.setRenderedValue(date(1977, 4, 3))
+        >>> print widget()
+        <div class="dropDownDateWidget"><select ...<option selected="selected" value="03">...
+        <select ...<option selected="selected" value="04">...
+        <select ...<option selected="selected" value="1977">...
+        ...
+        
+        
+        
+        ===================
+        FLASH UPLOAD WIDGET
+        ===================
+        
+        the flashupload vars page configures the flash frontend
+        
+        >>> from z3c.widget.flashupload import upload
+        >>> from zope.publisher.browser import TestRequest
+        >>> from zope.app.pagetemplate import ViewPageTemplateFile
+        >>> from zope.app.pagetemplate.simpleviewclass import SimpleViewClass
+        >>> request = TestRequest()
+        >>> context = object()
+        >>> viewClass = SimpleViewClass(
+        ...     'flashuploadvars.pt', bases=(upload.FlashUploadVars,))
+        >>> view = viewClass(context, request)
+        >>> print view()
+        <?xml version="1.0" ?>
+        <var>
+        <var name="file_progress">File Progress</var>
+        <var name="overall_progress">Overall Progress</var>
+        <var name="error">Error on uploading files</var>
+        <var name="uploadcomplete">all files uploaded</var>
+        <var name="uploadpartial">files uploaded</var>
+        <var name="notuploaded">files were not uploaded because
+        they're too big</var>
+        <var name="maxfilesize">maximum file size is</var>
+        </var>
+        
+        >>> view.allowedFileTypes = ('.jpg', '.gif')
+        >>> print view()
+        <?xml version="1.0" ?>
+        <var>
+        ...
+        <var name="allowedFileType">.jpg</var>
+        <var name="allowedFileType">.gif</var>
+        </var>
+        
+        
+        
+        ================
+        The Image Widget
+        ================
+        
+        this image widget should be used as a custom_widget for image fields.
+        comparing to the default widget in zope3 it does not delete the
+        data in the field if the "delete" checkbox is not explicitly selected.
+        
+        
+        Adding an Image
+        ===============
+        
+        >>> import zope.schema
+        >>> from zope.publisher.browser import TestRequest
+        >>> from zope import interface
+        >>> from zope.schema.fieldproperty import FieldProperty
+        >>> from zope.app.file.interfaces import IImage
+        >>> from z3c.widget.image.widget import ImageWidget
+        >>> from zope.app.file.image import Image
+        
+        
+        create a content type with an image field.
+        
+        >>> class ITestObject(interface.Interface):
+        ...     image = zope.schema.Object(
+        ...     title=u'Image',
+        ...     schema=IImage)
+        >>> class TestObject(object):
+        ...     interface.implements(ITestObject)
+        ...     image = FieldProperty(ITestObject['image'])
+        
+        >>> obj = TestObject()
+        
+        >>> field = ITestObject['image'].bind(obj)
+        
+        
+        Send the request without any image information. the empty field
+        should not be changed...
+        
+        >>> request = TestRequest(form={'field.image' : u''})
+        >>> widget = ImageWidget(field, request)
+        >>> widget._getFormInput() is None
+        True
+        
+        Send some Image information to the field. the image information
+        should be stored in the field as a Image Object
+        
+        >>> request = TestRequest(form={'field.image' : u'PNG123Test'})
+        >>> widget = ImageWidget(field, request)
+        >>> widget._getFormInput()
+        <zope.app.file.image.Image object at ...>
+        
+        
+        Now we save the field again, but without any new image data.
+        the old image information should not be lost
+        
+        >>> obj.image = Image(u'PNG123Test')
+        >>> request = TestRequest(form={'field.image' : u''})
+        >>> widget = ImageWidget(field, request)
+        >>> widget._getFormInput() is obj.image
+        True
+        
+        Now we want to delete the image. the forminput should be None now.
+        
+        >>> request = TestRequest(form={'field.image' : u'',
+        ...     'field.image.delete': u'true'})
+        >>> widget = ImageWidget(field, request)
+        >>> widget._getFormInput() is None
+        True
+        
+        >>> print widget()
+        <div class="z3cImageWidget">
+        <input type="file" name="field.image" id="field.image" /><br/>
+        <input type="checkbox" name="field.image.delete" value="true" />delete image
+        </div>
+        
+        
+        
+        
+        
+        
+        ====================
+        The Widget Namespace
+        ====================
+        
+        The widget namespace provides a way to traverse to the widgets of a
+        formlib form.
+        
+        >>> from z3c.widget.namespace.namespace import WidgetHandler
+        
+        Let us define a form to test this behaviour.
+        
+        >>> from zope.formlib import form
+        >>> from zope import interface, schema
+        >>> class IMyContent(interface.Interface):
+        ...     title = schema.TextLine(title=u'Title')
+        >>> class MyContent(object):
+        ...     interface.implements(IMyContent)
+        ...     title=None
+        >>> content = MyContent()
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        >>> class MyForm(form.EditForm):
+        ...     form_fields = form.Fields(IMyContent)
+        >>> view = MyForm(content,request)
+        >>> handler = WidgetHandler(view,request)
+        >>> handler.traverse('title',None)
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        
+        
+        
+        =========================
+        Optional Dropdown Widgets
+        =========================
+        
+        The Optional Dropdown Widget simulates the common desktop widget of a combo
+        box, which can also receive a custom entry.
+        
+        Before we can start, we have to do a little bit of setup:
+        
+        >>> import zope.component
+        >>> import zope.schema
+        >>> import zope.app.form.browser
+        >>> from zope.publisher.interfaces.browser import IBrowserRequest
+        
+        >>> zope.component.provideAdapter(
+        ...     zope.app.form.browser.TextWidget,
+        ...     (zope.schema.interfaces.ITextLine, IBrowserRequest),
+        ...     zope.app.form.interfaces.IInputWidget)
+        
+        
+        First we have to create a field and a request:
+        
+        >>> from z3c.schema.optchoice import OptionalChoice
+        
+        >>> optchoice = OptionalChoice(
+        ...     __name__='occupation',
+        ...     title=u'Occupation',
+        ...     description=u'The Occupation',
+        ...     values=(u'Programmer', u'Designer', u'Project Manager'),
+        ...     value_type=zope.schema.TextLine())
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Now we can initialize widget.
+        
+        >>> class Content(object):
+        ...     occupation = None
+        >>> content = Content()
+        >>> boundOptChoice = optchoice.bind(content)
+        
+        >>> from z3c.widget.optdropdown import OptionalDropdownWidget
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        Let's make sure that all fields have the correct value:
+        
+        >>> widget.name
+        'field.occupation'
+        
+        >>> widget.label
+        u'Occupation'
+        
+        >>> widget.hint
+        u'The Occupation'
+        
+        >>> widget.visible
+        True
+        
+        >>> widget.required
+        True
+        
+        The constructor should have also created 2 widgets:
+        
+        >>> widget.customWidget
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        >>> widget.dropdownWidget
+        <zope.formlib.itemswidgets.DropdownWidget object at ...>
+        
+        
+        ``setRenderedValue(value)`` Method
+        ==================================
+        
+        The first method is ``setRenderedValue()``. The widget has two use cases,
+        based on the type of value. If the value is a custom value, it will
+        send the information to the custom widget:
+        
+        >>> print widget.customWidget()
+        <... value="" />
+        >>> 'selected=""' in widget.dropdownWidget()
+        False
+        
+        >>> widget.setRenderedValue(u'Scientist')
+        
+        >>> print widget.customWidget()
+        <... value="Scientist" />
+        >>> 'selected=""' in widget.dropdownWidget()
+        False
+        
+        After resetting the widget passing in one of the choices in the
+        vocabulary, the value should be displayed in the dropdown:
+        
+        >>> widget.setRenderedValue(u'Designer')
+        
+        >>> print widget.customWidget()
+        <... value="" />
+        >>> print widget.dropdownWidget()
+        <div>
+        ...
+        <option selected="selected" value="Designer">Designer</option>
+        ...
+        </div>
+        
+        
+        ``setPrefix(prefix)`` Method
+        ============================
+        
+        The prefix determines the name of the widget and the sub-widgets.
+        
+        >>> widget.name
+        'field.occupation'
+        >>> widget.dropdownWidget.name
+        'field.occupation.occupation'
+        >>> widget.customWidget.name
+        'field.occupation.custom'
+        
+        >>> widget.setPrefix('test.')
+        
+        >>> widget.name
+        'test.occupation'
+        >>> widget.dropdownWidget.name
+        'test.occupation.occupation'
+        >>> widget.customWidget.name
+        'test.occupation.custom'
+        
+        
+        ``getInputValue()`` Method
+        ==========================
+        
+        This method returns a value based on the input; the data is assumed to
+        be valid. In our case that means, if we entered a custom value, it is
+        returned:
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher'})
+        
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        >>> widget.getInputValue()
+        u'Teacher'
+        
+        On the other hand, if we selected a choice from the vocabulary, it should be
+        returned:
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Designer'})
+        
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        >>> widget.getInputValue()
+        u'Designer'
+        
+        
+        ``applyChanges(content)`` Method
+        ================================
+        
+        This method applies the new value to the passed content. However, it
+        must be smart enough to detect whether the values really changed.
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher'})
+        
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.applyChanges(content)
+        True
+        >>> content.occupation
+        u'Teacher'
+        
+        >>> widget.applyChanges(content)
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Designer'})
+        
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        >>> widget.applyChanges(content)
+        True
+        >>> content.occupation
+        u'Designer'
+        
+        >>> widget.applyChanges(content)
+        False
+        
+        
+        ``hasInput()`` Method
+        =====================
+        
+        This mehtod checks for any input, but does not validate it. In our case this
+        means that either a choice has been selected or the the custom value has been
+        entered.
+        
+        >>> request = TestRequest()
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher\nBad Stuff'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasInput()
+        True
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Waitress'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasInput()
+        True
+        
+        
+        ``hasValidInput()`` Method
+        ==========================
+        
+        Additionally to checking for any input, this method also checks whether the
+        input is valid:
+        
+        >>> request = TestRequest()
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Waitress'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Designer'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasValidInput()
+        True
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher\nBad Stuff'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.hasValidInput()
+        True
+        
+        
+        hidden() Method
+        ===============
+        
+        This method is implemented by simply concatenating the two widget's hidden
+        output:
+        
+        >>> request = TestRequest()
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.setRenderedValue(u'Designer')
+        >>> print widget.hidden()
+        <input class="hiddenType" id="field.occupation.occupation"
+        name="field.occupation.occupation" type="hidden" value="Designer"  />
+        <input class="hiddenType" id="field.occupation.custom"
+        name="field.occupation.custom" type="hidden" value=""  />
+        
+        >>> widget.setRenderedValue(u'Teacher')
+        >>> print widget.hidden()
+        <input class="hiddenType" id="field.occupation.occupation"
+        name="field.occupation.occupation" type="hidden" value=""  />
+        <input class="hiddenType" id="field.occupation.custom"
+        name="field.occupation.custom" type="hidden" value="Teacher"  />
+        
+        
+        error() Method
+        ==============
+        
+        Again, we have our two cases. If an error occured in the dropdown, it is
+        reported:
+        
+        >>> from zope.app.form.interfaces import IWidgetInputError
+        >>> from zope.app.form.browser.exception import WidgetInputErrorView
+        >>> from zope.app.form.browser.interfaces import IWidgetInputErrorView
+        
+        >>> zope.component.provideAdapter(
+        ...     WidgetInputErrorView,
+        ...     (IWidgetInputError, IBrowserRequest), IWidgetInputErrorView)
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Designer'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.getInputValue()
+        u'Designer'
+        >>> widget.error()
+        ''
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.occupation': u'Waitress'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        ConversionError: (u'Invalid value', InvalidValue("token u'Waitress' not found in vocabulary"))
+        >>> widget.error()
+        u'<span class="error">Invalid value</span>'
+        
+        Otherwise the custom widget's errors are reported:
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.getInputValue()
+        u'Teacher'
+        >>> widget.error()
+        ''
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher\nBad Stuff'})
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('custom', u'', ConstraintNotSatisfied(u'Teacher\nBad Stuff'))
+        >>> widget.error()
+        u'<span class="error">Constraint not satisfied</span>'
+        
+        
+        __call__() Method
+        =================
+        
+        This method renders the widget using the sub-widgets. It simply adds the two
+        widgets' output placing the ``connector`` between them:
+        
+        >>> request = TestRequest(form={
+        ...     'field.occupation.custom': u'Teacher'})
+        
+        >>> widget = OptionalDropdownWidget(boundOptChoice, request)
+        >>> widget.connector
+        u'<br />\n'
+        
+        >>> print widget()
+        <div>
+        <div class="value">
+        <select id="field.occupation.occupation"
+        name="field.occupation.occupation" size="1" >
+        <option selected="selected" value="">(nothing selected)</option>
+        <option value="Programmer">Programmer</option>
+        <option value="Designer">Designer</option>
+        <option value="Project Manager">Project Manager</option>
+        </select>
+        </div>
+        <input name="field.occupation.occupation-empty-marker" type="hidden"
+        value="1" />
+        </div><br />
+        <input class="textType" id="field.occupation.custom"
+        name="field.occupation.custom" size="20" type="text" value="Teacher" />
+        
+        
+        ====================
+        SequenceTable Widget
+        ====================
+        
+        This package provides a Sequence Widget just as
+        zope.app.form.browser.sequencewidget.
+        The main difference is that it places the subobject's fields horizontally in
+        a table. That means a kind of voucher-item forms are piece of cake to do.
+        
+        There is also a widget (SequenceTableJSWidget) which does the add/remove item
+        in the browser with javascript.
+        The trick is to embed an invisible template of an empty row in the HTML,
+        add that each time a new row is required.
+        
+        Drawbacks of JS:
+        * Validation is done ONLY when the complete form is submitted to the server.
+        * Submitting the form and using the Back button of the browser does not work.
+        
+        WARNING!
+        ========
+        The subobject MUST have subwidgets. That is usually the case if the subobject
+        is based on zope.schema.Object.
+        
+        TODO
+        ====
+        Tests.
+        Some are there, some are copied from z.a.form.browser and need fix.
+        
+        ==========
+        SSN Widget
+        ==========
+        
+        The social security number widget can be used as a custom widget for text line
+        fields, enforcing a particular layout.
+        
+        First we have to create a field and a request:
+        
+        >>> import datetime
+        >>> import zope.schema
+        
+        >>> field = zope.schema.TextLine(
+        ...     title=u'SSN',
+        ...     description=u'Social Security Number',
+        ...     required=True)
+        >>> field.__name__ = 'field'
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Now we can initialize widget.
+        
+        >>> from z3c.widget.ssn.browser import SSNWidget
+        >>> widget = SSNWidget(field, request)
+        
+        Let's make sure that all fields have the correct value:
+        
+        >>> widget.name
+        'field.field'
+        
+        >>> widget.label
+        u'SSN'
+        
+        >>> widget.hint
+        u'Social Security Number'
+        
+        >>> widget.visible
+        True
+        
+        >>> widget.required
+        True
+        
+        The constructor should have also created 3 sub-widgets:
+        
+        >>> widget.widgets['first']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        >>> widget.widgets['second']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        >>> widget.widgets['third']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        
+        
+        ``setRenderedValue(value)`` Method
+        ==================================
+        
+        The first method is ``setRenderedValue()``. The widget has two use cases,
+        based on the type of value:
+        
+        >>> widget = SSNWidget(field, request)
+        >>> widget.setRenderedValue(u'123-45-6789')
+        >>> print widget()
+        <input class="textType" id="field.field.first" name="field.field.first"
+        size="3" type="text" value="123"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.second" name="field.field.second"
+        size="2" type="text" value="45"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.third" name="field.field.third"
+        size="4" type="text" value="6789"  />
+        
+        
+        ``setPrefix(prefix)`` Method
+        ============================
+        
+        The prefix determines the name of the widget and all its sub-widgets.
+        
+        >>> widget.name
+        'field.field'
+        >>> widget.widgets['first'].name
+        'field.field.first'
+        >>> widget.widgets['second'].name
+        'field.field.second'
+        >>> widget.widgets['third'].name
+        'field.field.third'
+        
+        >>> widget.setPrefix('test.')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['first'].name
+        'test.field.first'
+        >>> widget.widgets['second'].name
+        'test.field.second'
+        >>> widget.widgets['third'].name
+        'test.field.third'
+        
+        If the prefix does not end in a dot, one is added:
+        
+        >>> widget.setPrefix('test')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['first'].name
+        'test.field.first'
+        >>> widget.widgets['second'].name
+        'test.field.second'
+        >>> widget.widgets['third'].name
+        'test.field.third'
+        
+        
+        ``getInputValue()`` Method
+        ==========================
+        
+        This method returns the full SSN string:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        
+        >>> widget = SSNWidget(field, request)
+        
+        >>> value = widget.getInputValue()
+        >>> value
+        u'123-45-6789'
+        
+        If a set of values does not produce a valid string, a value error is
+        raised:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '1234',
+        ...     'field.field.second': '56',
+        ...     'field.field.third': '7890'})
+        
+        >>> widget = SSNWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('first', u'Frst three digits', ConstraintNotSatisfied(u'1234'))
+        
+        >>> widget._error.__class__
+        <class 'zope.formlib.interfaces.WidgetInputError'>
+        
+        
+        ``applyChanges(content)`` Method
+        ================================
+        
+        This method applies the new SSN to the passed content. However, it
+        must be smart enough to detect whether the values really changed.
+        
+        >>> class Content(object):
+        ...     field = None
+        >>> content = Content()
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        
+        >>> widget = SSNWidget(field, request)
+        >>> widget.applyChanges(content)
+        True
+        >>> content.field
+        u'123-45-6789'
+        
+        >>> widget.applyChanges(content)
+        False
+        
+        
+        ``hasInput()`` Method
+        =====================
+        
+        This method checks for any input, but does not validate it.
+        
+        >>> request = TestRequest()
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.second': '45'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasInput()
+        True
+        
+        
+        ``hasValidInput()`` Method
+        ==========================
+        
+        Additionally to checking for any input, this method also checks whether the
+        input is valid:
+        
+        >>> request = TestRequest()
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.second': '45'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.hasValidInput()
+        True
+        
+        
+        ``hidden()`` Method
+        ===================
+        
+        This method is renders the output as hidden fields:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> print widget.hidden()
+        <input class="hiddenType" id="field.field.first" name="field.field.first"
+        type="hidden" value="123" />
+        <input class="hiddenType" id="field.field.second" name="field.field.second"
+        type="hidden" value="45"  />
+        <input class="hiddenType" id="field.field.third" name="field.field.third"
+        type="hidden" value="6789"  />
+        
+        
+        ``error()`` Method
+        ==================
+        
+        Let's test some bad data and check the error handling.
+        
+        The third field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '678'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('third', u'Third four digits', ConstraintNotSatisfied(u'678'))
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        The second field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '4-',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('second', u'Second two digits', ConstraintNotSatisfied(u'4-'))
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        The first field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': 'xxx',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('first', u'Frst three digits', ConstraintNotSatisfied(u'xxx'))
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        No error occurred:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> widget.getInputValue()
+        u'123-45-6789'
+        >>> widget.error()
+        ''
+        
+        
+        ``__call__()`` Method
+        =====================
+        
+        This method renders the widget using the sub-widgets. Let's see the output:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45',
+        ...     'field.field.third': '6789'})
+        >>> widget = SSNWidget(field, request)
+        >>> print widget()
+        <input class="textType" id="field.field.first" name="field.field.first"
+        size="3" type="text" value="123"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.second" name="field.field.second"
+        size="2" type="text" value="45"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.third" name="field.field.third"
+        size="4" type="text" value="6789"  />
+        
+        
+        ==========================
+        HTML-Editor Widget TinyMCE
+        ==========================
+        
+        This package provides a WYSIWYG-Editor-Widget for HTML-Content, by
+        using the greate TinyMCE editor (see: http://tinymce.moxiecode.com/).
+        
+        
+        
+        
+        ===============
+        US Phone Widget
+        ===============
+        
+        The US phone number widget can be used as a custom widget for text line
+        fields, enforcing a particular layout.
+        
+        First we have to create a field and a request:
+        
+        >>> import datetime
+        >>> import zope.schema
+        
+        >>> field = zope.schema.TextLine(
+        ...     title=u'Phone',
+        ...     description=u'Phone Number',
+        ...     required=True)
+        >>> field.__name__ = 'field'
+        
+        >>> from zope.publisher.browser import TestRequest
+        >>> request = TestRequest()
+        
+        Now we can initialize widget.
+        
+        >>> from z3c.widget.usphone.browser import PhoneWidget
+        >>> widget = PhoneWidget(field, request)
+        
+        Let's make sure that all fields have the correct value:
+        
+        >>> widget.name
+        'field.field'
+        
+        >>> widget.label
+        u'Phone'
+        
+        >>> widget.hint
+        u'Phone Number'
+        
+        >>> widget.visible
+        True
+        
+        >>> widget.required
+        True
+        
+        The constructor should have also created 3 sub-widgets:
+        
+        >>> widget.widgets['first']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        >>> widget.widgets['second']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        >>> widget.widgets['third']
+        <zope.formlib.textwidgets.TextWidget object at ...>
+        
+        
+        ``setRenderedValue(value)`` Method
+        ==================================
+        
+        The first method is ``setRenderedValue()``. The widget has two use cases,
+        based on the type of value:
+        
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.setRenderedValue(u'123-456-7890')
+        >>> print widget()
+        (<input class="textType" id="field.field.first" name="field.field.first"
+        size="3" type="text" value="123"  />)&nbsp;
+        <input class="textType" id="field.field.second" name="field.field.second"
+        size="3" type="text" value="456"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.third" name="field.field.third"
+        size="4" type="text" value="7890"  />
+        
+        
+        ``setPrefix(prefix)`` Method
+        ============================
+        
+        The prefix determines the name of the widget and all its sub-widgets.
+        
+        >>> widget.name
+        'field.field'
+        >>> widget.widgets['first'].name
+        'field.field.first'
+        >>> widget.widgets['second'].name
+        'field.field.second'
+        >>> widget.widgets['third'].name
+        'field.field.third'
+        
+        >>> widget.setPrefix('test.')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['first'].name
+        'test.field.first'
+        >>> widget.widgets['second'].name
+        'test.field.second'
+        >>> widget.widgets['third'].name
+        'test.field.third'
+        
+        If the prefix does not end in a dot, one is added:
+        
+        >>> widget.setPrefix('test')
+        
+        >>> widget.name
+        'test.field'
+        >>> widget.widgets['first'].name
+        'test.field.first'
+        >>> widget.widgets['second'].name
+        'test.field.second'
+        >>> widget.widgets['third'].name
+        'test.field.third'
+        
+        
+        ``getInputValue()`` Method
+        ==========================
+        
+        This method returns the full phone string:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        
+        >>> widget = PhoneWidget(field, request)
+        
+        >>> value = widget.getInputValue()
+        >>> value
+        u'123-456-7890'
+        
+        If a set of values does not produce a valid string, a value error is
+        raised:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '1234',
+        ...     'field.field.second': '56',
+        ...     'field.field.third': '7890'})
+        
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('first', u'Area Code', ConstraintNotSatisfied(u'1234'))
+        
+        >>> widget._error.__class__
+        <class 'zope.formlib.interfaces.WidgetInputError'>
+        
+        
+        ``applyChanges(content)`` Method
+        ================================
+        
+        This method applies the new phone number to the passed content. However, it
+        must be smart enough to detect whether the values really changed.
+        
+        >>> class Content(object):
+        ...     field = None
+        >>> content = Content()
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.applyChanges(content)
+        True
+        >>> content.field
+        u'123-456-7890'
+        
+        >>> widget.applyChanges(content)
+        False
+        
+        
+        ``hasInput()`` Method
+        =====================
+        
+        This method checks for any input, but does not validate it.
+        
+        >>> request = TestRequest()
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.second': '456'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasInput()
+        True
+        
+        
+        ``hasValidInput()`` Method
+        ==========================
+        
+        Additionally to checking for any input, this method also checks whether the
+        input is valid:
+        
+        >>> request = TestRequest()
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.second': '456'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasValidInput()
+        False
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.hasValidInput()
+        True
+        
+        
+        ``hidden()`` Method
+        ===================
+        
+        This method is renders the output as hidden fields:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> print widget.hidden()
+        <input class="hiddenType" id="field.field.first" name="field.field.first"
+        type="hidden" value="123" />
+        <input class="hiddenType" id="field.field.second" name="field.field.second"
+        type="hidden" value="456"  />
+        <input class="hiddenType" id="field.field.third" name="field.field.third"
+        type="hidden" value="7890"  />
+        
+        
+        ``error()`` Method
+        ==================
+        
+        Let's test some bad data and check the error handling.
+        
+        The third field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '78901'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('third', u'Four Digits', ConstraintNotSatisfied(u'78901'))
+        
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        The second field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '45-',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('second', u'Three Digits', ConstraintNotSatisfied(u'45-'))
+        
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        The first field contains an invalid value:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': 'xxx',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.getInputValue()
+        Traceback (most recent call last):
+        ...
+        WidgetInputError: ('first', u'Area Code', ConstraintNotSatisfied(u'xxx'))
+        
+        >>> print widget.error()
+        <span class="error">Constraint not satisfied</span>
+        
+        No error occurred:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> widget.getInputValue()
+        u'123-456-7890'
+        >>> widget.error()
+        ''
+        
+        
+        ``__call__()`` Method
+        =====================
+        
+        This method renders the widget using the sub-widgets. Let's see the output:
+        
+        >>> request = TestRequest(form={
+        ...     'field.field.first': '123',
+        ...     'field.field.second': '456',
+        ...     'field.field.third': '7890'})
+        >>> widget = PhoneWidget(field, request)
+        >>> print widget()
+        (<input class="textType" id="field.field.first" name="field.field.first"
+        size="3" type="text" value="123"  />)&nbsp;
+        <input class="textType" id="field.field.second" name="field.field.second"
+        size="3" type="text" value="456"  />&nbsp;&mdash;&nbsp;
+        <input class="textType" id="field.field.third" name="field.field.third"
+        size="4" type="text" value="7890"  />
+        
+Keywords: zope zope3 form formlib
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Zope3
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
