@@ -1,0 +1,104 @@
+>>> from fluentxml import Parser
+
+>>> data = '<foo xmlns="foobar" xmlns:a="toto"><a:bar>data</a:bar><baz>re</baz><stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" id="c2s&amp;123"><a>&quot;&amp;&lt;&gt;</a></stream:stream></foo>'
+
+Test feed call
+
+>>> p = Parser()
+>>> p.feed(data)
+>>> str(p.root) == data
+True
+
+Test feed call in constructor
+
+>>> p = Parser(data=data)
+>>> str(p.root) == data
+True
+
+>>> class MyParser(Parser):
+...     def dispatch(self, node):
+...         print(node._name)
+>>> mp = MyParser(data, dispatch_depth=1)
+bar
+baz
+stream
+
+Test dispatching
+
+>>> class MyParser(Parser):
+...     def dispatch(self, node):
+...         print(node)
+>>> data1 = '<foo>'
+>>> data2 = '<bar/>'
+>>> data3 = '<baz><grault><corge/></grault></baz>'
+>>> data4 = '<quux/>'
+>>> data5 = '</foo>'
+
+>>> p = MyParser(dispatch_depth=1)
+>>> p.feed(data1)
+>>> print(p.root)
+<foo/>
+>>> p.feed(data2)
+<bar/>
+>>> print(p.root)
+<foo/>
+>>> p.feed(data3)
+<baz><grault><corge/></grault></baz>
+>>> print(p.root)
+<foo/>
+>>> p.feed(data4)
+<quux/>
+>>> print(p.root)
+<foo/>
+>>> p.feed(data5)
+>>> print(p.root)
+<foo/>
+
+>>> p = MyParser(dispatch_depth=2)
+>>> p.feed(data1)
+>>> print(p.root)
+<foo/>
+>>> p.feed(data2)
+>>> print(p.root)
+<foo><bar/></foo>
+>>> p.feed(data3)
+<grault><corge/></grault>
+>>> print(p.root)
+<foo><bar/><baz/></foo>
+>>> p.feed(data4)
+>>> print(p.root)
+<foo><bar/><baz/><quux/></foo>
+>>> p.feed(data5)
+>>> print(p.root)
+<foo><bar/><baz/><quux/></foo>
+
+>>> p = MyParser(dispatch_depth=2, delete_node_after_dispatch=False)
+>>> p.feed(data1)
+>>> print(p.root)
+<foo/>
+>>> p.feed(data2)
+>>> print(p.root)
+<foo><bar/></foo>
+>>> p.feed(data3)
+<grault><corge/></grault>
+>>> print(p.root)
+<foo><bar/><baz><grault><corge/></grault></baz></foo>
+>>> p.feed(data4)
+>>> print(p.root)
+<foo><bar/><baz><grault><corge/></grault></baz><quux/></foo>
+>>> p.feed(data5)
+>>> print(p.root)
+<foo><bar/><baz><grault><corge/></grault></baz><quux/></foo>
+
+>>> data = ''.join((data1, data2, data3, data4, data5))
+
+>>> p = Parser()
+>>> p.feed(data)
+>>> print(p.root)
+<foo><bar/><baz><grault><corge/></grault></baz><quux/></foo>
+
+>>> p = Parser(dispatch_depth=0)
+>>> p.feed(data)
+>>> print(p.root)
+None
+

@@ -1,0 +1,84 @@
+>>> from fluentxml import Node, Null
+
+Test addition and removal
+
+>>> n = Node('n')
+>>> n += Node('foo')
+>>> n += Node('bar')
+>>> n += Node('foo')
+>>> n += Node('foo')
+>>> n += Node('baz')
+>>> n += Node('bar')
+>>> n += Node('quux')
+>>> n._del_children('foo')
+>>> n._get_children('foo') is Null()
+True
+>>> for child in n._iter_children():
+...     print(child._name)
+bar
+baz
+bar
+quux
+>>> n._del_child('bar')
+>>> for child in n._get_children():
+...     print(child._name)
+baz
+bar
+quux
+
+Test recursivity
+
+>>> n = Node('foo', children=[Node('bar')])
+>>> n += n
+>>> n
+Node('foo', children=[Node('bar'), Node('foo', children=[Node('bar')])])
+
+Test deletion by attribute
+
+>>> n = Node('n')
+>>> n += Node('foo', {'bar': 42})
+>>> n += Node('foo', {'baz': 12})
+>>> n += Node('foo', {'bar': 21})
+>>> n += Node('foo', {'baz': 24})
+>>> n += Node('foo', {'bar': 21})
+>>> n += Node('foo', {'bar': 12})
+>>> n += Node('foo', {'bar': 42})
+>>> n._del_children(attributes={'bar': 42})
+>>> for child in n._iter_children():
+...     print(child._attributes)
+{'baz': 12}
+{'bar': 21}
+{'baz': 24}
+{'bar': 21}
+{'bar': 12}
+>>> n._del_child(attributes={'bar': 21})
+>>> for child in n._iter_children():
+...     print(child._attributes)
+{'baz': 12}
+{'baz': 24}
+{'bar': 21}
+{'bar': 12}
+>>> n._del_child()
+>>> for child in n._iter_children():
+...     print(child._attributes)
+{'baz': 24}
+{'bar': 21}
+{'bar': 12}
+>>> n._del_children(attributes=('bar',))
+>>> for child in n._iter_children():
+...     print(child._attributes)
+{'baz': 24}
+
+Test advanced retrieval
+
+>>> n1 = Node('bar', attributes={'x': '42'})
+>>> n2 = Node('bar', attributes={'x': '21'})
+>>> n3 = Node('bar', attributes={'y': '24'})
+>>> n4 = Node('baz', attributes={'x': '42'})
+>>> n5 = Node('foo', children=(n1, n2, n3, n4))
+>>> n5._get_children('bar', attributes={'x': '42'})
+[Node('bar', {'x': '42'})]
+>>> n5._get_children(attributes=('x',))
+[Node('bar', {'x': '42'}), Node('bar', {'x': '21'}), Node('baz', {'x': '42'})]
+>>> n5._get_children(attributes={'x': '42'})
+[Node('bar', {'x': '42'}), Node('baz', {'x': '42'})]
