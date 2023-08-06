@@ -1,0 +1,218 @@
+{% extends "projector/project/detail.html" %}
+
+{% load i18n %}
+{% load markup %}
+{% load native %}
+{% load projector_tags %}
+{% load richtemplates_tags %}
+
+{% block col-single-extra %}
+
+<div class="richtemplates-panel">
+    <h5>{% trans "Project's repository browser" %}</h5>
+    <div class="richtemplates-panel-content">
+
+    {% block repository-menu %}
+    <ul class="nav-inline">
+        <li class="richbuttonset">
+            <a href="{{ project.get_browse_repo_url }}">{% trans "Sources" %}</a>
+            <a href="{{ project.get_changesets_url }}">{% trans "Changesets" %}</a>
+        </li>
+    </ul>
+    {% endblock %}
+
+    {% block browse-content %}
+    <div id="repo-browser">
+        {% block browse-content-info %}
+        {% load breadcrumber %}
+        <div class="browser-breadcrumbs">
+            {% path_breadcrumbs request.META.PATH_INFO 3 %}
+        </div>
+
+        {% block changeset-message %}
+        {% if changeset %}
+        <ul class="messages">
+            <li class="message message-info">
+                {% trans "Committed by" %} {{ changeset.author|hide_email }}
+                <span class="show-tipsy" title="{{ changeset.date }}">{{ changeset.date|timesince }}</span>
+                {% trans "ago" %}<br/><br/>
+                {{ changeset.message }}
+            </li>
+        </ul>
+        {% endif %}
+        {% endblock %}
+        <div class="richblock">
+        <table id="node-properties" class="richblock-properties">
+            <tbody>
+                <tr>
+                    <th>{% trans "Path" %}</th>
+                    <td><a class="show-tipsy"
+                           href="{% url projector_project_sources_browse project.author.username project.slug root.changeset.id root.path %}"
+                           title="{% trans "Show node" %} {{ root.path }}">{{ root.path|default:"/"|slice:"20" }}{% if root.path|length > 20 %}...{% endif %}</a>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{% trans "Revision" %}</th>
+                    <td><a class="show-tipsy"
+                           href="{% url projector_project_sources_browse project.author.username project.slug root.changeset.id '' %}"
+                           title="{% trans "Show changeset" %}">{{ root.changeset }}</a></td>
+                </tr>
+                {% if root.is_file %}
+                <tr>
+                    <th>{% trans "Last committer" %}</th>
+                    <td>{{ root.last_changeset.author|hide_email|tooltip:"80" }}</td>
+                </tr>
+                <tr>
+                    <th>{% trans "Last modified" %}</th>
+                    <td><span class="show-tipsy" title="{{ root.last_changeset.date }}">{{ root.last_changeset.date|timesince }}</span></td>
+                </tr>
+                <tr>
+                    <th>{% trans "Size" %}</th>
+                    <td>{% if root.is_file %}{{ root.size|filesizeformat }}{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>{% trans "Mimetype" %}</th>
+                    <td>{{ root.mimetype }}</td>
+                </tr>
+                <tr>
+                    <th>{% trans "Download" %}</th>
+                    <td><a href="{% url projector_project_sources_raw project.author.username project.slug root.changeset.id root.path %}">{% trans "raw file" %}</a></td>
+                </tr>
+                <tr>
+                    <th>{% trans "Annotate" %}</th>
+                    <td><a href="{% url projector_project_sources_annotate project.author.username project.slug root.changeset.id root.path %}">{% trans "annotate" %}</a></td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        {# history #}
+        {% if root.is_file %}
+        <div id="history">
+        <h2>{% trans "History" %}</h2>
+        <ul id="node-history-list" class="nav-vertical">
+            {% for changeset in root.history %}
+            <li>
+                <a href="{% url projector_project_sources_browse project.author.username project.slug changeset.id root.path %}"
+                   class="show-tipsy"
+                   title="{% trans "Show at revision" %}">{{ changeset }}</a>
+            {% if root.changeset.id != changeset.id %}
+            (<a href="{% url projector_project_sources_diff project.author.username project.slug changeset.id root.changeset.id root.path %}"
+               class="show-tipsy"
+               title="{% trans "Show diff" %}">{% trans "diff" %}</a>)
+            {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        </div>
+        <script type="text/javascript">
+            $(document).ready(function(){
+                var history = $('#history');
+                var nodePropertiesTable = $('#node-properties');
+                history.hide();
+                $('tr:last', nodePropertiesTable).after('<tr><th>{% trans "History" %}</th><td>' + 
+                    '<a id="toggle-history" href="#toggle-history">{% trans "Show/hide history" %}</a></td></tr>');
+                $('#toggle-history').toggle(
+                    function(){
+                        history.show();
+                    },
+                    function(){
+                        history.hide();
+                    }
+                );
+            });
+        </script>
+        {% endif %}
+        {# end history #}
+        
+        </div>
+        {% endblock %}
+        
+        {% if root.is_dir %}
+        <table class="code-browser">
+            <thead>
+                <tr>
+                    <th class="width-50 lefted">{% trans "Name" %}</th>
+                    <th class="width-10 righted">{% trans "Size" %}</th>
+                    <th class="width-10 righted">{% trans "Revision" %}</th>
+                    <th class="width-15 righted">{% trans "Last modified" %}</th>
+                    <th class="width-15 righted">{% trans "Last committer" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                {% if root.parent %}
+                <tr class="even hoverable">
+                    <td>
+                        <a class="browser-dir"
+                            href="{% url projector_project_sources_browse project.author.username project.slug changeset.id root.parent.path %}">..</a>
+                    </td>
+                    <td class="righted"></td>
+                    <td class="righted width-10"></td>
+                    <td class="righted width-10">
+                    </td>
+                    <td class="righted width-10"></td>
+                </tr>
+                {% endif %}
+
+                {% for node in root.nodes %}
+                <tr class="{% cycle "odd" "even" %} hoverable">
+                    <td>
+                        <a class="{% if node.is_dir %}browser-dir{% else %}browser-file{% endif %}"
+                           href="{% url projector_project_sources_browse project.author.username project.slug node.changeset.id node.path %}"
+                            >{{ node.name }}</a>
+                    </td>
+                    {% if node.is_dir %}
+                    <td></td><td></td><td></td><td></td>
+                    {% else %}
+                    <td class="righted">{% if node.is_file %}{{ node.size|filesizeformat }}{% endif %}</td>
+                    <td class="righted">
+                        <a class="show-tipsy"
+                           href="{% url projector_project_sources_browse project.author.username project.slug node.last_changeset.id '' %}"
+                           title="{% trans "Browse revision's content" %}"
+                           >{{ node.last_changeset.revision }}</a>
+                    </td>
+                    <td class="righted">
+                        <span class="show-tipsy"
+                            title="{{ node.last_changeset.date|date:"Y-m-d" }} {{ node.last_changeset.date|date:"H:i:s" }}">
+                        {{ node.last_changeset.date|timesince }} {% trans "ago" %}
+                        </span>
+                    </td>
+                    <td class="righted">{{ node.last_changeset.author|hide_email|tooltip:"20" }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% if root.is_file %}
+
+
+            {% if root.is_binary %}
+            <ul class="messages">
+                <li class="message message-warning">{% trans "This is binary file" %}</li>
+            </ul>
+            {% else %}        
+            <div class="codeblock">
+                {% highlight root.content root.lexer_alias linenos=true anchorlinenos=true lineanchors=line cssclass="code-highlight" %}
+            </div>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endblock %}
+
+</div>
+</div>
+
+{% if readme_node and readme_node.content %}
+<div class="richtemplates-panel">
+    <h5>{{ readme_node }}</h5>
+    <div class="richtemplates-panel-content">
+        <div class="codeblock">
+            {% highlight readme_node.content readme_node.lexer_alias linenos=true anchorlinenos=true lineanchors=line cssclass="code-highlight" %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

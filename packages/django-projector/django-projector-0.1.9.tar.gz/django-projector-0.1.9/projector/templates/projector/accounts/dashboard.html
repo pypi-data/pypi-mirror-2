@@ -1,0 +1,181 @@
+{% extends "richtemplates/accounts/profile.html" %}
+
+{% load i18n %}
+
+{% block extra-head %}{{ block.super }}
+<style>
+    table.action-table thead tr th {
+        vertical-align: inherit;
+        text-align: center;
+        width: 150px;
+    }
+    table.action-table tbody tr th {
+        vertical-align: inherit;
+        text-align: center;
+    }
+    table.action-table a.richbutton {
+        width: 180px;
+    }
+</style>
+{% endblock %}
+
+{% block col-left %}
+    
+    <div class="richtemplates-panel">
+        <h5>{% if profile.is_team %}{% trans "Team" %}{% else %}{% trans "User" %}{% endif %}: {{ request.user }}</h5>
+	    <div class="richtemplates-panel-content">
+            {% if request.user == profile.user %}
+			<ul class="nav-vertical">
+                <li><a href="{% url projector_users_profile_detail request.user.username %}"
+                            >{% trans "Show your public profile" %}</a></li>
+                <li><a href="{% url projector_dashboard %}">{% trans "Dashboard" %}</a></li>
+            </ul>
+            {% endif %}
+	    </div>
+	</div>
+
+    {% if profile.is_team %}
+    <div class="richtemplates-panel">
+        <h5>{% trans "Team's members" %} ({{ profile.group.user_set.all|length }})</h5>
+	    <div class="richtemplates-panel-content">
+            {% if request.user == profile.user %}
+            {% endif %}
+            {% if not profile.group.user_set.all|length %}
+                <p>{% trans "No members" %}</p>
+            {% else %}
+                <table class="datatable">
+                    <thead class="datatable-thead">
+                        <tr class="datatable-thead-subheader lefted">
+                            <th class="width-10">{% trans "Member" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="datatable-tbody">
+                        {% for member in profile.group.user_set.all %}
+                        <tr class="{% cycle "odd" "even" %} hoverable">
+                            <td><a href="{% url projector_users_profile_detail member.username %}"
+                                   class="block-link">{{ member }}</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+	    </div>
+	</div>
+    {% endif %}
+
+{% endblock %}
+
+{% block col-main-title %}
+{% if profile.is_team %}
+    {% trans "Team profile" %}
+{% else %}
+    {% trans "User profile" %}
+{% endif %}
+{% endblock %}
+
+{% block col-main-content %}
+    <form action="." method="post">
+        {% csrf_token %}
+        <table class="form-table">
+            {% include "richtemplates/forms/form.html" %}
+        </table>
+        <div>
+            <input id="id_submit" type="submit" name="submit" value="Submit" />
+        </div>
+    </form>
+{% endblock %}
+
+{% block col-main-extra %}
+<div class="richtemplates-panel">
+    <h5>{% trans "Actions" %}</h5>
+    <div class="richtemplates-panel-content">
+
+        <table class="action-table width-90">
+            <thead>
+                <tr>
+                    <th>{% trans "Action" %}</th>
+                    <th>{% trans "Description" %}</th>
+                </tr>
+            <tbody>
+            <tr>
+                <th>
+                    <a href="{% url projector_project_create %}"
+                       class="richbutton">{% trans "Create project" %}</a>
+                </th>
+                <td>
+                    <div class="message message-info">
+                        <p>{% trans "Create new project" %}</p>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <th>
+                    <a href="{% url auth_password_change %}"
+                       class="richbutton">{% trans "Change password" %}</a>
+                </th>
+                <td>
+                    <div class="message message-info">
+                        <p>{% trans "Change your password" %}</p>
+                    </div>
+                </td>
+            </tr>
+            {% if can_fork_external %}
+            <tr>
+                <th>
+                    <a href="{% url projector_dashboard_fork %}"
+                       class="richbutton">{% trans "Fork project" %}</a>
+                </th>
+                <td>
+                    <div class="message message-info">
+                        <p>
+                            {% blocktrans %}
+                            Fork project from external location (i.e. from <a href="http://bitbucket.org">Bitbucket</a>).
+                            This is <strong>not</strong> same as forking project within {{ site }} - to fork project
+                            already present here simply navigate to the project homepage and run fork process from there.
+                            {% endblocktrans %}
+                        </p>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+
+            {% if profile.is_team %}
+            {# Team actions #}
+            <tr>
+                <th>
+                    <a href="{% url projector_dashboard_add_member %}"
+                       class="richbutton">{% trans "Add member" %}</a>
+                </th>
+                <td>
+                    <div class="message message-info">
+                        <p>{% trans "Allow to add new member" %}</p>
+                    </div>
+                </td>
+            </tr>            
+            {% else %}
+            {# Standard (not-team) user actions #}
+            <tr>
+                <th>
+                    <a href="{% url projector_dashboard_convert_to_team %}"
+                       class="richbutton">{% trans "Convert to team" %}</a>
+                </th>
+                <td>
+                    <div class="message message-info">
+                        <p>
+                        {% blocktrans %}
+                    Converts your account into Team. This account would remain untouched - you'd be able to authorize 
+                    with it and manage it as usual. However, new Group with same name as your username would be created and
+                    Team connecting this group would be created for each project you're author of.
+                        {% endblocktrans %}
+                        </p>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+{% endblock %}
+
