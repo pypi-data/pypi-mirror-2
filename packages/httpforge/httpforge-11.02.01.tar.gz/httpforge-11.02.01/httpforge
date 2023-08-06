@@ -1,0 +1,52 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+
+import sys
+
+from httpforgelib import HTTPRequest, get_option_parser
+
+def alter_request(request, options):
+  if options.method is not None:
+    request.method = options.method
+  
+  if options.uri is not None:
+    request.uri = options.uri
+  
+  if options.version is not None:
+    request.version = options.version
+  
+  if options.body is not None:
+    request.body = options.body
+  
+  if options.clength is not None:
+    request.add_content_length_header()
+  
+  for header in options.header:
+    request.set_header_from_string(header)
+
+if __name__ == "__main__":
+  parser = get_option_parser()
+  parser.set_defaults(alter=False, header=[])
+  
+  parser.add_option("-m", "--method", dest="method", help="request method")
+  parser.add_option("-p", "--protocol", dest="version", help="protocol version")
+  parser.add_option("-u", "--uri", dest="uri", help="request URI")
+  parser.add_option("-s", "--set-header", dest="header", action="append",
+                    help="add or change a header")
+  parser.add_option("-a", "--alter", dest="alter", action="store_true",
+                    help="read and alter a request from stdin")
+  parser.add_option("-b", "--body", dest="body", help="request body")
+  parser.add_option("-l", "--content-length",dest="clength",action="store_true",
+                    help="add Content-Length header according to body")
+  
+  options, args = parser.parse_args()
+  
+  if options.alter:
+    request = HTTPRequest.read(sys.stdin)
+  else:
+    request = HTTPRequest()
+  
+  alter_request(request, options)
+  sys.stdout.write(str(request))

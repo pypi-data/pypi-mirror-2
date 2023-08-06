@@ -1,0 +1,67 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+from socket import socket, getaddrinfo, AF_UNSPEC, SOCK_STREAM, SHUT_WR
+from time import time
+
+from httpforgelib import HTTPRequest, UsageError, get_option_parser
+
+def send(request, options):
+  s = None
+  
+  host = options.address or request.headers.get("Host", None)
+  port = options.port
+  
+  if host is None:
+    raise UsageError("There is no Host header. Please give me a destination")
+  
+  for res in getaddrinfo(host, port, AF_UNSPEC, SOCK_STREAM):
+    af, socktype, proto, canonname, sa = res
+    try:
+      s = socket(af, socktype, proto)
+    except:
+      s = None
+      continue
+    
+    try:
+      s.connect(sa)
+    except:
+      s.close()
+      s = None
+      continue
+    
+    break
+  
+  if s is None:
+    print "Could not connect"
+    sys.exit(1)
+  
+  s.sendall(str(request))
+  s.shutdown(SHUT_WR)
+  return s.makefile()
+
+if __name__ == "__main__":
+  parser = get_option_parser()
+  parser.set_defaults(ssl=False, time=False)
+  
+  parser.add_option("-a", "--address", dest="address", default=None,
+                    help="send to ip/logical address")
+  #parser.add_option("-s", "--ssl", action="store_true", dest="ssl",
+  #                  help="Use ssl ?")
+  parser.add_option("-p", "--port", dest="port", help="destination port",
+                    default=80)
+  parser.add_option("-t", "--time", dest="time", action="store_true",
+                    help="display response time only, in seconds")
+  
+  options, args = parser.parse_args()
+  request = HTTPRequest.read(sys.stdin)
+  
+  start = time()
+  
+  data = send(request, options).read()
+  
+  if options.time:
+    print "%f" % time() - start
+  else:
+    sys.stdout.write(data)
