@@ -1,0 +1,237 @@
+
+First, the test setup: we'll set up a repository and local checkout.
+Sven won't do this for you.
+
+Sven uses Bazaar, which doesn't need a central repository. But, it's
+better to set one up and work against a checkout, so we'll do that.
+
+   >>> repo_dir = '/tmp/svenbzr/'
+   >>> checkout_dir = '/tmp/svenbzrco'
+   >>> other_checkoutdir = '/tmp/svenbzrco2'
+   >>> import subprocess
+   >>> subprocess.call(['rm', '-rf', repo_dir, checkout_dir, other_checkoutdir])
+   0
+   >>> subprocess.call(['bzr', 'init', repo_dir])
+   0
+   >>> subprocess.call(['bzr', 'co', 'file://%s'%repo_dir, checkout_dir])
+   0
+
+Instantiate an object that knows about your local checkout directory:
+
+   >>> from sven.bzr import BzrAccess, UpdatingBzrAccess
+   >>> client = BzrAccess(checkout_dir)
+
+Sven throws its own flavors of IOErrors to deal with various edge cases of
+interacting with the repository. For instance, trying to get metadata on
+a resource that doesn't exist:
+
+   >>> client.last_changed_rev('/path/to/file')
+   Traceback (most recent call last):
+   ...
+   NoSuchResource: [Errno 2] No such file or directory: 'path/to/file'
+
+The same error is thrown if you're looking for a particular revision:
+
+   >>> client.last_changed_rev('/path/to/file', rev=0)
+   Traceback (most recent call last):
+   ...
+   NoSuchResource: [Errno 2] No such file or directory: 'path/to/file'
+
+Even if the revision is in the future of the repository:
+
+   >>> client.last_changed_rev('/path/to/file', rev=4)
+   Traceback (most recent call last):
+   ...
+   NoSuchResource: [Errno 2] No such file or directory: 'path/to/file'
+
+If you're trying to get the contents of a resource:
+
+   >>> client.read('/path/to/file')
+   Traceback (most recent call last):
+   ...
+   NoSuchResource: [Errno 2] No such file or directory: 'path/to/file'
+
+A different error will be thrown in the future case:
+
+   >>> client.read('/path/to/file', rev=4)
+   Traceback (most recent call last):
+   ...
+   FutureRevision: No such revision 4 yet in the repository
+
+Now let's actually save a file. Sven's workflow encourages you to think
+of your repository as a filesystem; you write to a file and commit it
+to the repository in a single step:
+   
+   >>> client.write('file', "first version")
+   <Revision kind=number 1>
+
+Sven returns a pysvn.Revision object with information about the changeset
+you just committed.
+
+Sven will create all necessary directories based on the resource path[1]:
+
+   >>> client.write('/path/to/file', "a second versioned content")
+   <Revision kind=number 2>
+
+Speaking of intermediate directories, let's make sure last_changed_rev works
+properly on directories. We want it to give the log of changes including files
+under the directory's path, not just changes on the directory itself. This is
+known to fail on bzr 1.13.1 and succeeds on bzr 2.0;
+https://bugs.edge.launchpad.net/bzr/+bug/97715 is relevant.
+
+   >>> client.last_changed_rev('/path/to/file')
+   2
+   >>> client.last_changed_rev('/path/to/')
+   2
+   >>> client.last_changed_rev('/path/to')
+   2
+   >>> client.last_changed_rev('/path')
+   2
+   >>> client.last_changed_rev('/path', rev=2)
+   2
+   >>> client.last_changed_rev('/path/to', rev=1)
+   Traceback (most recent call last):
+   ...
+   NoSuchResource: [Errno 2] No such file or directory: 'path/to'
+
+You commit changes to an existing file in the same way as saving a new file:
+
+   >>> client.write('/file', "second version")
+   <Revision kind=number 3>
+
+Now that we have some resources, we can finally start reading them too:
+
+   >>> client.read('file')
+   'second version\n'
+
+And we can read previous versions as well, by passing in the desired
+global revision number:
+
+   >>> client.read('file', rev=1)
+   'first version\n'
+
+Sven will throw a different flavor of IOError if you try to read content
+from a path that exists, but is a directory instead of a file:
+
+   >>> client.read('/path')
+   Traceback (most recent call last):
+   ...
+   NotAFile: [Errno 21] Is a directory: 'path'
+
+To read the most recent version of a resource, don't pass in any revision:
+
+   >>> client.read('path/to/file')
+   'a second versioned content\n'
+
+But if you do pass in a revision, sven will tell you if the file was unchanged
+in that revision, with a custom exception:
+
+   >>> client.read('path/to/file', rev=3)
+   Traceback (most recent call last):
+   ...
+   ResourceUnchanged: Resource 'path/to/file' unchanged since 2
+
+This ResourceUnchaged exception contains the revision number of the last
+change made to the file:
+
+   >>> from sven.exc import ResourceUnchanged
+   >>> try:
+   ...     client.read('path/to/file', rev=3)
+   ... except ResourceUnchanged, e:
+   ...     print "last changed at r%d" % e.last_change
+   last changed at r2
+   
+   >>> client.read('path/to/file', rev=2)
+   'a second versioned content\n'
+
+You cannot overwrite directories with files, of course:
+
+   >>> client.write('/path/to', "i'm gonna clobber this directory with a file!")
+   Traceback (most recent call last):
+   ...
+   NotAFile: [Errno 21] Is a directory: 'path/to'
+
+When writing a file, you can pass in a commit message, and you can also
+set any versioned properties on the file:
+
+   >>> client.write('file', "now with metadata",
+   ...              msg="Changed the content",
+   ...              metadata={'mimetype':"text/plain"})
+   <Revision kind=number 4>
+
+   >>> client.read('file')
+   'now with metadata\n'
+
+Great work!
+
+[1] "Sven will create all necessary directories based on the resource path"
+This is actually tricky -- so let's exercise it in a couple of cases:
+
+   >>> client.write('a_file_at_the_root', "foo")
+   <Revision kind=number 5>
+   >>> client.write('one_level/deep', "foo")
+   <Revision kind=number 6>
+   >>> client.write('one_level/again', "foo")
+   <Revision kind=number 7>
+   >>> client.write('totally/nonexistent/path_to/a_file', "foo")
+   <Revision kind=number 8>
+   >>> client.write('totally/partly/extant_path/to_a_file', "foo")
+   <Revision kind=number 9>
+   >>> client.write('totally/partly/extant/path/to_another_file', "foo")
+   <Revision kind=number 10>
+   >>> client.write('a_file_at_the_root', "foobar")
+   <Revision kind=number 11>
+   >>> client.write('one_level/deep', "foobar")
+   <Revision kind=number 12>
+   >>> client.write('one_level/again', "foobar")
+   <Revision kind=number 13>
+   >>> client.write('totally/nonexistent/path_to/a_file', "foobar")
+   <Revision kind=number 14>
+   >>> client.write('totally/partly/extant_path/to_a_file', "foobar")
+   <Revision kind=number 15>
+   >>> client.write('totally/partly/extant/path/to_another_file', "foobar")
+   <Revision kind=number 16>
+
+Sven tries to think of your repository-backed filesystem as basically
+stateless -- a sort of RESTful approach to versioning. Because of this,
+sven tries to make version conflicts just sort of melt away by always
+clobbering the repository's copy with the client's new copy:
+
+   >>> subprocess.call(['bzr', 'co', 'file://%s'%repo_dir, other_checkoutdir])
+   0
+
+   >>> client2 = UpdatingBzrAccess(other_checkoutdir)
+   >>> client = UpdatingBzrAccess(checkout_dir)
+
+   >>> client.write('file', "version 1\n2\n3")
+   <Revision kind=number 17>
+   >>> client2.write('file', 'feeble feeblefeed')
+   <Revision kind=number 18>
+   >>> client.write('file', "version 1\n5\n3")
+   <Revision kind=number 19>
+
+   >>> client.read('file')
+   'version 1\n5\n3\n'
+
+   >>> client2.read('file')
+   'feeble feeblefeed\n'
+
+Synchronization errors can still occur if you tell sven not to
+keep files up-to-date before writing, though:
+
+   >>> from sven.exc import ResourceChanged
+   >>> client2.write('file', 'moobly moo', update_before_write=False)
+   Traceback (most recent call last):
+   ...
+   ResourceChanged: Resource 'file' is out of date
+
+   >>> client.write('file', "version 1\n2\n3", update_before_write=False)
+   <Revision kind=number 20>
+
+So there are a couple of approaches possible here if you prefer to keep
+auto-updates off for performance reasons. One simple approach would be
+to assume that writes will succeed until proven otherwise, while retaining
+sven's natural inclination to clobber conflicting changesets.
+
+>>> [i for i in client.iter_content("file")]
+[(20, 'version 1\n2\n3\n'), (19, 'version 1\n5\n3\n'), (18, 'feeble feeblefeed\n'), (17, 'version 1\n2\n3\n'), (4, 'now with metadata\n'), (3, 'second version\n'), (1, 'first version\n')]
