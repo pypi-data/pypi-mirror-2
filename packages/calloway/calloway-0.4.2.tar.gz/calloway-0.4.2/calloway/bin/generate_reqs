@@ -1,0 +1,138 @@
+#! /usr/bin/env python
+import os
+from optparse import make_option
+
+mapping = {
+    'admin_tools': ('django-admin-tools==0.4.0',),
+    'admin_tools.dashboard': ('django-admin-tools==0.4.0',),
+    'admin_tools.menu': ('django-admin-tools==0.4.0',),
+    'admin_tools.theming': ('django-admin-tools==0.4.0',),
+    'ban': ('django-ban==0.1.2', 'ipcalc>=0.1', ),
+    'categories': ('django-categories==0.6','django-mptt==0.4.2', ),
+    'critic': ('critic==0.1.1',),
+    'debug_toolbar': ('django-debug-toolbar==0.8.5',),
+    'django_extensions': ('django-extensions==0.6',),
+    'django_memcached': ('django-memcached==0.1.2', 'python-memcached==1.47',),
+    'editor': ('django-categories==0.6','django-mptt==0.4.2', ),
+    'frontendadmin': ('django-frontendadmin==0.4', 'django-livevalidation==0.1.1',),
+    'google_analytics': ('google_analytics==0.2',),
+    'haystack': ('django-haystack==1.2.4',),
+    'hiermenu': ('django-hiermenu==0.2.1',),
+    'livevalidation': ('django-livevalidation==0.1.1',),
+    'mailfriend': ('django-mailfriend==0.1.6',),
+    'massmedia': ('django-massmedia==0.8.3', 'django-tagging==0.3.1', 'IPTCInfo', 'hachoir-metadata', 'hachoir-core', 'hachoir-parser',),
+    'memcache_status': ('django-memcache-status==1.0.1',),
+    'mptt': ('django-mptt==0.4.2',),
+    'mptt_comments': ('django-mptt-comments==0.1.4','django-mptt==0.4.2',),
+    'native_tags': ('django-native-tags==0.5.2',),
+    'news_sitemaps': ('django-news-sitemaps==0.1.6',),
+    'offensivecontent': ('offensivecontent==0.2.7',),
+    'pagination': ('django-pagination==1.1.0',),
+    'piston': ('django-piston==0.2.2',),
+    'pollit': ('pollit==0.2.3',),
+    'positions': ('django-kamasutra==0.2.3','simplejson==2.0.9',),
+    'pullquote': ('pullquote==0.1.1',),
+    'registration': ('django-registration==0.8-alpha-1',),
+    'reversion': ('django-reversion==1.3.1',),
+    'robots': ('django-robots==0.8.0',),
+    'staff': ('django-staff==0.5.1',),
+    'staticmediamgr': ('django-staticmediamgr==0.6',),
+    'stories': ('django-stories==0.6.3', 'BeautifulSoup', 'pytidylib'),
+    'synagg': ('django-synagg', 'feedparser==4.1', 'django-picklefield==0.1.6', 'lxml==2.2.6', 'pytidylib'),
+    'tagging': ('django-tagging==0.3.1',),
+    'tinymce': ('django-tinymce==1.5.1beta1',),
+    'uni_form': ('django-uni-form==0.7',),
+    'varnishapp': ('django-varnish==0.1', 'python-varnish==0.1.1',),
+    'versionedcache': ('versionedcache==0.1.0dev',),
+    'viewpoint': ('viewpoint==0.8.5',),
+}
+
+unknown = {
+    'python-dateutil': 'python-dateutil==1.5',
+    'django-logjam': 'django-logjam==0.1.1',
+    'django-profiles': 'django-profiles>=0.2',
+    'simplejson': 'simplejson==2.0.9',
+}
+
+always_required = (
+	'python-memcached==1.45',
+	'PIL',
+)
+
+def parse_req_files(req_files=()):
+    """
+    Parse a requirements file and return a set of apps.
+    
+    Works recursively if a -r is encountered
+    """
+    import os
+    
+    perm_cwd = os.getcwd()
+    items = set()
+    
+    for req_file in req_files:
+        lines = open(req_file).readlines()
+        cwd = os.path.join(perm_cwd, os.path.dirname(req_file))
+        for line in lines:
+            line = line.strip('\n\t\r ')
+            if line.startswith('-r'):
+                filename = line.split(' ')[1]
+                filepath = os.path.join(cwd, filename)
+                items |= parse_req_files((filepath,))
+            if line and line[0] not in ['#', '-']:
+                items.add(line.replace(' ', ''))
+    return items
+
+def generate_requirements(output_path=None, req_files=()):
+    """
+    Loop through the INSTALLED_APPS and create a set of requirements for pip.
+    
+    if output_path is ``None`` then write to standard out, otherwise write
+    to the path.
+    """
+    import settings
+    reqs = set(always_required)
+    
+    excluded = parse_req_files(req_files)
+    
+    for app in settings.INSTALLED_APPS:
+        if app in mapping.keys():
+            reqs |= set(mapping[app])
+    reqs = reqs - excluded
+    if output_path is None:
+        print "--extra-index-url=http://opensource.washingtontimes.com/simple/"
+        for item in reqs:
+            print item
+    else:
+        try:
+            out_file = open(output_path, 'w')
+            out_file.write("--extra-index-url=http://opensource.washingtontimes.com/simple/\n")
+            for item in reqs:
+                out_file.write("%s\n" % item)
+        finally:
+            out_file.close()
+            print "Wrote requirements to %s" % output_path
+
+
+if __name__ == "__main__":
+    from optparse import OptionParser
+    import sys
+    
+    parser = OptionParser()
+    
+    parser.add_option(
+        "-r", 
+        "--requirements", 
+        dest="req_file", 
+        help="Don't duplicate entries in this requirements FILE. You can pass in several files.",
+        metavar="FILE",
+        action="append",
+    )
+    sys.path.insert(0, os.getcwd())
+    (options, args) = parser.parse_args()
+    if len(args) == 1:
+        generate_requirements(args[0], req_files=options.req_file or ())
+    elif len(args) == 0:
+        generate_requirements(req_files=options.req_file)
+    else:
+        raise CommandError("No more than one file path may be specified on the command.")
