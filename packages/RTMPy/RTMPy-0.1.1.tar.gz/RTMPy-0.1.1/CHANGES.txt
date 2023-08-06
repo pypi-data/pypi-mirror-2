@@ -1,0 +1,25 @@
+Changelog
+=========
+
+This file contains information about the changes between the different
+versions of RTMPy.
+
+.. contents::
+
+
+0.1.1 (2010-11-30)
+------------------
+- Allow stream names to be reused if a peer disconnects uncleanly (Ticket:74)
+- Switch to Distribute (Ticket:63)
+- Allow > 4GB streams to be consumed (Ticket:54)
+- Application.onDisconnect implemented (Ticket:66)
+- Ensure that ParamedString will work with Python 2.4 (Ticket:76)
+- Switched license from MIT to LGPLv2.1 (or newer) (Ticket:64)
+
+
+0.1 (2010-10-21)
+----------------
+- Ability to publish and subscribe to live streams. Provide support for AMF0 and
+  AMF3 connections.
+- Encoder and decoder for the RTMP protocol
+- Methods to construct and send RTMP packets
