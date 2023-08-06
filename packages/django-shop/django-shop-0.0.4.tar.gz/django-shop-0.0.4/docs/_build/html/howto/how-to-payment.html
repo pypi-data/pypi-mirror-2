@@ -1,0 +1,186 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>3. How to create a Payment backend &mdash; Django Shop v0.0.0 documentation</title>
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Django Shop v0.0.0 documentation" href="../index.html" />
+    <link rel="next" title="4. How to create a shipping backend" href="how-to-shipping.html" />
+    <link rel="prev" title="2. How to create a Cart modifier" href="how-to-cart-mod.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="how-to-shipping.html" title="4. How to create a shipping backend"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="how-to-cart-mod.html" title="2. How to create a Cart modifier"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../index.html">Django Shop v0.0.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="how-to-create-a-payment-backend">
+<h1>3. How to create a Payment backend<a class="headerlink" href="#how-to-create-a-payment-backend" title="Permalink to this headline">¶</a></h1>
+<p>Payment backends must be listed in settings.SHOP_PAYMENT_BACKENDS</p>
+<div class="section" id="shop-interface">
+<h2>3.1. Shop interface<a class="headerlink" href="#shop-interface" title="Permalink to this headline">¶</a></h2>
+<p>While we could solve this with defining a superclass for all payment backends,
+the better approach to plugins is to implement inversion-of-control, and let
+the backends hold a reference to the shop instead.</p>
+<p>The reference interface for payment backends is located at
+shop.payment.api.ShopPaymentAPI</p>
+<p>Currently, the shop interface defines the following methods:</p>
+<div class="section" id="common-with-shipping">
+<h3>3.1.1. Common with shipping<a class="headerlink" href="#common-with-shipping" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>get_order(request): Returns the currently being processed order.</li>
+<li>add_extra_info(order, text): Adds an extra info filed to the order (whatever)</li>
+<li>is_order_payed(order): Whether the passed order is fully payed or not</li>
+<li>is_order_complete(order): Whether the passed order is in a &#8220;finished&#8221; state</li>
+<li>get_order_total(order): Returns the order&#8217;s grand total.</li>
+<li>get_order_subtotal(order): Returns the order&#8217;s sum of item prices (without
+taxes or S&amp;H)</li>
+<li>get_order_short_name(order): A short human-readable description of the order</li>
+<li>get_order_unique_id(order): The order&#8217;s unique identifier for this shop system</li>
+<li>get_order_for_id(id): Returns an Order object given a unique identifier (this
+is the reverse of get_order_unique_id())</li>
+</ul>
+</div>
+<div class="section" id="specific-to-payment">
+<h3>3.1.2. Specific to payment<a class="headerlink" href="#specific-to-payment" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>confirm_payment(order, amount, transaction_id, save=True): This should be
+called when the confirmation from the payment processor was called and that the
+payment was confirmed for a given amount. The processor&#8217;s transaction
+identifier should be passed too, along with an instruction to save the object
+or not. For instance, if you expect many small confirmations you might want to
+save all of them at the end in one go (?). Finally the payment method keeps track
+of what backend was used for this specific payment.</li>
+</ul>
+</div>
+</div>
+<div class="section" id="backend-interface">
+<span id="payment-backend-interface"></span><h2>3.2. Backend interface<a class="headerlink" href="#backend-interface" title="Permalink to this headline">¶</a></h2>
+<p>The payment backend should define the following interface for the shop to be able
+do to anything sensible with it:</p>
+<div class="section" id="attributes">
+<h3>3.2.1. Attributes<a class="headerlink" href="#attributes" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>backend_name : The name of the backend (to be displayed to users)</li>
+<li>url_namespace : &#8220;slug&#8221; to prepend to this backend&#8217;s URLs (acting as a namespace)</li>
+</ul>
+</div>
+<div class="section" id="methods">
+<h3>3.2.2. Methods<a class="headerlink" href="#methods" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>__init__(): must accept a &#8220;shop&#8221; argument (to let the shop system inject a
+reference to it)</li>
+<li>get_urls(): should return a list of URLs (similar to urlpatterns), to be added
+to the URL resolver when urls are loaded. Theses will be namespaced with the
+url_namespace attribute by the shop system, so it shouldn&#8217;t be done manually.</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3. How to create a Payment backend</a><ul>
+<li><a class="reference internal" href="#shop-interface">3.1. Shop interface</a><ul>
+<li><a class="reference internal" href="#common-with-shipping">3.1.1. Common with shipping</a></li>
+<li><a class="reference internal" href="#specific-to-payment">3.1.2. Specific to payment</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#backend-interface">3.2. Backend interface</a><ul>
+<li><a class="reference internal" href="#attributes">3.2.1. Attributes</a></li>
+<li><a class="reference internal" href="#methods">3.2.2. Methods</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="how-to-cart-mod.html"
+                        title="previous chapter">2. How to create a Cart modifier</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="how-to-shipping.html"
+                        title="next chapter">4. How to create a shipping backend</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/howto/how-to-payment.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="how-to-shipping.html" title="4. How to create a shipping backend"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="how-to-cart-mod.html" title="2. How to create a Cart modifier"
+             >previous</a> |</li>
+        <li><a href="../index.html">Django Shop v0.0.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Chris Glass.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
