@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+
+"""
+csvcut is originally the work of eminent hackers Joe Germuska and Aaron Bycoffe.
+
+This code is forked from:
+https://gist.github.com/561347/9846ebf8d0a69b06681da9255ffe3d3f59ec2c97
+
+Used and modified with permission.
+"""
+
+import sys
+
+from csvkit import CSVKitReader, CSVKitWriter
+from csvkit.cli import extract_csv_reader_kwargs, extract_csv_writer_kwargs, init_common_parser, parse_column_identifiers
+
+def main(args):
+    """
+    Command line-utility that filters and truncates CSV files. Like unix "cut" command, but for tabular data.
+    """
+    rows = CSVKitReader(args.file, **extract_csv_reader_kwargs(args))
+    column_names = rows.next()
+
+    if args.names_only:
+        for i, c in enumerate(column_names):
+            sys.stdout.write('%3i: %s\n' % (i + 1, c))
+
+        sys.exit()
+
+    column_ids = parse_column_identifiers(args.columns, column_names)
+    output = CSVKitWriter(sys.stdout, **extract_csv_writer_kwargs(args))
+
+    output.writerow([column_names[c] for c in column_ids])
+
+    for i, row in enumerate(rows):
+        out_row = [row[c] if c < len(row) else None for c in column_ids] 
+        
+        output.writerow(out_row)
+                
+if __name__ == "__main__":
+    """
+    Process command line arguments.
+    """
+    parser = init_common_parser(description='Filter and truncate CSV files. Like unix "cut" command, but for tabular data.')
+    parser.add_argument('-n', '--names', dest='names_only', action='store_true',
+                        help='Display column names and indices from the input CSV and exit.')
+    parser.add_argument('-c', '--columns', dest='columns',
+                        help='A comma separated list of column indices or names to be extracted. Defaults to all columns.')
+
+    main(parser.parse_args())
