@@ -1,0 +1,60 @@
+Introduction
+============
+Dont upgrade a working site to version 4.1.
+I have not had the time to make an upgrade profile yet.
+
+
+Changelog
+=========
+
+
+4.1
+----------
+Added brosho plugin - http://demos.usejquery.com/brosho-plugin/
+
+4.0b7
+- Changes in #content (#content li > #content-core li etc.)
+
+4.0b6
+- Changed viewlet definitions etc. due to change in Plone Classic theme
+
+4.0b5
+- changed all "content classes" " to #content ( https://dev.plone.org/plone/ticket/10231 )
+- small fixes on round corners portlets
+
+4.0b4
+- added two round corners portlets
+- added a lot of extras
+  grad on columns
+  navbackground
+  portletsbackground
+- fixed nameing
+- added images 
+  round corners and page curl
+
+4.0b3
+- checked and validated all css files 
+- added a lot of "extra selections" to tweak site
+- added a few more images
+- added extra file "members.css" to overrule members.css while developing
+- Changes in control panel (Product.PloneSubSkins). 
+  It now includes "next" buttons to "walk through the options"
+
+4.0b2
+- added support for colorized images,
+- added another multiselct option for small tweaks
+- Added a lot of new layout options
+- Removed a lot of images that are not longer needed.
+- Most of selections now uses the new "colorize" option instead of images
+
+4.0
+medialog.subskins for plone 4
+
+
+Things I want to include / Links worth checking out:
+============
+
+http://snipt.net/public/tag/css
+http://devsnippets.com/article/40-new-high-quality-icon-set-for-elegant-designs.html
+http://demos.usejquery.com/brosho-plugin/
+
