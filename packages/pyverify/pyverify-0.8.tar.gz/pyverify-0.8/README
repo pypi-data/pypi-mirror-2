@@ -1,0 +1,170 @@
+========
+Pyverify
+========
+
+Welcome to Pyverify!
+
+Pyverify leverages Distutils2 and PEP 376 - Database of Installed Python Distributions
+
+
+Pyverify can only verify installed distributions with a vaid RECORD metadata file.
+
+The RECORD file holds the list of installed files.
+
+
+**Beware that Pyverify is in its early stage and should not be used in
+production. Its API is subject to changes**
+
+
+Introduction
+------------
+pyverify verifies Python packages with a vaid RECORD metadata file; see PEP 376.
+- API Usage at the bottom!
+
+How to install pyverify
+-----------------------
+Download and install distutils2.
+Download and install pyverify using distutils2::
+
+    $ wget http://pypi.python.org/packages/source/p/pyverify/pyverify-0.8.tar.gz
+    $ tar -xvf pyverify-0.8.tar.gz
+    $ cd pyverify-0.8
+    $ python -m 'distutils2.run' install_dist
+
+
+Verify a package
+----------------
+Once you have pyverify installed, you can use it like this::
+
+    $ pyverify SomePackage
+    $ pyverify pyverify
+    pyverify: dist ok
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/__init__.py
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/verify.py
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/__init__.pyc
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/verify.pyc
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/METADATA
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/INSTALLER
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/REQUESTED
+    ok  /opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/RECORD
+
+You can provide an optional path to look for installed distributions::
+
+    $ pyverify --paths '../site-packages/' dummy
+    dummy: installed file(s) md5 mismatch
+    ?   dummy.py
+    ok  dummy.pyc
+    ?   METADATA
+    ?   INSTALLER
+    ?   REQUESTED
+    ok  RECORD
+
+
+Status Codes
+------------
+- "?"   file is missing
+- "ok"  md5sum matches
+- "md5" md5sum mismatch
+
+Usage
+-----
+
+Usage::
+
+    $ pyverify -h
+    usage: pyverify [-h] [--paths PATHS] PACKAGE [PACKAGE ...]
+
+    Verify installed packages
+
+    positional arguments:
+      PACKAGE        Package to verify
+
+    optional arguments:
+        -h, --help     show this help message and exit
+        --paths PATHS  Scan all in paths directories ending with ``.dist-info``
+
+API Usage
+---------
+
+Pyverify provides an API (alpha), you can use it like this::
+
+    from __future__ import print_function
+    from pyverify.verify import verify_dists
+    from pyverify.verify import STATUS_CODES
+    import pprint
+
+    pp = pprint.PrettyPrinter(depth=2)
+
+    dists = ['pyverify']
+
+    # verify_dists returns a generator
+    verified = verify_dists(dists)
+
+    for v in verified:
+        print("RETURNED FROM verify_dists()")
+        pp.pprint(v)
+
+        name = v[0]
+        details = v[1]
+        pkg_status_code = details['status']
+        pkg_status_desc = STATUS_CODES[pkg_status_code]['description']
+
+        print()
+        print("PACKAGE STATUS")
+        print("Pkg Name: {}".format(name))
+        print("Pkg Status: {}".format(pkg_status_desc))
+
+        print()
+        print("FILE(s) STATUS")
+        print("(file, md5sum, filesize, status(added by pyverify. See PEP 376))")
+        for f in details['verified_files']:
+            print(f)
+
+    print()
+    print("STATUS CODES")
+    pp.pprint(STATUS_CODES)
+
+
+Output::
+
+    $ pyverify_demo.py
+    RETURNED FROM verify_dists()
+    ('pyverify', {'status': 3, 'verified_files': [...]})
+
+    PACKAGE STATUS
+    Pkg Name: pyverify
+    Pkg Status: dist ok
+
+    FILE(s) STATUS
+    (file, md5sum, filesize, status(added by pyverify. See PEP 376))
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/__init__.py', 'd41d8cd98f00b204e9800998ecf8427e', 0, 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/verify.py', '9e835bf812562084c7f490926332fa8e', 3906, 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/__init__.pyc', '', '', 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify/verify.pyc', '', '', 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/METADATA', 'b43498883bf1adddab1d0bab03f9bf10', 2842, 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/INSTALLER', '44e3fde05f3f537ed85831969acf396d', 9, 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/REQUESTED', 'd41d8cd98f00b204e9800998ecf8427e', 0, 0)
+    ('/opt/OpenPython-2.7.1/lib/python2.7/site-packages/pyverify-0.8.dist-info/RECORD', '', '', 0)
+
+    STATUS CODES
+    {0: {'description': 'file ok', 'display': 'ok'},
+     1: {'description': 'md5 mismatch', 'display': 'md5'},
+     2: {'description': 'missing', 'display': '?'},
+     3: {'description': 'dist ok', 'display': 'ok'},
+     4: {'description': 'installed file(s) md5 mismatch', 'display': 'md5'},
+     5: {'description': 'distribution not installed', 'display': '!'},
+     6: {'description': 'cannot read dist-info', 'display': '?'}}
+
+
+Running Unittests
+-----------------
+Test can be run using nose like this::
+
+    $ nosetests -v tests/
+
+Useful links
+------------
+- Repository: https://bitbucket.org/khightower/pyverify
+- Bug tracker: https://bitbucket.org/khightower/pyverify/issues
+- Distutils2: http://distutils2.notmyidea.org/index.html
+- PEP 376: http://www.python.org/dev/peps/pep-0376
