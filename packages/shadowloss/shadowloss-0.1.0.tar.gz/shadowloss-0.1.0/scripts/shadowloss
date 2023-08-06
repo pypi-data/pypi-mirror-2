@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# shadowloss: a stickman-oriented game against time
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of shadowloss.
+#
+# shadowloss is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# shadowloss is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with shadowloss.  If not, see <http://www.gnu.org/licenses/>.
+
+##[ Name        ]## scripts.shadowloss
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Starts the shadowloss world
+##[ Start date  ]## 2010 September 13
+
+import sys
+import os.path
+from optparse import OptionParser
+
+try:
+    import shadowloss.various
+    # If this script has been called by shadowloss-local, it is
+    # already set. Only set it if it is not set.
+    if 'INSTALLED' not in dir():
+        INSTALLED = True
+except ImportError:
+    # shadowloss is not installed, trying an ugly fix. Considering that
+    # this executable is in the scripts/ directory, appending the
+    # directory one level up to sys.path should make importing possible.
+    basedir = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
+    sys.path.insert(0, basedir)
+    INSTALLED = False
+
+import shadowloss.various as various
+from shadowloss.world import World
+import shadowloss.generalinformation as ginfo
+
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = various.nothing
+
+class NewOptionParser(OptionParser):
+    def format_description(self, formatter):
+        return self.description
+
+    def format_epilog(self, formatter):
+        return self.epilog
+    
+    def error(self, msg, done=False, **kwds):
+        various.error(msg, done, self.prog + ': error', **kwds)
+
+parser = NewOptionParser(
+    prog=ginfo.program_name,
+    usage='Usage: %prog [OPTION]... [LEVEL]...',
+    description=ginfo.program_description,
+    version=ginfo.version_info,
+    epilog='''
+Being a stickman with no shadow, life can be tough. But don\'t run too
+fast!
+
+Objective: Win by pressing on your keyboard the letters appearing on
+your screen when your stickfigure passes them, so that your
+stickfigure can come to a halt. Avoid the numbers by shooting them
+with your eye laser.
+
+Controls:
+<letter>: letter
+<SPACE>:  when playing:           laser beam
+<SPACE>:  when level is finished: next level
+<RIGHT>:  when level is finished: next level
+<LEFT>:   when level is finished: previous level
+r:        when level is finished: restart level
+ESCAPE:   quit program
+''')
+parser.add_option('-c', '--config-file', dest='config_file_path', metavar='PATH',
+                  help='set the path to your config file (defaults to "$HOME/.shadowloss.config")',
+                  default=os.path.expanduser('~/.shadowloss.config'))
+parser.add_option('-f', '--fullscreen', dest='use_fullscreen',
+                  action='store_true',
+                  help='play in fullscreen mode instead of windowed mode (may not always work, "fullscreen" in config file)')
+parser.add_option('-z', '--zoom', dest='disp_zoom', type='float',
+                  help='scale game window (not applicable in fullscreen mode) ("zoom" in config file)',
+                  metavar='NUMBER')
+parser.add_option('-F', '--fakefullscreen', dest='use_fakefullscreen',
+                  action='store_true',
+                  help='play in a "fake" fullscreen mode using the zooming feature \
+(somewhat slower than "true" fullscreen mode but may look and work better) ("fakefullscreen" in config file)')
+parser.add_option('-s', '--size', dest='disp_size', metavar='[WIDTH]x[HEIGHT]',
+                  help='scale the game window using the zooming feature, \
+and change the canvas size if needed (a manual version of fakefullscreen, "size" in config file)')
+parser.add_option('-b', '--noborder', dest='use_border',
+                  action='store_false',
+                  help='do not show a border on the game window ("border" in config file)')
+parser.add_option('-H', '--nohwaccel', dest='use_hwaccel',
+                  action='store_false',
+                  help='do not attempt to use hardware acceleration \
+(hardware acceleration is only attempted in fullscreen mode, "hwaccel" in config file)')
+parser.add_option('-B', '--nodoublebuf', dest='use_doublebuf',
+                  action='store_false',
+                  help='do not attempt to use double buffering \
+(faster but perhaps uglier) ("doublebuf" in config file)')
+parser.add_option('-p', '--max-fps', dest='max_fps', type='float',
+                  help='limit the frames per second ("max fps" in config file)',
+                  metavar='NUMBER')
+parser.add_option('-m', '--mute', dest='mute',
+                  action='store_true',
+                  help='do not play sound and music (not recommended)')
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false',
+                  help='don\'t print error messages (named "verbose" in \
+your config file)')
+parser.add_option('-g', '--show-debug', dest='show_debug',
+                  action='store_true',
+                  help='show debugging information while playing \
+("show debug" in config file)')
+parser.add_option('-C', '--no-color-errors', dest='term_color_errors',
+                  action='store_false',
+                  help='do not attempt to print error messages in the \
+terminal in a red color (named "color errors" in your config file)')
+
+options, args = parser.parse_args()
+options = eval(str(options))
+options['levels'] = args or None
+options['error_function'] = parser.error
+if not INSTALLED:
+    options['data_dir'] = os.path.join(basedir, 'data')
+
+setproctitle(parser.prog)
+
+# Create and run
+w = World(**options)
+try:
+    w.start()
+except (EOFError, KeyboardInterrupt):
+    pass
+except Exception:
+    import traceback
+    traceback.print_exc()
+finally:
+    w.end()
