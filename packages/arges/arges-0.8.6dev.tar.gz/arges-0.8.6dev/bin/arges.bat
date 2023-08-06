@@ -1,0 +1,1 @@
+python c:\arges\src\argestools\runner\arges.py %*%
