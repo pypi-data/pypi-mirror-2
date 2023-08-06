@@ -1,0 +1,216 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="Products.CMFPublicator">
+
+<metal:block fill-slot="top_slot"
+             tal:define="dummy python:request.set('disable_border',1)" />
+
+<body>
+
+<div metal:fill-slot="body"
+     tal:define="parentNode here/getParentNode;
+                 search_path python:'/'.join(parentNode.getPhysicalPath());
+                 portal_url context/@@plone_portal_state/portal_url;
+                 portal_publicator nocall:here/portal_publicator;
+                 portal_catalog nocall:here/portal_catalog;
+                 box_id request/box_id;
+                 publicationBox python:portal_publicator.getPublicationBoxesInfo(box_id);"
+     class="configlet">
+
+    <div class="documentEditable">
+
+    <tal:header define="dummy python:request.response.setHeader('pragma','no-cache')" />
+
+    <div id="edit-bar">
+      <ul id="content-views" class="contentViews">
+        <li class="plain">
+          <a href="publicator_select_form"
+             i18n:translate="">Select</a>
+        </li>
+        <li class="plain">
+          <a href="publicator_edit_all_form"
+             i18n:translate="">Edit All</a>
+        </li>
+        <li class="plain">
+          <a href="publicator_setup_all_form"
+             i18n:translate="">Setup All</a>
+        </li>
+        <li class="selected">
+          <a href="publicator_edit_form"
+             tal:attributes="href string:publicator_edit_form?box_id=${box_id}"
+             i18n:translate="">Edit</a>
+        </li>
+        <li class="plain">
+          <a href="publicator_setup_form"
+             tal:attributes="href string:publicator_setup_form?box_id=${box_id}"
+             i18n:translate="">Setup</a>
+        </li>
+      </ul>
+    </div>
+    <div class="contentActions">&nbsp;</div>
+
+    <div id="content">
+
+        <h1 i18n:translate="edit_publication">Content Publication</h1>
+
+        <p i18n:translate="edit_content_boxes">
+          Select the content that you want show in each site box.
+        </p>
+
+        <form action="portal_publicator"
+              method="post"
+              tal:attributes="action portal_publicator/absolute_url">
+
+            <fieldset metal:define-macro="edit_box"
+                      tal:define="name publicationBox/name;
+                                  n_items publicationBox/n_items;
+                                  content_type publicationBox/content_type;
+                                  n_searched_items publicationBox/n_searched_items;
+                                  search_states publicationBox/search_states;
+                                  icon_url publicationBox/icon_url;
+                                  w_image publicationBox/with_image;
+                                  with_image python:w_image==1 and 1 or None;
+                                  images_folder publicationBox/images_folder;
+                                  image_states publicationBox/image_states;
+                                  items python:publicationBox['items'];
+                                  ellipsis portal_publicator/getEllipsis;
+                                  results python:portal_catalog.searchResults(
+                                      path=search_path,
+                                      portal_type=content_type,
+                                      sort_on='Date',
+                                      sort_order='reverse',
+                                      review_state=search_states,
+                                      sort_limit=n_searched_items);
+                                  images_result python:portal_publicator.getImagesSearched(
+                                      need_image=with_image,
+                                      relative_portal_path=images_folder,
+                                      content_type=['File','Image'],
+                                      content_state=image_states);">
+
+                <legend tal:content="name"
+                        i18n:translate="">Box name</legend>
+
+                <input type="hidden"
+                       name="box_id"
+                       value="box_id"
+                       tal:attributes="value box_id" />
+
+                <tal:loop2 repeat="index python:range(n_items)">
+
+                    <tal:block define="the_item python:portal_publicator.getItemsContent(items, index)">
+
+                        <div class="field">
+
+                            <label i18n:translate="Item ${item_x}">Item
+                                <tal:title
+                                    i18n:name="item_x"
+                                    tal:content="python:index+1">x</tal:title>
+                            </label>
+
+                            <br />
+
+                            <select name="item_url_box"
+                                    tal:attributes="name python:'item_%s_%s' % (box_id, str(index))">
+
+                                <option value="" i18n:translate="none">None</option>
+                                <tal:loop3 repeat="obj results">
+                                    <option value="path"
+                                            tal:define="itemRelative_url the_item/RelativeURL;
+                                                        objPath obj/getPath;
+                                                        title python:obj.Title and obj.Title or obj.getId;
+                                                        title_size python:len(title);"
+                                            tal:attributes="value objPath;
+                                                            selected python:objPath==itemRelative_url and 'selected' or None;">
+                                        <span tal:replace="repeat/obj/number" /> -
+                                        <tal:test condition="python: not ellipsis or title_size <= ellipsis">
+                                            <span tal:replace="title" />
+                                        </tal:test>
+                                        <tal:test condition="python: ellipsis and title_size > ellipsis">
+                                            <span tal:replace="python:title[0:ellipsis]" />...
+                                        </tal:test>
+                                    </option>
+                                </tal:loop3>
+
+                            </select>
+
+                        </div>
+
+                        <div class="field"
+                             tal:define="new_window the_item/NewWindow;">
+
+                            <input type="checkbox"
+                                   class="noborder"
+                                   name="new_window"
+                                   id="cb_new_window"
+                                   tal:attributes="id python:'cb_new_window_%s_%s' % (box_id, str(index));
+                                                   name python:'new_window_%s_%s' % (box_id, str(index));
+                                                   checked python:new_window and 'checked' or None;" />
+
+                            <label for="cb_new_window"
+                                   i18n:translate="new_window"
+                                   tal:attributes="for python:'cb_new_window_%s_%s' % (box_id, str(index))">
+                                Open in new window
+                            </label>
+
+                        </div>
+
+                        <div class="field"
+                             tal:condition="with_image">
+
+                            <label i18n:translate="image_url">Image URL</label>
+
+                            <select name="image_url_box"
+                                    tal:attributes="name python:'image_url_%s_%s' % (box_id, str(index))">
+
+                                <option value="" i18n:translate="none">None</option>
+                                <tal:loop4 repeat="obj images_result">
+                                    <option value="path"
+                                            tal:define="imageURL the_item/ImageURL;
+                                                        itemURL python:obj.getURL().replace(portal_url+'/', '');
+                                                        Title obj/Title;"
+                                            tal:attributes="value itemURL;
+                                                            selected python:itemURL==imageURL and 'selected' or None;"
+                                            tal:content="python:Title and Title or obj.getId">
+                                    </option>
+                                </tal:loop4>
+
+                            </select>
+
+                        </div>
+
+                    </tal:block>
+
+                    <hr tal:condition="python:n_items!=index+1 and 1 or 0" />
+
+                </tal:loop2>
+
+            </fieldset>
+
+            <div class="formControls">
+
+                <input class="context"
+                       type="submit"
+                       value="Save"
+                       name="changePBItems:method"
+                       i18n:attributes="value" />
+
+                <input class="standalone"
+                       type="submit"
+                       value="Cancel"
+                       name="form.button.Cancel"
+                       i18n:attributes="value" />
+
+            </div>
+
+        </form>
+
+    </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
+
