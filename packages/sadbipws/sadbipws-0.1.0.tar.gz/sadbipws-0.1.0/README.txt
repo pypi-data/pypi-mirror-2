@@ -1,0 +1,69 @@
+
+========
+sadbipws
+========
+
+sadbipws (Serializing And Deserializing Binarily Is Possible With
+Sadbipws) is a binary data serializer, a bit like BSON (binary JSON),
+except that it has more features. The current format definition is
+defined in the Python code. The SADBIPWS format is not standardized.
+
+sadbipws is a Python 3.1+ module.
+
+
+License
+=======
+
+sadbipws is free software under the terms of the GNU General Public
+License version 3 (or any later version). The author of sadbipws is
+Niels Serup, contactable at ns@metanohi.org. This is version 0.1.0 of
+the module.
+
+
+Installation
+============
+
+To install sadbipws, run::
+
+  python3 setup.py install
+
+You must be a superuser to do this.
+
+
+Use
+===
+
+When sadbipws has been installed, it can be used just like any other
+Python module. To see which parts of the module are useful, and to see
+how those parts function, run::
+
+  pydoc3 sadbipws
+
+``sadbipws`` can be imported with a simple ``import`` statement.
+
+
+Development
+===========
+
+sadbipws uses Git for branches. To get the latest branch, download it
+from gitorious.org like this::
+
+  $ git clone git://gitorious.org/sadbipws/sadbipws.git
+
+
+Logo
+====
+
+The sadbipws logo (located in the ``logo`` directory) has been put
+into the public domain (or, if that is not possible, made available
+under the Creative Commons Zero 1.0 license).
+
+
+This document
+=============
+Copyright (C) 2011  Niels Serup
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.  This file is offered as-is,
+without any warranty.
