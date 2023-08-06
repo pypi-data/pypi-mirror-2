@@ -1,0 +1,477 @@
+Metadata-Version: 1.0
+Name: vimpdb
+Version: 0.4.5
+Summary: Vim and Pdb integration
+Home-page: http://github.com/gotcha/vimpdb
+Author: Godefroid Chapelle
+Author-email: gotcha@bubblenet.be
+License: MIT
+Description: ===================
+        VIM Pdb integration
+        ===================
+        
+        .. contents::
+        
+        Abstract
+        ========
+        
+        This package provides an integration of the Python debugger ``pdb`` into the
+        VIM editor.
+        
+        Usage
+        =====
+        
+        Python code
+        -----------
+        
+        Using **vimpdb** is easy -- just insert a call to ``set_trace`` in your code
+        almost as usual::
+        
+            import vimpdb; vimpdb.set_trace() 
+        
+        Then start your python application/script.
+        
+        When the python interpreter hits that line, **vimpdb** will launch a VIM 
+        instance. VIM should get the focus; it loads the source file at the right line.
+        
+        VIM commands
+        ------------
+        
+        In VIM, you may now use the following commands:
+        
+        .. csv-table:: **vimpdb** commands
+            :header-rows: 1
+        
+            Ex Command, Key binding, Details
+            ``:PDBNext``, ``n`` , ``pdb`` (n)ext
+            ``:PDBStep``, ``s`` , ``pdb`` (s)tep 
+            ``:PDBArgs``, ``a`` , ``pdb`` (a)rgs
+            ``:PDBUp``, ``u`` , ``pdb`` (u)p
+            ``:PDBDown``, ``d`` , ``pdb`` (d)own
+            ``:PDBReturn``, ``r`` , ``pdb`` (r)eturn
+            ``:PDBContinue``, ``c`` , ``pdb`` (c)ontinue
+            ``:PDBBreak``, ``b`` , Sets a breakpoint at the line on which the cursor is sitting; similar to ``pdb`` b(reak)
+            ``:PDBClear``, ``B`` , Clears a breakpoint at the line on which the cursor is sitting; similar to ``pdb`` cl(ear)
+            ``:PDBWord``, ``w`` , Evaluates the value of the identifier on which the cursor is sitting.
+            ``:PDBEval``, ``?`` , Evaluates a Python expression after having asked for it.
+            ``:PDBReset``, ``x`` , Switch back to normal debugging in shell with standard ``pdb``.
+            N/A, ``v(im)`` , Switch back to **vimpdb**; only in plain ``pdb``.
+        
+        Standard ``pdb`` hook
+        ---------------------
+        
+        If you find it hard to change habits and keep on typing 
+        
+        ::
+        
+            import pdb; pdb.set_trace()
+        
+        you can add the following line to the  ``.pdbrc`` file sitting in your home
+        folder::
+        
+            import vimpdb; vimpdb.hookPdb()
+        
+        This way, the command ``v(im)`` mentioned above is added to your standard 
+        ``pdb`` and you can switch to **vimpdb** at any time.
+        
+        Requirements
+        ============
+        
+        **vimpdb** has been used successfully under Linux, Mac OSX and Windows.
+        
+        It **is compatible** with Python 2.7, 2.6, 2.5 and 2.4. 
+        It **is not compatible** with Python 3.1 (it should be the same for 3.0).
+        
+        **vimpdb** requires an installation of VIM that supports both ``python`` and
+        ``clientserver`` options.
+        
+        Find out if it is the case by issuing the following command at the VIM prompt::
+        
+            :version
+        
+        If the options are supported, you will see ``+clientserver`` and ``+python`` in the
+        output. In the opposite case, you will see ``-clientserver`` or ``-python``.
+        
+        On Linux and Windows, the default VIM build should already be server-enabled.
+        
+        On Windows, the ``python`` option compiled in VIM depends on a specific Python
+        version. Find out if that specific version is installed and works in VIM by
+        issuing the following command at the VIM prompt::
+        
+            :python import sys; print sys.version
+        
+        On Mac OSX, you'll want to use MacVIM_. MacVIM also has the ``python`` option 
+        compiled in by default.
+        
+        .. _MacVIM: http://code.google.com/p/macvim/
+        
+        Installation
+        ============
+        
+        Standard installation with ``easy_install`` ::
+        
+            $ easy_install vimpdb
+        
+        You can obviously also use ``pip``.
+        
+            If you look inside the package, you will see a VIM script file: ``vimpdb.vim``.
+            Do **not** move it to VIM configuration directory (like ``~/.vim/plugin``).
+            **vimpdb** knows how to make the script available to VIM.
+        
+        Configuration
+        =============
+        
+        Short story
+        -----------
+        
+        **vimpdb** tries to avoid depending on any user configuration.
+        If it cannot detect the right configuration by itself, 
+        it will ask a few questions which you should be able to answer easily.
+        
+        Long story
+        ----------
+        
+        When launched, **vimpdb** looks for its RC file : ``~/.vimpdbrc``. If it does
+        not find it, **vimpdb** creates that file for you from default values.
+        
+        **vimpdb** tries a set of default values that should work.
+        It checks if those default values are appropriate.
+        If the default values do not work, **vimpdb** asks for other values 
+        interactively until it has checked that the values provided actually work.
+        
+        The default values per OS are listed hereunder.
+        
+        For Linux::
+        
+            vim_client_script = vim
+            vim_server_script = gvim
+            server_name = GVIM
+            port = 6666
+        
+        For MacOSX::
+        
+            vim_client_script = mvim
+            vim_server_script = mvim
+            server_name = VIM
+            port = 6666
+        
+        For Windows::
+        
+            vim_client_script = vim.exe
+            vim_server_script = gvim.exe
+            server_name = VIM
+            port = 6666
+        
+        See below for details about each option.
+        
+        You are obviously allowed to create and tune that RC file.
+        Nevertheless, the RC file should hold values for all 4 options.
+        If one of them is missing, **vimpdb** breaks and complains accordingly.
+        
+        
+        VIM client script - ``vim_client_script``
+        -----------------------------------------
+        
+        To communicate with the VIM instance where debugging happens,
+        **vimpdb** needs to launch another VIM instance in client mode. 
+        
+        ``vim_client_script`` option holds the script used to launch that VIM instance 
+        with ``clientserver`` support.
+        
+        On Windows, it should hold ``vim.exe``, **not** ``gvim.exe``.
+        Furthermore, do **not** include quotes in the value to take care
+        of whitespace in the path.
+        
+        VIM server script - ``vim_server_script``
+        -----------------------------------------
+        
+        In case no VIM instance is running, **vimpdb** launches a VIM instance in
+        server mode.
+        
+        ``vim_server_script`` option holds the script used to launch that VIM instance
+        with ``clientserver`` support. As debugging in the VIM instance is written with
+        python, that instance must have ``python`` support.
+        
+        On MacOSX and Linux, ``vim_server_script`` and ``vim_client_script`` can hold 
+        the same value.
+        
+        On Windows, only the graphical VIM can be used as server, reason for the two 
+        separate default values as seen above.
+        
+        Server Name - ``server_name``
+        -----------------------------
+        
+        The VIM instance in server mode has a name.
+        
+        By default, **vimpdb** speaks to the server named ``VIM``, which  
+        is the default ``servername`` used by VIM.
+        
+        If you want **vimpdb** to use another server name, modify the 
+        ``server_name`` option. It should hold the name of the VIM
+        server you want to be used for debugging. 
+        
+        You may list the currently running VIM servers using::
+        
+            $ vim --serverlist
+            VIM
+        
+        Or, on a Mac::
+        
+            $ /Applications/MacVim.app/Contents/MacOS/Vim --serverlist
+            VIM
+        
+        When a VIM instance with ``clientserver`` support is running, you can find its 
+        name by issuing the following command at the VIM prompt::
+        
+            :echo v:servername
+        
+        UDP Port - ``port``
+        -------------------
+        
+        VIM communicates to **vimpdb** through a UDP socket. 
+        By default, the socket is opened on port 6666.
+        
+        If that socket is not available in your system, you can specify an available
+        port number with the ``port`` option.
+        
+        Known issues
+        ============
+        
+        None for now.
+        
+        Backward Compatibility
+        ======================
+        
+        Before version 0.4.1, **vimpdb** RC file (``~/.vimpdbrc``) had a single 
+        ``script`` option. That option has been turned into the ``vim_client_script``
+        option. The upgrade should be transparent.
+        
+        Before version 0.4.0, **vimpdb** was configured through environment variables.
+        If you had a working configuration, upgrade should be transparent.
+        The values of ``VIMPDB_SERVERNAME`` and ``VIMPDB_VIMSCRIPT`` environment
+        variables are setup in the RC file (``~/.vimpdbrc``). 
+        They are put respectively in ``server_name`` and ``script`` options.
+        
+        Fixed issues
+        ============
+        
+        See changelog_
+        
+        .. _changelog: http://pypi.python.org/pypi/vimpdb#id1
+        
+        ..  vim: set ft=rst ts=4 sw=4 expandtab tw=78 : 
+        
+        CREDITS
+        =======
+        
+        - Godefroid Chapelle
+        
+        - Jean-Francois Roche
+        
+        - Stefan Eletzhofer
+        
+        - Rewrite started when looking at ``vimpdbhook`` by Stefan Eletzhofer 
+          http://code.google.com/p/vimpdbhook/
+        
+        - Some code taken from ``vimpdb`` 0.2.1 by Stefan Eletzhofer 
+        
+        - Some code taken from ``VimPdb.vim`` by Yaron Budowski
+          http://www.vim.org/scripts/script.php?script_id=2043
+        
+        Changelog
+        =========
+        
+        0.4.5 (2011-04-28)
+        ------------------
+        
+        - fix highlighting of current line.
+        
+        0.4.4 (2010-11-29)
+        ------------------
+        
+        - tests cleanup : get rid of helper class and functions.
+        
+        - code cleanup : improve imports style.
+        
+        - after c(ontinue), key mapping was broken (again :-().
+        
+        
+        0.4.3.2 (2010-11-27)
+        --------------------
+        
+        - fix Linux default values in documentation.
+        
+        - document ``PDBxx`` commands.
+        
+        - less noise on VIM command-line.
+        
+        - better highlighting of current line.
+        
+        
+        0.4.3 (2010-11-26)
+        ------------------
+        
+        - fix launch of VIM server when server names collide like VIM and GVIM.
+        
+        - fix detection of VIM support.
+        
+        - fix **vimpdb** buffer creation. 
+        
+        - fix and tune Linux default values.
+        
+        
+        0.4.2 (2010-11-26)
+        ------------------
+        
+        - ``PDBEval`` (mapped to ``?`` key) to ask for a Python expression to evaluate.
+        
+        - ``PDBClear`` (mapped to ``B`` key) to clear a previously set breakpoint.
+        
+        - open new tab only if there is already an opened file in VIM.
+        
+        - close **vimpdb** buffer when ``continue`` (``c``), ``reset`` (``x``) or quit
+          (``q``).
+        
+        - launch VIM server also if another server is running.
+        
+        
+        0.4.1.2 (2010-11-26)
+        --------------------
+        
+        - polish documentation.
+        
+        
+        0.4.1.1 (2010-11-26)
+        --------------------
+        
+        - tune documentation.
+        
+        
+        0.4.1 (2010-11-26)
+        ------------------
+        
+        - check ``python`` and ``clientserver`` support; gives a chance to provide right
+          configuration if support is missing.
+        
+        - try to launch a VIM server instance if none is running.
+        
+        
+        0.4.0 (2010-07-29)
+        ------------------
+        
+        - tested with Python 2.7.
+        
+        - UDP port is now an option.
+        
+        - configuration through ``~/.vimpdbrc`` instead of environment variables.
+        
+        
+        0.3.8 (2010-06-17)
+        ------------------
+        
+        - fix: some versions of VIM need explicit import of vim module
+          even though most don't.
+          (http://github.com/gotcha/vimpdb/issues/issue/5)
+        
+        
+        0.3.7 (2010-05-20)
+        ------------------
+        
+        - fix: could not go ``down`` after switching from ``pdb`` to
+          **vimpdb** after having gone ``up``.
+          (http://github.com/gotcha/vimpdb/issues/issue/4)
+        
+        0.3.6 (2010-04-17)
+        ------------------
+        
+        - fix: ``continue`` command was broken after breakpoint has been set.
+          (http://github.com/gotcha/vimpdb/issues/issue/3)
+        
+        - fix: Key mappings were left broken after ``continue`` command.
+          (http://github.com/gotcha/vimpdb/issues/issue/2)
+        
+        0.3.5 (2010-03-22)
+        ------------------
+        
+        - better documentation, especially for Windows.
+        
+        - fix: capture of output was broken for Python 2.5 and 2.6.
+        
+        - Windows compatibility (at least XP)
+        
+        
+        0.3.4 (2010-03-15)
+        ------------------
+        
+        - close socket to allow debugging session to start again.
+        
+        
+        0.3.3 (2010-03-04)
+        ------------------
+        
+        - avoid leaving mappings in debugged buffers.
+        
+        
+        0.3.2 (2010-03-03)
+        ------------------
+        
+        - more documentation
+        
+        
+        0.3.1 (2010-03-02)
+        ------------------
+        
+        - fix setup.py metadata so that it does not hold non ascii chars.
+          This avoided actual release to PyPI.
+        
+        
+        0.3 (2010-03-02)
+        ----------------
+        
+        - fully rewritten.
+        
+        
+        0.2.1 (2008-06-27)
+        ------------------
+        
+        - added ``vimpdb`` script.
+        
+        - added "exit" callback.
+        
+        0.2 (2008-06-17)
+        ----------------
+        
+        - first release to PyPI.
+        
+        
+        TODO
+        ====
+        
+        In priority order:
+        
+        - add a watch window.
+        
+        - highlight breakpoints
+        
+        - conditional breakpoints
+        
+        - keep debugging state in VIM to switch **vimpdb** back to ``pdb`` when closing
+          VIM while debugging.
+        
+        - key bindings in **vimpdb** buffer.
+        
+        - enable customization of key bindings.
+        
+        and much more...
+        
+Keywords: pdb vim
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 2.4
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Topic :: Software Development :: Debuggers
+Classifier: Topic :: Text Editors
