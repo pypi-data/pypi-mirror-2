@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+# vim: set expandtab ts=4 sw=4:
+
+# Copyright (C) 2011 Ian Gable
+# You may distribute under the terms of either the GNU General Public
+# License or the Apache v2 License, as specified in the README file.
+
+## Auth.: Ian Gable
+
+import sys
+import difflib
+from difflib import SequenceMatcher 
+from data_gc_ca_api.cityweather import  City, CityIndex
+from data_gc_ca_api.__version__ import version
+from optparse import OptionParser
+
+
+def getBestGuess(city, cityList):
+    # Find the closest matching city including the case where the  
+    # input city matches a complete sub string. For example the case where 
+    # someone uses "Ottawa" but environment Canada uses the name
+    # "Ottawa (Richmond - Metcalfe)" we want to guess the long string 
+    # rather then the close string Oshawa
+
+     
+    s = SequenceMatcher()
+    s.set_seq1(city)
+    cityLength = len(city)
+    longestMatch = { 'length':0, 'city': None }
+
+    for possibleCity in cityList:
+        s.set_seq2(possibleCity)
+        match = s.find_longest_match(0,len(city),0,len((possibleCity)))
+
+        if match[2] > longestMatch['length']:
+            longestMatch['length'] = match[2]
+            longestMatch['city'] = possibleCity
+
+    if len(city) == longestMatch['length']:
+        return longestMatch['city']
+    else:
+        return difflib.get_close_matches(city,cityList,1)[0]
+
+
+
+
+def main():
+
+
+    parser = OptionParser(usage="%prog -c CITY -q QUANTITY", version = "%prog " + version)
+
+    parser.add_option("-c", "--city", dest="city",
+                                            help="The City you want information about", metavar="CITY")
+    parser.add_option("-q", "--quantity", dest="quantity",
+                                            help="the particular quatity toy want to know", metavar="QUANTITY")
+    parser.add_option("-l", "--list", action="store_true", dest="list",
+                                            help="Show a list of the available cities")
+    (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args()
+
+    # globals
+    city = "Victoria"
+    quantity = "currentConditions/temperature"
+
+    cityindex = CityIndex()
+
+    if options.list:
+        for cityname in cityindex.getEnglishCityList():
+            print cityname
+        sys.exit(1)
+    if not options.city:
+        print "No City given, using, Victoria, BC (the best city)."
+    else:
+        city = options.city
+    if not options.quantity:
+        print "No requested quantity given, using teperature"
+    else:
+        quantity = options.quantity
+    
+    if cityindex.isCity(city):
+        cityObject = City(cityindex.getDataUrl(city))
+        print quantity + " is " + cityObject.getQuantity(quantity)
+    else:
+        print city + " is not availble"
+        bestGuess = getBestGuess(city,cityindex.getEnglishCityList())
+        if bestGuess:
+           print "Did you mean: " + bestGuess
+        else:
+           print "Do 'weatherca --list' to get a list of cities"
+
+
+if __name__ == "__main__":
+    main()
+
