@@ -1,0 +1,502 @@
+============
+Preferential
+============
+
+Copeland's Method
+-----------------
+
+Below is an example of an election that took place between 5 candidates
+competing for one seat::
+
+    >>> from ballotbox.ballot import BallotBox
+    >>> from ballotbox.singlewinner.plurality import FirstPastPostVoting
+    >>> from ballotbox.singlewinner.preferential import CopelandVoting
+
+    >>> rounds = []
+    >>> round1 = BallotBox(method=FirstPastPostVoting)
+    >>> round1.batch_votes([("alice", 41), ("bob", 59)])
+    >>> rounds.append(round1)
+
+    >>> round2 = BallotBox(method=FirstPastPostVoting)
+    >>> round2.batch_votes([("alice", 71), ("carol", 29)])
+    >>> rounds.append(round2)
+
+    >>> round3 = BallotBox(method=FirstPastPostVoting)
+    >>> round3.batch_votes([("alice", 61), ("dave", 39)])
+    >>> rounds.append(round3)
+
+    >>> round4 = BallotBox(method=FirstPastPostVoting)
+    >>> round4.batch_votes([("alice", 71), ("eve", 0)])
+    >>> rounds.append(round4)
+
+    >>> round5 = BallotBox(method=FirstPastPostVoting)
+    >>> round5.batch_votes([("bob", 30), ("carol", 60)])
+    >>> rounds.append(round5)
+
+    >>> round6 = BallotBox(method=FirstPastPostVoting)
+    >>> round6.batch_votes([("bob", 30), ("dave", 70)])
+    >>> rounds.append(round6)
+
+    >>> round7 = BallotBox(method=FirstPastPostVoting)
+    >>> round7.batch_votes([("bob", 59), ("eve", 41)])
+    >>> rounds.append(round7)
+
+    >>> round8 = BallotBox(method=FirstPastPostVoting)
+    >>> round8.batch_votes([("carol", 60), ("dave", 10)])
+    >>> rounds.append(round8)
+
+    >>> round9 = BallotBox(method=FirstPastPostVoting)
+    >>> round9.batch_votes([("carol", 71), ("eve", 29)])
+    >>> rounds.append(round9)
+
+    >>> round10 = BallotBox(method=FirstPastPostVoting)
+    >>> round10.batch_votes([("dave", 39), ("eve", 61)])
+    >>> rounds.append(round10)
+
+    >>> bb = BallotBox(method=CopelandVoting)
+    >>> bb.get_winner(rounds)
+    [(2, 'alice')]
+
+
+The Kemeny-Young Method
+-----------------------
+
+Here is a fictional vote to move the capital of Tennessee. The inhabitants of
+each city want to have the capital as close to their city as possible, if their
+city doesn't actually win. Each voter will list their preferences for the state
+capital from most desired to least.
+
+The candidates for the capital are:
+
+ * Memphis, the state's largest city, with 42% of the voters, but located far
+   from the other cities
+
+ * Nashville, with 26% of the voters, near the center of Tennessee
+
+ * Knoxville, with 17% of the voters
+
+ * Chattanooga, with 15% of the voters
+
+The three nearest cities to Memphis, closest first, are: Nashville,
+Chattanooga, and Knoxville -- so Memphis voters would vote in that order (with
+Memphis first, of course). For Nashville, the nearest are: Chattanooga,
+Knoxville, and Memphis. For Chattanooga they are: Knoxville, Nashville, and
+Memphis. For Knoxville they are: Chattanooga, Nashville, and Memphis.
+
+So this means that 42% of the voters would make their list of city preferences
+in the first order given. Similarly, 26%, 17%, and 15% would do the same for
+the remaining, respectively.
+
+Here the code that determines the winner (we'll just assume that there are 100
+people living in Tennessee)::
+
+    >>> from ballotbox.singlewinner.preferential import KemenyYoungVoting
+
+    >>> bb = BallotBox(method=KemenyYoungVoting)
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
+    [(393, (u'Nashville', u'Chattanooga', u'Knoxville', u'Memphis'))]
+
+We can also return runners' up, etc.::
+
+    >>> bb.get_winner(position_count=2)
+    [(393, (u'Nashville', u'Chattanooga', u'Knoxville', u'Memphis')), (377, (u'Nashville', u'Chattanooga', u'Memphis', u'Knoxville'))]
+    >>> bb.get_winner(position_count=3)
+    [(393, (u'Nashville', u'Chattanooga', u'Knoxville', u'Memphis')), (377, (u'Nashville', u'Chattanooga', u'Memphis', u'Knoxville')), (361, (u'Nashville', u'Memphis', u'Chattanooga', u'Knoxville'))]
+
+Here's a listing of all possibilities and their ranks::
+
+    >>> for rank, preference in bb.get_winner(position_count=24):
+    ...   print " ".join(preference), rank
+    Nashville Chattanooga Knoxville Memphis 393
+    Nashville Chattanooga Memphis Knoxville 377
+    Nashville Memphis Chattanooga Knoxville 361
+    Chattanooga Nashville Knoxville Memphis 357
+    Memphis Nashville Chattanooga Knoxville 345
+    Chattanooga Nashville Memphis Knoxville 341
+    Nashville Knoxville Chattanooga Memphis 327
+    Chattanooga Memphis Nashville Knoxville 325
+    Chattanooga Knoxville Nashville Memphis 321
+    Nashville Knoxville Memphis Chattanooga 311
+    Memphis Chattanooga Nashville Knoxville 309
+    Chattanooga Knoxville Memphis Nashville 305
+    Nashville Memphis Knoxville Chattanooga 295
+    Knoxville Nashville Chattanooga Memphis 291
+    Chattanooga Memphis Knoxville Nashville 289
+    Memphis Nashville Knoxville Chattanooga 279
+    Knoxville Nashville Memphis Chattanooga 275
+    Memphis Chattanooga Knoxville Nashville 273
+    Knoxville Memphis Nashville Chattanooga 259
+    Knoxville Chattanooga Nashville Memphis 255
+    Memphis Knoxville Nashville Chattanooga 243
+    Knoxville Chattanooga Memphis Nashville 239
+    Knoxville Memphis Chattanooga Nashville 223
+    Memphis Knoxville Chattanooga Nashville 207
+
+Now, we could have a situation where there was a tie or equal preference
+between to choices. For instance, in the following example, Everyone in
+Chattanooga equally preferred Knoxville and Nashville::
+
+    >>> bb = BallotBox(method=KemenyYoungVoting)
+    >>> preference1 = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> preference2 = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> preference3 = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> preference4 = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 2, "Memphis": 3}
+    >>> bb.batch_votes([
+    ... (preference1, 42), (preference2, 26), (preference3, 17), 
+    ... (preference4, 15)])
+    >>> bb.get_winner()
+    [(393, (u'Nashville', u'Chattanooga', u'Knoxville', u'Memphis'))]
+
+Here's a listing of all possibilities and their ranks::
+
+    >>> for rank, preference in bb.get_winner(position_count=24):
+    ...   print " ".join(preference), rank
+    Nashville Chattanooga Knoxville Memphis 393
+    Nashville Chattanooga Memphis Knoxville 377
+    Nashville Memphis Chattanooga Knoxville 361
+    Chattanooga Nashville Knoxville Memphis 357
+    Memphis Nashville Chattanooga Knoxville 345
+    Chattanooga Nashville Memphis Knoxville 341
+    Nashville Knoxville Chattanooga Memphis 327
+    Chattanooga Memphis Nashville Knoxville 325
+    Nashville Knoxville Memphis Chattanooga 311
+    Memphis Chattanooga Nashville Knoxville 309
+    Chattanooga Knoxville Nashville Memphis 306
+    Nashville Memphis Knoxville Chattanooga 295
+    Chattanooga Knoxville Memphis Nashville 290
+    Memphis Nashville Knoxville Chattanooga 279
+    Knoxville Nashville Chattanooga Memphis 276
+    Chattanooga Memphis Knoxville Nashville 274
+    Knoxville Nashville Memphis Chattanooga 260
+    Memphis Chattanooga Knoxville Nashville 258
+    Knoxville Memphis Nashville Chattanooga 244
+    Knoxville Chattanooga Nashville Memphis 240
+    Memphis Knoxville Nashville Chattanooga 228
+    Knoxville Chattanooga Memphis Nashville 224
+    Knoxville Memphis Chattanooga Nashville 208
+    Memphis Knoxville Chattanooga Nashville 192
+
+Note that the rank amounts changed from the previous example as a result of the
+tie in preference3.
+
+
+Minmax Voting
+-------------
+
+The Minmax voting method has three varieties:
+
+ * winning votes
+
+ * margins
+
+ * pairwise opposition
+
+Let's take a look at these in order, starting with the "winning votes" method::
+
+    >>> from ballotbox.singlewinner.preferential import MinimaxVoting
+
+    >>> bb = BallotBox(method=MinimaxVoting, mode="winning votes")
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 2, "Memphis": 3}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner("Nashville", "Memphis")
+    [(58, 'Nashville > Memphis')]
+    >>> bb.get_winner("Memphis", "Nashville")
+    [(0, 'Memphis > Nashville')]
+    >>> bb.get_winner("Knoxville", "Chattanooga")
+    [(0, 'Knoxville > Chattanooga')]
+    >>> bb.get_winner("Chattanooga", "Knoxville")
+    [(83, 'Chattanooga > Knoxville')]
+    >>> bb.get_winner("Nashville", "Knoxville")
+    [(68, 'Nashville > Knoxville')]
+
+Next is the "margins" method::
+
+    >>> bb = BallotBox(method=MinimaxVoting, mode="margins")
+    >>> preference1 = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> preference2 = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> preference3 = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> preference4 = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 2, "Memphis": 3}
+    >>> bb.batch_votes([
+    ... (preference1, 42), (preference2, 26), (preference3, 17), 
+    ... (preference4, 15)])
+
+    >>> bb.get_winner("Nashville", "Memphis")
+    [(16, 'Nashville > Memphis')]
+    >>> bb.get_winner("Memphis", "Nashville")
+    [(-16, 'Memphis > Nashville')]
+    >>> bb.get_winner("Knoxville", "Chattanooga")
+    [(-66, 'Knoxville > Chattanooga')]
+    >>> bb.get_winner("Chattanooga", "Knoxville")
+    [(66, 'Chattanooga > Knoxville')]
+    >>> bb.get_winner("Nashville", "Knoxville")
+    [(51, 'Nashville > Knoxville')]
+
+Finally, we have the "pairwise opposition" method::
+
+    >>> bb = BallotBox(method=MinimaxVoting, mode="pairwise opposition")
+    >>> preference1 = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> preference2 = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> preference3 = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> preference4 = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 2, "Memphis": 3}
+    >>> bb.batch_votes([
+    ... (preference1, 42), (preference2, 26), (preference3, 17), 
+    ... (preference4, 15)])
+
+    >>> bb.get_winner("Nashville", "Memphis")
+    [(58, 'Nashville > Memphis')]
+    >>> bb.get_winner("Memphis", "Nashville")
+    [(42, 'Memphis > Nashville')]
+    >>> bb.get_winner("Knoxville", "Chattanooga")
+    [(17, 'Knoxville > Chattanooga')]
+    >>> bb.get_winner("Chattanooga", "Knoxville")
+    [(83, 'Chattanooga > Knoxville')]
+    >>> bb.get_winner("Nashville", "Knoxville")
+    [(68, 'Nashville > Knoxville')]
+
+
+Borda Voting
+------------
+
+The Borda count method has four major varieties:
+
+ * standard
+
+ * fractional
+
+ * truncated
+
+ * modified
+
+These are covered below, starting with the standard Borda method::
+
+    >>> from ballotbox.singlewinner.preferential import BordaVoting
+
+    >>> bb = BallotBox(method=BordaVoting, mode="standard")
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
+    [(194, u'Nashville')]
+
+Here are the results using the fractional Borda count::
+
+    >>> bb = BallotBox(method=BordaVoting, mode="fractional")
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
+    [(57.666666666666664, u'Nashville')]
+
+Here are the results using a truncated Borda count::
+
+    >>> bb = BallotBox(method=BordaVoting, mode="truncated")
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 0, "Knoxville": 0}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 0, "Memphis": 0}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 0}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 0, "Nashville": 0, "Memphis": 0}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
+    [(179, u'Nashville')]
+
+Here are the results using modified Borda count::
+
+    >>> bb = BallotBox(method=BordaVoting, mode="modified")
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
+    [(52, u'Nashville')]
+
+In the Borda count it is possible for a candidate who is the first preference
+of an absolute majority of voters to fail to be elected; this is because the
+Borda count affords greater importance to a voter's lower preferences than most
+other systems. Here is an example of that in action::
+
+    >>> bb = BallotBox(method=BordaVoting, mode="standard")
+    >>> preference = {
+    ...   "Alice": 1, "Carol": 2, "Bob": 3, "Dave": 4}
+    >>> bb.add_votes(preference, 51)
+    >>> preference = {
+    ...   "Carol": 1, "Bob": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 5)
+    >>> preference = {
+    ...   "Bob": 1, "Carol": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 23)
+    >>> preference = {
+    ...   "Dave": 1, "Carol": 2, "Bob": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 21)
+
+    >>> bb.get_winner()
+    [(205, u'Carol')]
+
+In most other systems, Alice would have been the winner. Take, for example, the
+Kemeny-Young method::
+
+    >>> bb = BallotBox(method=KemenyYoungVoting)
+    >>> preference = {
+    ...   "Alice": 1, "Carol": 2, "Bob": 3, "Dave": 4}
+    >>> bb.add_votes(preference, 51)
+    >>> preference = {
+    ...   "Carol": 1, "Bob": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 5)
+    >>> preference = {
+    ...   "Bob": 1, "Carol": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 23)
+    >>> preference = {
+    ...   "Dave": 1, "Carol": 2, "Bob": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 21)
+
+    >>> bb.get_winner()
+    [(388, (u'Alice', u'Carol', u'Bob', u'Dave'))]
+
+
+Nanson Voting
+-------------
+
+By using the Nanson method, we end up with a condorcet Borda count. It uses
+the same mechanisms as Borda, but it retallies votes after eliminating
+candidates who rank lower than the average Borda count in each round. This
+results in exactly one winner::
+
+    >>> from ballotbox.singlewinner.preferential import NansonVoting
+
+    >>> bb = BallotBox(method=NansonVoting)
+    >>> preference = {
+    ...   "Alice": 1, "Carol": 2, "Bob": 3, "Dave": 4}
+    >>> bb.add_votes(preference, 51)
+    >>> preference = {
+    ...   "Carol": 1, "Bob": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 5)
+    >>> preference = {
+    ...   "Bob": 1, "Carol": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 23)
+    >>> preference = {
+    ...   "Dave": 1, "Carol": 2, "Bob": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 21)
+
+    >>> bb.get_winner()
+    [(205, u'Carol')]
+
+
+Baldwin Voting
+--------------
+
+While the Nanson method drops candidates below the average, the Baldwin method
+simple drops the lowest ranking candidate (using Borda count scores) and
+retallies until only one winner remains::
+
+    >>> from ballotbox.singlewinner.preferential import BaldwinVoting
+
+    >>> bb = BallotBox(method=BaldwinVoting)
+    >>> preference = {
+    ...   "Alice": 1, "Carol": 2, "Bob": 3, "Dave": 4}
+    >>> bb.add_votes(preference, 51)
+    >>> preference = {
+    ...   "Carol": 1, "Bob": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 5)
+    >>> preference = {
+    ...   "Bob": 1, "Carol": 2, "Dave": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 23)
+    >>> preference = {
+    ...   "Dave": 1, "Carol": 2, "Bob": 3, "Alice": 4}
+    >>> bb.add_votes(preference, 21)
+
+    >>> bb.get_winner()
+    [(205, u'Carol')]
+
+
+------------------
+Ranked Pair Voting
+------------------
+
+    >>> from ballotbox.singlewinner.preferential import RankedPairsVoting
+
+    >>> bb = BallotBox(method=RankedPairsVoting)
+    >>> preference = {
+    ...   "Memphis": 1, "Nashville": 2, "Chattanooga": 3, "Knoxville": 4}
+    >>> bb.add_votes(preference, 42)
+    >>> preference = {
+    ...   "Nashville": 1, "Chattanooga": 2, "Knoxville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 26)
+    >>> preference = {
+    ...   "Knoxville": 1, "Chattanooga": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 17)
+    >>> preference = {
+    ...   "Chattanooga": 1, "Knoxville": 2, "Nashville": 3, "Memphis": 4}
+    >>> bb.add_votes(preference, 15)
+
+    >>> bb.get_winner()
