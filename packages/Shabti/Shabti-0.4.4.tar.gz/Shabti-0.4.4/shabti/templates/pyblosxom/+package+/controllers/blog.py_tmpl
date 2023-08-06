@@ -1,0 +1,42 @@
+# -*- coding: utf-8 -*-
+import os
+import StringIO
+import urllib
+import sys
+import pylons
+from pylons import request
+from {{package}}.lib.base import BaseController
+import Pyblosxom.pyblosxom
+
+import logging
+log = logging.getLogger(__name__)
+
+configpydir = '/'.join(os.path.dirname(__file__).split('/')[:-2]) + \
+    '/data/blog'
+if configpydir not in sys.path:
+    sys.path.insert(0, configpydir)
+
+class BlogController(BaseController):
+
+    def index(self):
+        os.chdir(configpydir)
+        # Thanks to ianbicking for identifying both the necessity
+        # for and the description of this workaround for
+        # reconstituting wsgi.input
+        if request.environ.get('paste.parsed_formvars', False):
+            wsgi_input = urllib.urlencode(
+                request.environ['paste.parsed_formvars'][0], True)
+            request.environ['wsgi.input'] = \
+                    StringIO.StringIO(wsgi_input)
+            request.environ['CONTENT_LENGTH'] = len(wsgi_input)
+        # Uncomment this if you're using PrefixMiddleware
+        # request.environ['SCRIPT_NAME'] = ''
+        request.environ['PATH_INFO'] = \
+                    request.environ['PATH_INFO'].__str__()
+        application = Pyblosxom.pyblosxom.PyBlosxomWSGIApp()
+        return application(request.environ, self.start_response)
+
+    def view(self, *args, **kwargs):
+        os.chdir(configpydir)
+        application = Pyblosxom.pyblosxom.PyBlosxomWSGIApp()
+        return application(request.environ, self.start_response)

@@ -1,0 +1,32 @@
+import pylons
+from decorator import decorator
+from pylons.controllers.util import abort
+from repoze.what.predicates import NotAuthorizedError
+from pylons import request
+import logging
+
+log = logging.getLogger(__name__)
+
+def require(predicate):
+    """
+    Make repoze.what verify that the predicate is met.
+    
+    :param predicate: A repoze.what predicate.
+    :return: The decorator that checks authorization.
+    
+    """
+    
+    @decorator
+    def check_auth(func, *args, **kwargs):
+        environ = request.environ
+        try:
+            predicate.check_authorization(environ)
+        except NotAuthorizedError, reason:
+            # TODO: We should warn the user
+            # flash(reason, status='warning')
+            abort(401, detail=reason)
+        
+        return func(*args, **kwargs)
+    return check_auth
+    
+
