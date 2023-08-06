@@ -1,0 +1,72 @@
+{% extends "logistics/reports_base.html" %}
+{% load i18n %}
+
+{% block content %}
+    <div class="module">
+
+        {% include "logistics/partials/accordion_nav.html" %}
+        <div id="main">
+                <h2>Stock for {{ facility.name }}</h2>
+        {% if stockonhands %}
+                <table class="stock">
+                    <thead><tr>
+                        <th>{% trans "Commodity" %}</th>
+                        <th class="stock_col">{% trans "Months Until Stockout" %}</th>
+                        <th class="stock_col">{% trans "Current Stock" %}</th>
+                        <th class="stock_col">{% trans "Monthly Consumption" %}</th>
+                        <th class="stock_col">{% trans "Emergency Level" %}</th>
+                        <th class="stock_col">{% trans "Reorder Level" %}</th>
+                        <th class="stock_col">{% trans "Maximum Level" %}</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for stockonhand in stockonhands %}
+                        <tr>
+                        <td>{{ stockonhand.product.name }}</td>
+                        <td
+                        
+                        {% if stockonhand.is_stocked_out %}
+                                class="stockout"
+                        {% else %}
+                            {% if stockonhand.is_below_emergency_level %}
+                                class="emergency"
+                            {% else %}
+                                {% if stockonhand.is_below_low_supply_but_above_emergency_level %}
+                                    class="low_supply"
+                                {% else %}
+                                    {% if stockonhand.is_in_good_supply %}
+                                        class="good_supply"
+                                    {% else %}
+                                        {% if stockonhand.is_overstocked %}
+                                           class="overstock"
+                                       {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+
+                        >{{ stockonhand.months_remaining|default_if_none:"n/a" }}</td>
+                        <td>{{ stockonhand.quantity|default_if_none:"n/a" }}</td>
+                        <td {% ifequal stockonhand.monthly_consumption None %}
+                                class="big_error"
+                            {% endifequal %}>
+                            {{ stockonhand.monthly_consumption|default_if_none:"not set" }}
+                        </td>
+                        <td>{{ stockonhand.emergency_reorder_level|default_if_none:"n/a" }}</td>
+                        <td>{{ stockonhand.reorder_level|default_if_none:"n/a" }}</td>
+                        <td>{{ stockonhand.maximum_level|default_if_none:"n/a" }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table><br/>
+            <a href="{% url input_stock facility.code %}">INPUT STOCK for {{ facility.name }}</a>
+            {% if last_reported %}
+                <p>The last report received was on {{ last_reported|date:"M d, h:m A" }}.</p>
+            {%  endif %}
+            {% else %}<p></p>
+                <div class="error">
+                    {{ facility.name }} has not been configured with the appropriate stock yet. Please contact Focus Region Health Project for assistance.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
