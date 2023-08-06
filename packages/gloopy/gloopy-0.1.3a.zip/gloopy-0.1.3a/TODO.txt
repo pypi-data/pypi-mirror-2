@@ -1,0 +1,456 @@
+
+Next
+----
+
+* release on PyPI
+    * can we do without the data/examples/docs entries in MANIFEST.in now?
+    * run examples in isolation using the installed Gloopy
+        * test that fixpath prioritises local Gloopy over installed,
+          but finds installed if no local found
+    * code to generate setup.py's package_data param
+    * replace the setup.py to handle examples, put in MANIFEST.in
+    * Repeat on Ubuntu
+    * make upload
+    * binary release not required (it's a library)
+    * add a comment on pyweek message board
+
+* Talk: Set up the tension of posing problems, then solving them:
+    vertex arrays are nasty denormalized, Shape->Glyph solves that
+    performance of many independently positions shapes is bad,
+        use VBOs to avoid sending data every frame
+        optimise by cleaning up the main render loop, incl VAO
+        Cython
+        Hypothetical: purely shader based with single draw call
+    processing each vertex every frame is hard:
+        use shaders to animate
+
+    Talk Outline
+    ------------
+    * Inspirations - Effective non-photo-realistic work in gaming, movies and
+      the demo scene. (1m) A convenient & Pythonic way to model 3D polyhedra,
+      and some neat generators to convert these into OpenGL arrays at runtime.
+      (7m)
+    * Algorithmic modification of shapes, such as bevels, geometric duals, and
+      polyhedron stellation. (2m)
+    * The resulting performance characteristics: What works well from Python,
+      and what doesn't. (2m)
+    * Composition of polyhedra to create more complex shapes (3m)
+    * Koch tetrahedron & tetrix, aka Sierpinski tetrahedron. (1m)
+    * Surprisingly effective 3D models created from small bitmaps. (1m)
+    * Automatic generation of trees, mazes, complex spaces. (3m)
+    * Shapes that morph: Rearranging vertices on the fly (5m)
+    * Questions (5m)
+
+* add Serpinski Gasket (tetrahedral, aka Tetrix)
+* add Serpinski Cube (aka ?)
+* fiddle with sizes of basic shapes so they interpenetrate interestingly
+
+* demo: co-axial rings spinning at various speeds about the common axis
+* demo: nested radial slices of cylinders (partial rings) orbiting a common
+        axis
+
+
+Geometry
+--------
+
+* color should be a float throughout
+
+* color a shape by its face labels
+
+* fix Face.centroid method - take the one from solescion
+
+* polyhedra bevel
+
+* modifier to change colors using labelled faces, one color for each unique
+  label
+
+* function to truncate a shape by amount from 0 to 1. Truncation by 1
+  results in the geometric dual. This is half done, but turns out to be a
+  bit hard, because we don't know precisely what order to add the
+  newly-generated vertices.
+
+* 2D poly extruder
+* 2D poly into ring
+* interlinked rings. knots.
+
+* close-packed cube patterns, specified as tuple ordinates, eliminating
+  faces of cubes which abut.
+* Tetris shapes
+* Cube cluster generated from pixels of small bitmaps. Invader! Mario! etc.
+
+* Interpenetrating cuboid solids and voids. (& rooms, a void in a solid)
+
+complicated saddle surfaces with holes:
+http://www.cs.berkeley.edu/~sequin/SCULPTS/scherk.html
+
+building skyline at night:
+http://www.openbusiness.cc/wp-content/uploads/hk1.jpg
+
+bulbous blobs with holes
+http://www.cs.berkeley.edu/~sequin/MVS/index.html
+http://www.graphica.com/gallery/trott1.html
+
+Sections of a sphere:
+http://www.cs.berkeley.edu/~sequin/ART/MaxBill/MBTy5.jpg
+
+screenshots on the geexlab website
+
+Seirpinky cubes with floating debris:
+http://www.youtube.com/user/xenopusRTRT#p/u/2/SDzZchuhECY
+
+
+Rendering
+---------
+
+* lighting is wrong! Stationary camera, spinning object, lighting stays fixed.
+  Maybe compare my shader with the tutorial at:
+  http://www.arcsynthesis.org/gltut/Illumination/Illumination.html
+  Add a point light source while we're at it?
+
+* Curved surfaces: Expressed in shape as a collection of faces. Verts for all
+  faces within the collection are shared, not duplicated from one face to the
+  next, and normals for each vertex are interpolated between surface normal for
+  each adjacent participating face. Assume colors are fixed across the whole
+  surface?
+* Cylinder * sphere * Ring (hollow cylinder) * donut * ring with crosses
+* equipotential surfaces in scalar fields, (see examples in geometry)
+
+* better shaders:
+    * ambient light level should be a uniform
+        * demo should populate this using world.background_color
+    * directional light position & color should be uniforms
+        * demo should assign these
+    * point light source position & color should be uniforms
+        * demo should attach point light source to a moving item
+    * specular highlights from directional light
+    * specular highlights from point light
+    * per pixel lighting so that specular highlights in middle of flat faces
+      look good
+    * Textures. See:
+      http://www.lighthouse3d.com/opengl/glsl/index.php?textureComb
+    * if skybox is drawn, demo should draw a 'sun' or 'moon' or somesuch
+      in direction of directional light source
+
+* Allow each gameitem to specify its own shader program
+
+* scale movement by mean dt over last few frames to reduce jittery movement
+  caused by isolated slow or fast frames.
+
+* anti-alias. Use multisampling. Expose as option to application.
+
+
+Animation
+---------
+
+* Add uniform to tween between two models
+* use tweening to animate creation of a bevel
+* use tweening to animate forming a polyhedra's dual
+
+* Add to geometry while it is being displayed
+    * recreate it from scratch? Or modify (& grow) existing vertex array?
+
+
+Infrastructure
+--------------
+
+* sdist documentation images are included twice
+* sdist documentation should not be in html subdir
+* documentation should not include test packages
+* pip install should install deps, e.g. pyglet, popengl
+* Readme cannot contain class links, but we'd like the intro.rst (derived
+  from it) to do so. Some sort of copy with a search-and-replace?
+
+* pyglet latest from hg
+* Python 3
+
+* log file is broken?
+* log file should be created in app_root if possible, or else in
+  application's scratch space, not cwd
+
+* Convert options to use argparse, so that it can provide command line usage
+* command-line option to select screen resolution on startup, and restore
+  desktop resolution on exit
+* keys or something to select new screen resolution during runtime
+* persist options to store user's chosen screen resolution
+
+
+OpenGL 3
+--------
+
+* VBO the index array
+  Can this go into same vertex array object?
+
+* instead of setting modelview using glMultMatrix, we should be passing in
+  object matrix (or position, orientation) using vertex shader uniforms.
+  Review Mike's 'canonical opengl3 application', from his old pycon talk.
+  try OpenGL.FORWARD_COMPATIBLE_ONLY = True
+  see http://pyopengl.sourceforge.net/documentation/deprecations.html
+  Does this still work ok on opengl 2.1?
+  Does this affect performance?
+  Same for projection matrix?
+
+
+Startup Performance
+-------------------
+
+- check a profiler
+
+* Combining the orientations of nested multishapes is done in an innefficient
+  manner, multiplying every vertex by each multishape's orientation in
+  series. Modify to calculate the cumulative orientation first, then
+  multiply each vertex by the result.
+
+* totally rewrite shape_to_glyph algorithm, incorporating what Glyph then
+  subsequently does with the outputs. Suspect we're
+  doing too much work (e.g. vertex and index re-ordering)
+
+
+Render Performance
+------------------
+
+* split performance demo into a) performance and b) twister
+
+- create a matrix object which combines all the methods of Vector
+  and orientation and which outputs a matrix which can be fed directly to
+  shader 'modelview' uniform
+    - read this guy's Cython-howto tutorial:
+      https://github.com/ricardodelnero/small-Cython-How-To
+- Cython the render loop
+
+* Pass an array of gameitem positions & orientations directly to the shaders,
+  perhaps as a float texture. Add an integer vertex attribute to say which
+  gameitem the vertex belongs to (i.e. an index into the image array.) There
+  is then no need to update modelview between draw calls. Do the same with
+  orientation, and then all objects could be drawn with a single glDraw call.
+OR
+* try an entirely CPU based solution. Calc vertex array positions using Cython
+  accel arithmetic, then render all using single glDraw.
+
+
+Design
+------
+
+* Reassigning to an item's shape attr also needs to convert to glyph
+  As does modifying a shape in place.
+  How to manage this?
+* Review whether gloopy should be broken into separate libraries:
+    - rendering: should know nothing of shapes or world.
+        passed a list of (glyph, pos&orientation)
+    - shape: model polyhedra and convert them to glyphs
+    - shaders: provided shaders and binding them
+* user should (can?) provide a world update function?
+* newtonian movement should be provided as a public callable to either:
+    - be called for one item, AS its update method
+    - be called for one item, FROM its update method.
+    - be called for all items, from world.update
+
+
+
+Ideas for later
+---------------
+
+* Fake skybox geometry:
+    * vector:
+        * triangular stars
+        * a ground, with mountains! and moon
+        * animate: sky changes color, moon moves
+        * A sun! * moon has rings!
+    * a real bitmap skybox thing
+    * stack skyboxes, so that bitmap background has ground & mountains
+      overlaid. Or sky background has ground overlaid.
+    * (if bitmaps can contain alpha, then they can usefully overlay too.
+      eg. big planet from UT skyboxes)
+* In game text:
+    for HUD
+    for MENUS, instructions
+    as bitmaps on shapes
+* Allow items to toggle between being mobile (with a position)
+  and 'static', which draws them as part of the 'world' render call
+* triangulation for convex faces
+* shadows
+* Introduce a variable to control the use of primitives other than
+  GL_TRIANGLES. When using GL_TRIANGLE_FAN or _STRIP, draw all the
+  discontinuous faces of a single shape in a single draw call, using:
+    glEnable( GL_PRIMITIVE_RESTART )
+    glPrimitiveRestartIndex( MAXINT ) # for eg
+  and then insert indices of value MAXINT into the index array to form a
+  break between strips. Bear in mind this is meant to be a space & time
+  optimisation, so measure the latter before deciding the keep it.
+* Noise shaders
+* Geometry instancing, see techniques enumerated here:
+  http://www.geeks3d.com/20100629/test-opengl-geometry-instancing-geforce-gtx-480-vs-radeon-hd-5870/
+* Try enabling gamma correction using: glEnable(GL_FRAMEBUFFER_SRGB)
+  This can make a huge difference to the results of lighting
+* 2D mode, with ortho projection and 2D verts
+* orbit should have an option to face in particular direction during orbit,
+  i.e. in direction of motion, or toward rotated body. Presumably expressing
+  this as a Q relative to direction of motion makes sense.
+* assigning orbit should not move the object discontinuously, but should
+  smoothly interpolate from initial position
+  (interpolate not quite right - might result in reversal of direction
+  towards the end. How to generate a feasible-looking orbital insertion?)
+* how to generalise the above for all movers?
+
+
+DONE
+
+* delete bits of pyweek11 game that aren't required by gloopy,
+* move required bits of pyweek11 specific functionality out to demo.py
+* presumably glooby, as a library, should not have a main.py
+* move stuff out of demo.py into new gloopy.init()
+* creation of cube and a non-default sky color should be done by demo.py
+* Named colors: use the xkcd database, as staticmethods on Color
+* Eventloop knows about many unrelated things
+* Log the version number of gloopy
+* Log opengl info
+* Log options
+* Gameitem orientations
+* Gameitem spinners
+* Gameitem movement
+* measure performance - doesn't look like we're getting 60fps
+* camera in wobblyorbit
+* changes to euclid: Are there tests to guaruantee behaviour is preserved? Y.
+* camera should not be attribute of eventloop.
+* make sure all access to pyeuclid is using the local copy.
+* any_orthogonal has a bug if given vector is negative y axis.
+    Should set friend as:
+    'Vector.XAxis if abs(x) < abs(y) or abs(x) < abs(z)) else Vector.YAxis
+* current diffs cause slowdown because of __setattr__ on gameitem. (measure
+  to confirm this) Fix might be to explicitly pass 'item' to item.update,
+  in world.update, so that orbits, etc would no longer need to have their
+  own reference to their parent gameitem.
+* orbit center should accept either a location or a gameitem.
+
+* try using pyopengl bindings with pyopengl-accelerate added
+  (10%, ie 2fps. meh)
+* add pyopengl performance fixes (no bloody difference.)
+* figure out difference between pyglet.gl and pyglet.gl.gl 
+  (former includes glu, glext_arb, etc)
+* make it easy to switch between pyglet.gl and pyopengl (bool in util.gl)
+
+* f12 to toggle fps
+* alt-enter to toggle fullscreen
+
+* code from old europython talk does 450 independant cubes at 60fps.
+  we can only do 100. wtf? Reason is the code in middle of render loop
+  which handles position and orientations. Every frame it was creating new
+  euclid.Matrix, offsetting it, rotating it, and worst of all, then ctypesing
+  it to pass to glMatrixMult.
+* repeatable performance test one or more new demo.py scripts:
+    512 cube shaped gameitems, unique positions, unique glyphs, FPS:
+     23: no orientations
+     19: no orientations, newtonian update, with acc, with vel
+     16: with orientations
+     12: with orientations, newtonian update, with acc, with vel, with ang_vel
+* Review TODO doc from 'flyinghigh opengl from python' talk
+* Review TODO doc from 'pyweek11'
+- position as vector
+* revert quaternions to better API and more understandable implementation using
+  3-axis
+- pass glMultMatrix a matrix constructed from position and orientation
+* remove utils.gl. Modules should just use OpenGL.GL or pyglet.gl as they
+  please
+* create 'pyls' script to aid refactoring
+* combine vertex, color, normals into single interleaved array,
+* switch from vertex arrays to VBO objects
+* move from using glVertexPointer, glColorPointer, glNormalPointer to using
+  glVertexAttributePointer
+* use vertex array object to reduce number of bind calls needed in inner
+  render loop.
+* Can binding the VBO itself go into the vertex array object? Y.
+* use pyopengl shader management instead of our own compile/link code.
+  Or improve our own shader management code to take uniforms, see:
+    http://swiftcoder.wordpress.com/2008/12/19/simple-glsl-wrapper-for-pyglet/
+* color in top level package
+* add an example which allows browsing of a bestiary
+* the regular solids
+* try subdividing shapes with a new vertex in the middle of the face
+* function to stellate a shape (either strict stellation, or else just replace
+  each face with a pointy thing. The second seems both easier and more
+  flexible - pointy could be varied in height, even made negative.
+  (REPLACE the current subdivide_center with this - it is of little use for
+  iterated application)
+* decide what to do about uniformly dark faces on opposite side of polyhedra
+  to the directional light source
+* keypresses should map to invocation of a callable.
+    * Callables to create basic shapes and add them to the world
+    * Callables to modify the shape of the last-added item
+        * subdivide, etc
+    * Callables to change the colors
+        * one random color all over
+        * different random color for each face
+* normalise the sizes of the basic shapes to all have verts at the given
+  radius
+* subdivide adds more vertices than it needs to: two at the midpoint of each
+  edge (one for each adjacent face.)
+* subdivide should work on faces with any number of edges.
+  leave same shape as original in middle, surround it with triangles from
+  cutting off each corner
+* Startup: Replace the (* seq) operator on initialising gl_array in Glyph.
+  Instead use:
+    array = arraytype()
+    array[:] = seq # eg. [11, 22, 33... ]
+* creating a shape labels faces with 'Tetrahedron', etc
+* or '?' if unknown
+* Make sure all faces use same instance of the string
+* change modifiers 'subdivide', 'stellate', 'normalize' to expose fn which
+  operates on just a single given face, and to expose a function which
+  operates on specified faces (specified as a list of integer face-indices.)
+* change modifiers to append to face's label: 'Tetrahedron.subdivided-center'
+* move centroid method to Face
+* create functions to return list of face indices based on face labels
+* rewrite DualTetrahedron to use the above faculty
+* new modifier to extrude faces
+* extrude center subdivisions
+* extrude corner subdivisions
+* stellate extrusion-ends
+* browser demo should have keys to select face type, then other keys to operate
+  on the selected faces
+* color modifiers should operate on selected faces
+* keypress to generate koche tetra and color it nicely
+* face labelling:
+    * label each face with a 'generation' count? Or a 'face type' UID, so that
+      modifications could operate on just a subset of faces.
+      * UID is bad because how to subsequent operations know which UID to
+        operate on?
+      * generation count is bad because subsequent operations could create#
+        identical counts on very different faces
+      * maybe each face has a list of operations that have been performed on it
+        Tetrahedron:
+            f0 [tetrahedron]
+            f1 [tetrahedron]
+            f2 [tetrahedron]
+            f3 [tetrahedron]
+        subdivide:
+            f0.0 [tetrahedron,center]
+            f0.1 [tetrahedron,corner]
+            f0.2 [tetrahedron,corner]
+            f0.3 [tetrahedron,corner]
+            f1.0 [tetrahedron,center]
+            f1.1 [tetrahedron,corner]
+            f1.1 [tetrahedron,corner]
+            f1.1 [tetrahedron,corner]
+            etc
+    * add shape modifiers that subdivide, then operate on just a subset of the
+      new faces. Recreate Koche tetra using this.
+* key to toggle cull backface?
+* keys to zoom camera orbit in and out
+* make camera zoom smooth
+* Add good shapes from flyinghigh
+* talk new draft
+* finish documentation
+    * patch sphinx-apidoc to not garble the user's specified --doc-header
+    * move docs makefile into docs dir
+    * figure out how to link to classes, modules, etc
+    * add a worked example, with screenshots
+    * add docstrings throughout
+    * tidy the package / module / class API
+    * can we include README.txt in the middle of intro.rst?
+* eventloop in top level package? render? world? camera? what else?
+* being added to the world converts shapes to glyphs, not being rendered.
+* release on PyPI
+    * create a local sdist
+    * that can run
+    * and that can install
+    * check it includes the documentation, in documentation/html
+

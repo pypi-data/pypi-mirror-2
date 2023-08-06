@@ -1,0 +1,284 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>gloopy.geom.orientation &mdash; Gloopy 0.1.3a documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1.3a',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="Gloopy 0.1.3a documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">Gloopy 0.1.3a documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for gloopy.geom.orientation</h1><div class="highlight"><pre>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span><span class="p">,</span> <span class="n">degrees</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">uniform</span>
+
+<span class="kn">from</span> <span class="nn">OpenGL</span> <span class="kn">import</span> <span class="n">GL</span>
+
+<span class="kn">from</span> <span class="nn">.vector</span> <span class="kn">import</span> <span class="n">Vector</span>
+<span class="kn">from</span> <span class="nn">.matrix</span> <span class="kn">import</span> <span class="n">Matrix</span>
+
+
+
+<span class="n">EPSILON</span> <span class="o">=</span> <span class="mf">1e-15</span>
+<span class="n">matrix_type</span> <span class="o">=</span> <span class="n">GL</span><span class="o">.</span><span class="n">GLfloat</span> <span class="o">*</span> <span class="mi">16</span>
+
+
+<span class="k">class</span> <span class="nc">Orientation</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Orientation"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation">[docs]</a>    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Defines an orientation by maintaining a `forward` and `up` vector (and a</span>
+<span class="sd">    derived `right`, orthogonal to both.)</span>
+
+<span class="sd">    .. function:: __init__(forward=None, up=None)</span>
+<span class="sd">    </span>
+<span class="sd">        Constructs an orientation looking along the `forward` vector. If none</span>
+<span class="sd">        is given then defaul to the negative Z axis.</span>
+
+<span class="sd">        If `up` is specified, it must lie at right angles to `forward`. If none</span>
+<span class="sd">        is given then a default is chosen, the vector at right angles to forward</span>
+<span class="sd">        which lies closest to the positive Y axis.</span>
+
+<span class="sd">    Orientation.Identity, which results in zero rotation, is with forward</span>
+<span class="sd">    pointing along the negative Z axis, up along the positive Y axis (and</span>
+<span class="sd">    hence right along the positive X axis.)</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">forward</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">up</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Orientation.__init__"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.__init__">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        &#39;forward&#39; and &#39;up&#39; should be Vector or 3-part tuple.</span>
+<span class="sd">        If &#39;up&#39; is omitted, a sensible default up vector is chosen.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">forward</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">forward</span> <span class="o">=</span> <span class="n">Vector</span><span class="o">.</span><span class="n">ZNegAxis</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">forward</span><span class="p">,</span> <span class="n">Vector</span><span class="p">):</span>
+            <span class="n">forward</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">(</span><span class="o">*</span><span class="n">forward</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_forward</span> <span class="o">=</span> <span class="n">forward</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">up</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">up</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_default_up</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">up</span><span class="p">,</span> <span class="n">Vector</span><span class="p">):</span>
+            <span class="n">up</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">(</span><span class="o">*</span><span class="n">up</span><span class="p">)</span>
+            <span class="n">angle_between</span> <span class="o">=</span> <span class="n">forward</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span><span class="n">up</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">angle_between</span> <span class="o">-</span> <span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">EPSILON</span><span class="p">,</span> \
+                <span class="s">&quot;up (</span><span class="si">%s</span><span class="s">) must be 90deg to forward (</span><span class="si">%s</span><span class="s">), actually </span><span class="si">%f</span><span class="s"> deg&quot;</span> <span class="o">%</span> \
+                <span class="p">(</span><span class="n">up</span><span class="p">,</span> <span class="n">forward</span><span class="p">,</span> <span class="n">degrees</span><span class="p">(</span><span class="n">angle_between</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_up</span> <span class="o">=</span> <span class="n">up</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">right</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_right</span><span class="p">()</span>
+
+        <span class="c"># cached return value for &#39;matrix&#39; property. Needs reseting to None</span>
+        <span class="c"># whenever self.forward or self.up change.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span> <span class="o">=</span> <span class="bp">None</span>
+
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+        <span class="k">return</span> <span class="s">&#39;Orientation(</span><span class="si">%s</span><span class="s">, up=</span><span class="si">%s</span><span class="s">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Orientation</span><span class="p">)</span> <span class="ow">and</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">forward</span> <span class="ow">and</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">up</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">up</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+
+    <span class="n">__hash__</span> <span class="o">=</span> <span class="bp">None</span> <span class="c"># Orientations are mutable, so do not allow hashing</span>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">Random</span><span class="p">():</span>
+<div class="viewcode-block" id="Orientation.Random"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.Random">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Return a new random Orientation</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">fwd</span> <span class="o">=</span> <span class="n">Vector</span><span class="o">.</span><span class="n">RandomSphere</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Orientation</span><span class="p">(</span><span class="n">fwd</span><span class="p">)</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="n">pi</span><span class="p">,</span> <span class="o">+</span><span class="n">pi</span><span class="p">))</span>
+
+
+    <span class="k">def</span> <span class="nf">_set_forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_forward</span> <span class="o">=</span> <span class="n">new</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="n">forward</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_forward</span><span class="p">,</span> <span class="n">_set_forward</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;The forward vector&#39;</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">_set_up</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_up</span> <span class="o">=</span> <span class="n">new</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="n">up</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">_up</span><span class="p">,</span> <span class="n">_set_up</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;The up vector&#39;</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">_get_default_up</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        returns a sensible default up vector (ie. orthogonal to forward,</span>
+<span class="sd">        but pointed as near to the Y axis as possible)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="c"># special case for forward is y-axis or negative y-axis</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span> <span class="o">==</span> <span class="n">Vector</span><span class="o">.</span><span class="n">YAxis</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Vector</span><span class="o">.</span><span class="n">ZAxis</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span> <span class="o">==</span> <span class="n">Vector</span><span class="o">.</span><span class="n">YNegAxis</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Vector</span><span class="o">.</span><span class="n">ZNegAxis</span>
+
+        <span class="c"># project &#39;forward&#39; onto y=0 plane</span>
+        <span class="n">flat</span> <span class="o">=</span> <span class="n">Vector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">z</span><span class="p">)</span>
+        <span class="c"># find &#39;axis&#39;, a vector in the y=0 plane at right angles to &#39;flat&#39;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="n">flat</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">Vector</span><span class="o">.</span><span class="n">YAxis</span><span class="p">)</span>
+        <span class="c"># rotate &#39;forward&#39; by 90 deg about &#39;axis&#39;</span>
+        <span class="n">up</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="o">-</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">up</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+
+
+    <span class="k">def</span> <span class="nf">_get_right</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        value of self.right is always derived from self.forward and self.up</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">roll</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">angle</span><span class="p">):</span>
+<div class="viewcode-block" id="Orientation.roll"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.roll">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Rotate new Orientation, rotated about the &#39;forward&#39; axis</span>
+<span class="sd">        (ie. +ve angle rolls to the right.)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Orientation</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">,</span> <span class="o">-</span><span class="n">angle</span><span class="p">)</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+        <span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">yaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">angle</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Orientation.yaw"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.yaw">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Rotate about the &#39;down&#39; axis (ie. +ve angle yaws to the right.)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Orientation</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="p">,</span> <span class="n">angle</span><span class="p">)</span><span class="o">.</span><span class="n">normalized</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">up</span>
+        <span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">pitch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">angle</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Orientation.pitch"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.pitch">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Rotate about the &#39;right&#39; axis (ie. +ve angle pitches up.)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Orientation</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="o">-</span><span class="n">angle</span><span class="p">)</span><span class="o">.</span><span class="n">normalized</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="o">-</span><span class="n">angle</span><span class="p">)</span><span class="o">.</span><span class="n">normalized</span><span class="p">()</span>
+        <span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">rotate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">,</span> <span class="n">angle</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Orientation.rotate"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.rotate">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Rotate about the given axis by the given angle.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Orientation</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">angle</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">up</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">angle</span><span class="p">)</span>
+        <span class="p">)</span>
+
+
+    <span class="c"># This method is an ugly performance hack. Orientation shouldn&#39;t need</span>
+    <span class="c"># to import matrix, nor to know about ctypes. One day this will be</span>
+    <span class="c"># replaced by replacing every gameitem&#39;s position and orientation</span>
+    <span class="c"># attributes with a single attribute which stores position and</span>
+    <span class="c"># orientation stored natively as a ctypes matrix suitable for passing </span>
+    <span class="c"># directly to glMultMatrix or shader uniforms.</span>
+    <span class="nd">@property</span></div>
+    <span class="k">def</span> <span class="nf">matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Orientation.matrix"><a class="viewcode-back" href="../../../api/gloopy.geom.html#gloopy.geom.orientation.Orientation.matrix">[docs]</a>        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        The matrix that the OpenGL modelview matrix should be multiplied by</span>
+<span class="sd">        to represent this orientation. It&#39;s likely that this method will</span>
+<span class="sd">        disappear in later releases of Gloopy.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span> <span class="o">=</span> <span class="n">matrix_type</span><span class="p">(</span> <span class="o">*</span><span class="n">Matrix</span><span class="p">(</span><span class="n">Vector</span><span class="o">.</span><span class="n">Origin</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span> <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matrix</span>
+
+
+<span class="n">Orientation</span><span class="o">.</span><span class="n">Identity</span> <span class="o">=</span> <span class="n">Orientation</span><span class="p">()</span></div></div>
+
+<span class="c"># ugly hack to prevent cyclic imports</span>
+<span class="n">Matrix</span><span class="o">.</span><span class="n">_zero_rotation</span> <span class="o">=</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">Identity</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">Gloopy 0.1.3a documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Jonathan Hartley.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre.
+    </div>
+  </body>
+</html>
