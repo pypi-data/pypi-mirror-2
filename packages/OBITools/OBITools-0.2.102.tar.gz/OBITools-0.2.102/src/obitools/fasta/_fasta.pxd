@@ -1,0 +1,1 @@
+cpdef parseFastaDescription(str ds, object tagparser=?)
