@@ -1,0 +1,159 @@
+#!/usr/bin/env python
+#
+#
+
+""" install the GAE upload dir so it can be uploaded. """
+
+## bootstrap
+
+#import warnings
+#warnings.simplefilter("ignore")
+
+## imports
+
+import sys
+import os
+import pkg_resources
+import shutil
+import time
+
+os.environ['PATH'] = os.getcwd() + os.sep + 'bin:' + os.environ['PATH']
+sys.path.insert(0, os.getcwd())
+
+from me2.utils.log import setloglevel
+setloglevel("warn")
+
+## me2 imports
+
+from me2.utils.generic import gethighest, dosed, isdebian, botuser
+from me2.lib.version import getversion
+from me2.lib.datadir import getdatadir
+from me2.lib.config import getmainconfig
+
+print getversion("RELEASE")
+
+## options
+
+from optparse import OptionParser
+parser = OptionParser(usage='usage: %prog [options] <appid>', version='%prog ' + getversion())
+parser.add_option('-b', '--backup', action='store_true', default=False, dest='backup', help="keep backup dir")
+parser.add_option('-d', '--datadir', type='string', default=False, dest='datadir', help="datadir to use")
+opts, args = parser.parse_args()
+opts.args = args
+
+if opts.datadir and not os.path.isdir(opts.datadir): os.mkdir(opts.datadir)
+if not os.path.isdir(getdatadir()): os.mkdir(getdatadir())
+
+if opts.args:
+     ddir = opts.datadir or getdatadir()
+     if not os.path.isdir(ddir + os.sep + 'releases'):
+         os.mkdir(ddir + os.sep + 'releases')
+     release = ddir + os.sep + 'releases' + os.sep + opts.args[0]
+     if not os.path.isdir(release):
+         os.mkdir(release)
+     targetin = opts.args[0]
+else:
+     release = opts.datadir or getdatadir() + os.sep + "releases" + os.sep + 'me2'
+     targetin = 'me2'
+
+if isdebian() and botuser() == "me2" and os.path.isdir("var/spool/me2"): ddir = "var/spool/me2"
+else: ddir = opts.datadir or getdatadir()
+ddir = ddir + os.sep + "releases"
+
+if os.path.isdir(release + '.old'):
+    backup = ddir + os.sep + gethighest(ddir, targetin + '.old')
+else:
+    backup = release + '.old'
+
+if os.path.isdir(release):
+    print "MOVING %s TO %s" % (release, backup)
+    os.rename(release, backup)
+
+## define
+
+orig = 'botme2'
+
+## functions
+
+def copyover(source, target):
+    print "COPYING RESULTS TO %s" % target
+    shutil.copytree(source, target)   
+    if len(sys.argv) > 1:
+        sed(source, target)
+  
+def sed(source, target):
+    print "source: %s target: %s" % (source, target)
+
+    for f in os.listdir(target):
+        if f.startswith('..'):
+            continue
+        if f.endswith(".pyc"):
+            continue
+        if f.endswith("~"):
+            continue
+        if os.path.isdir(target + os.sep + f):
+            sed(source + os.sep + f, target + os.sep + f)
+            continue
+        else:
+            print "sedding %s (%s) - %s" % (f, orig, targetin)
+            dosed(target + os.sep + f, 's/%s/%s/' % (orig, targetin))
+            dosed(target + os.sep + f, 's/%s/%s/' % (orig.upper(), targetin.upper()))
+
+
+## doit
+
+try: source = pkg_resources.resource_filename("me2", 'upload')
+except ImportError: 
+    if isdebian(): source = "/var/lib/me2/me2/upload"
+    else: source = "/usr/local/me2/upload"
+print source
+copyover(source, release)
+try: source = pkg_resources.resource_filename("me2", "data")
+except ImportError:
+    if isdebian(): source = "/var/lib/me2/data"
+    else: source = "/usr/local/me2/data"
+print source
+copyover(source, release + os.sep + "data")
+print source
+source = pkg_resources.resource_filename('me2', '')
+print source
+copyover(source, release + os.sep + 'me2')
+
+homedir = os.path.expanduser("~")
+try:
+    shutil.move(os.path.join(release, 'data', 'config'), os.path.join(release, 'data', 'config.bck'))
+except IOError, ex:
+    print "TAKE NOTE ! no %s dir available" % os.path.join(release, "data", "config")
+
+if not os.path.isdir(homedir + os.sep + 'me2regs'):
+   os.mkdir(homedir + os.sep + 'me2regs')
+
+try:
+    copyover(os.path.join(homedir, 'me2regs', targetin), os.path.join(release, 'gozerdata', 'config'))
+    shutil.copy(os.path.join(homedir, "me2regs", targetin, 'app.yaml'), release + os.sep + 'app.yaml')
+    shutil.copy(os.path.join(homedir, "me2regs" , targetin,'cron.yaml'), release + os.sep + 'cron.yaml')
+    shutil.copy(os.path.join(homedir, "me2regs", targetin, 'queue.yaml'), release + os.sep + 'queue.yaml')
+except (OSError, IOError), ex:
+    print "TAKE NOTE: %s" % str(ex)
+    try:
+        copyover(os.path.join(release, 'data', 'examples'), os.path.join(homedir , 'me2regs', targetin))
+        print "\n\nplease edit ~/me2regs/%s/ dir and rerun this program.\n\n" % (targetin,)
+        os._exit(1)
+    except OSError, ex:
+        try:
+            copyover(os.path.join('/usr', 'local', 'me2', 'data', 'examples'), os.path.join(homedir, 'me2regs', targetin))
+            print "\n\nplease edit ~/me2regs/%s/ dir and rerun this program.\n\n" % (targetin,)
+            os._exit(1)
+        except OSError, ex:
+            print "ERROR: can't copy files to ~/me2regs %s" % str(ex)
+            os._exit(1)
+
+if os.path.isdir('docs'):
+    copyover('docs', release + os.sep + 'docs')
+
+
+if not opts.backup:
+    print "REMOVING BACKUP"
+    shutil.rmtree(backup)
+else:
+    print "CREATED BACKUP %s" % backup

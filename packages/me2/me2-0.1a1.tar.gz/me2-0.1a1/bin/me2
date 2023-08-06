@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+#
+#
+
+""" Console Bot. """
+
+
+import warnings
+warnings.simplefilter("ignore")
+
+## bootstrap
+
+import os, sys
+sys.path.insert(0, os.getcwd())
+
+from me2.lib.version import getversion
+print getversion('CONSOLE')
+
+## command line parsing
+
+from optparse import OptionParser
+parser = OptionParser(usage='usage: %prog [options] <appid>', version='%prog ' + getversion())
+parser.add_option('-d', '--datadir', type='string', default=False, dest='datadir', help="datadir to use")
+parser.add_option('-x', '--execute', type='string', default=False, dest='command', help="command to execute")
+parser.add_option('-c', '--channel', type='string', default=False, dest='channel', help="channel to operate on")
+parser.add_option('-n', '--name', type='string', default=False, dest='name', help="name of the console bot")
+parser.add_option('-l', '--loglevel', type='string', default=False, dest='loglevel', help="logging level")
+opts, args = parser.parse_args()
+opts.args = args
+
+if opts.datadir and not os.path.isdir(opts.datadir): os.mkdir(opts.datadir)
+
+## make config from cmndline options
+
+from me2.utils.log import setloglevel
+setloglevel(opts.loglevel or "error")
+
+from me2.lib.boot import boot
+boot(opts.datadir)
+
+## me2 imports
+
+from me2.utils.generic import waitforqueue
+from me2.utils.mainloop import mainloop
+from me2.lib.plugins import Plugins
+from me2.lib.console.bot import ConsoleBot
+from me2.lib.console.event import ConsoleEvent
+from me2.lib.plugins import Plugins
+from me2.lib.config import Config
+from me2.lib.datadir import makedirs
+from me2.lib.users import Users, users
+from me2.lib.errors import NoOwnerSet
+from me2.lib.threads import start_new_thread
+from me2.lib.fleet import getfleet
+
+## basic imports
+
+import getpass
+import logging
+import time
+import code
+import readline
+import atexit
+import os
+import getpass
+
+## start the bot
+name = opts.name or "default-console"
+cfg = Config("fleet" + os.sep + name + os.sep + 'config')
+cfg.botname = name
+userid = getpass.getuser() + '@' + cfg.uuid
+
+if userid not in cfg.owner: cfg.owner.append(userid)
+
+try: bot = ConsoleBot(cfg)
+except NoOwnerSet:
+    print "the owner is not set in %s" % cfg.cfile
+    os._exit(1)
+
+## check for -x option
+
+if opts.command:
+    result = bot.docmnd(userid, opts.channel or "console", opts.command + u' '+ u' '.join(opts.args))
+    if result:
+        waitforqueue(result.inqueue, 60)
+        print "command done. ltrs"
+    else: print "can't execute %s" % opts.command    
+    os._exit(0)
+
+bot.start()

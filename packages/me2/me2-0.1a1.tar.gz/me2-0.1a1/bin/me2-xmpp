@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+#
+#
+
+## bootstrap
+
+import warnings
+warnings.simplefilter("ignore")
+
+import os, sys
+sys.path.insert(0, os.getcwd())
+
+
+## me2 impors
+
+from me2.lib.socklib.xmpp.bot import SXMPPBot
+from me2.lib.boot import plugin_packages, boot
+from me2.utils.log import setloglevel
+from me2.lib.config import Config
+from me2.lib.errors import NoOwnerSet
+from me2.lib.fleet import getfleet
+from me2.utils.mainloop import mainloop
+from me2.utils.opts import makexmppopts, makexmppconfig
+import me2.lib.users as users
+import me2
+
+## basic imports
+
+import logging
+import time
+import os
+
+## options parser
+
+opts = makexmppopts()
+
+from me2.lib.version import getversion
+print getversion('SXMPP')
+
+boot(opts.datadir)
+
+cfg = makexmppconfig('sxmpp', opts)
+if opts.nick: cfg.nick = opts.nick
+cfg.save()
+
+## runtime
+
+setloglevel(cfg.loglevel)
+
+## start bot
+
+try:
+    bot = SXMPPBot(cfg)
+    bot.nick = cfg.nick or 'me2'
+except NoOwnerSet, ex:
+    print "owner is not set in %s - use the -o option" % str(ex)
+    os._exit(1)
+
+if opts.channel and not opts.channel in bot.state['joinedchannels']:
+    bot.state['joinedchannels'].append(opts.channel)
+    bot.state.save()
+
+fleet = getfleet(opts.datadir, new=True)
+fleet.addbot(bot)
+bot.start()
+mainloop()

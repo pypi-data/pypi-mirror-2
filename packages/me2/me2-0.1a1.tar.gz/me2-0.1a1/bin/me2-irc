@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+#
+#
+
+## bootstrap
+
+import warnings
+warnings.simplefilter("ignore")
+
+import os, sys
+sys.path.insert(0, os.getcwd())
+
+from me2.utils.opts import makeircconfig, makeircopts
+## options parser
+
+opts = makeircopts()
+
+from me2.lib.version import getversion
+print getversion('IRC')
+
+## me2 imports
+
+from me2.utils.exception import handle_exception
+from me2.lib.socklib.partyline import partyline
+from me2.lib.socklib.irc.bot import IRCBot
+from me2.lib.boot import plugin_packages, boot
+from me2.utils.log import setloglevel
+from me2.lib.config import Config
+from me2.lib.errors import NoOwnerSet
+from me2.lib.fleet import getfleet
+from me2.utils.mainloop import mainloop
+from me2.lib.threads import start_new_thread
+from me2.lib.eventhandler import mainhandler
+import me2.lib.users as users
+import me2
+
+## basic imports
+
+from me2.contrib.simplejson import load
+import logging
+import time
+import os
+
+## boot
+
+boot(opts.datadir)
+
+cfg = makeircconfig('irc', opts)
+cfg.type = "irc"
+if opts.nick: cfg.nick = opts.nick
+cfg.save()
+
+## runtime
+
+if opts.owner:
+    u = users.users_boot()
+    u.make_owner(opts.owner)
+
+setloglevel(cfg.loglevel)
+
+## resume or start the bot
+
+if opts.doresume and os.path.isfile(opts.doresume):
+    logging.warn("irc - resuming from %s" % opts.doresume)
+    if True:
+        fleet = getfleet()
+        fleet.resume(opts.doresume)
+        fleet.startok.wait()
+    partyline.resume(opts.doresume)
+    os.unlink(opts.doresume)
+else:
+    try:
+        bot = IRCBot(cfg)
+        bot.nick = cfg.nick or 'me2'
+    except NoOwnerSet, ex:
+        print "owner is not set in %s - use the -o option" % str(ex)
+        os._exit(1)
+    if opts.channel and not opts.channel in bot.state['joinedchannels']:
+        bot.state['joinedchannels'].append(opts.channel)
+        bot.state.save()
+    fleet = getfleet(opts.datadir)
+    fleet.addbot(bot)
+    #if opts.forward:
+    #    print "starting forward bot (%s)" % str(cfg)
+    #    forwardcfg = makeconfig('sxmpp', opts, 'forwardbot') # sxmpp for the forward bo
+    #    forwardbot = fleet.makebot('sxmpp', 'forwardbot', cfg=forwardcfg)
+    #    start_new_thread(forwardbot.start, ())
+    start_new_thread(bot.start, ())
+
+
+mainloop()

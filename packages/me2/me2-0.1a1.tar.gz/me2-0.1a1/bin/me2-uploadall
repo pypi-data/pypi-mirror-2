@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+#
+#
+
+""" upload all instances in ~/jsonreg/ """
+
+## me2 imports
+
+import os, sys
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, os.getcwd() + os.sep + "..")
+
+os.environ['PATH'] = os.getcwd() + os.sep + 'bin:' + os.environ['PATH']
+
+from me2.utils.popen import gozerpopen
+from me2.lib.datadir import getdatadir
+from me2.lib.version import getversion
+
+print getversion("UPLOADALL")
+
+## basic imports
+
+from subprocess import Popen, PIPE
+import os
+import sys
+
+
+## options parser
+
+from optparse import OptionParser
+parser = OptionParser(usage='usage: %prog [options] [list of appids]', version='%prog ' + getversion())
+parser.add_option('-d', '--datadir', type='string', default=False, dest='datadir', help="datadir to use")
+opts, args = parser.parse_args()
+opts.args = args
+
+if opts.datadir and not os.path.isdir(opts.datadir): os.mkdir(opts.datadir)
+
+ddir = opts.datadir or getdatadir()
+homedir = os.path.expanduser("~")
+target = opts.args or os.listdir(homedir + os.sep + 'me2regs')
+
+## upload all instances in ~/me2regs/
+
+for item in target:
+    print "DOING RELEASE %s" % item
+    if os.path.isfile('me2-release'): execstring = './me2-release -d%s %s' % (ddir, item)
+    else: execstring = 'me2-release -d%s %s' % (ddir, item)
+    print execstring
+    proc = Popen(execstring.split())
+    proc.wait()
+    print "UPLOADING %s" % item
+    execstring = '%s/google_appengine/appcfg.py update %s%sreleases%s%s' % (homedir, ddir, os.sep, os.sep, item)
+    print execstring
+    proc = Popen(execstring.split())
+    proc.wait()
