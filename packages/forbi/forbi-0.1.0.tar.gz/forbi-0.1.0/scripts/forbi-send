@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# forbi: a TCP-based communication tool
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of forbi.
+#
+# forbi is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# forbi is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General
+# Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public
+# License along with forbi. If not, see
+# <http://www.gnu.org/licenses/>.
+
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Command-line interface to D-Bus client
+
+import sys
+import os.path
+from optparse import OptionParser
+import getpass
+
+try:
+    import forbi.misc as misc
+except ImportError:
+    # Same ugly hack as in forbi
+    basedir = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
+    sys.path.insert(0, basedir)
+    import forbi.misc as misc
+
+import forbi.localconn as localconn
+
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = misc.nothing
+
+class ModifiedOptionParser(OptionParser):
+    def format_epilog(self, formatter):
+        return self.epilog
+
+parser = ModifiedOptionParser(
+    prog=misc.program_sender_name,
+    usage='Usage: %prog [OPTION]... [ARGUMENT...]',
+    description=misc.program_sender_description,
+    version=misc.version_text,
+    epilog='''
+This tool only works if you have a forbi client running. It uses D-Bus
+to send the command to the client, which then acts on it.
+
+If a command requires arguments which are not present, they will be
+requested directly on the command-line.
+
+Commands:
+  message <RECIPIENT> <MESSAGE> (default)
+    sends MESSAGE to RECIPIENT. Fails if there is no foreign client
+    linked to the RECIPIENT
+
+  users
+    returns a list of all online users
+
+  logout
+    logs out
+
+  exit
+    logs out if logged in, then exits alltogether
+
+  login <USER> <PASSWORD>
+    logs in as user USER with password PASSWORD. Fails if someone is
+    already logged in
+
+  register <USER> <PASSWORD>
+    registers a new user on the server, but does not login
+
+  unregister
+    unregisters the user on the server
+
+Examples:
+  forbi-send john 'IRC now'
+    sends the message 'IRC now' to user 'john'
+
+  forbi-send -c users
+    prints a list of online users
+
+  forbi-send -c login 'Mr. Rek' secretpassword
+    logs in as 'Mr. Rek' using the password 'secretpassword'
+''')
+
+parser.add_option('-c', '--command', dest='command',
+                  help='specify the command',
+                  default='message')
+
+setproctitle(parser.prog)
+
+options, args = parser.parse_args()
+
+command = options.command.decode(misc.encoding)
+args = [x.decode(misc.encoding) for x in args]
+
+if command == u'message':
+    if len(args) < 1:
+        args.append(raw_input('Enter recipient\'s username: ').decode(misc.encoding))
+    if len(args) < 2:
+        args.append(raw_input('Enter message: ').decode(misc.encoding))
+    if len(args) > 2:
+        args = [args[0], args[1] + u' ' + u' '.join(args[2:])]
+elif command in (u'login', u'register'):
+    if len(args) < 1:
+        args.append(raw_input('Enter username: ').decode(misc.encoding))
+    if len(args) < 2:
+        args.append(getpass.getpass('Enter password: ').decode(misc.encoding))
+    if len(args) > 2:
+        args = args[:2]
+else:
+    args = []
+
+try:
+    client = localconn.LocalClient()
+except Exception:
+    import traceback
+    traceback.print_exc()
+    sys.stderr.write('Do you even have a client running?\n')
+    sys.exit(1)
+args.insert(0, command)
+
+print client.send(args)

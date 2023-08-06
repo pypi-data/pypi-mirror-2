@@ -1,0 +1,184 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# forbi: a TCP-based communication tool
+# Copyright (C) 2010  Niels Serup
+
+# This file is part of forbi.
+#
+# forbi is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# forbi is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General
+# Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public
+# License along with forbi. If not, see
+# <http://www.gnu.org/licenses/>.
+
+##[ Maintainer  ]## Niels Serup <ns@metanohi.org>
+##[ Description ]## Command-line interface to forbi
+
+import sys
+import os.path
+from optparse import OptionParser
+
+try:
+    import forbi.misc as misc
+except ImportError:
+    # forbi is not installed, trying an ugly fix. Considering that
+    # this executable is in the scripts/ directory, appending the
+    # directory one level up to sys.path should make importing possible.
+    basedir = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
+    sys.path.insert(0, basedir)
+    import forbi.misc as misc
+
+from forbi.runner import ForbiRunner
+
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    setproctitle = misc.nothing
+
+class ModifiedOptionParser(OptionParser):
+    def error(self, msg):
+        misc.error(msg)
+
+    def format_epilog(self, formatter):
+        return self.epilog
+
+parser = ModifiedOptionParser(
+    prog=misc.program_name,
+    usage='Usage: %prog [OPTION]... [[USER[:PASSWORD]@][HOST][:PORT]]',
+    description=misc.program_description,
+    version=misc.version_text,
+    epilog='''
+If you are in doubt of what options to use, use none. Forbi features
+an interactive guide that will get you set up. The A:B@C:D shortcut is
+useful only when forbi is run as a client.
+
+A port number of -1 will result in a pseudorandom unused port ranging
+from 49152 to 65535. This is the default behavior when choosing a
+client port.
+''')
+
+parser.add_option('-c', '--config-file', dest='config_file_path',
+                  metavar='PATH', default=os.path.expanduser('~/.forbi.conf'),
+                  help='''\
+set the path to your config file (defaults to "$HOME/.forbi.conf")
+''')
+
+parser.add_option('-G', '--no-config-file', dest='use_config_file',
+                  action='store_false', default=True, help='''\
+do not attempt to use a config file
+''')
+
+parser.add_option('-d', '--save-file', dest='save_file',
+                  metavar='PATH', help='''\
+set the path to your save file (defaults to "$HOME/.forbi.db", named
+'save file' in your config file)
+''')
+
+parser.add_option('-x', '--execute-on-new-message', dest='execute_on_new_message',
+                  metavar='PROGRAM', help='''\
+set a program to run when you receive a message. By default no
+external program is run, and a simple internal GUI is used
+instead. Data will be sent to the program in the form of `PROGRAM FROM TO
+MESSAGE' (named 'execute on new message' in your config file)
+''')
+
+parser.add_option('-o', '--host', dest='server_host',
+                  metavar='ADDRESS', help='''\
+set server host (identical to HOST, named 'host' in your config file)
+''')
+
+parser.add_option('-p', '--port', dest='server_port', type='int',
+                  metavar='NUMBER', help='''\
+set server port (defaults to 54547, identical to PORT, named 'port' in
+your config file)
+''')
+
+parser.add_option('-u', '--user', dest='server_user',
+                  metavar='NAME', help='''\
+set username (identical to USER, named 'user' in your config file)
+''')
+
+parser.add_option('-w', '--password', dest='server_password',
+                  metavar='PASSWORD', help='''\
+set password (identical to PASSWORD, named 'password' in your config file)
+''')
+
+parser.add_option('-s', '--be-server', dest='is_server', action='store_true',
+                  help='''\
+run a forbi server (does not run a server by default, named "server"
+in your config file)
+''')
+
+parser.add_option('-P', '--client-port', dest='client_port', type='int',
+                  metavar='NUMBER', help='''\
+set client's serving port (defaults to a random port, named 'client
+port' in your config file)
+''')
+
+parser.add_option('-q', '--quiet', dest='term_verbose',
+                  action='store_false',
+                  help='''\
+do not print status and error messages (named "verbose" in your config
+file)
+''')
+
+parser.add_option('-C', '--no-colored-text', dest='term_colored_text',
+                  action='store_false',
+                  help='''\
+do not attempt to print status and error messages in the terminal in a
+red color (named "colored text" in your config file)
+''')
+
+setproctitle(parser.prog)
+
+options, args = parser.parse_args()
+options = eval(str(options))
+
+if args:
+    # Parse the [[USER[:PASSWORD]@][HOST][:PORT]] part
+    port = None
+    user = None
+    password = None
+    host = args[0]
+    if '@' in host:
+        host = host.split('@')
+        user = host[0]
+        host = host[1]
+        if ':' in user:
+            user = user.split(':')
+            password = user[1]
+            user = user[0]
+    if ':' in host:
+        host = host.split(':')
+        port = int(host[1])
+        host = host[0]
+
+    if host and options['server_host'] is None:
+        options['server_host'] = host
+    if port is not None and options['server_port'] is None:
+        options['server_port'] = port
+    if user is not None and options['server_user'] is None:
+        options['server_user'] = user
+    if password is not None and options['server_password'] is None:
+        options['server_password'] = password
+
+# Create and run
+runner = ForbiRunner(**options)
+try:
+    runner.start()
+except (EOFError, KeyboardInterrupt):
+    pass
+except Exception:
+    import traceback
+    traceback.print_exc()
+finally:
+    runner.end()

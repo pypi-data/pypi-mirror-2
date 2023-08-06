@@ -1,0 +1,175 @@
+
+=====
+forbi
+=====
+
+forbi is a TCP-based communication tool with PKCS#1 OAEP RSA
+encryption. It consists of a server and a client. The server keeps
+track of online users and forwards messages from clients to other
+clients. It is easy to configure what the forbi client should do when
+it receives a message. Its default action is to show it in a small
+window.
+
+forbi is designed to be both a secure message sender and a "pre-chat"
+message mechanism. If you want one of your friends to join an IRC
+channel, for example, you simply send him a message::
+
+  $ forbi-send 'Mr. Spock' 'Come to #thechannel now!'
+
+(Note that this will only work if both you and your friend have forbi
+clients running.)
+
+Because your friend has his forbi client configured in a way that
+works best for him (perhaps he has configured his client to run a
+program that makes a lot of noise when he receives a message, or maybe
+something else), he is sure to notice your message.
+  
+
+License
+=======
+
+forbi is free software under the terms of the GNU Affero General
+Public License version 3 (or any later version). This is version 0.1.0
+of the program.
+
+The libraries used by forbi are AGPL-compatible.
+
+
+Installing
+==========
+
+Way #1
+------
+
+Just run this (requires that you have python-setuptools installed)::
+
+  # easy_install forbi
+
+
+Way #2
+------
+
+Get the newest version of forbi at http://metanohi.org/projects/forbi/
+or at http://pypi.python.org/pypi/forbi
+
+Extract the downloaded file and run this in a terminal::
+
+  # python setup.py install
+
+  
+Dependencies
+============
+
+Python 2.6 is required. Python 3.x cannot be used because at least one
+of the required modules requires Python 2.x.
+
+``m2crypto``
+ + Web address: http://chandlerproject.org/bin/view/Projects/MeTooCrypto
+ + License: Modified BSD license
+ + Installing: ``$ sudo apt-get install python-m2crypto`` (or something similar)
+
+``dbus``
+ + Web address: http://www.freedesktop.org/wiki/Software/DBusBindings
+ + License: Expat license
+ + Installing: ``$ sudo apt-get install python-dbus`` (or something similar)
+
+``gobject``
+ + Web address: http://www.freedesktop.org/wiki/Software/DBusBindings
+ + License: LGPL 2.1+
+ + Installing: ``$ sudo apt-get install python-gobject`` (or something similar)
+
+``tk``
+ + Web address: 
+ + License: Python Software Foundation License
+ + Installing: ``$ sudo apt-get install python-tk`` (or something similar)
+
+
+Optional extras
+---------------
+
+If present, forbi will also use these Python modules:
+
+``termcolor``
+ + Web address: http://pypi.python.org/pypi/termcolor/
+ + License: GPLv3+
+ + Installing: ``$ sudo easy_install termcolor``
+
+Note that ``termcolor`` is included with forbi, so you don't
+really have to install it.
+ 
+``setproctitle``
+ + Web address: http://pypi.python.org/pypi/setproctitle/
+ + License: New BSD License
+ + Installing: ``$ sudo easy_install setproctitle``
+
+
+Using
+=====
+
+To see a list of forbi's command-line options, run ``forbi --help``.
+
+
+As a client
+-----------
+
+The forbi client can only be used together with a forbi server. If you
+don't know of anyone with a forbi server, you can run the server on
+the same computer as your client. In this case, the host address you
+must give the forbi client is ``localhost``.
+
+The client will run just fine with no command-line arguments. To start
+it, just run ``forbi``. When it is up and running, you can send
+commands to it with ``forbi-send``. To see what commands exist and
+what arguments they require, run ``forbi-send --help``.
+
+See the ``examples/`` directory for simple message receival scripts.
+
+
+As a server
+-----------
+
+It is equally easy to run forbi as a server. The simplest way is to
+run ``forbi -s``. Be aware that while data transportation in forbi
+is secure, protection against overflooding is non-existent. Anyone can
+register as a user on a forbi server, and there are no limits (except
+for those imposed by the underlying system) on how many clients can be
+connected to the server at the same time.
+
+
+In general
+----------
+
+forbi works by sending commands back and forth between server and
+clients. These commands are not at all frozen and could very well
+change in any eventual new releases. There are no detailed
+descriptions of how the responses to commands should be, but it works
+for now.
+
+forbi supports adjusting settings using a config file. To see an
+example of such a config file, take a look at ``forbi.conf`` in the
+``examples/`` directory of this distribution.
+
+The homepage for forbi is at http://metanohi.org/projects/forbi/
+
+
+Developing
+==========
+
+forbi is written in Python and uses Git for branches. To get the
+latest branch, get it from gitorious.org like this::
+
+  $ git clone git://gitorious.org/forbi/forbi.git
+
+Bugs can be reported at ns@metanohi.org (address of sole developer)
+
+
+This document
+=============
+
+Copyright (C) 2010  Niels Serup
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.  This file is offered as-is,
+without any warranty.
+
