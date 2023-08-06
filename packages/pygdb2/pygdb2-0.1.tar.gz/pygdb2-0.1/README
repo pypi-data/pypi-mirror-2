@@ -1,0 +1,114 @@
+.. -*- restructuredtext -*-
+
+pygdb2: control GDB from within the Python program being debugged
+==================================================================
+
+``pygdb2`` is a python module which allows you to send commands to the
+underlying ``gdb`` process.  For example, it can be used to automatically and
+programmatically add breakpoints and watchpoints.
+
+How to install
+--------------
+
+Make sure that ``pygdb2`` is installed::
+
+    $ pip install pygdb2
+
+Then, you need to activate the GDB integration by putting this line inside
+your ``~/.gdbinit``::
+
+    python import pygdb2
+
+
+How to use it
+--------------
+
+You need to launch your python program inside ``gdb`` using the special
+``pyrun`` command::
+
+    $ gdb --args python myscript.py
+    ...
+    (gdb) pyrun
+    ...
+
+From the python program, you can use ``pygdb2.set_trace()`` to enter the ``gdb``
+prompt, or ``pygdb2.execute()`` to send commands to ``gdb``.
+
+At the ``(gdb)`` prompt, it is possible to invoke the ``pdb`` command to enter
+in the corresponding debugger at the Python level.
+
+
+Example
+-------
+
+For example, the following code adds a watchpoint for a particular
+region of memory created with ``ctypes``::
+
+    import ctypes
+    import pygdb2
+
+    def main():
+        buf = ctypes.c_int()
+        buf.value = 42
+        adr = ctypes.cast(ctypes.pointer(buf), ctypes.c_void_p)
+        # enter gdb when we write to this memory
+        pygdb2.execute("watch *(int*)%d" % adr.value)
+
+        i = 0
+        while i < 5:
+            print i
+            i += 1
+            if i == 2:
+                buf.value = 43 # GDB stops here
+
+Here is an example of a gdb/pdb session::
+
+    $ gdb --args python set_watchpoint.py
+    ...
+    (gdb) # lines prefixed "pygdb2:" contain the command coming from pygdb2.execute()
+    (gdb) pyrun
+    ...
+    pygdb2: watch *(int*)14079984
+    Hardware watchpoint 1: *(int*)14079984
+    0
+    1
+    Hardware watchpoint 1: *(int*)14079984
+
+    Old value = 42
+    New value = 43
+    i_set (ptr=0xd6d7f0, value=<value optimized out>, size=4) at /build/buildd/python2.7-2.7.1/Modules/_ctypes/cfield.c:663
+    663	/build/buildd/python2.7-2.7.1/Modules/_ctypes/cfield.c: No such file or directory.
+        in /build/buildd/python2.7-2.7.1/Modules/_ctypes/cfield.c
+
+    (gdb) # now we are debugging at the C level
+    (gdb) # in particular, we are inside function of _ctypes
+    (gdb) # which sets the value of the buffer
+
+    (gdb) # Let's jump to the Python level
+    (gdb) pdb
+    Signal received, entering pdb
+    Traceback:
+      File "set_watchpoint.py", line 20, in <module>
+        main()
+      File "set_watchpoint.py", line 16, in main
+        buf.value = 43 # we should enter gdb here
+    > /home/antocuni/env/src/pygdb2/pygdb2/test/set_watchpoint.py(12)main()
+    -> while i < 5:
+    (Pdb++) print i
+    2
+    (Pdb++) c
+    2
+    3
+    4
+
+    Program exited normally.
+    (gdb) q
+
+
+
+Using signals
+-----------------
+
+``pygdb2`` uses both ``SIGUSR1`` and ``SIGUSR2`` to communicate with ``gdb``,
+so if your program also needs those, you might have conflicts.
+
