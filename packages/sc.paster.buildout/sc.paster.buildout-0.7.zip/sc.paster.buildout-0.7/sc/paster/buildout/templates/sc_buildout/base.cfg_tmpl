@@ -1,0 +1,241 @@
+[buildout]
+parts =
+#if not $eggifiedplone
+    plone
+#end if
+#if not $zope2_install
+    zope2
+#end if
+    productdistros
+    instance
+    zopepy
+
+unzip = true
+
+#if $eggifiedplone
+\# Change the number here to change the version of Plone being used
+extends = 
+#if not $plone4
+#if $eggifiedzope
+    http://download.zope.org/Zope2/index/${zope2_version}/versions.cfg
+#end if
+#end if
+    http://dist.plone.org/release/${plone_version}/versions.cfg
+#end if
+versions = versions
+
+
+find-links =
+    https://simplesnet.com.br/pacotes/catalogo/simple
+#if $eggifiedplone
+    http://dist.plone.org/release/${plone_version}
+#else
+    http://dist.plone.org
+#end if
+    http://dist.plone.org/thirdparty
+
+eggs =
+      PILwoTk
+#if $eggifiedplone
+      Plone
+#if not $plone4
+      plone.app.blob
+      plone.app.imaging
+#end if
+#end if
+#if not $eggifiedplone
+    elementtree
+#if not $plone3
+    plone.app.blob
+    plone.app.imaging
+#end if
+#end if
+
+develop =
+
+zcml =
+#if $eggifiedplone
+#if not $plone4
+      plone.app.blob
+      plone.app.imaging
+#end if
+#end if
+#if not $eggifiedplone
+      plone.app.blob
+      plone.app.imaging
+#end if
+
+[versions]
+#if $eggifiedplone
+#if not $plone4
+ZODB3 = 3.8.5
+#end if
+#end if
+#if not $eggifiedplone
+plone.recipe.zope2instance = 3.6
+zc.buildout = 1.4.3
+five.localsitemanager = 0.4 
+five.intid = 0.4.3
+Products.CMFCore = 2.1.2
+Products.GenericSetup = 1.4.5
+zope.location = 3.5.4
+zc.recipe.egg = 1.2.2
+zope.component = 3.5.1
+#end if
+
+#if $tarballs
+[plone]
+\# For more information on this step and configuration options see:
+\# http://pypi.python.org/pypi/plone.recipe.plone
+recipe = plone.recipe.plone==${plone_version}
+#if $plone_products_install
+\# By overriding the download URLs and making them an empty list, we
+\# Make sure our own products directory takes precedence
+urls =
+#end if
+#end if
+
+#if $z29tarballs
+[plone]
+recipe = plone.recipe.distros
+urls = http://launchpad.net/plone/2.5/${plone_version}/+download/Plone-${plone_version}.tar.gz
+nested-packages = Plone-${plone_version}.tar.gz
+version-suffix-packages = Plone-${plone_version}.tar.gz
+#end if
+
+#if not $zope2_install
+[zope2]
+recipe = plone.recipe.zope2install
+fake-zope-eggs = true
+#if $tarballs
+url = \${plone:zope2-url}
+#end if
+#if $z29tarballs
+url = http://www.zope.org/Products/Zope/${zope2_version}/Zope-${zope2_version}-final.tgz
+#end if
+#if $eggifiedplone
+url = \${versions:zope2-url}
+#end if
+#end if
+
+[productdistros]
+recipe = plone.recipe.distros
+urls =
+nested-packages =
+version-suffix-packages =
+
+[instance]
+recipe = plone.recipe.zope2instance
+#if $zope2_install
+#if not $eggifiedzope
+zope2-location = ${zope2_install}
+#end if
+#else
+zope2-location = \${zope2:location}
+#end if
+user = ${zope_user}:${zope_password}
+effective-user = \${users:zope}
+http-address = ${http_port}
+#if $debug_mode == 'on'
+debug-mode = on
+#else
+\#debug-mode = on
+#end if
+#if $verbose_security == 'on'
+verbose-security = on
+#else
+\#verbose-security = on
+#end if
+#if $eggifiedzope
+blob-storage = var/blobstorage
+#end if
+environment-vars =
+    PYTHON_EGG_CACHE \${buildout:directory}/var/.python-eggs
+    zope_i18n_compile_mo_files true
+    PTS_LANGUAGES en, pt-br, es
+eggs =
+#if $eggifiedzope
+    Zope2
+#end if
+#if $eggifiedplone
+    \${buildout:eggs}
+#end if
+#if $tarballs
+    \${buildout:eggs}
+    \${plone:eggs}
+#end if
+#if $z29tarballs
+    \${buildout:eggs}
+#end if
+
+\# If you want to register ZCML slugs for any packages, list them here.
+\# e.g. zcml = my.package my.other.package
+zcml =
+    \${buildout:zcml}
+products =
+    \${buildout:directory}/products
+    \${productdistros:location}
+#if $tarballs
+#if not $plone_products_install
+    \${plone:products}
+#else
+    ${plone_products_install}
+#end if
+#end if
+#if $z29tarballs
+#if not $plone_products_install
+    \${plone:location}
+#else
+    ${plone_products_install}
+#end if
+#end if
+
+[supervisor-settings]
+user = admin
+password = 4dm1n\${users:zope}
+
+[hosts]
+supervisor = 0.0.0.0
+instance = 0.0.0.0
+zeoserver = 127.0.0.1
+
+[ports]
+instance = 8080
+instance1 = 8081
+instance2 = 8082
+zeoserver = 8100
+supervisor = 9001
+
+[users]
+zope = usuario
+os = usuario_os
+
+[zopepy]
+recipe = zc.recipe.egg
+eggs = \${instance:eggs}
+interpreter = zopepy
+scripts = zopepy
+
+#if $plone4
+## create bin/i18ndude command
+[i18ndude]
+unzip = true
+recipe = zc.recipe.egg
+eggs = i18ndude
+
+## create bin/test command
+[test]
+recipe = zc.recipe.testrunner
+defaults = ['--auto-color', '--auto-progress']
+eggs =
+    \${instance:eggs}
+
+## create ZopeSkel command
+[zopeskel]
+unzip = true
+recipe = zc.recipe.egg
+eggs =
+    ZopeSkel
+    \${instance:eggs}
+#end if
+
