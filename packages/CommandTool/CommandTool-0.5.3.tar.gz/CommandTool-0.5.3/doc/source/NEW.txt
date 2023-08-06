@@ -1,0 +1,24 @@
+Q. Why should commands be marble like?
+
+A. We want to be able to do self.database.query() and have it work during the command stage. This means
+   that the command flow needs a pipestack.
+
+The bag is set up by PipeStack during handling the command line when it makes a call to start the command flow. 
+
+If the class isn't already initialised, the bag is used to initialise the class.
+
+If the class is not set up this way, it doesn't get the bag. Instead, the
+deprecated ``service`` argument to commandtool's ``handle_command()`` is set to
+the app object itself so that old classes using the on_run(self, service, args,
+opts) approach can still access the app (but not the bag).
+
+Logging and config parsing happen in the main ``AppCmd`` object which is set if
+your PipeStack commands don't create one themselves.
+
+This all means that commands have a choice. They can either call self.xxx to
+start working with pipes, or, if they haven't started any pipes, they can
+repeatedly call app.start_flow() to allow some other run() function to be
+executed lots of times with the same stack. You cannot currently do all those
+things together.
+
+
