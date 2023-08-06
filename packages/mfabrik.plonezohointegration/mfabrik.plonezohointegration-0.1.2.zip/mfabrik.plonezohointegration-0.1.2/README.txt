@@ -1,0 +1,111 @@
+.. contents:: local
+
+Introduction
+-------------
+
+*mfabrik.plonezohointegration* provide tools to integrate Plone CMS with `Zoho <http://www.zoho.com>`_ 
+web applications and their data.
+
+The main feature of this add-on product is a new contact form, available as standalone and a portlet,
+which will directly deliver contacts to Zoho CRM where your sales representatives can pick them
+up and handle according to their workflow.
+
+Features
+--------
+
+* Control panel to set Zoho username, password and API key required for integration communication
+
+* Contact form integration with Zoho CRM. All contacts are automatically converted to Zoho leads.
+  The sales person of your organization can screen contact submissions in Zoho CRM 
+  and dial/email to persons interested in your products. 
+
+The features are done using `mfabrik.zoho library for Python <http://github.com/miohtama/mfabrik.zoho>`_.
+
+Installation
+-------------
+
+Add the following to your buildout.cfg::
+
+        eggs =
+                ...
+                mfabrik.plonezohointegration
+                
+Rerun buildout.
+
+Restart Plone.
+
+Go to Plone Site Setup.
+
+Run add-on installer for *Zoho CRM integration*.
+
+Add your Zoho credentials in *Zoho settings* under *Site Setup*.
+
+.. note:: 
+
+        As the writing of this, plone.app.z3cform trunk version (0.5.0+)
+        is needed to make this add-on fully functional. 
+
+Plone 3 and beta components
+============================
+
+This add-on product uses software components which are not yet officially deployed
+for Plone 3 (and maybe never will) like plone.app.registry. To make these components
+work correctly you probably need to use "good-py version pindowns" in your
+buildout.cfg.
+
+For more information, see
+
+* http://plone.org/products/dexterity/documentation/manual/developer-manual/pre-requisites/buildout-configuration
+
+Contact Us portlets and forms
+==============================
+
+Contact Us form will be available in URL http://yoursite.com/@@zoho-contact-form
+
+The form is also available as a portlet *Zoho Contact Form*. We suggest 
+that you add this portlet as a content-type portlet on all of your
+*Pages* and *Folders*.
+
+You can add some fixed field values to all leads generated through the web site
+in Zoho settings.
+
+Portlet CSS
+===========
+
+You might want add the following to your site theming to hide form fields descriptions
+on the portlet form::
+
+        .portletZohoCRMContact .formHelp {
+           display: none;
+        } 
+        
+Migration instructions from older versions
+==========================================
+
+Rerun add-on installer. Before neither control panel nor contact form works.
+
+If you cannot access site setup link then go to Zope Management Interface and portal_quickinstaller. 
+
+Roadmap
+--------
+
+More dynamic fields will be included - e.g. how to push URL, browser, language, etc.
+data to CRM.
+
+Commercial development
+-----------------------
+
+This package is licensed under open source GPL license. 
+If you are looking for high quality Zoho/Python support, please contact
+`mFabrik Research <http://mfabrik.com>`_.
+Our top class Python developers are ready to help you with your software development.
+
+Author and contributors
+-------------------------
+
+`mFabrik Research Oy - Python and Plone professionals for hire <http://mfabrik.com>`_ 
+
+* `Web and Mobile CMS for Plone <http://webandmobile.mfabrik.com>`_ 
+
+* Jean-Michel FRANCOIS       
+
