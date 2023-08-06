@@ -1,0 +1,44 @@
+#!/bin/sh -e
+
+cloudooo_CONFIG_FILE="${:conf-output}"
+
+cloudooo_LOG_DIRECTORY="${buildout:log-directory}"
+
+PID="${buildout:run-directory}/cloudooo.pid"
+
+PASTER_PATH="${buildout:bin-directory}/paster"
+
+start() {
+  $PASTER_PATH serve $cloudooo_CONFIG_FILE --daemon \
+  --log-file=$cloudooo_LOG_DIRECTORY/cloudooo.log \
+  --pid-file=$PID;
+}
+
+stop() {
+  if [ -f $PID ]; then
+    pid=`cat $PID`
+    kill -HUP $pid
+    for x in `seq 1 10`; do
+        kill -0 $pid 2>/dev/null || break
+        ! sleep 1
+    done || ! echo " failed to stop cloudooo within 10 seconds"
+  fi
+}
+
+status(){
+  $PASTER_PATH serve $cloudooo_CONFIG_FILE --status \
+  --pid-file=$PID;
+}
+
+case "$1" in
+  start|stop|status)
+    $1;;
+  restart)
+    stop;
+    start;;
+  help)
+    echo "Usage: ./cloudoooctl {start|stop|restart|status}"
+    exit 1;;
+  *)
+    exec $PASTER_PATH serve $cloudooo_CONFIG_FILE;;
+esac
