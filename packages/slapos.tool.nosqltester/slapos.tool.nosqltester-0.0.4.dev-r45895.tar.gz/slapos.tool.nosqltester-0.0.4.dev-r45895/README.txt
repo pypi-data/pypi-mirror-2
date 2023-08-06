@@ -1,0 +1,2 @@
+slapos.tool.nosqltester
+=======================
