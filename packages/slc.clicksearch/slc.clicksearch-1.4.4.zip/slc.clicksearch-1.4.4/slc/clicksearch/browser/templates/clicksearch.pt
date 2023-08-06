@@ -1,0 +1,86 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      lang="en"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="plone">
+<head>
+    <metal:block fill-slot="top_slot"
+                 tal:define="dummy python:request.set('disable_border',1)" />
+    <metal:block fill-slot="column_two_slot" />
+</head>
+
+<body>
+<div metal:fill-slot="main"
+     tal:define="use_types_blacklist request/use_types_blacklist | python:True;
+                 use_navigation_root request/use_navigation_root | python:True;
+                 sort_order view/sort_order;
+                 sort_on request/sort_on | string:modified;
+                 results python:view.get_results(use_types_blacklist, False, sort_on, sort_order);
+                 Batch python:modules['Products.CMFPlone'].Batch;
+                 b_size python:30;b_start python:0;b_start request/b_start | b_start;
+                 desc_length site_properties/search_results_description_length;
+                 desc_ellipsis site_properties/ellipsis;
+                 searchterm request/SearchableText|nothing;
+                 use_view_action site_properties/typesUseViewActionInListings|python:();">
+
+    <h1 class="documentFirstHeading">
+        <span tal:replace="here/Title">
+        </span>
+    </h1>
+
+        <p class="documentDescription">
+            <metal:field use-macro="python:here.widget('description', mode='view')">
+            Description
+            </metal:field>
+        </p>
+
+    <div class="clicksearch_results_bar">
+
+        <div class="sort_by">
+            <form id="clicksearchform" name="clicksearchform" method="get"
+                  action="@@clicksearch" tal:attributes="action string:${request/URL}?${request/QUERY_STRING}">
+                  Sort by
+                  <select name="sort_on" onchange="this.form.submit();">
+                    <option tal:repeat="crit view/sort_criteria"
+                            tal:attributes="value crit/id; 
+                                            selected python:crit.get('id') == sort_on and True or None;"
+                            tal:content="crit/title">Title
+                    </option>
+                  </select>
+                  <tal:qs replace="structure view/generate_hidden_fields" />
+                  <noscript><input type="submit" alt="Go" align="top" value="Go" border="0" /></noscript>
+            </form>
+        </div>
+
+        <div class="num_results">
+            <span i18n:translate="batch_x_items_matching_your_criteria"
+            ><span i18n:name="number"
+                   tal:omit-tag=""
+                   tal:content="python:len(results)">234</span> items matching your selection</span>
+        </div>
+    </div>
+
+    <div tal:condition="not: results">
+        <p><strong i18n:translate="description_no_results_found">No results were found.</strong></p>
+    </div>
+
+
+    <div tal:condition="results"
+          tal:define="batch python:Batch(results, b_size, int(b_start), orphan=1);">
+
+        <span class="searchResults">
+        <tal:results repeat="result batch">
+        <span tal:replace="structure python:view.displayResult(result)" />
+
+        </tal:results>
+        </span>
+
+        <div metal:use-macro="here/batch_macros/macros/navigation" />
+    </div>
+
+</div>
+</body>
+</html>
+

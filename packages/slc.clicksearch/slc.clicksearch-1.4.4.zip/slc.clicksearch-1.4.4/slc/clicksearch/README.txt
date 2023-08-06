@@ -1,0 +1,96 @@
+slc.clicksearch
+===============
+
+This package provides a way to navigate using metadata, which can make sense if
+there are several different types of metadata categories which categorize the
+content. In our use case, we have Thesaurus, Category, Country, Language
+and NACE Code and about 10.000 items to filter on.
+
+It should be possible to browse the search results by clicking values from the
+different metadata. If I click a value, the search results are restricted by
+that value. If I broaden up my search again by clicking on a special link,
+this criteria is removed again.
+
+There is a ClickSearch Portlet on the left with one section for each metadata
+element. Each section has the name of the metadata element as title. Then it
+lists some of the most popular values of the metadata element as links. These
+"most populars" are configurable from within the portlet.
+
+A more link below the top values allows selecting from the total amount of
+values. Clicking on "more" turns up an extended selection page temporarily
+replacing the body area which has enough space to list all values and some
+explanation about their meaning. This is particularly useful for
+complex metadata like Thesaurus, Subcategory and NACE (several hundred entries
+or more in treeform).
+They will not be displayed as a popup any more. Instead the whole tree will be
+embedded in the page. The user selects a term and returns to the search
+results.
+
+If a user has selected an item and the search results have been narrowed down,
+he can undo this narrowing by broadening the search back again. As example
+the user clicks on "any Country" to remove the filter by country again.
+
+Customizing the widget
+----------------------
+It is possible to customize the portlet widget. That way you can create
+a different selection meachanism depending on the index type.
+For that you need to provide a new browser page for
+Products.ATContentTypes.content.topic.ATTopic
+with the name "slc.clicksearch.%s" % INDEX_NAME where INDEX_NAME must
+be the name of the index.
+BE CAREFUL, do not use a normal browser view here, because the semantics
+of __call__ are different. __call__ gets called with two parameters, index
+and box_config. index is just the index while box_config is the configuration.
+Please see slc.clicksearch.widgets.widgets for examples
+
+
+Providing better Results
+------------------------
+(OSHA Specific, should not be part of this package anymore later on)
+
+The result list should show the title and the first 200 characters of the
+description for each result. The object type, the creation date and the date
+of last change indicate type and freshness of the information. In addition
+the external link is displayed where the item will link to. Additional metadata
+is given like "Language", "See also" and the provider of the information.
+
+While images are not so useful in this case, an image of the linked homepage
+can be seen when moving the mouse over the remote link.
+
+This result list must then be optimised based on the results of a user search
+behaviour analysis which turns up what users are really looking for. If
+for example a certain group of users is searching by CAS Number, showing
+that number in the result list would give a benefit.
+
+
+
+Test setup
+----------
+
+To start experimenting, do the following:
+
+ - add a new topic called "Click Search"
+ - configure the topic to show a subset of your data, e.g. only the links
+ - On this topic add a Clicksearch portlet on the left
+ - configure the portlet to show metadatum Subject and allowedUsersAndRoles
+ - provide some values which you are going to use in your site
+ - In ZMI set the property layout to clicksearch on the click search folder,
+   this will show the result list immediately
+
+
+Add support for new indexes
+---------------------------
+
+In this example we want to support a hierarchical multilingual thesaurus
+stored in atvocabularymanager. For that we need:
+
+ * a portlet widget that shows the hierarchy
+ * A show more page which gives access to the full tree
+   (using VocabularyPickerWidget)
+
+Preparations
+First we need to add the vdex vocabulary file from the data folder to the
+ATVocabularyManager. Then we need to make this new metadata element
+available to the content types by schemaextending them and adding an
+index and metadata to the catalog.
+
