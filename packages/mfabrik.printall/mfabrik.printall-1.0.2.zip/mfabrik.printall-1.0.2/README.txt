@@ -1,0 +1,79 @@
+.. contents:: 
+
+Introduction
+------------
+
+``mfabrik.printall`` allows you to print all pages in a folder on one shot.
+Different pages are separated by a page break.
+
+This package is mainly used for printing on-line manual, etc. items out of Plone easily.
+
+
+Installation 
+----------------------
+
+Add to buildout.cfg::
+
+        eggs =
+                mfabrik.printall 
+
+
+Usage
+--------------------
+
+New option *Print All* appears in *Actions* menu of *Folder* content items after
+installing this add-on through Plone Add-ons.
+
+Source
+---------
+
+* http://svn.plone.org/svn/collective/mfabrik.printall/trunk
+
+Follow
+---------------
+
+Follow in Twitter
+
+* http://twitter.com/moo9000
+
+Commercial support
+-----------------------------------
+
+`Commercial support options <http://webandmobile.mfabrik.com/support>`_ guarantee that you do not
+need to fight with buildouts or cryptic tracebacks alone. We will do it for you.
+
+* Community support: Affordable support contract for open source community members who wish to support
+  the project
+
+* Enterprise support: Serious support for serious business
+
+Our top class Python developers are ready to help you with 
+any software development needs.
+
+Supported configurations
+-------------------------
+
+This add-on is tested with 
+
+* Plone 4.0.1
+
+TODO
+------
+
+* Remove inline styles. Add sample CSS.
+
+* Rewrite relative image URLs correctly, so that relative images can be printed 
+
+* Add Table of Contents to the first page
+
+Author
+------
+
+`mFabrik Research Oy <mailto:research@mfabrik.com>`_ - Python and Plone professionals for hire.
+
+* `mFabrik Web and Mobile - multichannel CMS made easy <http://webandmobile.mfabrik.com>`_ 
+
+* `mFabrik web site <http://mfabrik.com>`_ 
+
+* `Blog <http://blog.mfabrik.com>`_
+
