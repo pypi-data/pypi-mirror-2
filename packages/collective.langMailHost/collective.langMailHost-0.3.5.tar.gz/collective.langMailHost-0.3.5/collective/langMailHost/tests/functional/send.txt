@@ -1,0 +1,287 @@
+Defines and setup
+    >>> from Products.Five.testbrowser import Browser
+    >>> browser = Browser()
+
+    >>> def prink(e): print eval('"""%s"""' %str(e))
+
+    >>> portal.email_from_address = "mail@plone.test"
+    >>> mailhost = portal.MailHost
+
+    >>> portal_url = portal.absolute_url()
+    >>> browser.open(portal_url)
+
+    >>> installer = portal.portal_quickinstaller
+
+    Install Products.LinguaPlone
+    >>> installer.installProduct('Products.LinguaPlone')
+    ''
+    >>> installer.isProductInstalled('Products.LinguaPlone')
+    True
+    >>> from Products.CMFCore.utils import getToolByName
+    >>> language_tool = getToolByName(portal, 'portal_languages')
+    >>> language_tool.use_content_negotiation = False
+    >>> language_tool.use_content_negotiation
+    False
+
+Log in as the portal owner.
+---------------------------
+    >>> browser.open(portal_url)
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> browser.open(portal_url + '/login_form?came_from=' + portal_url)
+    >>> browser.getControl(name='__ac_name').value = portal_owner
+    >>> browser.getControl(name='__ac_password').value = default_password
+    >>> browser.getControl(name='submit').click()
+
+Make anonymous user registerable.
+    >>> browser.getLink('Site Setup').click()
+    >>> browser.open('http://nohost/plone/@@site-controlpanel')
+    >>> browser.getLink('Mail').click()
+    >>> browser.getControl(name="form.email_from_name").value = 'Plone Site'
+    >>> browser.getControl(name="form.actions.save").click()
+    >>> browser.getLink('Security').click()
+    >>> browser.getControl(name="form.enable_self_reg").value = 'on'
+    >>> browser.getControl(name="form.use_email_as_login").value = 'on'
+    >>> browser.getControl(name="form.actions.save").click()
+    >>> browser.getLink('Site Setup').click()
+    >>> portal.MailHost.smtp_host
+    'localhost'
+    >>> 'You have not configured a mail host' in browser.contents
+    False
+
+Log out
+    >>> browser.getLink('Log out').click()
+
+
+Contact in English
+    >>> browser.getLink('Contact').click()
+    >>> browser.getControl(name="sender_fullname").value = 'Test Name'
+    >>> browser.getControl(name="sender_from_address").value = 'from@test.com'
+    >>> browser.getControl(name="subject").value = 'Test Subject'
+    >>> browser.getControl(name="message").value = 'Test Message'
+    >>> browser.getControl(name="form.button.Send").click()
+    >>> 'Mail sent' in browser.contents
+    True
+    >>> len(mailhost.messages)
+    1
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="utf-8"
+    Content-Transfer-Encoding: quoted-printable
+    Subject: =?utf-8?q?Test_Subject?=
+    To: mail@plone.test
+    From: mail@plone.test
+    ...
+    <BLANKLINE>
+    Test Message
+    <BLANKLINE>
+    --
+    Plone Site
+    <BLANKLINE>
+    <BLANKLINE>
+    You are receiving this mail because Test Name
+    from@test.com
+    is sending feedback about the site you administer at http://nohost/plone.
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+
+Contact in Japanese
+    >>> browser.open('http://nohost/plone/contact-info?set_language=ja')
+    >>> browser.getControl(name="sender_fullname").value = 'テスト氏名'
+    >>> browser.getControl(name="sender_from_address").value = 'from@test.com'
+    >>> browser.getControl(name="subject").value = 'テスト件名'
+    >>> browser.getControl(name="message").value = 'テストメッセージ'
+    >>> browser.getControl(name="form.button.Send").click()
+    >>> 'メールが送られました' in browser.contents
+    True
+    >>> len(mailhost.messages)
+    2
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="iso-2022-jp"
+    Content-Transfer-Encoding: 7bit
+    Subject: =?iso-2022-jp?b?GyRCJUYlOSVIN29MPhsoQg==?=
+    To: mail@plone.test
+    From: mail@plone.test
+    ...
+    >>> '\x1b$B%F%9%H;aL>\x1b(B' in msg
+    True
+    >>> '\x1b$B%F%9%H%a%C%;!<%8\x1b(B' in msg
+    True
+
+Register in English
+    >>> browser.open('http://nohost/plone?set_language=en')
+    >>> browser.getLink('Register').click()
+    >>> browser.getControl(name="form.fullname").value = 'Test Name'
+    >>> browser.getControl(name="form.email").value = 'test.name@test.com'
+    >>> browser.getControl(name="form.actions.register").click()
+    >>> len(mailhost.messages)
+    3
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    To: test.name@test.com
+    Precedence: bulk
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="utf-8"
+    Content-Transfer-Encoding: quoted-printable
+    Subject: =?utf-8?q?User_Account_Information_for_Plone_site?=
+    From: Plone Site <mail@plone.test>
+    ...
+    <BLANKLINE>
+    <BLANKLINE>
+        Welcome Test Name,
+    	=
+    <BLANKLINE>
+        your user account has been created. =
+    <BLANKLINE>
+    	Your username is test.name@test.com. =
+    <BLANKLINE>
+    	Please activate it by visiting
+    <BLANKLINE>
+        ...
+    <BLANKLINE>
+        Please activate your account before ...
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+        With kind regards,
+    <BLANKLINE>
+    --
+    Plone Site
+    <BLANKLINE>
+    <BLANKLINE>
+    >>> dstring = '?user'
+    >>> url = msg[msg.find('http'):msg.find(dstring)]
+    >>> url = url + '?userid=test.name@test.com'
+    >>> browser.open(url)
+    >>> browser.getControl(name="password").value = 'testpass'
+    >>> browser.getControl(name="password2").value = 'testpass'
+    >>> browser.getControl("Set my password").click()
+    >>> 'Password set' in browser.contents
+    True
+
+Log in
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl(name="__ac_name").value = 'test.name@test.com'
+    >>> browser.getControl(name="__ac_password").value = 'testpass'
+    >>> browser.getControl(name="submit").click()
+    >>> 'You are now logged in.' in browser.contents
+    True
+
+Log out
+    >>> browser.getLink('Log out').click()
+
+Register in Japanese
+    >>> browser.open('http://nohost/plone?set_language=ja')
+    >>> browser.getLink('登録').click()
+    >>> browser.getControl(name="form.fullname").value = 'テスト氏名'
+    >>> browser.getControl(name="form.email").value = 'test.shimei@test.com'
+    >>> browser.getControl(name="form.actions.register").click()
+    >>> len(mailhost.messages)
+    4
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    To: test.shimei@test.com
+    Precedence: bulk
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="iso-2022-jp"
+    Content-Transfer-Encoding: 7bit
+    Subject: =?iso-2022-jp?b?UGxvbmUgc2l0ZSAbJEIkSyREJCQkRiROJWYhPCU2JSIlKyUmJXMbKEI=?=
+     =?iso-2022-jp?b?GyRCJUg+cEpzGyhC?=
+    From: Plone Site <mail@plone.test>
+    ...
+    >>> dstring = '?user'
+    >>> url = msg[msg.find('http'):msg.find(dstring)]
+    >>> url = url + '?userid=test.shimei@test.com'
+    >>> browser.open(url)
+    >>> browser.getControl(name="password").value = 'testpass'
+    >>> browser.getControl(name="password2").value = 'testpass'
+    >>> browser.getControl("パスワードを設定").click()
+    >>> 'パスワードは問題なく設定されました。' in browser.contents
+    True
+
+Log in
+    >>> browser.getLink('ログイン').click()
+    >>> browser.getControl(name="__ac_name").value = 'test.shimei@test.com'
+    >>> browser.getControl(name="__ac_password").value = 'testpass'
+    >>> browser.getControl(name="submit").click()
+    >>> 'ログインしました。' in browser.contents
+    True
+
+Log out
+    >>> browser.getLink('ログアウト').click()
+
+Forgot password in English
+    >>> browser.open('http://nohost/plone?set_language=en')
+    >>> browser.getLink('Log in').click()
+    >>> browser.getLink('we can send you a new one').click()
+    >>> browser.getControl(name="userid").value = 'test.name@test.com'
+    >>> browser.getControl("Start password reset").click()
+    >>> len(mailhost.messages)
+    5
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    To: test.name@test.com
+    Precedence: bulk
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="utf-8"
+    Content-Transfer-Encoding: quoted-printable
+    Subject: =?utf-8?q?Password_reset_request?=
+    From: Plone Site <mail@plone.test>
+    ...
+    <BLANKLINE>
+    <BLANKLINE>
+    The following link will take you to a page where you can reset your passwor=
+    d for Plone site site:
+        =
+    <BLANKLINE>
+    http://nohost/plone/passwordreset/...
+    (This link is valid for 168 hours)
+    <BLANKLINE>
+    If you didn't expect to receive this email, please ignore it. Your password=
+     has not been changed.
+    Request made from IP address =
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    >>> dstring = '\n(This link is valid for 168 hours)'
+    >>> url = msg[msg.find('http'):msg.find(dstring)]
+    >>> browser.open(url)
+    >>> browser.getControl(name="userid").value = 'test.name@test.com'
+    >>> browser.getControl(name="password").value = 'testnewpass'
+    >>> browser.getControl(name="password2").value = 'testnewpass'
+    >>> browser.getControl("Set my password").click()
+    >>> 'Password set' in browser.contents
+    True
+
+Forgot password in Japanese
+    >>> browser.open('http://nohost/plone?set_language=ja')
+    >>> browser.getLink('ログイン').click()
+    >>> browser.getLink('新しいものを送ることができます。').click()
+    >>> browser.getControl(name="userid").value = 'test.shimei@test.com'
+    >>> browser.getControl("パスワード再設定を開始").click()
+    >>> len(mailhost.messages)
+    6
+    >>> msg = mailhost.messages[-1]
+    >>> prink(msg)
+    To: test.shimei@test.com
+    Precedence: bulk
+    MIME-Version: 1.0
+    Content-Type: text/plain; charset="iso-2022-jp"
+    Content-Transfer-Encoding: 7bit
+    Subject: =?iso-2022-jp?b?GyRCJVElOSVvITwlSTpGQF9Eak1XNWEbKEI=?=
+    From: Plone Site <mail@plone.test>
+    ...
+    >>> dstring = '\x1b$B$3$N%j%s%/$O\x1b(B 168'
+    >>> url = msg[msg.find('http'):msg.find(dstring)]
+    >>> browser.open(url)
+    >>> browser.getControl(name="userid").value = 'test.shimei@test.com'
+    >>> browser.getControl(name="password").value = 'testnewpass'
+    >>> browser.getControl(name="password2").value = 'testnewpass'
+    >>> browser.getControl("パスワードを設定").click()
+    >>> 'パスワードは問題なく設定されました。' in browser.contents
+    True
