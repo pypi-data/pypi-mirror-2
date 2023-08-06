@@ -1,0 +1,1 @@
+Register any classes like Django's admin.
