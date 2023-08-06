@@ -1,0 +1,141 @@
+===================================
+Initial setup of portal and browser
+===================================
+
+    >>> from Products.Five.testbrowser import Browser
+    >>> from Products.PloneTestCase.setup import portal_owner, default_password
+    >>> from Products.CMFCore.utils import getToolByName
+    >>> import re
+    >>> catalog = getToolByName(self.portal, 'portal_catalog')
+    >>> portal.error_log.setProperties(20, ignored_exceptions=())
+    >>> portal_url = self.portal.absolute_url()
+    >>> browser = Browser()
+
+Log in as administrator
+    >>> browser.open(portal_url + '/login')
+    >>> browser.getControl('Login Name').value = portal_owner
+    >>> browser.getControl('Password').value = default_password
+    >>> browser.getControl('Log in').click()
+
+====================================
+Work with outer collage compose page
+====================================
+
+Go to outer collage compose page
+    >>> browser.open(self.ocollage.absolute_url())
+    >>> compose_url = browser.getLink('Compose').url
+    >>> browser.open(compose_url)
+
+We can create nested Collage objects
+    >>> browser.getLink(url='outer-collage/1/1/createObject?type_name=Collage')
+    <Link text='[IMG] Collage' ...>
+
+We can also search (browse) for an existing Collage object
+
+    >>> browser.getLink(url='outer-collage/1/1/existing-items-form').click()
+    >>> url = '%s/1/1/insert-alias?uid=%s' % (self.ocollage.absolute_url(), self.icollage.UID())
+    >>> link = browser.getLink(url=url)
+
+Then we add an alias pointing to the Collage object
+
+insert-alias can only be submitted by post method
+After submitting, we must go back and reload compose page due to 
+automatic redirection of Collage (not working in test)
+   
+    >>> url = link.url.split('?')[0]
+    >>> data = link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+
+    >>> browser.open(compose_url)
+
+Inner Collage is already present (with 'standard' layout)
+
+    >>> browser.getLink('Inner Collage')
+    <Link text='Inner Collage' url='http://nohost/plone/inner-collage'>
+    
+Set 'full' layout for Collage
+
+set-content-layout can only be submitted by post method
+After submitting, we must go back and reload compose page due to 
+automatic redirection of Collage (not working in test)
+
+    >>> layout_link = browser.getLink('full')
+    >>> url = layout_link.url.split('?')[0]
+    >>> data = layout_link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+
+    >>> browser.goBack()
+    >>> browser.reload()
+
+Collage layout has changed and it doesn't show a link anymore
+
+    >>> browser.getLink('Inner Collage')
+    Traceback (most recent call last):
+    ...
+    LinkNotFoundError
+
+But it shows the title and description
+
+    >>> 'Inner Collage' in browser.contents
+    True
+    >>> 'This is a nested Collage' in browser.contents
+    True
+    
+And also the collage contents: News Item and Page
+
+    >>> 'Test News item' in browser.contents
+    True
+    >>> 'Test Document' in browser.contents
+    True
+    
+We'll now test special Collage settings: show_title and show_description
+
+    >>> self.icollage.setShow_title(False)
+    >>> self.icollage.setShow_description(False)
+    >>> browser.open(compose_url)
+    >>> 'Inner Collage' in browser.contents
+    False
+    >>> 'This is a nested Collage' in browser.contents
+    False
+   
+Set 'content' layout for Collage
+
+set-content-layout can only be submitted by post method
+After submitting, we must go back and reload compose page due to 
+automatic redirection of Collage (not working in test)
+
+    >>> layout_link = browser.getLink(url='set-content-layout?layout=content')
+    >>> url = layout_link.url.split('?')[0]
+    >>> data = layout_link.url.split('?')[1]
+    >>> browser.post(url, data)
+    Traceback (most recent call last):
+    ...
+    HTTPError: HTTP Error 404: Not Found
+
+    >>> browser.goBack()
+    >>> browser.reload()
+
+No matter what show_title or show_description settings it has
+title and description won't be shown with this layout
+
+    self.icollage.setShow_title(True)
+    self.icollage.setShow_description(True)
+    >>> browser.reload()
+    >>> 'Inner Collage' in browser.contents
+    False
+    >>> 'This is a nested Collage' in browser.contents
+    False
+
+But collage contents are displayed: News Item and Page
+
+    >>> 'Test News item' in browser.contents
+    True
+    >>> 'Test Document' in browser.contents
+    True
+
