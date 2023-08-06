@@ -1,0 +1,75 @@
+>>> import webob
+>>> req = webob.Request.blank('/')
+>>> print req
+GET / HTTP/1.0
+Host: localhost:80
+>>> req.method = 'POST'
+>>> req.POST.update(dict(name='bob'))
+>>> print req
+POST / HTTP/1.0
+Content-Length: -1
+Host: localhost:80
+
+name=bob
+>>> from webob.dec import wsgify
+>>> @wsgify
+... def app(req):
+...   return webob.Response('Hello %s' % req.params.get('name'))
+>>> print app
+wsgify(app)
+>>> print req.get_response(app)
+200 OK
+Content-Type: text/html; charset=UTF-8
+Content-Length: 9
+
+Hello bob
+>>> from wsgiproxy.exactproxy import proxy_exact_request
+>>> req = webob.Request.blank('http://mozilla.com')
+>>> print req.get_response(proxy_exact_request)
+301 Moved Permanently
+Server: Apache
+X-Backend-Server: pm-web03
+Vary: Accept-Encoding
+Content-Type: text/html; charset=iso-8859-1
+Date: Tue, 14 Dec 2010 22:29:31 GMT
+Location: http://www.mozilla.com/
+Set-Cookie: X-Mapping-kgbglcod=1B5A3623E7A2B35508E09B80A2FDBADB; path=/
+X-Cache-Info: caching
+Content-Length: 231
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>301 Moved Permanently</title>
+</head><body>
+<h1>Moved Permanently</h1>
+<p>The document has moved <a href="http://www.mozilla.com/">here</a>.</p>
+</body></html>
+
+>>>
+>>> from webtest import TestApp
+>>> a = TestApp(app)
+>>> a.get('/')
+<200 OK text/html body='Hello None'>
+>>> print a.post('/', dict(name='foo'))
+Response: 200 OK
+Content-Type: text/html; charset=UTF-8
+Hello foo
+>>> resp = a.get('/')
+>>> resp.encode_content('gzip')
+>>> print resp
+Response: 200 OK
+Content-Encoding: gzip
+Content-Type: text/html; charset=UTF-8
+��H���W���Kʚ�u
+>>> resp.decode_content()
+>>> resp.body = '[1, 2, 3]'
+>>> resp.json
+Traceback (most recent call last):
+  File "<stdin>", line 24, in <module>
+    resp.json
+  File "/home/ianb/.virtualenvs/python/lib/python2.6/site-packages/webtest/__init__.py", line 955, in json
+    % self.content_type)
+AttributeError: Not a JSON response body (content-type: text/html)
+>>> resp.content_type = 'application/json'
+>>> resp.json
+[1, 2, 3]
