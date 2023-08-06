@@ -1,0 +1,134 @@
+
+Changelog
+=========
+
+0.6.0
+-----
+
+This is a feature release:
+
+* Users created lazily but not currently logged-in are now correctly detected
+  as lazy users. To facilitate this, a ``LazyUser`` model is included. Note
+  that existing code using ``is_lazy_user`` only on authenticated users will
+  continue to work, as the old method of checking the ``backend`` attribute
+  of the ``User`` object has been retained - it's faster to do that than a
+  potentially unnecessary database query.
+
+  For those who use it, a South migration is provided to create the initial
+  table. Data migration will be handled by South migrations from now on.
+
+* The canonical import location of ``is_lazy_user`` has changed from within
+  ``lazysignup.templatetags.lazysignup_tags`` to ``lazysignup.utils``.
+  Existing code that imports from the old location will continue to work.
+
+0.5.1
+-----
+
+Bugfix release:
+
+- Fix an issue where a lazy user would be misidentified as a non-lazy user
+
+0.5.0
+-----
+
+This version simplifies the implementation significantly by removing the requirement for
+a middleware. This is a backwards-incompatible change as the ``lazysignup.middleware``
+module no longer exists, and needs to be removed from your ``MIDDLEWARE_CLASSES`` list.
+
+This change means that you can no longer disable the software by removing the middleware
+class from your configuration. You might want to do this temporarily in development, for
+example, when testing that your views still work when an anonymous user is presented to
+them (perhaps through the user agent blacklisting functionality).
+
+To this end, support for a new settings has been added: ``ENABLE_LAZYSIGNUP``. It's set
+to True by default. Setting it to False will both prevent automatic login and
+automatic user creation.
+
+The ``allow_lazy_user`` decorator no longer has to be first in the decorator list. Thanks
+to Jauco Noordzij for pointing this out initially.
+
+There is now also an ``is_lazy_user`` template filter, which will return True if the
+current user is an automatically created user. It will return False for users who are
+anonymous, or were authenticated by some other means. Thanks again to Jauco Noordzij
+for the idea for this feature.
+
+Note that the ``is_lazy_user`` filter (which you can also just import and use
+directly in your view code) is the preferred way of checking for an automatically
+created user. ``has_usable_password`` will continue to return False for such users,
+but is no longer the canonical way to identify them. Users authenticated with
+other authentication backends (for example, LDAP backends) may return False when
+``has_usable_password`` is called.
+
+
+0.4.0
+-----
+
+This version fixes a number of issues, adds new features and has backwards-
+incompatible changes:
+
+  - Fix a RST issue in README
+  - Fix an issue where a POST to the convert view would break if the user was anonymous.
+    The convert view now redirects to the LOGIN_URL by default, parameterised in the view.
+
+New features:
+
+  - It is now easier to customise the process of converting a lazy user into a real user.
+    Previous versions allowed a custom form to be passed to the ``convert`` view, but the
+    code always expected a ``username`` and ``password1`` field to get credentials from to
+    log the user in. Now, a new ``get_credentials()`` method is called on the form to obtain
+    these credentials.
+  - The tests module now includes a ``no_lazysignup`` decorator that you can apply to a
+    method on your test case, which removes the lazy signup middleware for the duration
+    of that test only. This is useful for testing what happens when a view that is
+    marked with with the ``allow_lazy_user`` decorator ends up with an anonymous user
+    (most commonly, when a search engine visits).
+
+Backwards-incompatible changes:
+
+  - Generated usernames are now based on the session key, rather than actually being the
+    session key. This is to avoid a potential security issue where an app might simply
+    display a username, giving away a significant part of the user's session key. The
+    username is now generated from a SHA1 hash of the session key. This change means that
+    existing generated users will become invalid.
+
+0.3.0
+-----
+
+This version introduces a backwards-incompatible changes, renaming the ``@allow_lazy``
+decorator to ``@allow_lazy_user``. This is to avoid confusion with the decorator of
+the same name in ``django.utils.functional``.
+
+0.2.0
+-----
+
+This version fixes a number of issues:
+
+  - Correct a duplicated test
+  - Fix a bug where a new user would not be created if they already had a
+    session key.
+
+It also introduces a new feature, user agent blacklisting. This aims to
+prevent explosive growth in the number of users created by search engines,
+etc. This feature is still in test, so patches and feedback welcome. Note that
+this introduces a backwards-incompatibly behaviour. Prior to this release,
+it was safe to assume that all views marked with the ``@allow_lazy`` decorator
+would receive an authenticated user. This is now no longer the case.
+
+See the README.rst file for more information.
+
+0.1.2
+-----
+
+* Compatibility fixes for Django <1.2
+* The convert view is now itself lazy
+
+0.1.1
+-----
+
+* Fix some packaging errors
+
+0.1
+---
+
+* Initial release
+
