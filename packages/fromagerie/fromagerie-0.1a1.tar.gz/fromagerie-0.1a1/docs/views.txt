@@ -1,0 +1,185 @@
+.. _views:
+
+================
+Fromagerie Views
+================
+
+Fromagerie currently includes a number of simple yet customizable views
+for interacting with the package index. These views can be found in the
+``fromagerie.views`` module.
+
+
+The Package Index Controller
+============================
+
+The heart of the package index is the ``SimplePackageIndex`` class. This class
+provides the basic view functionality for registering, and uploading packages
+to the index. It provides a dispatcher and handlers for the action requests a
+Distutils_ client may make of the index, and it can parse the data and files
+submitted by Distutils_ clients.
+
+This class may serve as the basis for more sophisticated package index
+interaction.
+
+
+``SimplePackageIndex`` Attributes
+---------------------------------
+
+The following attributes are of interest to subclasses:
+
+``authentication_backend``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An instance of a simple class implementing two simple methods that both must
+accept an ``HttpRequest`` argument:
+
+``is_authenticated``
+    Returns a boolean representing whether the request has been authenticated
+
+``challenge``
+    Returns an ``HttpResponse`` with an authentication challenge to be returned
+    to the client
+
+The default value is an instance of
+``fromagerie.authentication.HttpBasicAuthentication`` which implements this
+interface for HTTP basic access authentication.
+
+
+``SimplePackageIndex`` Action Methods
+-------------------------------------
+
+The following methods are called to generate responses for the various
+Distutils_ action requests and may be overridden to provide different behavior.
+These methods must accept three positional arguments: the ``HttpRequest``
+object, a ``QueryDict`` containing any ``POST`` data, and a ``MultiValueDict``
+containing any submitted files:
+
+``default``
+~~~~~~~~~~~
+
+    The default response callback when no action is given by the client.
+    Returns a 'not implemented' response.
+    
+``verify``
+~~~~~~~~~~
+
+    Validates a package release's metadata.
+
+``list_classifiers``
+~~~~~~~~~~~~~~~~~~~~
+
+    Returns a list of all valid package classifiers.
+
+``user``
+~~~~~~~~
+
+    Registers a new user with the index.
+    The default implementation attempts to use ``RegistrationFormUniqueEmail``
+    from django-registration_ to validate that a unique username and
+    email address are given for the user account, and sends an activation email
+    to the given address.
+
+``password_reset``
+~~~~~~~~~~~~~~~~~~
+
+    Initiates a password reset for the given user.
+    The default implementation uses the auth_ app's ``PasswordResetForm`` which
+    sends a password reset confirmation key to the user's email address.
+    
+
+``submit``
+~~~~~~~~~~
+
+    Registers a release with the index.
+    The default implementation checks whether or not the given package and release
+    have been registered, and ensures the user has permissions to add releases and
+    packages if the given package does not exist. It also validates the given
+    package and release metadata according to the same rules as the PyPI_.
+
+``upload``
+~~~~~~~~~~
+
+    Handles the upload of a release distribution file.
+    The default implementation ensures that the file is a valid distribution file,
+    and that the given distribution metadata is valid for the file.
+
+
+The ``EnhancedPackageIndex``
+----------------------------
+
+A subclass of ``SimplePackageIndex`` is provided for convenience that makes the
+default action return the ``package_list`` view described below.
+
+
+Other Views
+===========
+
+Fromagerie includes the following simple views for browsing the index from a web
+browser:
+
+``package_list``
+----------------
+
+A simple wrapper on Django's generic ``object_list``_ view that provides the
+appropriate defaults for browsing ``Package`` objects.
+
+Defaults:
+
+    * ``queryset``: the ``QuerySet`` of all ``Package`` objects with a visible
+      ``Release``
+
+    * ``template_object_name``: ``'package'``
+
+    * ``template_name``: ``'fromagerie/package_list.html'``
+
+``package_overview``
+--------------------
+
+A simple detail view for a given ``Package`` object.
+
+Required Arguments:
+
+    * ``name``: the name of the ``Package`` object
+
+Optional Arguments:
+
+    * ``template_name``: defaults to ``'fromagerie/package_overview.html'``
+
+    * ``extra_context``: a ``dict`` of extra context variables to pass to the
+      template
+
+Template Context:
+
+    * ``package``: the ``Package`` object
+
+    * ``releases``: the ``QuerySet`` of visible ``Release`` objects for the
+      ``Package``
+
+``release_overview``
+--------------------
+
+A simple detail view for a given ``Release`` of a given ``Package``.
+
+Required Arguments:
+
+    * ``name``: the name of the ``Package`` object
+
+    * ``version``: the version specifier for the ``Release``
+
+Optional Arguments:
+
+    * ``template_name``: defaults to ``'fromagerie/release_overview.html'``
+
+    * ``extra_context``: a ``dict`` of extra context variables to pass to the
+      template
+
+Template Context:
+
+    * ``package``: the ``Package`` object
+
+    * ``release``: the ``Release`` object
+
+.. _Distutils: http://docs.python.org/library/distutils.html
+.. _django-registration: http://bitbucket.org/ubernostrum/django-registration/
+.. _auth: http://docs.djangoproject.com/en/dev/topics/auth/#topics-auth
+.. _PyPI: http://pypi.python.org/pypi
