@@ -1,0 +1,300 @@
+
+dubbel.py
+=========
+
+ConfigParser/YAML hybrid. Like an ini file with nested sections where the
+contents of each section is yaml. Values also cascade to child sections, and
+there is some limited interpolation.
+
+Example
+#######
+
+::
+
+    copyright: Jonah J. Jameson
+    date: 32nd Julember 3001
+    project: worrp
+    
+    [sphinx]
+    
+        master_doc: contents
+        rst_suffix: rst
+        default_sidebar: nav.html
+        html:
+            theme: default
+            title: Worrp Documentation
+    
+    [sphinx -> tutorial]
+    
+        version: 0.5
+        master_doc: index
+        html:
+            sidebars:
+                - localtoc.html
+                - search.html
+                - $default_sidebar
+    
+    [sphinx -> tutorial -> en]
+    
+        docroot: doc/tutorial/en
+        master_doc: master
+        html:
+            theme: haiku
+            title: Worrp Tutorial (version $version)
+    
+    [sphinx -> maindocs]
+    
+        html:
+            theme: scrolls
+        version: 1.0
+        docroot: doc/maindocs
+    
+
+Usage
+#####
+
+Import DubbelParser::
+
+    >>> from dubbel import DubbelParser, SafeDubbelParser
+
+Reading
+-------
+
+Create a parser instance.
+
+.. warning::
+
+    Use a SafeDubbelParser if you are not in control of the file contents.
+
+::
+
+    >>> config = SafeDubbelParser()
+
+add a section::
+
+    >>> config.add_section('main')
+
+add an option to the section::
+
+    >>> config.set('main', 'x', '1')
+
+write the result::
+
+    >>> import sys
+    >>> config.write(sys.stdout)
+    [main]
+    x: '1'
+    <BLANKLINE>
+
+Writing
+-------
+
+Create a parser instance::
+
+    >>> config = SafeDubbelParser()
+
+read from a stream::
+
+    >>> from cStringIO import StringIO
+    >>> config.readfp(StringIO("""
+    ... [main]
+    ... y : two
+    ... """))
+    ...
+
+write the result::
+
+    >>> config.write(sys.stdout)
+    [main]
+    y: two
+    <BLANKLINE>
+
+
+Updating
+--------
+
+Add further option::
+
+    >>> config.set('main', 'x', 1)
+
+write the result::
+
+    >>> config.write(sys.stdout)
+    [main]
+    x: 1
+    y: two
+    <BLANKLINE>
+
+Update existing option::
+
+    >>> config.get('main', 'y')
+    'two'
+    >>> config.set('main', 'y', 'three')
+    >>> config.get('main', 'y')
+    'three'
+
+write the result::
+
+    >>> config.write(sys.stdout)
+    [main]
+    x: 1
+    y: three
+    <BLANKLINE>
+
+
+Complex Example
+---------------
+
+Input::
+
+    >>> example = StringIO("""
+    ... [character-01]
+    ...
+    ...     name: Vorlin Laruknuzum
+    ...     sex: Male
+    ...     class: Priest
+    ...     title: Acolyte
+    ...     hp: [32, 71]
+    ...     sp: [1, 13]
+    ...     gold: 423
+    ...     inventory:
+    ...     - a Holy Book of Prayers (Words of Wisdom)
+    ...     - an Azure Potion of Cure Light Wounds
+    ...     - a Silver Wand of Wonder
+    ...
+    ... [character-02]
+    ...
+    ...     name: Rumpel Stilskin
+    ...     sex: Male
+    ...     class: Wizard
+    ...     title: Dr. R. Stilskin MPhil Phd
+    ...     hp: [12, 33]
+    ...     sp: [15, 15]
+    ...     gold: 1423
+    ...     inventory:
+    ...     - this
+    ...     - that
+    ...     - the other
+    ...     spells:
+    ...         level1:
+    ...         - Knock
+    ...         - Wizard's eye
+    ...         level2:
+    ...         - Find Trap
+    ...         - Shield
+    ...
+    ... """)
+    ...
+
+Create an instance::
+
+    >>> config = SafeDubbelParser()
+
+read input::
+
+    >>> config.readfp(example)
+
+write the result::
+
+    >>> config.write(sys.stdout)
+    [character-01]
+    class: Priest
+    gold: 423
+    hp:
+    - 32
+    - 71
+    inventory:
+    - a Holy Book of Prayers (Words of Wisdom)
+    - an Azure Potion of Cure Light Wounds
+    - a Silver Wand of Wonder
+    name: Vorlin Laruknuzum
+    sex: Male
+    sp:
+    - 1
+    - 13
+    title: Acolyte
+    <BLANKLINE>
+    [character-02]
+    class: Wizard
+    gold: 1423
+    hp:
+    - 12
+    - 33
+    inventory:
+    - this
+    - that
+    - the other
+    name: Rumpel Stilskin
+    sex: Male
+    sp:
+    - 15
+    - 15
+    spells:
+      level1:
+      - Knock
+      - Wizard's eye
+      level2:
+      - Find Trap
+      - Shield
+    title: Dr. R. Stilskin MPhil Phd
+    <BLANKLINE>
+
+Update nested property::
+
+    >>> config.get('character-01', 'hp')
+    [32, 71]
+    >>> config.get('character-01', 'hp')[0] = 42
+    >>> config.get('character-01', 'hp')[1] = 42
+    >>> config.get('character-01', 'hp')
+    [42, 42]
+    >>> config.get('character-02', 'spells')['level2'][0]
+    'Find Trap'
+    >>> config.get('character-02', 'spells')['level2'][0] = 'Fireball'
+    >>> config.get('character-02', 'spells')['level2'][0]
+    'Fireball'
+
+write the result::
+
+    >>> config.write(sys.stdout)
+    [character-01]
+    class: Priest
+    gold: 423
+    hp:
+    - 42
+    - 42
+    inventory:
+    - a Holy Book of Prayers (Words of Wisdom)
+    - an Azure Potion of Cure Light Wounds
+    - a Silver Wand of Wonder
+    name: Vorlin Laruknuzum
+    sex: Male
+    sp:
+    - 1
+    - 13
+    title: Acolyte
+    <BLANKLINE>
+    [character-02]
+    class: Wizard
+    gold: 1423
+    hp:
+    - 12
+    - 33
+    inventory:
+    - this
+    - that
+    - the other
+    name: Rumpel Stilskin
+    sex: Male
+    sp:
+    - 15
+    - 15
+    spells:
+      level1:
+      - Knock
+      - Wizard's eye
+      level2:
+      - Fireball
+      - Shield
+    title: Dr. R. Stilskin MPhil Phd
+    <BLANKLINE>
+
