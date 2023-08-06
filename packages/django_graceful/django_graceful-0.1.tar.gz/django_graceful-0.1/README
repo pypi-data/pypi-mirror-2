@@ -1,0 +1,74 @@
+Django Graceful
+
+
+1. About
+
+Django Graceful is a set of commands for deployment of django projects as
+fastcgi backends. Main purpose is to provide wrappers for complex "runfcgi"
+command and implement a way to update production code without interruption.
+
+Idea is very simple: you define your fastcgi options in settings.py and use
+provided commands to start/stop your fastcgi backend.
+
+But instead of one fastcgi process you have two independent processes and
+a possibility of switching web server between them without restart.
+This gives you the benefit of updating your production code without
+interruption of your service.
+
+
+2. Requirements
+
+   * Unix-like operating system;
+   * Web-server with fastcgi support over unix socket (nginx for example);
+   * Web server and fastcgi-backend on the same server;
+
+
+3. Installation
+
+   * Clone git://github.com/andreiko/django_graceful.git;
+   * Run python setup.py install;
+   * Add django_graceful to your project's INSTALLED_APPS;
+   * In your project's settings.py add GRACEFUL_STATEDIR variable with
+     full path to existing writable directory, where you want Graceful
+     to store .pid and .socket files;
+   * Optionally add to your settings.py GRACEFUL_OPTIONS variable with
+     dictionary of additional options to ./manage.py runfcgi command;
+
+
+4. Usage
+
+    Graceful adds following commands to your project's manage.py script:
+
+    * start - starts specified backends;
+    * stop - stops specified backends;
+    * switch - Switches to specified backend;
+    * keepalive - ensures there is a running backend and it's active;
+    * restart - restarts specified backends, even stopped ones;
+    * status - shows backends list with running/active status;
+    * update - restarts inactive backend and switches to it;
+
+    See ./manage.py <command> help for available options.
+
+5. Example
+
+    A short example of how Graceful is meant to be used.
+
+    * GRACEFUL_STATEDIR is set to "/home/web/project/var/run/" where
+      /home/web/project is a project root;
+
+    * nginx's fastcgi_pass points to socket symlink file:
+      fastcgi_pass unix:/home/web/project/var/run/fastcgi.socket;
+
+    * Add commands to your crontab:
+      */5 * * * * cd /home/web/project; ./manage.py stop --inactive
+      * * * * * cd /home/web/project; ./manage.py keepalive
+
+      This will ensure that one of your backends is running and active,
+      and the other is stopped shortly after losing active status;
+
+    * When you need to update your code, pull changes from repository
+      or update files some other way and run ./manage.py update;
+
+      This will start/restart inactive fastcgi backend and then switch
+      symlink to it's socket file.
+
