@@ -1,0 +1,7 @@
+- COULD use Distribute instead of setuptools
+- COULD allow a default value for e.g. text fields
+- COULD change as_dict for invalid dynamicformdata
+- COULD issue a warning/error message if a form is changed that makes posted data invalid (maybe use 'save as' in admin)
+- COULD use 'dynamicform' in the list_filter of DynamicFieldAdmin, DynamicFormDataAdmin instead of 'dynamicform__name'
+- COULD optionally use messaging framework for notifying success of posted dynamicform
+- SHOULD check whether using tags in e-mails is safe
