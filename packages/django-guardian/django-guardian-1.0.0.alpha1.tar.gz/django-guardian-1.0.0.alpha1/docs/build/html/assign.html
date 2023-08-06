@@ -1,0 +1,210 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Assign object permissions &mdash; django-guardian v1.0.0.alpha1 documentation</title>
+    <link rel="stylesheet" href="_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.0.alpha1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="django-guardian v1.0.0.alpha1 documentation" href="index.html" />
+    <link rel="next" title="Check object permissions" href="check.html" />
+    <link rel="prev" title="Configuration" href="configuration.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="check.html" title="Check object permissions"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="configuration.html" title="Configuration"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">django-guardian v1.0.0.alpha1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="assign-object-permissions">
+<span id="assign"></span><h1>Assign object permissions<a class="headerlink" href="#assign-object-permissions" title="Permalink to this headline">¶</a></h1>
+<p>Assigning object permissions should be very simple once permissions are created
+for models.</p>
+<div class="section" id="prepare-permissions">
+<h2>Prepare permissions<a class="headerlink" href="#prepare-permissions" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s assume we have following model:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Task</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+    <span class="n">content</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+    <span class="n">reported_by</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">User</span><span class="p">)</span>
+    <span class="n">created_at</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DateTimeField</span><span class="p">(</span><span class="n">auto_now_add</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>... and we want to be able to set custom permission <em>view_task</em>. We let know
+Django to do so by adding <tt class="docutils literal"><span class="pre">permissions</span></tt> tuple to <tt class="docutils literal"><span class="pre">Meta</span></tt> class and our final
+model could look like:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">Task</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+    <span class="n">content</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">TextField</span><span class="p">()</span>
+    <span class="n">reported_by</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">User</span><span class="p">)</span>
+    <span class="n">created_at</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DateTimeField</span><span class="p">(</span><span class="n">auto_now_add</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">class</span> <span class="nc">Meta</span><span class="p">:</span>
+        <span class="n">permissions</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s">&#39;view_task&#39;</span><span class="p">,</span> <span class="s">&#39;View task&#39;</span><span class="p">),</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+<p>After we call <tt class="docutils literal"><span class="pre">syncdb</span></tt> management command our <em>view_task</em> permission would be
+added to default set of permissions.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>By default, Django adds 3 permissions for each registered model:</p>
+<ul class="simple">
+<li><em>add_modelname</em></li>
+<li><em>change_modelname</em></li>
+<li><em>delete_modelname</em></li>
+</ul>
+<p class="last">(where <em>modelname</em> is a simplified name of our model&#8217;s class). See
+<a class="reference external" href="http://docs.djangoproject.com/en/1.2/topics/auth/#default-permissions">http://docs.djangoproject.com/en/1.2/topics/auth/#default-permissions</a> for
+more detail.</p>
+</div>
+<p>There is nothing new here since creation of permissions is
+<a class="reference external" href="http://docs.djangoproject.com/en/1.2/topics/auth/#id1">handled by django</a>.
+Now we can move to <em class="xref std std-ref">assign-obj-perms</em>.</p>
+</div>
+<div class="section" id="assign-obj-perms">
+<span id="id1"></span><h2>Assign object permissions<a class="headerlink" href="#assign-obj-perms" title="Permalink to this headline">¶</a></h2>
+<p>We can assign permissions for any user/group and object pairs using same,
+convenient function: <a class="reference internal" href="api/shortcuts.html#guardian.shortcuts.assign" title="guardian.shortcuts.assign"><tt class="xref py py-func docutils literal"><span class="pre">guardian.shortcuts.assign()</span></tt></a>.</p>
+<div class="section" id="for-user">
+<h3>For user<a class="headerlink" href="#for-user" title="Permalink to this headline">¶</a></h3>
+<p>Continuing our example we now can allow Joe user to view some task:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">boss</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&#39;Big Boss&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&#39;joe&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">task</span> <span class="o">=</span> <span class="n">Task</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">summary</span><span class="o">=</span><span class="s">&#39;Some job&#39;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="s">&#39;&#39;</span><span class="p">,</span> <span class="n">reported_by</span><span class="o">=</span><span class="n">boss</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="s">&#39;view_task&#39;</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>Well, not so fast Joe, let us create an object permission finally:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">guardian.shortcuts</span> <span class="kn">import</span> <span class="n">assign</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">assign</span><span class="p">(</span><span class="s">&#39;view_task&#39;</span><span class="p">,</span> <span class="n">joe</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="s">&#39;view_task&#39;</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="for-group">
+<h3>For group<a class="headerlink" href="#for-group" title="Permalink to this headline">¶</a></h3>
+<p>This case doesn&#8217;t really differ from user permissions assignment. The only
+difference is we have to pass <tt class="docutils literal"><span class="pre">Group</span></tt> instance rather than <tt class="docutils literal"><span class="pre">User</span></tt>.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">group</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s">&#39;employees&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">assign</span><span class="p">(</span><span class="s">&#39;change_task&#39;</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="s">&#39;change_task&#39;</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c"># Well, joe is not yet within an *employees* group</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">joe</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="s">&#39;change_task&#39;</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Assign object permissions</a><ul>
+<li><a class="reference internal" href="#prepare-permissions">Prepare permissions</a></li>
+<li><a class="reference internal" href="#assign-obj-perms">Assign object permissions</a><ul>
+<li><a class="reference internal" href="#for-user">For user</a></li>
+<li><a class="reference internal" href="#for-group">For group</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="configuration.html"
+                        title="previous chapter">Configuration</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="check.html"
+                        title="next chapter">Check object permissions</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/assign.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="check.html" title="Check object permissions"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="configuration.html" title="Configuration"
+             >previous</a> |</li>
+        <li><a href="index.html">django-guardian v1.0.0.alpha1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Lukasz Balcerzak.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1pre/7de5f67d9010.
+    </div>
+  </body>
+</html>
