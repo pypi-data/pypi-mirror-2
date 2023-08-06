@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright (C) 2010 Eric Allen
+#
+# Author: Eric Allen <eric@hackerengineer.net>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+import dripbox
+import re
+import logging
+import argparse
+import getpass
+
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+
+# setup logging
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+
+# parse arguments
+parser = argparse.ArgumentParser(
+        description='Automatically sync local files to remote')
+parser.add_argument('-p', '--remote-port',
+        type=int, help="SSH port on remote system")
+parser.add_argument('remote', nargs=1, metavar="USER@HOST:PATH")
+parser.add_argument('-s', '--sync', action="store_true", default=False,
+    help="Synchronize local to remote using rsync at start")
+parser.add_argument('-f', '--force', action="store_true", default=False,
+    help="Force dripbox to start even with a dirty remote")
+args = parser.parse_args()
+remote = args.remote[0]
+
+# parse remote
+matched = re.match("(.+@)?(.+):(.+)", remote)
+if not matched:
+    parser.error("Didn't recognize specified host, use: USER@HOST:PATH")
+username, host, remote_root = matched.groups()
+if username:
+    username = username.rstrip('@')
+else:
+    username = getpass.getuser()
+
+if not args.force:
+    dripbox.rsync(remote, host, args.remote_port, args.sync)
+
+dripbox.launch(username, host, remote_root, args.remote_port)
+print("Hit ENTER to quit")
+try:
+    raw_input()
+except KeyboardInterrupt:
+    print
