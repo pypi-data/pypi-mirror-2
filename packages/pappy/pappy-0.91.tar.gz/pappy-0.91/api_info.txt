@@ -1,0 +1,209 @@
+pappy - PortAudio Pushed to PYthon
+==================================
+Dale Cieslak <desizzle@users.sourceforge.net>
+----------------------------------
+
+API Reference: (see PortAudio for more details)
+-----------------------------------------------
+# returns version number of PortAudio (NOT pappy)
+def paGetVersion():
+
+# returns string containing version information
+def paGetVersionText():
+
+# returns string for a given error code
+def paGetErrorText(errCode):
+
+# initialize PortAudio.  Note that if you don't call paTerminate for each 
+# paInitialize when exiting your code, you may cause your audio system to stop
+# working (until you reboot).
+#
+# returns error code that maps to PaError type
+def paInitialize():
+
+# close PortAudio connection. Each paInitialize command MUST have a matching 
+# paTerminate command.
+#
+# returns error code that maps to PaError type
+def paTerminate():
+
+# return the number of available host APIs	
+def paGetHostApiCount():
+
+# returns an integer referring to the default host API	
+def paGetDefaultHostApi():
+
+# returns a Python dict containing information about the given host API
+def paGetHostApiInfo(hostApiIndex):
+
+# returns the integer corresponding to the host API type for a given host API
+# index
+def paHostApiTypeIdToHostApiIndex(typeId):
+
+# returns the host API index corresponding to the overall device index
+def paHostApiDeviceIndexToDeviceIndex(hostApi, hostApiDeviceIndex):
+
+# returns a Python dict containing information about the last error that
+# occurred 
+def	paGetLastHostErrorInfo():
+
+# returns the number of devices available
+def paGetDeviceCount():
+
+# returns a Python dict containing information for the given device index.
+def	paGetDeviceInfo(deviceIdx):
+
+# returns the device index for the default input device	
+def paGetDefaultInputDevice():
+
+# returns the device index for the default output device
+def paGetDefaultOutputDevice():
+
+# returns an integer corresponding to a PaError code denoting whether or not a
+# given format is supported
+def paIsFormatSupported(pyInputParamDict, pyOutputParamDict, sampleRate):
+
+# opens a PortAudio stream
+#
+# returns a tuple containing the error code, if any, and a reference to the stream	
+# SEE: Differences from the PortAudio C API
+def paOpenStream(pyInputParamDict, pyOutputParamDict, sampleRate, framesPerBuffer, streamFlags, pyUserData):
+	
+# opens a PortAudio stream with default settings
+#
+# returns a tuple containing the error code, if any, and a reference to the stream	
+# SEE: Differences from the PortAudio C API
+def paOpenDefaultStream(numInputChannels, numOutputChannels, sampleFormat, sampleRate, framesPerBuffer, pyUserData):
+
+# close a given stream.  Effectively aborts a stream in progress.
+#
+# returns error code that maps to PaError type	
+def paCloseStream(pyStream):
+
+# enable the "stream finished" callback for a given stream
+#
+# returns error code that maps to PaError type
+# SEE: Differences from the PortAudio C API
+def paSetStreamFinishedCallback(pyStream, activate):
+
+# start playback of a stream	
+#	
+# returns error code that maps to PaError type	
+def paStartStream(pyStream):
+
+# stop playback of a stream,  Note that the contents of the buffer will be
+# processed before stopping.
+#
+# returns error code that maps to PaError type	
+def paStopStream(pyStream):
+
+# abort playback of a stream without waiting for the contents of the buffer
+# to be processed.
+#
+# returns error code that maps to PaError type	
+def paAbortStream(pyStream):
+
+# check if stream is stopped
+#
+# returns error code that maps to PaError type	
+def paIsStreamStopped(pyStream):
+
+# check if stream is active
+#
+# returns error code that maps to PaError type	
+def paIsStreamActive(pyStream):
+
+# returns Python dict containing information about the given stream
+def paGetStreamInfo(pyStream):
+
+# returns a given stream's current time in seconds 
+def paGetStreamTime(pyStream):
+
+# returns the CPU load for a given stream
+def paGetStreamCpuLoad(pyStream):
+	
+# read given number of frames of data from a stream
+#
+# returns a tuple containing the error code and the buffer read (blocking)
+def paReadStream(pyStream, frames):
+
+# write data to the stream buffer (blocking)
+#
+# returns error code that maps to PaError type
+def paWriteStream(pyStream, pyBuffer, frames):
+
+# returns the maximum number of frames that can be read from a given stream 
+def paGetStreamReadAvailable(pyStream):
+
+# returns the maximum number of frames that can be written to a given stream
+def paGetStreamWriteAvailable(pyStream):
+	
+# returns the sample size for a given format
+def paGetSampleSize(format):
+	
+# sleep for a given number of milliseconds	
+def paSleep(msec):
+
+
+*** Differences from the PortAudio C API:
+-----------------------------------------
+
+* functions are renamed to pa* vs. the C-style Pa_*, for example, Pa_GetDeviceInfo is called paGetDeviceInfo in pappy.
+
+* Pa_OpenStream does not take a stream pointer as the first argument; paOpenStream returns both the error code and the stream as a tuple.  Example:
+
+	C API:
+		err = Pa_OpenStream(&stream, &inputParams, ...)
+	
+	pappy:
+		(err, stream) = paOpenStream(inputParams, ...)
+		
+* C structs are defined as Python dictionaries, for example:
+
+	C API:
+		inputParameters.device = Pa_GetDefaultOutputDevice()
+	
+	pappy:
+		inputParameters['device'] = paGetDefaultOutputDevice()
+		
+* Callbacks are defined as nested functions, like so:
+
+	def pyCallbackWrapper(userData):
+		funcdict = {}
+		def pyCallback():
+			pass
+		
+		funcdict['streamcallback'] = pyCallback
+		return funcdict
+		
+* Callbacks are passed to paOpenStream, however the userData itself is *NOT* passed to paOpenStream directly.  It is accessed through the nested function, as in this example:
+
+    pyCallback = pyCallbackWrapper(userData)
+	(err, stream) = paOpenStream(inputParams, outputParams, ... , pyCallback)
+	
+* StreamFinishedCallbacks must be defined when the stream is opened.  However, they must be activated using the "setStreamFinishedCallback" function.  Example:
+
+	def pyCallbackWrapper(userData):
+		funcdict = {}
+		def pyCallback():
+			pass
+		def pyFinishedCallback():
+			print "finished!"
+			
+		funcdict['streamcallback'] = pyCallback
+		funcdict['finishedcallback'] = pyFinishedCallback
+		
+		return funcdict
+		
+	pyCallback = pyCallbackWrapper(userData)
+	(err, stream) = paOpenStream(inputParams, ..., pyCallback)
+	
+	err = paSetStreamFinishedCallback(stream, True)	# activates pyFinishedCallback
+	
+	err = paSetStreamFinishedCallback(stream, False) # DE-activates pyFinishedCallback
+	
+* Unfortunately, at this time there is no way to change the StreamFinishedCallback once a stream is opened.  
+	
+For further examples, see the paTestSine.py script in the test folder.  It is the analog to the patest_sine.c program provided as part of the PortAudio distribution.
+
+
