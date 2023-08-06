@@ -1,0 +1,156 @@
+.. -*- rst -*-
+
+==========
+WatchVideo
+==========
+
+:Project page: http://savannah.nongnu.org/projects/watchvideo
+:Homepage: http://www.nongnu.org/watchvideo/
+:License: GNU Affero General Public License v3+
+:Version: 2.0.3 beta
+
+WatchVideo is an application to watch videos from many popular Flash
+based sites using an external player like VLC.
+
+Requirements
+============
+
+.. note::
+
+   You can use the command ``make check-dependencies`` to see which
+   dependencies are missing.
+
+For both GUI and CLI interface:
+
+* Python 2.5/2.6/2.7 (tested with Python 2.6 and 2.7)
+* GetMediumURL 0.0a2 or later
+* ``simplejson`` if using Python 2.5 (``python-simplejson``)
+
+The installation script will automatically install GetMediumURL if it
+is not available.  It requires ``lxml`` which should be installed from
+distribution package before (in Debian-based GNU/Linux distributions
+it is named ``python-lxml``).
+
+For GUI only:
+
+* PyQt4 (``python-qt4``) or PySide
+* libVLC version 1.1 (optional, required for built-in player)
+* ``python-notify`` (optional) – uses the system’s default mechanism to
+  show notification messages
+* FFmpeg (optional) – needed for all operations related with video
+  conversion, ripping or the built-in player.
+* FFmpeg2theora (optional) – needed to convert videos to Ogg Vorbis or
+  Theora, but not for ripping audio
+
+For installation:
+
+* Distribute (``python-setuptools``)
+
+If you downloaded through Subversion:
+
+* ``pyqt4-dev-tools`` (``pylupdate4``, ``pyrcc4``, ``pyuic4``)
+* ``libqt4-dev`` (``lrelease``)
+* Inkscape
+* OptiPNG (optional)
+
+PyQt4 is used by default.  When it is not found, PySide is used but
+there are known bugs when using it.  Set the environment variable
+``WATCHVIDEO_QT`` to a space-separated sequence of package names tried to
+use a different package (e.g. ``WATCHVIDEO_QT=PySide`` to use PySide on
+systems where PyQt4 is installed).
+
+
+Installation using ``easy_install``
+===================================
+
+Use ``easy_install -U WatchVideo`` to install the newest release of
+WatchVideo.  Optional dependencies should be installed separately.
+
+Installation from source
+========================
+
+Open terminal in the directory with this file and type ``sudo make install``.
+
+These options (specified after ``make``) can be used to change the
+installation directory:
+
+  ``prefix``
+    default is ``/usr/local``
+  ``datarootdir``
+    default is ``$prefix/share``
+
+Unless the prefix is changed, root priviledges are needed for
+installation.
+
+To use different Python interpreter than the one found by the ``python``
+command, specify it as the ``PYTHON`` variable.
+
+You can instead call ``python setup.py install`` with options described
+by ``python setup.py --help install`` and optionally install menu entry
+and icon by ``make install-data``.
+
+Using
+=====
+
+If installed
+------------
+
+There should be an entry in your menu under the Audio and Video section.
+
+If not or if you prefer, you can call the app with the command::
+
+  qtwatchvideo URL1 URL2 ...
+
+or simply::
+
+  qtwatchvideo
+
+If you want to use the CLI version::
+
+  watchvideo [OPTIONS] URL1 URL2 ...
+
+Run ``watchvideo --help`` to see all options of the CLI version.
+
+If not installed
+----------------
+
+.. note::
+
+   If you downloaded through Subversion, first you need to do ``make``
+   to generate the necessary files.
+
+Running ``python setup.py develop --user`` with put scripts needed to
+run WatchVideo in ``$HOME/.local/bin``, and use other file from the
+directory where the source is located.  You might use the programs as
+``~/.local/bin/qtwatchvideo`` and similarly ``watchvideo``, or write
+
+::
+
+  export PATH=$HOME/.local/bin:$PATH
+
+before to use them like when installed.
+
+Updating plugins
+================
+
+WatchVideo uses a package called GetMediumURL to get the information
+from the video-sharing websites.  Some of these sites often change
+their interfaces, so it won't find the video.  In this case try to
+update GetMediumURL, by doing the following in a terminal:
+``easy_install -U GetMediumURL`` or using your distribution packages for
+it.
+
+Translating
+===========
+
+If you wish to translate this application, do the following:
+
+1. Open a terminal in the source distribution directory.
+2. Do ``make check-dependencies`` to see if you have the necessary
+   dependencies.
+3. Add a reference for your language to ``L10N`` in the Makefile.
+4. Do ``make`` to generate the necessary files.
+5. Translate the ``.ts`` file generated in the ``po``
+   subdirectory. You can use Qt Linguist or any text editor of your
+   choice.
+6. When you're ready to test your translation, do ``make`` again.
