@@ -1,0 +1,43 @@
+Introduction
+============
+
+Recipe to generate Apache reverse proxy for Zope with SSL.
+
+Example configuration
+---------------------
+
+[buildout]
+parts =
+  my-frontend
+
+[my-frontend]
+recipe = erp5.recipe.apache
+httpd_binary = /path/to/bin/httpd
+openssl_binary = /path/to/bin/openssl
+
+ip = ::1
+port = 43214
+server_name = localhost
+
+backend_mapping =
+  127.0.0.1:16080/ /
+  127.0.0.1:16080/erp5 /erp5
+  127.0.0.1:16080/erp5 /differentview
+  127.0.0.1:16080/erp5/module/something /deep in
+
+After running this profile:
+
+ - SSL keys will be generated and stored in var/my-fronted-ssl
+ - var/run and var/log directories will be prepared:
+   - var/run/my-fronted.pid will be available during run
+   - var/log/my-fronted_access.log and var/log/my-fronted_error.log will be updated
+ - parts/my-fronted/etc/my-frontend.conf will be generated
+ - bin/my-fronted wrapper will be ready to serve apache in foreground mode
+
+VirtualHostMonster will be automatically configured to support backend mapping.
+
+TODO
+----
+
+ - convert README to docstring test
+ - use python entry point instead of shell script to generate wrapper
