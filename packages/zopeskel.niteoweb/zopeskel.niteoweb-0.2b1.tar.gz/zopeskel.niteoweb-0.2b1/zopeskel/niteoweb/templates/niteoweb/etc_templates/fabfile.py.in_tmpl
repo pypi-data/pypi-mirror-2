@@ -1,0 +1,462 @@
+"""
+This is your mindset: **deployment is boring**. You make it boring by making it easily repeatable
+and taking out the human part. You never want to connect to the server to do maintenance. You
+want to have a script that would do the tedious for for you.
+
+This is where Fabric comes in. Fabric command file (``fabfile.py``) contains several scripts for
+tasks you need to frequently do on your server. From installing base libraries, to running
+buildout to downloading production data to your local machine.
+
+Most commands (but not all!) are ordered in an hierarchy of top-level meta commands to low-level, specific tasks.
+Here is a tree-view of how commands relate to each other. If something goes awry when running
+a top-level command, it's best to resume deployment with a low-level sub-command. 
+
+You can get a list of all available commands by running ``bin/fab --list``.
+
+::
+
+    deploy (deploy a Plone 4 site to the server)
+    |-- deploy_base (deploy non-plone specific libraries, software and configuration)
+    |   |-- enable_sudo (enable Fabric to use ``sudo``)
+    |   |-- create_maintenance_users (create user accounts for administrators)
+    |   |-- harden_security (lock down ``sshd`` and ``sudoers`` configuration)
+    |   |-- lock_root_password (disable root login)
+    |   |-- create_services_users (create dedicated runner users for Nginx, etc.)
+    |   |-- set_system_time (set timezone to GMT and install ``ntp``)
+    |   `-- install_software_stack (install base libraries and software)
+    |       |-- install_system_libs (install libraries such as ``gcc``, ``rsync``, ``vim``, ``libpng``, etc.)
+    |       |-- enable_epel_repositories (enable EPEL repositories from where we can pull Python, Munin, etc.)
+    |       |-- install_python (install Python 2.6, Distribute and ``virtualenv``)
+    |       |-- install_sendmail (install a localhost SMTP server for sending out system email)
+    |       |-- install_nginx (install and configure Nginx)
+    |       |   |-- reload_nginx_confg (upload ``./etc/nginx.conf`` and reload it) 
+    |       |   `-- upload_static_files (upload files in ``./src/\${config:namespace}/\${config:package}/static``) 
+    |       |-- install_munin_node (install, patch and configure ``munin-node``)
+    |       `-- clean_yum (clean some disk space)
+    `-- deploy_plone (deploy a Plone 4 site to a prepared server)
+        |-- prepare_buildout_environment (pull project code from repositoy and bootstrap it)
+        |   `-- checkout_code (pull project code from Unfuddle subversion repository)
+        |-- run_buildout (run ``bin/buildout -c production.cfg``)
+        |-- upload_data (upload Data.fs and blobs from you local machine)
+        `-- start_supervisor (start ``supervisord`` which in turns starts Zope and ZEO)
+"""
+
+import os
+from getpass import getpass
+from fabric import api
+from fabric.context_managers import settings
+from fabric.contrib.console import confirm
+from fabric.contrib.files import append, exists, comment, uncomment, sed, upload_template
+from fabric.contrib.project import rsync_project
+
+api.env.administrators = '\${config:administrators}'
+api.env.hosts = ['\${config:server_ip}']
+api.env.path = os.getcwd()
+
+def deploy():
+    deploy_base()
+    deploy_plone()
+
+def deploy_base():
+
+    # configure users and access to server
+    enable_sudo()
+    create_maintenance_users()
+    harden_security()
+    lock_root_password()
+    create_services_users()
+    
+    # bootstrap server
+    set_system_time()
+    install_software_stack()
+
+def deploy_plone():    
+    # deploy application
+    prepare_buildout_environment()
+    run_buildout()
+    upload_data()
+    start_supervisor()
+
+def enable_sudo():
+    """
+    """
+    
+    with api.settings(user='root', password='\${config:temp_root_pass}'):
+        # comment this out to enable usage of fabric.api.sudo
+        comment('/etc/sudoers', 'Defaults    requiretty')
+
+def create_maintenance_users():
+    """Create maintenance accounts, so admins can use their own dedicate maintenance accounts to access the server."""
+
+    with api.settings(user='root', password='\${config:temp_root_pass}'):
+        for user in api.env.administrators.split(','):
+            user = user.strip()
+            password = '\${config:default_administrator_password}'
+        
+            # create user
+            api.run('getent passwd %(user)s || /usr/sbin/adduser %(user)s' % locals())
+        
+            # set password
+            api.run('echo "%(user)s:%(password)s" | chpasswd' % locals())
+        
+            # add public key for SSH access
+            api.run('ls -a /home/%(user)s | grep .ssh || mkdir /home/%(user)s/.ssh' % locals())
+            api.put("%(path)s/keys/%(user)s.pub" % dict(api.env.items() + locals().items()),"/home/%(user)s/.ssh/authorized_keys" % locals())
+        
+            # allow sudo for maintenance user
+            append('%(user)s	ALL=(ALL) 	ALL' % locals(), '/etc/sudoers')
+
+            # enable SSH login for maintenance user
+            append('AllowUsers %(user)s@*' % locals(), '/etc/ssh/sshd_config')
+
+
+def harden_security():
+    """"""
+
+    with api.settings(user='root', password='\${config:temp_root_pass}'):
+        # configure iptables firewall
+        api.put('%(path)s/etc/iptables' % api.env, '/etc/sysconfig/iptables')
+        api.run('iptables-restore < /etc/sysconfig/iptables')
+
+        # Enable public-key authentication
+        uncomment('/etc/ssh/sshd_config', '#RSAAuthentication yes')
+        uncomment('/etc/ssh/sshd_config', '#PubkeyAuthentication yes')
+
+        # Disable password authentication
+        sed('/etc/ssh/sshd_config','PasswordAuthentication yes', 'PasswordAuthentication no')
+        
+        # Disable GSSAPI authentication
+        sed('/etc/ssh/sshd_config','GSSAPIAuthentication yes', 'GSSAPIAuthentication no')
+        
+        # Deny root login
+        sed('/etc/ssh/sshd_config', '#PermitRootLogin yes', 'PermitRootLogin no')
+    
+        # Deny services users to login
+        append('DenyUsers root@* nginx@* production@*', '/etc/ssh/sshd_config')
+        
+        # Apply changes
+        api.run('/etc/init.d/sshd restart')
+
+def lock_root_password():
+    """"""
+    api.sudo('passwd --lock root')
+
+def create_services_users():
+    """"""
+    
+    # user for running nginx webproxy in an isolated environment   
+    api.sudo('getent passwd nginx || /usr/sbin/adduser nginx')
+    
+    # a user that will hold actual production environment (Zope, code, cronjobs, etc. )
+    api.sudo('getent passwd production || /usr/sbin/adduser production')
+
+def set_system_time():
+    """
+    """
+    
+    # set timezone
+    api.sudo('cp /usr/share/zoneinfo/GMT /etc/localtime')
+    
+    # install NTP
+    api.sudo('yum -y install ntp')
+    api.sudo('chkconfig ntpd on')
+    api.sudo('ntpdate pool.ntp.org')
+    api.sudo('/etc/init.d/ntpd start')
+
+def install_software_stack():
+    """
+    build software stack
+    """
+    install_system_libs()
+    enable_epel_repositories()
+    install_python()
+    install_sendmail()
+    install_nginx()
+    install_munin_node()
+    clean_yum()
+
+def install_system_libs():
+    # install bunch of stuff we need
+    api.sudo('yum -y install '
+             # tools
+             'vim-enhanced '
+             'curl '
+             'lynx '
+             'rsync '
+             'which '
+             'gcc-c++ '
+             'make '
+             'subversion '
+             
+             # pretty fonts
+             'xorg-x11-fonts-truetype.noarch '
+             'freetype-devel '
+             
+             # image formats
+             'libpng-devel '
+             'libjpeg-devel '
+             
+             # other libs
+             'zlib-devel '
+             'pcre-devel '
+             'openssl-devel '
+             
+             # xdv support
+             'libxml2-devel '
+             'libxslt-devel '
+             )
+
+def enable_epel_repositories():
+    """"""
+    
+    # enable EPEL repositories (we need them for installing python2.6, nginx, munin-node, etc.)
+    api.sudo('rpm -Uvh http://download.fedora.redhat.com/pub/epel/5Server/x86_64/epel-release-5-4.noarch.rpm')
+
+def install_python():
+    """"""
+    
+    api.sudo('yum -y install python26 python26-devel')
+
+    install_distribute()
+    install_virtualenv()
+
+def install_distribute():
+    """"""
+    
+    api.sudo('wget http://python-distribute.org/distribute_setup.py')
+    api.sudo('python distribute_setup.py')
+    api.sudo('rm -f distribute_setup.py')
+    api.sudo('rm -f distribute-0.6.10.tar.gz')
+
+def install_virtualenv():
+    """"""
+    
+    api.sudo('easy_install virtualenv')
+
+def install_sendmail():
+    """"""
+
+    # install sendmail
+    api.sudo('yum -y install sendmail')
+    
+    # set server's hostname and make it persistent
+    comment('/etc/sysconfig/network', 'HOSTNAME', use_sudo=True)
+    append('HOSTNAME=${package}.${headquarters_hostname}', '/etc/sysconfig/network', use_sudo=True)
+    api.sudo('hostname ${package}.${headquarters_hostname}')
+
+    # all email should be sent to maintenance@${headquarters_hostname}
+    append('root:           maintenance@${headquarters_hostname}', '/etc/aliases', use_sudo=True)
+
+    # set crontab's MAILTO variable to maintenance@${headquarters_hostname}
+    sed('/etc/crontab', 'MAILTO=root' ,'MAILTO=maintenance@${headquarters_hostname}', use_sudo=True)
+    api.sudo('echo "MAILTO=maintenance@${headquarters_hostname}" >> /var/spool/cron/root')
+    api.sudo('echo "MAILTO=maintenance@${headquarters_hostname}" >> /var/spool/cron/production')
+
+    # start sendmail
+    api.sudo('chkconfig sendmail on')
+    api.sudo('/etc/init.d/sendmail start')
+
+def install_nginx():
+    """"""
+    # install
+    api.sudo('yum -y install nginx')
+    
+    # start
+    api.sudo('chkconfig nginx on')
+    api.sudo('/etc/init.d/nginx start')
+
+    # install our config
+    reload_nginx_config()
+    
+    # upload static files
+    upload_static_files()
+
+def reload_nginx_config():
+    """"""
+
+    # upload new config file 
+    upload_template('%(path)s/etc/nginx.conf' % api.env, '/etc/nginx/nginx.conf', use_sudo=True)
+    
+    # reload config
+    api.sudo('/etc/init.d/nginx reload')
+
+def upload_static_files():
+    """Upload static HTML/CSS files served directly by Nginx."""
+
+    confirm("This will destroy all current static files on the server. Are you sure you want to continue?")
+    
+    # first upload Data.fs
+    if os.path.exists('/home/nginx/static'):
+        api.sudo('rm -rf /home/nginx/static')
+    if os.path.exists('/tmp/static'):
+        api.sudo('/tmp/static' % api.env)
+    rsync_project('/tmp', local_dir='%(path)s/src/\${config:namespace}/\${config:package}/static' % api.env)
+    api.sudo('cp -r /tmp/static /home/nginx/')
+    api.sudo('chown -R nginx:nginx /home/nginx/static')
+    
+def install_munin_node():
+    """"""
+    # install munin-node
+    api.sudo('yum -y install munin-node')
+    
+    # TODO: patch iostat plugin
+    # This is so incredibly hacky and ugly I cannot believe it. Several layers of escaping makes it totally fucked up!
+    # Anyone got a better solution?
+    api.sudo("sed -i.bak -e 's" +                                                                                                       # first part of sed command
+             "#" +                                                                                                                      # delimiter
+             "next unless \$tmpnam =~ /\\\\\/c\\\\\d+d\\\\\d+\$/" +                                                                       # search for this
+             "#" +                                                                                                                      # delimiter
+             "if(!-d \"/proc/xen\" || `grep control_d /proc/xen/capabilities 2>/dev/null`)" +                                           # replace with this
+             "{next unless \$tmpnam =~ /\\\\\/c\\\\\d+d\\\\\d+\$/}" +                                                                     
+             "#' " +                                                                                                                    # delimiter
+             "/etc/munin/plugins/iostat")
+
+    # Patch munin-yum plugin (it just needs yum.state to be there)
+    api.sudo('touch /var/lib/munin/plugin-state/yum.state')
+    api.sudo('chown munin:munin /var/lib/munin/plugin-state/yum.state')
+
+    # install config file 
+    upload_template('%(path)s/etc/munin-node.conf' % api.env, '/etc/munin/munin-node.conf', use_sudo=True)
+
+    # patch munin-node.conf -> allow IP must be escaped REGEX-style
+    ip = '\${config:headquarters_ip}'
+    escaped_ip = ip.replace('.', '\\\.')
+    sed('/etc/munin/munin-node.conf', 'allow %(ip)s' % locals(), 'allow %(escaped_ip)s' % locals(), use_sudo=True)
+
+    # start munin-node
+    api.sudo('chkconfig munin-node on')
+    api.sudo('/etc/init.d/munin-node start')
+    
+    # add node to munin-master on Headquarters server
+    with settings(host_string='\${config:headquarters_ip}:22'):
+        api.sudo("echo '[\${config:package}]' >> /etc/munin/munin.conf")
+        api.sudo("echo '    address \${config:server_ip}' >> /etc/munin/munin.conf")
+        api.sudo("echo '    use_node_name yes' >> /etc/munin/munin.conf")
+        api.sudo("echo ' ' >> /etc/munin/munin.conf")    
+ 
+def clean_yum():
+    """"""
+    # During its normal use, yum creates a cache of metadata and packages. 
+    # This cache can take up a lot of space. The yum clean command allows you 
+    # to clean up these files. All the files yum clean will act on are 
+    # normally stored in /var/cache/yum.
+    api.sudo('yum clean all')
+
+def checkout_code():
+    """"""
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    api.sudo('svn co --no-auth-cache --username %(username)s --password %(password)s \
+          http://\${config:namespace}.unfuddle.com/svn/\${config:namespace}_\${config:package}/trunk /home/production/' 
+          % locals())
+    api.sudo('chown -R production:production /home/production')
+
+def update_code():
+    """"""
+    username = getpass("Enter your unfuddle username: ")
+    password = getpass("Enter your unfuddle password: ")
+    api.sudo('svn up --no-auth-cache --username %(username)s --password %(password)s \
+          /home/production' % locals())
+    api.sudo('chown -R production:production /home/production')  
+    
+def prepare_buildout_environment():
+    """"""
+    with api.cd('/home/production'):
+        checkout_code()
+        api.sudo('virtualenv -p python2.6 --no-site-packages ./', user='production')
+        api.sudo('bin/python bootstrap.py -c production.cfg', user='production')
+
+def run_buildout():
+    """"""
+    with api.cd('/home/production'):
+        api.sudo('bin/buildout -c production.cfg', user='production')    
+
+def upload_data():
+    """Upload Zope's data to the server."""
+    
+    confirm("This will destroy all current Zope data on the server. Are you sure you want to continue?")
+
+    # shutdown Zope
+    stop(); supervisor_command()
+    
+    # Upload Data.fs
+    if os.path.exists('/tmp/Data.fs'):
+        # remove temporary Data.fs file from previous uploads
+        api.sudo('rm -rf /tmp/Data.fs' % api.env)
+        
+    # upload Data.fs to server and move it to it's place
+    upload_template('%(path)s/var/filestorage/Data.fs' % api.env, '/home/production/var/filestorage/Data.fs', use_sudo=True)
+    api.sudo('chown -R production:production /home/production/var/filestorage/Data.fs')
+    
+    # Upload Blobs
+    if os.path.exists('/home/production/var/blobstorage'):
+        # backup current Blobs
+        api.sudo('mv /home/production/var/blobstorage /home/production/var/blobstorage.bak')
+    if exists('/tmp/blobstorage'):
+        # remove temporary Blobs previous uploads
+        api.sudo('rm -rf /tmp/blobstorage')
+        
+    # upload Blobs to server and move it to it's place
+    rsync_project('/tmp', local_dir='%(path)s/var/blobstorage' % api.env)
+    api.sudo('rm -rf /home/production/var/blobstorage')
+    api.sudo('mv /tmp/blobstorage /home/production/var/')
+    api.sudo('chown -R production:production /home/production/var/blobstorage')
+
+    # update code to latest revision
+    update_code()
+    
+    # start Zope
+    restart(); supervisor_command()
+
+def start_supervisor():
+    """"""
+    with api.cd('/home/production'):
+        api.sudo('bin/supervisord', user='production')    
+
+def status():
+    """"""
+    api.env.supervisor_command = 'status'
+def stop():
+    """"""
+    api.env.supervisor_command = 'stop all'
+def restart():
+    """"""
+    api.env.supervisor_command = 'restart all'
+
+def supervisor_command():
+    """"""
+    api.require('supervisor_command', provided_by = [status, stop, restart])
+    with api.cd('/home/production'):
+        api.sudo('bin/supervisorctl %(supervisor_command)s' % api.env, user='production')    
+        
+def download_data():
+    """Download Zope's Data.fs from the server."""
+
+    confirm("This will destroy all current Zope data on your local machine. Are you sure you want to continue?")
+
+    # Downlaod Data.fs
+    if os.path.exists('%(path)s/var/filestorage/Data.fs' % api.env):
+        # backup current Data.fs
+        api.local('mv %(path)s/var/filestorage/Data.fs %(path)s/var/filestorage/Data.fs.bak' % api.env)
+    
+    if exists('/tmp/Data.fs', use_sudo=True):
+        # remove temporary Data.fs file from previous downloads
+        api.sudo('rm -rf /tmp/Data.fs')
+    
+    # downlaod Data.fs from server
+    api.sudo('rsync -a /home/production/var/filestorage/Data.fs /tmp/Data.fs')
+    api.get('/tmp/Data.fs', '%(path)s/var/filestorage/Data.fs' % api.env)
+
+    # Download Blobs
+    if os.path.exists('%(path)s/var/blobstorage' % api.env):
+        # backup current Blobs
+        api.local('mv %(path)s/var/blobstorage %(path)s/var/blobstorage_bak' % api.env)
+        
+    if exists('/tmp/blobstorage', use_sudo=True):
+        # remove temporary Blobs from previous downloads
+        api.sudo('rm -rf /tmp/blobstorage')
+
+    # download Blobs from server
+    api.sudo('rsync -a /home/production/var/blobstorage /tmp/')
+    api.sudo('chown -R %(user)s /tmp/blobstorage' % api.env)
+    api.local('rsync -az %(user)s@\${config:server_ip}:/tmp/blobstorage %(path)s/var/' % api.env)
