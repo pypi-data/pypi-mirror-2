@@ -1,0 +1,123 @@
+This is an XSLT template engine for Django.
+
+XSLT is a powerful templating language and this package extends it
+further with the ability to render to XML any Django context object
+(including querysets).
+
+== Some XSLT examples ==
+
+The djangoxslt system causes Django {{{RequestContext}}} variables to
+be mapped into an XSLT function namespace. You can render Django
+values by calling them as XSLT functions.
+
+This requires that you declare the xdjango namespace in your XSLT like
+this:
+
+{{{
+<?xml version="1.0" encoding="utf-8"?>
+<xsl:stylesheet  version="1.0" 
+    extension-element-prefixes="xdjango"
+    exclude-result-prefixes="xdjango"
+    xmlns:xdjango="http://djangoproject.com/template/xslt"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  .
+  .
+  .
+}}}
+
+=== Render simple values ===
+
+Spitting out the {{{MEDIA_ROOT}}} from the Django settings file:
+
+{{{
+<img src="{xdjango:settings.MEDIA_ROOT()}/images/boo.jpg"/>
+}}}
+
+this will be possible if you have added the Django builtin context
+processor {{{django.core.context_processors.media}}} to the
+{{{TEMPLATE_CONTEXT_PROCESSORS}}} in the settings file.
+
+
+=== Render more complex objects ===
+
+Rendering a form:
+
+{{{
+<form class="hidden" id="commentform" method="POST" >
+    <ul>
+        <xsl:copy-of select="xdjango:comment.as_ul('parsehtml')//html:li"/>
+    </ul>
+</form>
+}}}
+
+this will work if you attach the form in the obvious way:
+
+{{{
+ctx = RequestContext(request, {
+        "comment": CommentForm(),
+        })
+return render_to_response("episode.xslt", ctx)
+}}}
+
+note that we had to specifically declare the namespace on the nodes
+coming out of the xdjango function. This is because the xdjango
+namespace is presumed to be the namepsace of the result
+fragment. {{{parsehtml}}} will always produce XHTML tho so we have to
+specify the namespace.
+
+This would require an XSLT declaration something like this:
+
+{{{
+<?xml version="1.0" encoding="utf-8"?>
+<xsl:stylesheet  version="1.0" 
+    extension-element-prefixes="xdjango"
+    exclude-result-prefixes="xdjango"
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:html="http://www.w3.org/1999/xhtml"
+    xmlns:xdjango="http://djangoproject.com/template/xslt"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  .
+  .
+  .
+}}}
+
+Note the double declaration of the XHTML namespace.
+
+
+=== Display Query Sets ==
+
+First, iterating over a queryset context object and rendering the username
+and the id:
+
+{{{
+<xsl:for-each select="xdjango:users()//user">
+  <span id="{@id}"><xsl:value-of select="@username"/></span>
+</xsl:for-each>
+}}}
+
+this renders a queryset attached to a context - something like this:
+
+{{{
+from djangoxslt.xslt.managers import xmlify
+qs = Users.objects.filter(gender="F")
+ctx = RequestContext(request, {
+     "users": xmlify(qs, 
+                     username="username", 
+                     id="id"
+                     )
+    })
+return render_to_response("myxslt.xslt", ctx)
+}}}
+
+
+
+== Project structure ==
+
+This project is {{{veh}}} enabled. See
+[[http://github.com/nicferrier/veh|here]] for more information about
+{{{veh}}}.
+
+This project comes with a demoapp which is included to illustrate how
+to add xslt to any project but also to facilitate unit testing of the
+current code.
+
