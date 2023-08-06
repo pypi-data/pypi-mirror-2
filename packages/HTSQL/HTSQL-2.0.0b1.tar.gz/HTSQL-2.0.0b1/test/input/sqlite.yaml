@@ -1,0 +1,62 @@
+#
+# Copyright (c) 2006-2010, Prometheus Research, LLC
+# Authors: Clark C. Evans <cce@clarkevans.com>,
+#          Kirill Simonov <xi@resolvent.net>
+#
+
+title: SQLite regression tests
+id: sqlite
+output: test/output/sqlite.yaml
+tests:
+# FIXME: need a regression schema and a set of tests.
+
+- title: Remove any existing regression database
+  id: cleanup-sqlite
+  tests:
+  - rmdir: build/regress/regress-sqlite
+
+- title: Deploy the regression database
+  id: setup-sqlite
+  tests:
+  - mkdir: build/regress/regress-sqlite
+  - connect: &connect
+      engine: sqlite
+      database: build/regress/regress-sqlite/htsql_regress.sqlite
+    sql-include: test/sql/regress-sqlite.sql
+
+- db: *connect
+
+- title: Queries
+  id: queries-sqlite
+  tests:
+
+  # Display all tables in the regression schema.
+  - title: Regression schema
+    tests:
+    - uri: /school
+    - uri: /department
+    - uri: /program
+    - uri: /course
+
+  # Empty and scalar queries.
+  - title: Scalar queries
+    tests:
+    - uri: /
+    - uri: /{2+2}
+    - uri: /{'HT'+'SQL'}
+
+  # Simple (non-aggregate) filters.
+  - title: Simple filters
+    tests:
+    - uri: /school?code='ns'
+    - uri: /department?school.code='ns'
+    - uri: /program?school.code='ns'&code='uchem'
+    - uri: /course?credits=5
+
+  # Simple (non-aggregate) selectors.
+  - title: Simple selectors
+    tests:
+    - uri: /school{name}
+    - uri: /department{school.*,*}
+    - uri: /department{school.name+' - '+name}
+
