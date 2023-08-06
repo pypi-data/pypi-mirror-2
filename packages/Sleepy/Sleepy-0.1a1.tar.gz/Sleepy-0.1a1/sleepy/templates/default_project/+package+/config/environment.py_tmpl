@@ -1,0 +1,57 @@
+from os.path import join, dirname, abspath
+
+from mako.lookup import TemplateLookup
+from pylons.configuration import PylonsConfig
+from pylons.error import handle_mako_error
+
+from sleepy.lonsies import data_path
+from sleepy import resource
+
+import {{ package }}.lib.app_globals as app_globals
+import {{ package }}.lib.helpers
+from {{ package }}.config.routing import make_map
+
+def load_environment( global_conf,
+                      app_conf ):
+    config = PylonsConfig()
+    
+    root = dirname( dirname( abspath( __file__ )))
+    paths = dict( root=root,
+                  controllers=join( root,
+                                    "controllers" ),
+                  static_files=join( root,
+                                     "public" ),
+                  templates=[ join( root,
+                                    "templates" ),
+                              resource.templates_dir() ] )
+
+    config.init_app( global_conf,
+                     app_conf,
+                     package="{{ package }}",
+                     paths=paths )
+
+    config[ "routes.map" ] = make_map( config )
+    config[ "pylons.app_globals" ] = app_globals.Globals( config )
+    config[ "pylons.h" ] = {{ package }}.lib.helpers
+    
+    # Setup cache object as early as possible
+    import pylons
+    pylons.cache._push_object( config[ "pylons.app_globals" ]
+                                     .cache )
+    
+    ( config[ "pylons.app_globals" ]
+            .mako_lookup = TemplateLookup( directories=paths[ "templates" ],
+                                           error_handler=handle_mako_error,
+                                           module_directory=join( app_conf[ "cache_dir" ],
+                                                                  "templates" ),
+                                           input_encoding="utf-8",
+                                           default_filters=[ "_raw",
+                                                             "escape" ],
+                                           imports=[ "from sleepy.shorties import _raw",
+                                                     "from webhelpers.html import escape" ] ))
+
+    pylons.config.push_process_config( config )
+    resource.init( data_path( "resources.yaml" ))
+    pylons.config.pop_process_config()
+
+    return config
